@@ -194,6 +194,43 @@ export const Dashboard = () => {
     }
   }, [user]);
 
+  // Realtime subscription for orders
+  useEffect(() => {
+    if (!user) return;
+
+    const channel = supabase
+      .channel('orders-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'orders',
+          filter: `user_id=eq.${user.id}`
+        },
+        () => {
+          loadOrders();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'order_items',
+          filter: `user_id=eq.${user.id}`
+        },
+        () => {
+          loadOrders();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user]);
+
   const loadOrders = async () => {
     if (!user) return;
     
