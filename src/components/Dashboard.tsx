@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,6 +10,7 @@ import { OrderHistoryDialog } from "./OrderHistoryDialog";
 import { ActionButtons } from "./ActionButtons";
 import { PriorityView } from "./PriorityView";
 import { PhaseButtons } from "./PhaseButtons";
+import { ColumnSettings, ColumnVisibility } from "./ColumnSettings";
 import { toast } from "@/hooks/use-toast";
 
 // Types
@@ -147,6 +148,31 @@ export const Dashboard = () => {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showHistoryDialog, setShowHistoryDialog] = useState(false);
+  
+  // Column visibility state with localStorage persistence
+  const [columnVisibility, setColumnVisibility] = useState<ColumnVisibility>(() => {
+    const saved = localStorage.getItem("columnVisibility");
+    return saved ? JSON.parse(saved) : {
+      priority: true,
+      orderNumber: true,
+      item: true,
+      description: true,
+      quantity: true,
+      createdDate: true,
+      status: true,
+      client: true,
+      deskTicket: true,
+      deliveryDeadline: true,
+      daysRemaining: true,
+      phaseManagement: true,
+      actions: true,
+    };
+  });
+
+  // Save column visibility to localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem("columnVisibility", JSON.stringify(columnVisibility));
+  }, [columnVisibility]);
 
   const getPriorityClass = (priority: Priority) => {
     switch (priority) {
@@ -364,6 +390,10 @@ export const Dashboard = () => {
             <Calendar className="h-4 w-4 mr-2" />
             Filtrar Data
           </Button>
+          <ColumnSettings 
+            visibility={columnVisibility}
+            onVisibilityChange={setColumnVisibility}
+          />
           <AddOrderDialog onAddOrder={handleAddOrder} />
         </div>
       </div>
@@ -407,19 +437,19 @@ export const Dashboard = () => {
             <table className="w-full">
               <thead className="dashboard-header">
                 <tr>
-                  <th className="text-left p-4 font-semibold">Prioridade</th>
-                  <th className="text-left p-4 font-semibold">Número do Pedido</th>
-                  <th className="text-left p-4 font-semibold">Item</th>
-                  <th className="text-left p-4 font-semibold">Descrição</th>
-                  <th className="text-left p-4 font-semibold">Quantidade</th>
-                  <th className="text-left p-4 font-semibold">Data de Criação</th>
-                  <th className="text-left p-4 font-semibold">Status</th>
-                  <th className="text-left p-4 font-semibold">Cliente</th>
-                  <th className="text-left p-4 font-semibold">Chamado Desk</th>
-                  <th className="text-left p-4 font-semibold">Prazo de Entrega</th>
-                  <th className="text-left p-4 font-semibold">Dias Restantes</th>
-                  <th className="text-left p-4 font-semibold">Gestão de Fase</th>
-                  <th className="text-center p-4 font-semibold">Ações</th>
+                  {columnVisibility.priority && <th className="text-left p-4 font-semibold">Prioridade</th>}
+                  {columnVisibility.orderNumber && <th className="text-left p-4 font-semibold">Número do Pedido</th>}
+                  {columnVisibility.item && <th className="text-left p-4 font-semibold">Item</th>}
+                  {columnVisibility.description && <th className="text-left p-4 font-semibold">Descrição</th>}
+                  {columnVisibility.quantity && <th className="text-left p-4 font-semibold">Quantidade</th>}
+                  {columnVisibility.createdDate && <th className="text-left p-4 font-semibold">Data de Criação</th>}
+                  {columnVisibility.status && <th className="text-left p-4 font-semibold">Status</th>}
+                  {columnVisibility.client && <th className="text-left p-4 font-semibold">Cliente</th>}
+                  {columnVisibility.deskTicket && <th className="text-left p-4 font-semibold">Chamado Desk</th>}
+                  {columnVisibility.deliveryDeadline && <th className="text-left p-4 font-semibold">Prazo de Entrega</th>}
+                  {columnVisibility.daysRemaining && <th className="text-left p-4 font-semibold">Dias Restantes</th>}
+                  {columnVisibility.phaseManagement && <th className="text-left p-4 font-semibold">Gestão de Fase</th>}
+                  {columnVisibility.actions && <th className="text-center p-4 font-semibold">Ações</th>}
                 </tr>
               </thead>
               <tbody>
@@ -431,48 +461,58 @@ export const Dashboard = () => {
                       onClick={(e) => handleRowClick(order, e)}
                       className={`border-t transition-colors hover:bg-muted/50 cursor-pointer ${getPriorityClass(order.priority)}`}
                     >
-                      <td className="p-4">
-                        <span className={`font-medium ${order.priority === "high" ? "priority-blink" : ""}`}>
-                          {getPriorityLabel(order.priority)}
-                        </span>
-                      </td>
-                      <td className="p-4 font-mono text-sm">{order.orderNumber}</td>
-                      <td className="p-4 font-medium">{order.item}</td>
-                      <td className="p-4 text-sm text-muted-foreground">{order.description}</td>
-                      <td className="p-4 text-center">{order.quantity}</td>
-                      <td className="p-4 text-sm">{new Date(order.createdDate).toLocaleDateString('pt-BR')}</td>
-                      <td className="p-4">
-                        <Badge className={`status-badge ${getStatusColor(order.status)}`}>
-                          {getStatusLabel(order.status)}
-                        </Badge>
-                      </td>
-                      <td className="p-4 text-sm">{order.client}</td>
-                      <td className="p-4 text-sm font-mono">{order.deskTicket}</td>
-                      <td className="p-4 text-sm">{new Date(order.deliveryDeadline).toLocaleDateString('pt-BR')}</td>
-                      <td className="p-4">
-                        <div className="flex items-center gap-2">
-                          <Progress 
-                            value={getProgressWidth(daysRemaining)} 
-                            className="h-2 flex-1"
+                      {columnVisibility.priority && (
+                        <td className="p-4">
+                          <span className={`font-medium ${order.priority === "high" ? "priority-blink" : ""}`}>
+                            {getPriorityLabel(order.priority)}
+                          </span>
+                        </td>
+                      )}
+                      {columnVisibility.orderNumber && <td className="p-4 font-mono text-sm">{order.orderNumber}</td>}
+                      {columnVisibility.item && <td className="p-4 font-medium">{order.item}</td>}
+                      {columnVisibility.description && <td className="p-4 text-sm text-muted-foreground">{order.description}</td>}
+                      {columnVisibility.quantity && <td className="p-4 text-center">{order.quantity}</td>}
+                      {columnVisibility.createdDate && <td className="p-4 text-sm">{new Date(order.createdDate).toLocaleDateString('pt-BR')}</td>}
+                      {columnVisibility.status && (
+                        <td className="p-4">
+                          <Badge className={`status-badge ${getStatusColor(order.status)}`}>
+                            {getStatusLabel(order.status)}
+                          </Badge>
+                        </td>
+                      )}
+                      {columnVisibility.client && <td className="p-4 text-sm">{order.client}</td>}
+                      {columnVisibility.deskTicket && <td className="p-4 text-sm font-mono">{order.deskTicket}</td>}
+                      {columnVisibility.deliveryDeadline && <td className="p-4 text-sm">{new Date(order.deliveryDeadline).toLocaleDateString('pt-BR')}</td>}
+                      {columnVisibility.daysRemaining && (
+                        <td className="p-4">
+                          <div className="flex items-center gap-2">
+                            <Progress 
+                              value={getProgressWidth(daysRemaining)} 
+                              className="h-2 flex-1"
+                            />
+                            <span className="text-xs font-medium w-8 text-right">{daysRemaining}d</span>
+                          </div>
+                        </td>
+                      )}
+                      {columnVisibility.phaseManagement && (
+                        <td className="p-4">
+                          <PhaseButtons
+                            order={order}
+                            onStatusChange={handleStatusChange}
                           />
-                          <span className="text-xs font-medium w-8 text-right">{daysRemaining}d</span>
-                        </div>
-                      </td>
-                      <td className="p-4">
-                        <PhaseButtons
-                          order={order}
-                          onStatusChange={handleStatusChange}
-                        />
-                      </td>
-                      <td className="p-4">
-                        <ActionButtons
-                          order={order}
-                          onEdit={handleEditOrder}
-                          onDuplicate={handleDuplicateOrder}
-                          onApprove={handleApproveOrder}
-                          onCancel={handleCancelOrder}
-                        />
-                      </td>
+                        </td>
+                      )}
+                      {columnVisibility.actions && (
+                        <td className="p-4">
+                          <ActionButtons
+                            order={order}
+                            onEdit={handleEditOrder}
+                            onDuplicate={handleDuplicateOrder}
+                            onApprove={handleApproveOrder}
+                            onCancel={handleCancelOrder}
+                          />
+                        </td>
+                      )}
                     </tr>
                   );
                 })}
