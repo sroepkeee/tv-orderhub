@@ -138,16 +138,16 @@ const mockOrders: Order[] = [
 
 // Tabs configuration
 const tabs = [
+  { id: "all", name: "Todos os Pedidos" },
   { id: "production", name: "Pedidos de Produção" },
   { id: "sales", name: "Pedidos de Venda" },
   { id: "materials", name: "Remessa de Materiais" },
   { id: "in_transit", name: "Em Trânsito" },
   { id: "completed", name: "Concluídos" },
-  { id: "all", name: "Todos os Pedidos" },
 ];
 
 export const Dashboard = () => {
-  const [activeTab, setActiveTab] = useState("production");
+  const [activeTab, setActiveTab] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [orders, setOrders] = useState<Order[]>(mockOrders);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
