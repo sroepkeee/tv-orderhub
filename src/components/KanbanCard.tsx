@@ -13,6 +13,8 @@ interface KanbanCardProps {
 }
 
 export const KanbanCard = ({ order, onEdit, onStatusChange }: KanbanCardProps) => {
+  const [dragStarted, setDragStarted] = React.useState(false);
+  
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: order.id,
   });
@@ -20,6 +22,22 @@ export const KanbanCard = ({ order, onEdit, onStatusChange }: KanbanCardProps) =
   const style = {
     transform: CSS.Translate.toString(transform),
     opacity: isDragging ? 0.5 : 1,
+  };
+
+  // Detecta quando o drag realmente começa
+  React.useEffect(() => {
+    if (isDragging) {
+      setDragStarted(true);
+    }
+  }, [isDragging]);
+
+  const handleClick = (e: React.MouseEvent) => {
+    // Só abre o editor se não houve drag
+    if (!dragStarted) {
+      onEdit(order);
+    }
+    // Reset após o clique
+    setDragStarted(false);
   };
 
   const getPriorityClass = (priority: Order["priority"]) => {
@@ -97,21 +115,19 @@ export const KanbanCard = ({ order, onEdit, onStatusChange }: KanbanCardProps) =
   const progressBarColor = getProgressBarColor(daysRemaining);
 
   return (
-    <Card
+    <div
       ref={setNodeRef}
       style={style}
-      className={`kanban-card p-3 cursor-grab active:cursor-grabbing hover:shadow-lg transition-all duration-200 ${getPriorityClass(
-        order.priority
-      )} ${isDragging ? "dragging" : ""}`}
       {...listeners}
       {...attributes}
-      onClick={(e) => {
-        // Apenas abre o editor se não estiver arrastando
-        if (!isDragging) {
-          onEdit(order);
-        }
-      }}
+      onClick={handleClick}
+      className={`cursor-grab active:cursor-grabbing ${isDragging ? "dragging" : ""}`}
     >
+      <Card
+        className={`kanban-card p-3 hover:shadow-lg transition-all duration-200 ${getPriorityClass(
+          order.priority
+        )}`}
+      >
       {/* Header */}
       <div className="flex items-start justify-between mb-2">
         <div className="flex flex-col gap-1">
@@ -174,6 +190,7 @@ export const KanbanCard = ({ order, onEdit, onStatusChange }: KanbanCardProps) =
           <span className="font-medium">Qtd:</span> {order.quantity}
         </p>
       </div>
-    </Card>
+      </Card>
+    </div>
   );
 };
