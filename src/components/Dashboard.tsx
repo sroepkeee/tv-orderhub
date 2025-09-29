@@ -9,7 +9,7 @@ import { AddOrderDialog } from "./AddOrderDialog";
 import { EditOrderDialog } from "./EditOrderDialog";
 import { ActionButtons } from "./ActionButtons";
 import { PriorityView } from "./PriorityView";
-import { PhaseManagementDialog } from "./PhaseManagementDialog";
+import { PhaseButtons } from "./PhaseButtons";
 import { ColumnSettings, ColumnVisibility } from "./ColumnSettings";
 import { ThemeToggle } from "./ThemeToggle";
 import { DateRangeFilter } from "./DateRangeFilter";
@@ -150,7 +150,6 @@ export const Dashboard = () => {
   const [orders, setOrders] = useState<Order[]>(mockOrders);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [showEditDialog, setShowEditDialog] = useState(false);
-  const [showPhaseDialog, setShowPhaseDialog] = useState(false);
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
   
   // User ID state with localStorage persistence
@@ -533,17 +532,10 @@ export const Dashboard = () => {
                       )}
                       {columnVisibility.phaseManagement && (
                         <td className="p-4">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setSelectedOrder(order);
-                              setShowPhaseDialog(true);
-                            }}
-                          >
-                            Gestão de Fase
-                          </Button>
+                          <PhaseButtons
+                            order={order}
+                            onStatusChange={handleStatusChange}
+                          />
                         </td>
                       )}
                       {columnVisibility.actions && (
@@ -580,14 +572,6 @@ export const Dashboard = () => {
           onSave={handleEditOrder}
         />
       )}
-
-      {/* Phase Management Dialog */}
-      <PhaseManagementDialog
-        order={selectedOrder}
-        open={showPhaseDialog}
-        onOpenChange={setShowPhaseDialog}
-        onStatusChange={handleStatusChange}
-      />
     </div>
   );
 };
