@@ -166,17 +166,17 @@ export const Dashboard = () => {
     return saved ? JSON.parse(saved) : {
       priority: true,
       orderNumber: true,
-      item: true,
-      description: true,
-      quantity: true,
-      createdDate: true,
-      status: true,
-      client: true,
+      item: false,
+      description: false,
+      quantity: false,
+      createdDate: false,
+      status: false,
+      client: false,
       deskTicket: true,
       deliveryDeadline: true,
       daysRemaining: true,
       phaseManagement: true,
-      actions: true,
+      actions: false,
     };
   });
 
