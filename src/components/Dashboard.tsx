@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { DateRange } from "react-day-picker";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,6 +11,9 @@ import { ActionButtons } from "./ActionButtons";
 import { PriorityView } from "./PriorityView";
 import { PhaseButtons } from "./PhaseButtons";
 import { ColumnSettings, ColumnVisibility } from "./ColumnSettings";
+import { ThemeToggle } from "./ThemeToggle";
+import { DateRangeFilter } from "./DateRangeFilter";
+import { UserSettingsDialog } from "./UserSettingsDialog";
 import { toast } from "@/hooks/use-toast";
 
 // Types
@@ -146,10 +150,22 @@ export const Dashboard = () => {
   const [orders, setOrders] = useState<Order[]>(mockOrders);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [showEditDialog, setShowEditDialog] = useState(false);
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
   
-  // Column visibility state with localStorage persistence
+  // User ID state with localStorage persistence
+  const [userId, setUserId] = useState<string>(() => {
+    const saved = localStorage.getItem("currentUserId");
+    return saved || "default-user";
+  });
+
+  // Save user ID to localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem("currentUserId", userId);
+  }, [userId]);
+  
+  // Column visibility state with user-specific localStorage persistence
   const [columnVisibility, setColumnVisibility] = useState<ColumnVisibility>(() => {
-    const saved = localStorage.getItem("columnVisibility");
+    const saved = localStorage.getItem(`columnVisibility_${userId}`);
     return saved ? JSON.parse(saved) : {
       priority: true,
       orderNumber: true,
@@ -167,10 +183,18 @@ export const Dashboard = () => {
     };
   });
 
-  // Save column visibility to localStorage whenever it changes
+  // Save column visibility to localStorage whenever it changes or user changes
   useEffect(() => {
-    localStorage.setItem("columnVisibility", JSON.stringify(columnVisibility));
-  }, [columnVisibility]);
+    localStorage.setItem(`columnVisibility_${userId}`, JSON.stringify(columnVisibility));
+  }, [columnVisibility, userId]);
+
+  // Reload column visibility when user changes
+  useEffect(() => {
+    const saved = localStorage.getItem(`columnVisibility_${userId}`);
+    if (saved) {
+      setColumnVisibility(JSON.parse(saved));
+    }
+  }, [userId]);
 
   const getPriorityClass = (priority: Priority) => {
     switch (priority) {
@@ -202,7 +226,7 @@ export const Dashboard = () => {
     return percentage;
   };
 
-  // Filter orders based on active tab and search
+  // Filter orders based on active tab, search, and date range
   const filteredOrders = orders.filter((order) => {
     const matchesTab = activeTab === "all" || order.type === activeTab;
     const matchesSearch = 
@@ -210,7 +234,18 @@ export const Dashboard = () => {
       order.item.toLowerCase().includes(searchQuery.toLowerCase()) ||
       order.client.toLowerCase().includes(searchQuery.toLowerCase()) ||
       order.deskTicket.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesTab && matchesSearch;
+    
+    // Date range filter
+    let matchesDate = true;
+    if (dateRange?.from) {
+      const orderDate = new Date(order.createdDate);
+      matchesDate = orderDate >= dateRange.from;
+      if (dateRange.to) {
+        matchesDate = matchesDate && orderDate <= dateRange.to;
+      }
+    }
+    
+    return matchesTab && matchesSearch && matchesDate;
   });
 
   // Action handlers
@@ -383,14 +418,19 @@ export const Dashboard = () => {
               className="pl-10 w-80"
             />
           </div>
-          <Button variant="outline" size="lg">
-            <Calendar className="h-4 w-4 mr-2" />
-            Filtrar Data
-          </Button>
+          <DateRangeFilter 
+            dateRange={dateRange}
+            onDateRangeChange={setDateRange}
+          />
           <ColumnSettings 
             visibility={columnVisibility}
             onVisibilityChange={setColumnVisibility}
           />
+          <UserSettingsDialog
+            currentUserId={userId}
+            onUserIdChange={setUserId}
+          />
+          <ThemeToggle />
           <AddOrderDialog onAddOrder={handleAddOrder} />
         </div>
       </div>

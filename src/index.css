@@ -54,62 +54,62 @@ All colors MUST be HSL.
     --progress-critical: 0 75% 55%;
 
     /* Status colors - Preparação/Planejamento */
-    --status-pending: 251 146 60;
-    --status-pending-bg: 255 237 213;
-    --status-analysis: 59 130 246;
-    --status-analysis-bg: 219 234 254;
-    --status-awaiting: 168 85 247;
-    --status-awaiting-bg: 243 232 255;
-    --status-planned: 34 197 94;
-    --status-planned-bg: 220 252 231;
+    --status-pending: 38 92% 50%;
+    --status-pending-bg: 38 100% 92%;
+    --status-analysis: 217 91% 60%;
+    --status-analysis-bg: 217 92% 92%;
+    --status-awaiting: 271 91% 65%;
+    --status-awaiting-bg: 271 100% 95%;
+    --status-planned: 142 76% 36%;
+    --status-planned-bg: 142 76% 94%;
     
     /* Status colors - Separação/Produção */
-    --status-separation: 99 102 241;
-    --status-separation-bg: 224 231 255;
-    --status-production: 139 92 246;
-    --status-production-bg: 237 233 254;
-    --status-material: 234 179 8;
-    --status-material-bg: 254 249 195;
-    --status-sep-complete: 16 185 129;
-    --status-sep-complete-bg: 209 250 229;
-    --status-prod-complete: 34 211 238;
-    --status-prod-complete-bg: 207 250 254;
+    --status-separation: 239 84% 67%;
+    --status-separation-bg: 239 84% 95%;
+    --status-production: 258 90% 66%;
+    --status-production-bg: 258 90% 96%;
+    --status-material: 45 93% 47%;
+    --status-material-bg: 45 93% 94%;
+    --status-sep-complete: 160 84% 39%;
+    --status-sep-complete-bg: 160 84% 94%;
+    --status-prod-complete: 187 85% 53%;
+    --status-prod-complete-bg: 187 85% 96%;
     
     /* Status colors - Embalagem/Conferência */
-    --status-quality: 249 115 22;
-    --status-quality-bg: 255 237 213;
-    --status-packaging: 245 158 11;
-    --status-packaging-bg: 254 243 199;
-    --status-ready: 20 184 166;
-    --status-ready-bg: 204 251 241;
+    --status-quality: 27 96% 61%;
+    --status-quality-bg: 27 96% 95%;
+    --status-packaging: 43 96% 56%;
+    --status-packaging-bg: 43 96% 95%;
+    --status-ready: 172 66% 50%;
+    --status-ready-bg: 172 66% 95%;
     
     /* Status colors - Expedição/Logística */
-    --status-released: 6 182 212;
-    --status-released-bg: 207 250 254;
-    --status-expedition: 8 145 178;
-    --status-expedition-bg: 186 230 253;
-    --status-transit: 14 116 144;
-    --status-transit-bg: 224 242 254;
-    --status-scheduled: 59 130 246;
-    --status-scheduled-bg: 219 234 254;
-    --status-pickup: 37 99 235;
-    --status-pickup-bg: 191 219 254;
+    --status-released: 187 85% 53%;
+    --status-released-bg: 187 85% 96%;
+    --status-expedition: 187 80% 42%;
+    --status-expedition-bg: 187 80% 94%;
+    --status-transit: 187 81% 41%;
+    --status-transit-bg: 187 81% 95%;
+    --status-scheduled: 217 91% 60%;
+    --status-scheduled-bg: 217 92% 92%;
+    --status-pickup: 217 92% 76%;
+    --status-pickup-bg: 217 92% 95%;
     
     /* Status colors - Conclusão */
-    --status-delivered: 22 163 74;
-    --status-delivered-bg: 220 252 231;
-    --status-completed: 21 128 61;
-    --status-completed-bg: 187 247 208;
+    --status-delivered: 142 77% 43%;
+    --status-delivered-bg: 142 76% 94%;
+    --status-completed: 142 72% 29%;
+    --status-completed-bg: 142 72% 92%;
     
     /* Status colors - Exceção/Problemas */
-    --status-cancelled: 239 68 68;
-    --status-cancelled-bg: 254 226 226;
-    --status-hold: 161 161 170;
-    --status-hold-bg: 244 244 245;
-    --status-delayed: 220 38 38;
-    --status-delayed-bg: 254 202 202;
-    --status-returned: 192 38 211;
-    --status-returned-bg: 250 232 255;
+    --status-cancelled: 0 84% 60%;
+    --status-cancelled-bg: 0 86% 95%;
+    --status-hold: 240 5% 65%;
+    --status-hold-bg: 240 5% 96%;
+    --status-delayed: 0 91% 71%;
+    --status-delayed-bg: 0 93% 94%;
+    --status-returned: 300 76% 72%;
+    --status-returned-bg: 300 100% 97%;
 
     /* Order Type Colors */
     --type-production: 260 60% 55%;
@@ -186,62 +186,62 @@ All colors MUST be HSL.
     --priority-low-border: 125 55% 55%;
 
     /* Status Colors - Dark Mode - Preparação/Planejamento */
-    --status-pending: 251 146 60;
-    --status-pending-bg: 38 28 15;
-    --status-analysis: 59 130 246;
-    --status-analysis-bg: 18 28 40;
-    --status-awaiting: 168 85 247;
-    --status-awaiting-bg: 30 23 42;
-    --status-planned: 34 197 94;
-    --status-planned-bg: 15 40 22;
+    --status-pending: 38 92% 65%;
+    --status-pending-bg: 38 70% 15%;
+    --status-analysis: 217 91% 70%;
+    --status-analysis-bg: 217 50% 15%;
+    --status-awaiting: 271 91% 75%;
+    --status-awaiting-bg: 271 50% 15%;
+    --status-planned: 142 76% 50%;
+    --status-planned-bg: 142 50% 15%;
     
     /* Status Colors - Dark Mode - Separação/Produção */
-    --status-separation: 99 102 241;
-    --status-separation-bg: 23 24 45;
-    --status-production: 139 92 246;
-    --status-production-bg: 28 22 45;
-    --status-material: 234 179 8;
-    --status-material-bg: 42 35 10;
-    --status-sep-complete: 16 185 129;
-    --status-sep-complete-bg: 10 38 28;
-    --status-prod-complete: 34 211 238;
-    --status-prod-complete-bg: 12 40 42;
+    --status-separation: 239 84% 75%;
+    --status-separation-bg: 239 50% 15%;
+    --status-production: 258 90% 75%;
+    --status-production-bg: 258 50% 15%;
+    --status-material: 45 93% 60%;
+    --status-material-bg: 45 60% 15%;
+    --status-sep-complete: 160 84% 50%;
+    --status-sep-complete-bg: 160 50% 15%;
+    --status-prod-complete: 187 85% 60%;
+    --status-prod-complete-bg: 187 50% 15%;
     
     /* Status Colors - Dark Mode - Embalagem/Conferência */
-    --status-quality: 249 115 22;
-    --status-quality-bg: 40 25 10;
-    --status-packaging: 245 158 11;
-    --status-packaging-bg: 42 32 8;
-    --status-ready: 20 184 166;
-    --status-ready-bg: 10 38 35;
+    --status-quality: 27 96% 70%;
+    --status-quality-bg: 27 60% 15%;
+    --status-packaging: 43 96% 65%;
+    --status-packaging-bg: 43 60% 15%;
+    --status-ready: 172 66% 60%;
+    --status-ready-bg: 172 50% 15%;
     
     /* Status Colors - Dark Mode - Expedição/Logística */
-    --status-released: 6 182 212;
-    --status-released-bg: 8 38 42;
-    --status-expedition: 8 145 178;
-    --status-expedition-bg: 8 32 38;
-    --status-transit: 14 116 144;
-    --status-transit-bg: 8 28 32;
-    --status-scheduled: 59 130 246;
-    --status-scheduled-bg: 18 28 40;
-    --status-pickup: 37 99 235;
-    --status-pickup-bg: 15 22 42;
+    --status-released: 187 85% 65%;
+    --status-released-bg: 187 50% 15%;
+    --status-expedition: 187 80% 55%;
+    --status-expedition-bg: 187 50% 15%;
+    --status-transit: 187 81% 55%;
+    --status-transit-bg: 187 50% 15%;
+    --status-scheduled: 217 91% 70%;
+    --status-scheduled-bg: 217 50% 15%;
+    --status-pickup: 217 92% 80%;
+    --status-pickup-bg: 217 50% 15%;
     
     /* Status Colors - Dark Mode - Conclusão */
-    --status-delivered: 22 163 74;
-    --status-delivered-bg: 12 35 20;
-    --status-completed: 21 128 61;
-    --status-completed-bg: 12 30 18;
+    --status-delivered: 142 77% 55%;
+    --status-delivered-bg: 142 50% 15%;
+    --status-completed: 142 72% 45%;
+    --status-completed-bg: 142 50% 15%;
     
     /* Status Colors - Dark Mode - Exceção/Problemas */
-    --status-cancelled: 239 68 68;
-    --status-cancelled-bg: 40 18 18;
-    --status-hold: 161 161 170;
-    --status-hold-bg: 30 30 32;
-    --status-delayed: 220 38 38;
-    --status-delayed-bg: 38 15 15;
-    --status-returned: 192 38 211;
-    --status-returned-bg: 35 15 38;
+    --status-cancelled: 0 84% 70%;
+    --status-cancelled-bg: 0 50% 15%;
+    --status-hold: 240 5% 75%;
+    --status-hold-bg: 240 5% 20%;
+    --status-delayed: 0 91% 75%;
+    --status-delayed-bg: 0 60% 15%;
+    --status-returned: 300 76% 80%;
+    --status-returned-bg: 300 50% 15%;
 
     /* Order Type Colors - Dark Mode */
     --type-production: 260 60% 70%;
@@ -252,10 +252,26 @@ All colors MUST be HSL.
     --type-materials-bg: 160 40% 12%;
 
     /* Dashboard specific - Dark Mode */
-    --dashboard-header: 220 25% 12%;
+    --dashboard-header: 220 10% 92%;
     --dashboard-nav: 220 20% 15%;
     --tab-active: 220 10% 85%;
     --tab-inactive: 220 15% 35%;
+
+    --sidebar-background: 240 5.9% 10%;
+
+    --sidebar-foreground: 240 4.8% 95.9%;
+
+    --sidebar-primary: 224.3 76.3% 48%;
+
+    --sidebar-primary-foreground: 0 0% 100%;
+
+    --sidebar-accent: 240 3.7% 15.9%;
+
+    --sidebar-accent-foreground: 240 4.8% 95.9%;
+
+    --sidebar-border: 240 3.7% 15.9%;
+
+    --sidebar-ring: 217.2 91.2% 59.8%;
   }
 }
 
