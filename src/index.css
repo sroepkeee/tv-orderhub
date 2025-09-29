@@ -8,33 +8,53 @@ All colors MUST be HSL.
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    /* Dashboard optimized for TV viewing */
+    --background: 220 15% 96%;
+    --foreground: 220 15% 15%;
 
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: 220 15% 15%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover-foreground: 220 15% 15%;
 
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
+    --primary: 220 25% 25%;
+    --primary-foreground: 0 0% 98%;
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 220 10% 88%;
+    --secondary-foreground: 220 15% 25%;
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    --muted: 220 10% 92%;
+    --muted-foreground: 220 10% 45%;
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    --accent: 220 15% 85%;
+    --accent-foreground: 220 15% 25%;
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 98%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    --border: 220 10% 85%;
+    --input: 220 10% 90%;
+    --ring: 220 25% 25%;
+
+    /* Priority Colors */
+    --priority-high: 0 75% 65%;
+    --priority-high-bg: 0 75% 95%;
+    --priority-medium: 45 90% 60%;
+    --priority-medium-bg: 45 90% 95%;
+    --priority-low: 120 50% 50%;
+    --priority-low-bg: 120 50% 95%;
+
+    /* Progress Colors */
+    --progress-good: 120 60% 50%;
+    --progress-warning: 45 90% 60%;
+    --progress-critical: 0 75% 60%;
+
+    /* Dashboard specific */
+    --dashboard-header: 220 25% 25%;
+    --dashboard-nav: 220 20% 30%;
+    --tab-active: 220 25% 25%;
+    --tab-inactive: 220 10% 75%;
 
     --radius: 0.5rem;
 
@@ -56,41 +76,48 @@ All colors MUST be HSL.
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
+    /* Dark mode optimized for TV viewing */
+    --background: 220 25% 8%;
+    --foreground: 220 10% 92%;
 
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
+    --card: 220 25% 12%;
+    --card-foreground: 220 10% 92%;
 
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
+    --popover: 220 25% 12%;
+    --popover-foreground: 220 10% 92%;
 
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
+    --primary: 220 10% 85%;
+    --primary-foreground: 220 25% 15%;
 
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
+    --secondary: 220 20% 18%;
+    --secondary-foreground: 220 10% 85%;
 
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
+    --muted: 220 20% 15%;
+    --muted-foreground: 220 10% 65%;
 
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
+    --accent: 220 20% 20%;
+    --accent-foreground: 220 10% 85%;
 
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 0 75% 65%;
+    --destructive-foreground: 220 10% 92%;
 
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --border: 220 15% 22%;
+    --input: 220 15% 18%;
+    --ring: 220 10% 85%;
+
+    /* Priority Colors - Dark Mode */
+    --priority-high: 0 75% 70%;
+    --priority-high-bg: 0 75% 15%;
+    --priority-medium: 45 85% 65%;
+    --priority-medium-bg: 45 85% 15%;
+    --priority-low: 120 50% 60%;
+    --priority-low-bg: 120 50% 15%;
+
+    /* Dashboard specific - Dark Mode */
+    --dashboard-header: 220 25% 12%;
+    --dashboard-nav: 220 20% 15%;
+    --tab-active: 220 10% 85%;
+    --tab-inactive: 220 15% 35%;
   }
 }
 
@@ -100,6 +127,50 @@ All colors MUST be HSL.
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-sans;
+  }
+
+  /* Dashboard specific animations and utilities */
+  .priority-blink {
+    animation: priorityBlink 1.5s infinite;
+  }
+
+  .progress-bar {
+    @apply transition-all duration-300 ease-in-out;
+  }
+
+  .dashboard-table {
+    @apply text-base font-medium;
+    font-size: 1.1rem;
+    line-height: 1.6;
+  }
+
+  .dashboard-header {
+    background: hsl(var(--dashboard-header));
+    color: hsl(var(--primary-foreground));
+  }
+
+  .priority-high-row {
+    background: hsl(var(--priority-high-bg));
+    border-left: 4px solid hsl(var(--priority-high));
+  }
+
+  .priority-medium-row {
+    background: hsl(var(--priority-medium-bg));
+    border-left: 4px solid hsl(var(--priority-medium));
+  }
+
+  .priority-low-row {
+    background: hsl(var(--priority-low-bg));
+    border-left: 4px solid hsl(var(--priority-low));
+  }
+
+  @keyframes priorityBlink {
+    0%, 100% {
+      color: hsl(var(--priority-high));
+    }
+    50% {
+      color: hsl(var(--destructive));
+    }
   }
 }
