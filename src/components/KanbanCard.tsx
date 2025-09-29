@@ -13,8 +13,6 @@ interface KanbanCardProps {
 }
 
 export const KanbanCard = ({ order, onEdit, onStatusChange }: KanbanCardProps) => {
-  const [dragStarted, setDragStarted] = React.useState(false);
-  
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: order.id,
   });
@@ -22,22 +20,6 @@ export const KanbanCard = ({ order, onEdit, onStatusChange }: KanbanCardProps) =
   const style = {
     transform: CSS.Translate.toString(transform),
     opacity: isDragging ? 0.5 : 1,
-  };
-
-  // Detecta quando o drag realmente começa
-  React.useEffect(() => {
-    if (isDragging) {
-      setDragStarted(true);
-    }
-  }, [isDragging]);
-
-  const handleClick = (e: React.MouseEvent) => {
-    // Só abre o editor se não houve drag
-    if (!dragStarted) {
-      onEdit(order);
-    }
-    // Reset após o clique
-    setDragStarted(false);
   };
 
   const getPriorityClass = (priority: Order["priority"]) => {
@@ -118,13 +100,13 @@ export const KanbanCard = ({ order, onEdit, onStatusChange }: KanbanCardProps) =
     <div
       ref={setNodeRef}
       style={style}
-      {...listeners}
-      {...attributes}
-      onClick={handleClick}
-      className={`cursor-grab active:cursor-grabbing ${isDragging ? "dragging" : ""}`}
+      className={isDragging ? "dragging" : ""}
     >
       <Card
-        className={`kanban-card p-3 hover:shadow-lg transition-all duration-200 ${getPriorityClass(
+        {...listeners}
+        {...attributes}
+        onClick={() => onEdit(order)}
+        className={`kanban-card p-3 cursor-pointer hover:shadow-lg transition-all duration-200 ${getPriorityClass(
           order.priority
         )}`}
       >
