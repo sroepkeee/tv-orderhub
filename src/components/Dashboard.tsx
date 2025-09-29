@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import logo from "@/assets/logo.png";
 import { DateRange } from "react-day-picker";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -497,7 +498,10 @@ export const Dashboard = () => {
     <div className="min-h-screen bg-background p-6">
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
-        <h1 className="text-3xl font-bold text-dashboard-header">Logística SSM</h1>
+        <div className="flex items-center gap-4">
+          <img src={logo} alt="Imply Logo" className="h-12 w-auto" />
+          <h1 className="text-3xl font-bold text-dashboard-header">Logística SSM</h1>
+        </div>
         <div className="flex items-center gap-4">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
