@@ -37,18 +37,39 @@ All colors MUST be HSL.
     --input: 220 10% 90%;
     --ring: 220 25% 25%;
 
-    /* Priority Colors */
-    --priority-high: 0 75% 65%;
-    --priority-high-bg: 0 75% 95%;
-    --priority-medium: 45 90% 60%;
-    --priority-medium-bg: 45 90% 95%;
-    --priority-low: 120 50% 50%;
-    --priority-low-bg: 120 50% 95%;
+    /* Priority Colors - Enhanced */
+    --priority-high: 0 75% 55%;
+    --priority-high-bg: 0 65% 96%;
+    --priority-high-border: 0 75% 65%;
+    --priority-medium: 35 85% 55%;
+    --priority-medium-bg: 35 75% 96%;
+    --priority-medium-border: 35 85% 65%;
+    --priority-low: 125 55% 45%;
+    --priority-low-bg: 125 45% 96%;
+    --priority-low-border: 125 55% 55%;
 
-    /* Progress Colors */
-    --progress-good: 120 60% 50%;
-    --progress-warning: 45 90% 60%;
-    --progress-critical: 0 75% 60%;
+    /* Progress Colors - Enhanced */
+    --progress-good: 125 60% 45%;
+    --progress-warning: 35 85% 55%;
+    --progress-critical: 0 75% 55%;
+
+    /* Status Colors */
+    --status-pending: 210 20% 60%;
+    --status-pending-bg: 210 15% 95%;
+    --status-approved: 125 55% 45%;
+    --status-approved-bg: 125 45% 95%;
+    --status-cancelled: 0 60% 60%;
+    --status-cancelled-bg: 0 50% 95%;
+    --status-completed: 200 50% 45%;
+    --status-completed-bg: 200 40% 95%;
+
+    /* Order Type Colors */
+    --type-production: 260 60% 55%;
+    --type-production-bg: 260 50% 96%;
+    --type-sales: 280 50% 55%;
+    --type-sales-bg: 280 40% 96%;
+    --type-materials: 160 50% 45%;
+    --type-materials-bg: 160 40% 96%;
 
     /* Dashboard specific */
     --dashboard-header: 220 25% 25%;
@@ -105,13 +126,34 @@ All colors MUST be HSL.
     --input: 220 15% 18%;
     --ring: 220 10% 85%;
 
-    /* Priority Colors - Dark Mode */
+    /* Priority Colors - Dark Mode Enhanced */
     --priority-high: 0 75% 70%;
-    --priority-high-bg: 0 75% 15%;
-    --priority-medium: 45 85% 65%;
-    --priority-medium-bg: 45 85% 15%;
-    --priority-low: 120 50% 60%;
-    --priority-low-bg: 120 50% 15%;
+    --priority-high-bg: 0 60% 12%;
+    --priority-high-border: 0 75% 60%;
+    --priority-medium: 35 85% 70%;
+    --priority-medium-bg: 35 70% 12%;
+    --priority-medium-border: 35 85% 60%;
+    --priority-low: 125 55% 65%;
+    --priority-low-bg: 125 45% 12%;
+    --priority-low-border: 125 55% 55%;
+
+    /* Status Colors - Dark Mode */
+    --status-pending: 210 25% 70%;
+    --status-pending-bg: 210 20% 12%;
+    --status-approved: 125 55% 65%;
+    --status-approved-bg: 125 45% 12%;
+    --status-cancelled: 0 65% 70%;
+    --status-cancelled-bg: 0 55% 12%;
+    --status-completed: 200 55% 65%;
+    --status-completed-bg: 200 45% 12%;
+
+    /* Order Type Colors - Dark Mode */
+    --type-production: 260 60% 70%;
+    --type-production-bg: 260 50% 12%;
+    --type-sales: 280 50% 70%;
+    --type-sales-bg: 280 40% 12%;
+    --type-materials: 160 50% 65%;
+    --type-materials-bg: 160 40% 12%;
 
     /* Dashboard specific - Dark Mode */
     --dashboard-header: 220 25% 12%;
@@ -152,17 +194,32 @@ All colors MUST be HSL.
 
   .priority-high-row {
     background: hsl(var(--priority-high-bg));
-    border-left: 4px solid hsl(var(--priority-high));
+    border-left: 4px solid hsl(var(--priority-high-border));
+    transition: all 0.2s ease;
   }
 
   .priority-medium-row {
     background: hsl(var(--priority-medium-bg));
-    border-left: 4px solid hsl(var(--priority-medium));
+    border-left: 4px solid hsl(var(--priority-medium-border));
+    transition: all 0.2s ease;
   }
 
   .priority-low-row {
     background: hsl(var(--priority-low-bg));
-    border-left: 4px solid hsl(var(--priority-low));
+    border-left: 4px solid hsl(var(--priority-low-border));
+    transition: all 0.2s ease;
+  }
+
+  .action-button {
+    @apply transition-all duration-200 hover:scale-105 hover:shadow-md;
+  }
+
+  .order-type-badge {
+    @apply px-2 py-1 rounded-full text-xs font-medium;
+  }
+
+  .status-badge {
+    @apply px-2 py-1 rounded-full text-xs font-medium;
   }
 
   @keyframes priorityBlink {
