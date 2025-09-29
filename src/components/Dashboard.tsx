@@ -141,6 +141,8 @@ const tabs = [
   { id: "production", name: "Pedidos de Produção" },
   { id: "sales", name: "Pedidos de Venda" },
   { id: "materials", name: "Remessa de Materiais" },
+  { id: "in_transit", name: "Em Trânsito" },
+  { id: "completed", name: "Concluídos" },
   { id: "all", name: "Todos os Pedidos" },
 ];
 
@@ -228,7 +230,18 @@ export const Dashboard = () => {
 
   // Filter orders based on active tab, search, and date range
   const filteredOrders = orders.filter((order) => {
-    const matchesTab = activeTab === "all" || order.type === activeTab;
+    let matchesTab = false;
+    
+    if (activeTab === "all") {
+      matchesTab = true;
+    } else if (activeTab === "in_transit") {
+      matchesTab = order.status === "collected" || order.status === "in_transit";
+    } else if (activeTab === "completed") {
+      matchesTab = order.status === "delivered" || order.status === "completed";
+    } else {
+      matchesTab = order.type === activeTab;
+    }
+    
     const matchesSearch = 
       order.orderNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
       order.item.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -399,6 +412,13 @@ export const Dashboard = () => {
     const target = e.target as HTMLElement;
     if (target.closest('button') || target.closest('[role="button"]')) {
       return;
+    }
+    
+    // Auto-navigate to appropriate tab based on order status
+    if (order.status === "collected" || order.status === "in_transit") {
+      setActiveTab("in_transit");
+    } else if (order.status === "delivered" || order.status === "completed") {
+      setActiveTab("completed");
     }
     
     setSelectedOrder(order);
