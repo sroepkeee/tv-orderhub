@@ -14,7 +14,116 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      order_history: {
+        Row: {
+          changed_at: string
+          id: string
+          new_status: string
+          old_status: string
+          order_id: string
+          user_id: string
+        }
+        Insert: {
+          changed_at?: string
+          id?: string
+          new_status: string
+          old_status: string
+          order_id: string
+          user_id: string
+        }
+        Update: {
+          changed_at?: string
+          id?: string
+          new_status?: string
+          old_status?: string
+          order_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_history_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      orders: {
+        Row: {
+          created_at: string
+          customer_name: string
+          delivery_address: string
+          delivery_date: string
+          driver_name: string | null
+          id: string
+          notes: string | null
+          order_number: string
+          order_type: string
+          priority: string
+          status: string
+          updated_at: string
+          user_id: string
+          vehicle_plate: string | null
+        }
+        Insert: {
+          created_at?: string
+          customer_name: string
+          delivery_address: string
+          delivery_date: string
+          driver_name?: string | null
+          id?: string
+          notes?: string | null
+          order_number: string
+          order_type: string
+          priority: string
+          status: string
+          updated_at?: string
+          user_id: string
+          vehicle_plate?: string | null
+        }
+        Update: {
+          created_at?: string
+          customer_name?: string
+          delivery_address?: string
+          delivery_date?: string
+          driver_name?: string | null
+          id?: string
+          notes?: string | null
+          order_number?: string
+          order_type?: string
+          priority?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+          vehicle_plate?: string | null
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          email: string | null
+          full_name: string | null
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          email?: string | null
+          full_name?: string | null
+          id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string | null
+          full_name?: string | null
+          id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
