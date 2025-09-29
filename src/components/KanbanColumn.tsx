@@ -3,8 +3,11 @@ import { KanbanCard } from "./KanbanCard";
 import { Order } from "@/components/Dashboard";
 import { LucideIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { useDroppable } from "@dnd-kit/core";
+import { Phase } from "./KanbanView";
 
 interface KanbanColumnProps {
+  id: Phase;
   title: string;
   icon: LucideIcon;
   orders: Order[];
@@ -14,6 +17,7 @@ interface KanbanColumnProps {
 }
 
 export const KanbanColumn = ({
+  id,
   title,
   icon: Icon,
   orders,
@@ -22,9 +26,17 @@ export const KanbanColumn = ({
   onStatusChange,
 }: KanbanColumnProps) => {
   const highCount = orders.filter((o) => o.priority === "high").length;
+  const { setNodeRef, isOver } = useDroppable({
+    id: id,
+  });
 
   return (
-    <div className="kanban-column flex-shrink-0 w-80 flex flex-col">
+    <div
+      ref={setNodeRef}
+      className={`kanban-column flex-shrink-0 w-80 flex flex-col ${
+        isOver ? "drop-target" : ""
+      }`}
+    >
       {/* Column Header */}
       <div className={`${colorClass} rounded-t-lg p-4 sticky top-0 z-10 shadow-sm`}>
         <div className="flex items-center justify-between">

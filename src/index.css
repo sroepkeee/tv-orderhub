@@ -398,7 +398,14 @@ All colors MUST be HSL.
   }
 
   .kanban-column {
-    @apply min-w-80 max-w-80;
+    @apply min-w-80 max-w-80 transition-all duration-300;
+  }
+
+  /* Coluna em estado de drop target */
+  .kanban-column.drop-target {
+    background: hsl(var(--primary) / 0.05);
+    border: 2px dashed hsl(var(--primary));
+    border-radius: 0.5rem;
   }
 
   .kanban-cards-container {
@@ -422,10 +429,35 @@ All colors MUST be HSL.
   .kanban-card {
     @apply transition-all duration-200;
     animation: fadeIn 0.3s ease-out;
+    touch-action: none;
   }
 
   .kanban-card:hover {
     @apply scale-[1.02];
+  }
+
+  /* Card sendo arrastado */
+  .kanban-card.dragging {
+    opacity: 0.5;
+    cursor: grabbing;
+  }
+
+  /* Overlay do drag */
+  .kanban-drag-overlay {
+    opacity: 0.95;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+    transform: rotate(2deg) scale(1.02);
+    cursor: grabbing;
+    animation: dragPulse 0.5s ease-in-out;
+  }
+
+  @keyframes dragPulse {
+    0%, 100% {
+      transform: rotate(2deg) scale(1.02);
+    }
+    50% {
+      transform: rotate(2deg) scale(1.05);
+    }
   }
 
   @keyframes fadeIn {

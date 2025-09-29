@@ -3,6 +3,8 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Clock, AlertCircle } from "lucide-react";
 import { Order } from "@/components/Dashboard";
+import { useDraggable } from "@dnd-kit/core";
+import { CSS } from "@dnd-kit/utilities";
 
 interface KanbanCardProps {
   order: Order;
@@ -11,6 +13,15 @@ interface KanbanCardProps {
 }
 
 export const KanbanCard = ({ order, onEdit, onStatusChange }: KanbanCardProps) => {
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+    id: order.id,
+  });
+
+  const style = {
+    transform: CSS.Translate.toString(transform),
+    opacity: isDragging ? 0.5 : 1,
+  };
+
   const getPriorityClass = (priority: Order["priority"]) => {
     switch (priority) {
       case "high":
@@ -87,10 +98,19 @@ export const KanbanCard = ({ order, onEdit, onStatusChange }: KanbanCardProps) =
 
   return (
     <Card
-      className={`kanban-card p-3 cursor-pointer hover:shadow-lg transition-all duration-200 ${getPriorityClass(
+      ref={setNodeRef}
+      style={style}
+      className={`kanban-card p-3 cursor-grab active:cursor-grabbing hover:shadow-lg transition-all duration-200 ${getPriorityClass(
         order.priority
-      )}`}
-      onClick={() => onEdit(order)}
+      )} ${isDragging ? "dragging" : ""}`}
+      {...listeners}
+      {...attributes}
+      onClick={(e) => {
+        // Apenas abre o editor se não estiver arrastando
+        if (!isDragging) {
+          onEdit(order);
+        }
+      }}
     >
       {/* Header */}
       <div className="flex items-start justify-between mb-2">

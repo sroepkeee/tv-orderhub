@@ -8,6 +8,17 @@ import {
   Truck,
   CheckCircle2,
 } from "lucide-react";
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  KeyboardSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+  DragOverlay,
+} from "@dnd-kit/core";
+import { KanbanCard } from "./KanbanCard";
 
 export type Phase = "preparation" | "production" | "packaging" | "logistics" | "completion";
 
@@ -18,6 +29,17 @@ interface KanbanViewProps {
 }
 
 export const KanbanView = ({ orders, onEdit, onStatusChange }: KanbanViewProps) => {
+  const [activeId, setActiveId] = React.useState<string | null>(null);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8, // Drag apenas após 8px de movimento
+      },
+    }),
+    useSensor(KeyboardSensor)
+  );
+
   const getPhaseFromStatus = (status: Order["status"]): Phase => {
     switch (status) {
       case "pending":
@@ -89,21 +111,87 @@ export const KanbanView = ({ orders, onEdit, onStatusChange }: KanbanViewProps) 
     return orders.filter((order) => getPhaseFromStatus(order.status) === phase);
   };
 
+  const getDefaultStatusForPhase = (phase: Phase): Order["status"] => {
+    switch (phase) {
+      case "preparation":
+        return "pending";
+      case "production":
+        return "in_production";
+      case "packaging":
+        return "in_packaging";
+      case "logistics":
+        return "in_expedition";
+      case "completion":
+        return "completed";
+    }
+  };
+
+  const handleDragStart = (event: DragEndEvent) => {
+    setActiveId(event.active.id as string);
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    setActiveId(null);
+
+    if (!over) return;
+
+    const orderId = active.id as string;
+    const targetPhase = over.id as Phase;
+    const order = orders.find((o) => o.id === orderId);
+
+    if (!order) return;
+
+    const currentPhase = getPhaseFromStatus(order.status);
+    
+    // Se soltar na mesma coluna, não faz nada
+    if (currentPhase === targetPhase) return;
+
+    const newStatus = getDefaultStatusForPhase(targetPhase);
+    onStatusChange(orderId, newStatus);
+  };
+
+  const handleDragCancel = () => {
+    setActiveId(null);
+  };
+
+  const activeOrder = activeId ? orders.find((o) => o.id === activeId) : null;
+
   return (
-    <div className="kanban-view">
-      <div className="kanban-container flex gap-4 overflow-x-auto pb-4 min-h-[calc(100vh-300px)]">
-        {columns.map((column) => (
-          <KanbanColumn
-            key={column.id}
-            title={column.title}
-            icon={column.icon}
-            orders={getOrdersByPhase(column.id)}
-            colorClass={column.colorClass}
-            onEdit={onEdit}
-            onStatusChange={onStatusChange}
-          />
-        ))}
+    <DndContext
+      sensors={sensors}
+      collisionDetection={closestCenter}
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
+      onDragCancel={handleDragCancel}
+    >
+      <div className="kanban-view">
+        <div className="kanban-container flex gap-4 overflow-x-auto pb-4 min-h-[calc(100vh-300px)]">
+          {columns.map((column) => (
+            <KanbanColumn
+              key={column.id}
+              id={column.id}
+              title={column.title}
+              icon={column.icon}
+              orders={getOrdersByPhase(column.id)}
+              colorClass={column.colorClass}
+              onEdit={onEdit}
+              onStatusChange={onStatusChange}
+            />
+          ))}
+        </div>
       </div>
-    </div>
+      <DragOverlay>
+        {activeOrder ? (
+          <div className="kanban-drag-overlay">
+            <KanbanCard
+              order={activeOrder}
+              onEdit={onEdit}
+              onStatusChange={onStatusChange}
+            />
+          </div>
+        ) : null}
+      </DragOverlay>
+    </DndContext>
   );
 };
