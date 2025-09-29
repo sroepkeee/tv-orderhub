@@ -7,11 +7,24 @@ import { Progress } from "@/components/ui/progress";
 import { AddOrderDialog } from "./AddOrderDialog";
 import { ActionButtons } from "./ActionButtons";
 import { PriorityView } from "./PriorityView";
+import { PhaseButtons } from "./PhaseButtons";
 import { toast } from "@/hooks/use-toast";
 
 // Types
 type Priority = "high" | "medium" | "low";
-type OrderStatus = "pending" | "approved" | "in_progress" | "completed" | "cancelled";
+type OrderStatus = 
+  // Fase de Preparação/Planejamento
+  | "pending" | "in_analysis" | "awaiting_approval" | "planned"
+  // Fase de Separação/Produção
+  | "separation_started" | "in_production" | "awaiting_material" | "separation_completed" | "production_completed"
+  // Fase de Embalagem/Conferência
+  | "in_quality_check" | "in_packaging" | "ready_for_shipping"
+  // Fase de Expedição/Logística
+  | "released_for_shipping" | "in_expedition" | "in_transit" | "pickup_scheduled" | "awaiting_pickup"
+  // Fase de Conclusão
+  | "delivered" | "completed"
+  // Status de Exceção/Problemas
+  | "cancelled" | "on_hold" | "delayed" | "returned";
 type OrderType = "production" | "sales" | "materials";
 
 export interface Order {
@@ -54,7 +67,7 @@ const mockOrders: Order[] = [
     description: "Sistema de bombeamento para irrigação",
     quantity: 8,
     createdDate: "2024-01-16",
-    status: "approved",
+    status: "planned",
     client: "Fazenda XYZ",
     deliveryDeadline: "2024-02-28",
     deskTicket: "DSK-2024-002",
@@ -68,7 +81,7 @@ const mockOrders: Order[] = [
     description: "Kit de parafusos inoxidáveis M8",
     quantity: 500,
     createdDate: "2024-01-17",
-    status: "in_progress",
+    status: "in_production",
     client: "Construtora DEF",
     deliveryDeadline: "2024-03-10",
     deskTicket: "DSK-2024-003",
@@ -213,8 +226,12 @@ export const Dashboard = () => {
 
   const handleApproveOrder = (orderId: string) => {
     setOrders(prev => prev.map(order => 
-      order.id === orderId ? { ...order, status: "approved" as OrderStatus } : order
+      order.id === orderId ? { ...order, status: "planned" as OrderStatus } : order
     ));
+    toast({
+      title: "Pedido aprovado",
+      description: "Pedido foi planejado e aprovado para produção.",
+    });
   };
 
   const handleCancelOrder = (orderId: string) => {
@@ -223,26 +240,85 @@ export const Dashboard = () => {
     ));
   };
 
+  const handleStatusChange = (orderId: string, newStatus: OrderStatus) => {
+    setOrders(prev => prev.map(order => 
+      order.id === orderId ? { ...order, status: newStatus } : order
+    ));
+    const order = orders.find(o => o.id === orderId);
+    toast({
+      title: "Status atualizado",
+      description: `Pedido ${order?.orderNumber} movido para ${getStatusLabel(newStatus)}`,
+    });
+  };
+
   const getStatusLabel = (status: string) => {
-    switch (status) {
-      case "pending": return "Pendente";
-      case "approved": return "Aprovado";
-      case "in_progress": return "Em Andamento";
-      case "completed": return "Concluído";
-      case "cancelled": return "Cancelado";
-      default: return status;
-    }
+    const labels: Record<string, string> = {
+      // Preparação/Planejamento
+      "pending": "Pendente (Novo)",
+      "in_analysis": "Em Análise",
+      "awaiting_approval": "Aguardando Aprovação",
+      "planned": "Planejado",
+      // Separação/Produção
+      "separation_started": "Iniciado a Separação",
+      "in_production": "Em Produção",
+      "awaiting_material": "Aguardando Material",
+      "separation_completed": "Concluído a Separação",
+      "production_completed": "Concluído a Produção",
+      // Embalagem/Conferência
+      "in_quality_check": "Em Conferência/Qualidade",
+      "in_packaging": "Em Embalagem",
+      "ready_for_shipping": "Pronto para Envio",
+      // Expedição/Logística
+      "released_for_shipping": "Liberado para Envio",
+      "in_expedition": "Deixado na Expedição",
+      "in_transit": "Em Trânsito",
+      "pickup_scheduled": "Retirada Agendada",
+      "awaiting_pickup": "Aguardando Retirada",
+      // Conclusão
+      "delivered": "Entregue",
+      "completed": "Finalizado",
+      // Exceção/Problemas
+      "cancelled": "Cancelado",
+      "on_hold": "Em Espera",
+      "delayed": "Atrasado",
+      "returned": "Devolvido"
+    };
+    return labels[status] || status;
   };
 
   const getStatusColor = (status: string) => {
-    switch (status) {
-      case "pending": return "bg-status-pending-bg text-status-pending";
-      case "approved": return "bg-status-approved-bg text-status-approved";
-      case "in_progress": return "bg-blue-100 text-blue-700";
-      case "completed": return "bg-status-completed-bg text-status-completed";
-      case "cancelled": return "bg-status-cancelled-bg text-status-cancelled";
-      default: return "bg-gray-100 text-gray-700";
-    }
+    const colors: Record<string, string> = {
+      // Preparação/Planejamento
+      "pending": "bg-status-pending-bg text-status-pending",
+      "in_analysis": "bg-status-analysis-bg text-status-analysis",
+      "awaiting_approval": "bg-status-awaiting-bg text-status-awaiting",
+      "planned": "bg-status-planned-bg text-status-planned",
+      // Separação/Produção
+      "separation_started": "bg-status-separation-bg text-status-separation",
+      "in_production": "bg-status-production-bg text-status-production",
+      "awaiting_material": "bg-status-material-bg text-status-material",
+      "separation_completed": "bg-status-sep-complete-bg text-status-sep-complete",
+      "production_completed": "bg-status-prod-complete-bg text-status-prod-complete",
+      // Embalagem/Conferência
+      "in_quality_check": "bg-status-quality-bg text-status-quality",
+      "in_packaging": "bg-status-packaging-bg text-status-packaging",
+      "ready_for_shipping": "bg-status-ready-bg text-status-ready",
+      // Expedição/Logística
+      "released_for_shipping": "bg-status-released-bg text-status-released",
+      "in_expedition": "bg-status-expedition-bg text-status-expedition",
+      "in_transit": "bg-status-transit-bg text-status-transit",
+      "pickup_scheduled": "bg-status-scheduled-bg text-status-scheduled",
+      "awaiting_pickup": "bg-status-pickup-bg text-status-pickup",
+      // Conclusão
+      "delivered": "bg-status-delivered-bg text-status-delivered",
+      "completed": "bg-status-completed-bg text-status-completed",
+      // Exceção/Problemas
+      "cancelled": "bg-status-cancelled-bg text-status-cancelled",
+      "on_hold": "bg-status-hold-bg text-status-hold",
+      "delayed": "bg-status-delayed-bg text-status-delayed",
+      "returned": "bg-status-returned-bg text-status-returned"
+    };
+    return colors[status] || "bg-gray-100 text-gray-700";
   };
 
   const calculateDaysRemaining = (deadline: string) => {
@@ -320,6 +396,7 @@ export const Dashboard = () => {
                   <th className="text-left p-4 font-semibold">Chamado Desk</th>
                   <th className="text-left p-4 font-semibold">Prazo de Entrega</th>
                   <th className="text-left p-4 font-semibold">Dias Restantes</th>
+                  <th className="text-left p-4 font-semibold">Gestão de Fase</th>
                   <th className="text-center p-4 font-semibold">Ações</th>
                 </tr>
               </thead>
@@ -354,6 +431,12 @@ export const Dashboard = () => {
                           />
                           <span className="text-xs font-medium w-8 text-right">{daysRemaining}d</span>
                         </div>
+                      </td>
+                      <td className="p-4">
+                        <PhaseButtons
+                          order={order}
+                          onStatusChange={handleStatusChange}
+                        />
                       </td>
                       <td className="p-4">
                         <ActionButtons

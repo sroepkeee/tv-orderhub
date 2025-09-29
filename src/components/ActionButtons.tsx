@@ -99,7 +99,7 @@ export const ActionButtons = ({
         <Copy className="h-4 w-4" />
       </Button>
 
-      {order.status !== "approved" && order.status !== "completed" && (
+      {order.status !== "planned" && order.status !== "completed" && order.status !== "delivered" && (
         <Button
           variant="ghost"
           size="icon"
@@ -111,7 +111,7 @@ export const ActionButtons = ({
         </Button>
       )}
 
-      {order.status !== "cancelled" && order.status !== "completed" && (
+      {order.status !== "cancelled" && order.status !== "completed" && order.status !== "delivered" && (
         <>
           <ConfirmationDialog
             open={cancelOpen}
