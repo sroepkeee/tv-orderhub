@@ -11,9 +11,8 @@ import { ActionButtons } from "./ActionButtons";
 import { PriorityView } from "./PriorityView";
 import { PhaseButtons } from "./PhaseButtons";
 import { ColumnSettings, ColumnVisibility } from "./ColumnSettings";
-import { ThemeToggle } from "./ThemeToggle";
 import { DateRangeFilter } from "./DateRangeFilter";
-import { UserSettingsDialog } from "./UserSettingsDialog";
+import { UserMenu } from "./UserMenu";
 import { toast } from "@/hooks/use-toast";
 
 // Types
@@ -517,11 +516,10 @@ export const Dashboard = () => {
             visibility={columnVisibility}
             onVisibilityChange={setColumnVisibility}
           />
-          <UserSettingsDialog
+          <UserMenu
             currentUserId={userId}
             onUserIdChange={setUserId}
           />
-          <ThemeToggle />
           <AddOrderDialog onAddOrder={handleAddOrder} />
         </div>
       </div>
