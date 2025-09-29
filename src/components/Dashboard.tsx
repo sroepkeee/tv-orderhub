@@ -5,6 +5,8 @@ import { Input } from "@/components/ui/input";
 import { Search, Calendar } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { AddOrderDialog } from "./AddOrderDialog";
+import { EditOrderDialog } from "./EditOrderDialog";
+import { OrderHistoryDialog } from "./OrderHistoryDialog";
 import { ActionButtons } from "./ActionButtons";
 import { PriorityView } from "./PriorityView";
 import { PhaseButtons } from "./PhaseButtons";
@@ -142,6 +144,9 @@ export const Dashboard = () => {
   const [activeTab, setActiveTab] = useState("production");
   const [searchQuery, setSearchQuery] = useState("");
   const [orders, setOrders] = useState<Order[]>(mockOrders);
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [showEditDialog, setShowEditDialog] = useState(false);
+  const [showHistoryDialog, setShowHistoryDialog] = useState(false);
 
   const getPriorityClass = (priority: Priority) => {
     switch (priority) {
@@ -328,6 +333,18 @@ export const Dashboard = () => {
     return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
   };
 
+  const handleRowClick = (order: Order, e: React.MouseEvent) => {
+    // Prevent opening if clicking on buttons or interactive elements
+    const target = e.target as HTMLElement;
+    if (target.closest('button') || target.closest('[role="button"]')) {
+      return;
+    }
+    
+    setSelectedOrder(order);
+    setShowEditDialog(true);
+    setShowHistoryDialog(true);
+  };
+
   return (
     <div className="min-h-screen bg-background p-6">
       {/* Header */}
@@ -378,6 +395,11 @@ export const Dashboard = () => {
           onDuplicate={handleDuplicateOrder}
           onApprove={handleApproveOrder}
           onCancel={handleCancelOrder}
+          onRowClick={(order) => {
+            setSelectedOrder(order);
+            setShowEditDialog(true);
+            setShowHistoryDialog(true);
+          }}
         />
       ) : (
         <div className="bg-card rounded-lg border overflow-hidden">
@@ -404,7 +426,11 @@ export const Dashboard = () => {
                 {filteredOrders.map((order) => {
                   const daysRemaining = calculateDaysRemaining(order.deliveryDeadline);
                   return (
-                    <tr key={order.id} className={`border-t transition-colors hover:bg-muted/50 ${getPriorityClass(order.priority)}`}>
+                    <tr 
+                      key={order.id} 
+                      onClick={(e) => handleRowClick(order, e)}
+                      className={`border-t transition-colors hover:bg-muted/50 cursor-pointer ${getPriorityClass(order.priority)}`}
+                    >
                       <td className="p-4">
                         <span className={`font-medium ${order.priority === "high" ? "priority-blink" : ""}`}>
                           {getPriorityLabel(order.priority)}
@@ -459,6 +485,23 @@ export const Dashboard = () => {
             </div>
           )}
         </div>
+      )}
+
+      {/* Edit and History Dialogs */}
+      {selectedOrder && (
+        <>
+          <EditOrderDialog
+            order={selectedOrder}
+            open={showEditDialog}
+            onOpenChange={setShowEditDialog}
+            onSave={handleEditOrder}
+          />
+          <OrderHistoryDialog
+            order={selectedOrder}
+            open={showHistoryDialog}
+            onOpenChange={setShowHistoryDialog}
+          />
+        </>
       )}
     </div>
   );

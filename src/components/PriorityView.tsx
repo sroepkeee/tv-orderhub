@@ -10,6 +10,7 @@ interface PriorityViewProps {
   onDuplicate: (order: Order) => void;
   onApprove: (orderId: string) => void;
   onCancel: (orderId: string) => void;
+  onRowClick?: (order: Order) => void;
 }
 
 export const PriorityView = ({ 
@@ -17,7 +18,8 @@ export const PriorityView = ({
   onEdit, 
   onDuplicate, 
   onApprove, 
-  onCancel 
+  onCancel,
+  onRowClick 
 }: PriorityViewProps) => {
   // Sort orders by priority: high -> medium -> low
   const sortedOrders = [...orders].sort((a, b) => {
@@ -103,6 +105,18 @@ export const PriorityView = ({
     return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
   };
 
+  const handleRowClick = (order: Order, e: React.MouseEvent) => {
+    // Prevent opening if clicking on buttons or interactive elements
+    const target = e.target as HTMLElement;
+    if (target.closest('button') || target.closest('[role="button"]')) {
+      return;
+    }
+    
+    if (onRowClick) {
+      onRowClick(order);
+    }
+  };
+
   // Group orders by priority for better visual organization
   const groupedOrders = {
     high: sortedOrders.filter(order => order.priority === "high"),
@@ -126,7 +140,11 @@ export const PriorityView = ({
           {orders.map((order) => {
             const daysRemaining = calculateDaysRemaining(order.deliveryDeadline);
             return (
-              <div key={order.id} className={`${getPriorityClass(order.priority)} p-4 rounded-lg border`}>
+              <div 
+                key={order.id} 
+                onClick={(e) => handleRowClick(order, e)}
+                className={`${getPriorityClass(order.priority)} p-4 rounded-lg border cursor-pointer hover:shadow-md transition-shadow`}
+              >
                 <div className="grid grid-cols-12 gap-4 items-center dashboard-table">
                   <div className="col-span-1">
                     <Badge className={`order-type-badge ${getTypeColor(order.type)}`}>
