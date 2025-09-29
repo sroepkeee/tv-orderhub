@@ -97,17 +97,17 @@ export const KanbanCard = ({ order, onEdit, onStatusChange }: KanbanCardProps) =
   const progressBarColor = getProgressBarColor(daysRemaining);
 
   return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      className={isDragging ? "dragging" : ""}
-    >
-      <Card
+      <div
+        ref={setNodeRef}
+        style={style}
+        className={isDragging ? "dragging" : ""}
         onClick={() => onEdit(order)}
-        className={`relative kanban-card p-3 cursor-pointer hover:shadow-lg transition-all duration-200 ${getPriorityClass(
-          order.priority
-        )}`}
       >
+        <Card
+          className={`relative kanban-card p-3 cursor-pointer hover:shadow-lg transition-all duration-200 ${getPriorityClass(
+            order.priority
+          )}`}
+        >
         {/* Drag handle */}
         <button
           className="absolute right-2 top-2 p-1 rounded hover:bg-muted text-muted-foreground cursor-grab active:cursor-grabbing"
