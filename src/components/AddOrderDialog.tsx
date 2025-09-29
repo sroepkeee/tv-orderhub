@@ -12,9 +12,11 @@ import { toast } from "@/hooks/use-toast";
 interface OrderFormData {
   type: string;
   priority: string;
-  item: string;
-  description: string;
-  quantity: number;
+  itemCode: string;
+  itemDescription: string;
+  requestedQuantity: number;
+  receivedQuantity: number;
+  deliveryStatus: string;
   client: string;
   deliveryDeadline: string;
   deskTicket: string;
@@ -93,22 +95,49 @@ export const AddOrderDialog = ({ onAddOrder }: AddOrderDialogProps) => {
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <Label htmlFor="item">Item</Label>
-              <Input {...register("item", { required: true })} placeholder="Nome do item" />
+              <Label htmlFor="itemCode">Código do Item</Label>
+              <Input {...register("itemCode", { required: true })} placeholder="Ex: ITEM-001" />
             </div>
             <div>
-              <Label htmlFor="quantity">Quantidade</Label>
+              <Label htmlFor="requestedQuantity">Quantidade Solicitada</Label>
               <Input 
-                {...register("quantity", { required: true, valueAsNumber: true })} 
+                {...register("requestedQuantity", { required: true, valueAsNumber: true })} 
                 type="number" 
-                placeholder="Quantidade" 
+                placeholder="Quantidade solicitada" 
+                min="0"
               />
             </div>
           </div>
 
           <div>
-            <Label htmlFor="description">Descrição</Label>
-            <Textarea {...register("description", { required: true })} placeholder="Descrição do pedido" />
+            <Label htmlFor="itemDescription">Descrição do Item</Label>
+            <Textarea {...register("itemDescription", { required: true })} placeholder="Descrição detalhada do item" rows={3} />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="receivedQuantity">Quantidade Recebida</Label>
+              <Input 
+                {...register("receivedQuantity", { valueAsNumber: true })} 
+                type="number" 
+                placeholder="Quantidade recebida" 
+                min="0"
+                defaultValue={0}
+              />
+            </div>
+            <div>
+              <Label htmlFor="deliveryStatus">Status de Entrega</Label>
+              <Select onValueChange={(value) => setValue("deliveryStatus", value)} defaultValue="pending">
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="pending">Pendente</SelectItem>
+                  <SelectItem value="complete">Entregue - Pedido Completo</SelectItem>
+                  <SelectItem value="partial">Entregue - Parcial</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">

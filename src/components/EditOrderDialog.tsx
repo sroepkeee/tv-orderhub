@@ -177,18 +177,38 @@ export const EditOrderDialog = ({ order, open, onOpenChange, onSave }: EditOrder
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="item">Item</Label>
-                  <Input {...register("item", { required: true })} />
+                  <Label htmlFor="itemCode">Código do Item</Label>
+                  <Input {...register("itemCode", { required: false })} placeholder="Ex: ITEM-001" />
                 </div>
                 <div>
-                  <Label htmlFor="quantity">Quantidade</Label>
-                  <Input {...register("quantity", { required: true, valueAsNumber: true })} type="number" />
+                  <Label htmlFor="requestedQuantity">Quantidade Solicitada</Label>
+                  <Input {...register("requestedQuantity", { valueAsNumber: true })} type="number" min="0" />
                 </div>
               </div>
 
               <div>
-                <Label htmlFor="description">Descrição</Label>
-                <Textarea {...register("description", { required: true })} />
+                <Label htmlFor="itemDescription">Descrição do Item</Label>
+                <Textarea {...register("itemDescription")} placeholder="Descrição detalhada do item" rows={3} />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="receivedQuantity">Quantidade Recebida</Label>
+                  <Input {...register("receivedQuantity", { valueAsNumber: true })} type="number" min="0" />
+                </div>
+                <div>
+                  <Label htmlFor="deliveryStatus">Status de Entrega</Label>
+                  <Select onValueChange={(value) => setValue("deliveryStatus" as any, value)} defaultValue={order?.deliveryStatus || "pending"}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="pending">Pendente</SelectItem>
+                      <SelectItem value="complete">Entregue - Pedido Completo</SelectItem>
+                      <SelectItem value="partial">Entregue - Parcial</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">

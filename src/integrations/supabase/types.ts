@@ -55,12 +55,17 @@ export type Database = {
           customer_name: string
           delivery_address: string
           delivery_date: string
+          delivery_status: string | null
           driver_name: string | null
           id: string
+          item_code: string | null
+          item_description: string | null
           notes: string | null
           order_number: string
           order_type: string
           priority: string
+          received_quantity: number | null
+          requested_quantity: number | null
           status: string
           updated_at: string
           user_id: string
@@ -71,12 +76,17 @@ export type Database = {
           customer_name: string
           delivery_address: string
           delivery_date: string
+          delivery_status?: string | null
           driver_name?: string | null
           id?: string
+          item_code?: string | null
+          item_description?: string | null
           notes?: string | null
           order_number: string
           order_type: string
           priority: string
+          received_quantity?: number | null
+          requested_quantity?: number | null
           status: string
           updated_at?: string
           user_id: string
@@ -87,12 +97,17 @@ export type Database = {
           customer_name?: string
           delivery_address?: string
           delivery_date?: string
+          delivery_status?: string | null
           driver_name?: string | null
           id?: string
+          item_code?: string | null
+          item_description?: string | null
           notes?: string | null
           order_number?: string
           order_type?: string
           priority?: string
+          received_quantity?: number | null
+          requested_quantity?: number | null
           status?: string
           updated_at?: string
           user_id?: string

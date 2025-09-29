@@ -49,6 +49,11 @@ export interface Order {
   client: string;
   deliveryDeadline: string;
   deskTicket: string;
+  itemCode?: string;
+  itemDescription?: string;
+  requestedQuantity?: number;
+  receivedQuantity?: number;
+  deliveryStatus?: string;
 }
 
 // Mock data
@@ -212,14 +217,19 @@ export const Dashboard = () => {
         type: dbOrder.order_type as OrderType,
         priority: dbOrder.priority as Priority,
         orderNumber: dbOrder.order_number,
-        item: dbOrder.customer_name, // Usando customer_name como item
-        description: dbOrder.notes || "",
-        quantity: 0, // Não temos quantidade no schema atual
+        item: dbOrder.item_code || dbOrder.customer_name,
+        description: dbOrder.item_description || dbOrder.notes || "",
+        quantity: dbOrder.requested_quantity || 0,
         createdDate: new Date(dbOrder.created_at).toISOString().split('T')[0],
         status: dbOrder.status as OrderStatus,
         client: dbOrder.customer_name,
         deliveryDeadline: dbOrder.delivery_date,
-        deskTicket: dbOrder.order_number, // Usando order_number como deskTicket
+        deskTicket: dbOrder.notes || dbOrder.order_number,
+        itemCode: dbOrder.item_code,
+        itemDescription: dbOrder.item_description,
+        requestedQuantity: dbOrder.requested_quantity,
+        receivedQuantity: dbOrder.received_quantity,
+        deliveryStatus: dbOrder.delivery_status,
       }));
 
       setOrders(transformedOrders);
@@ -313,12 +323,27 @@ export const Dashboard = () => {
           status: "pending",
           priority: orderData.priority,
           order_type: orderData.type,
-          notes: orderData.description,
+          notes: orderData.deskTicket,
+          item_code: orderData.itemCode,
+          item_description: orderData.itemDescription,
+          requested_quantity: orderData.requestedQuantity,
+          received_quantity: orderData.receivedQuantity || 0,
+          delivery_status: orderData.deliveryStatus || 'pending',
         })
         .select()
         .single();
 
       if (error) throw error;
+
+      // Save to history if delivery status changed
+      if (data && orderData.deliveryStatus && orderData.deliveryStatus !== 'pending') {
+        await supabase.from('order_history').insert({
+          order_id: data.id,
+          user_id: user.id,
+          old_status: 'pending',
+          new_status: orderData.deliveryStatus,
+        });
+      }
 
       // Reload orders
       await loadOrders();
@@ -347,6 +372,10 @@ export const Dashboard = () => {
     if (!user) return;
 
     try {
+      // Find the old order to compare delivery status
+      const oldOrder = orders.find(o => o.id === updatedOrder.id);
+      const deliveryStatusChanged = oldOrder && oldOrder.deliveryStatus !== updatedOrder.deliveryStatus;
+
       const { error } = await supabase
         .from('orders')
         .update({
@@ -356,12 +385,27 @@ export const Dashboard = () => {
           status: updatedOrder.status,
           priority: updatedOrder.priority,
           order_type: updatedOrder.type,
-          notes: updatedOrder.description,
+          notes: updatedOrder.deskTicket,
+          item_code: updatedOrder.itemCode,
+          item_description: updatedOrder.itemDescription,
+          requested_quantity: updatedOrder.requestedQuantity,
+          received_quantity: updatedOrder.receivedQuantity,
+          delivery_status: updatedOrder.deliveryStatus,
         })
         .eq('id', updatedOrder.id)
         .eq('user_id', user.id);
 
       if (error) throw error;
+
+      // Save to history if delivery status changed
+      if (deliveryStatusChanged) {
+        await supabase.from('order_history').insert({
+          order_id: updatedOrder.id,
+          user_id: user.id,
+          old_status: oldOrder.deliveryStatus || 'pending',
+          new_status: updatedOrder.deliveryStatus || 'pending',
+        });
+      }
 
       // Reload orders
       await loadOrders();
