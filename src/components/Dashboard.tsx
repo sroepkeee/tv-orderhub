@@ -327,17 +327,24 @@ export const Dashboard = () => {
     return percentage;
   };
 
+  // Helper function to check if order is in production phase
+  const isInProductionPhase = (status: OrderStatus) => {
+    return ["separation_started", "in_production", "awaiting_material", "separation_completed", "production_completed"].includes(status);
+  };
+
   // Filter orders based on active tab, search, and date range
   const filteredOrders = orders.filter((order) => {
     let matchesTab = false;
     
     if (activeTab === "all") {
       matchesTab = true;
+    } else if (activeTab === "production") {
+      matchesTab = isInProductionPhase(order.status);
     } else if (activeTab === "in_transit") {
       matchesTab = order.status === "collected" || order.status === "in_transit";
     } else if (activeTab === "completed") {
       matchesTab = order.status === "delivered" || order.status === "completed";
-    } else {
+    } else if (activeTab === "sales" || activeTab === "materials") {
       matchesTab = order.type === activeTab;
     }
     
