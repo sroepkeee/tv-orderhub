@@ -356,17 +356,6 @@ export const PriorityView = ({
 
   return (
     <div className="space-y-6">
-      {/* Header with View Controls */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-primary">
-            Todos os Pedidos
-          </h2>
-          <p className="text-sm text-muted-foreground mt-1">
-            {sortedOrders.length} pedidos no total
-          </p>
-        </div>
-      </div>
 
       <ViewControls
         sortBy={sortBy}
