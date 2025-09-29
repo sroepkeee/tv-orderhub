@@ -94,6 +94,8 @@ All colors MUST be HSL.
     --status-scheduled-bg: 217 92% 92%;
     --status-pickup: 217 92% 76%;
     --status-pickup-bg: 217 92% 95%;
+    --status-collected: 160 84% 39%;
+    --status-collected-bg: 160 84% 94%;
     
     /* Status colors - Conclusão */
     --status-delivered: 142 77% 43%;
@@ -226,6 +228,8 @@ All colors MUST be HSL.
     --status-scheduled-bg: 217 50% 15%;
     --status-pickup: 217 92% 80%;
     --status-pickup-bg: 217 50% 15%;
+    --status-collected: 160 84% 55%;
+    --status-collected-bg: 160 50% 15%;
     
     /* Status Colors - Dark Mode - Conclusão */
     --status-delivered: 142 77% 55%;

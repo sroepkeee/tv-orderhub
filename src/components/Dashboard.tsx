@@ -26,7 +26,7 @@ type OrderStatus =
   // Fase de Embalagem/Conferência
   | "in_quality_check" | "in_packaging" | "ready_for_shipping"
   // Fase de Expedição/Logística
-  | "released_for_shipping" | "in_expedition" | "in_transit" | "pickup_scheduled" | "awaiting_pickup"
+  | "released_for_shipping" | "in_expedition" | "in_transit" | "pickup_scheduled" | "awaiting_pickup" | "collected"
   // Fase de Conclusão
   | "delivered" | "completed"
   // Status de Exceção/Problemas
@@ -338,6 +338,7 @@ export const Dashboard = () => {
       "in_transit": "Em Trânsito",
       "pickup_scheduled": "Retirada Agendada",
       "awaiting_pickup": "Aguardando Retirada",
+      "collected": "Coletado",
       // Conclusão
       "delivered": "Entregue",
       "completed": "Finalizado",
@@ -373,6 +374,7 @@ export const Dashboard = () => {
       "in_transit": "bg-status-transit-bg text-status-transit",
       "pickup_scheduled": "bg-status-scheduled-bg text-status-scheduled",
       "awaiting_pickup": "bg-status-pickup-bg text-status-pickup",
+      "collected": "bg-status-collected-bg text-status-collected",
       // Conclusão
       "delivered": "bg-status-delivered-bg text-status-delivered",
       "completed": "bg-status-completed-bg text-status-completed",

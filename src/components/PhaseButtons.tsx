@@ -75,6 +75,7 @@ export const PhaseButtons = ({ order, onStatusChange }: PhaseButtonsProps) => {
         { value: "in_transit", label: "Em Trânsito" },
         { value: "pickup_scheduled", label: "Retirada Agendada" },
         { value: "awaiting_pickup", label: "Aguardando Retirada" },
+        { value: "collected", label: "Coletado" },
       ]
     },
     {
