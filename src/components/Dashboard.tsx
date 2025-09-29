@@ -318,14 +318,83 @@ export const Dashboard = () => {
   };
 
   const handleStatusChange = (orderId: string, newStatus: OrderStatus) => {
+    const order = orders.find(o => o.id === orderId);
+    const previousStatus = order?.status;
+    
     setOrders(prev => prev.map(order => 
       order.id === orderId ? { ...order, status: newStatus } : order
     ));
-    const order = orders.find(o => o.id === orderId);
+    
+    // Save to history
+    if (order && previousStatus) {
+      saveOrderHistory(orderId, previousStatus, newStatus, order.orderNumber);
+    }
+    
     toast({
       title: "Status atualizado",
       description: `Pedido ${order?.orderNumber} movido para ${getStatusLabel(newStatus)}`,
     });
+  };
+
+  const saveOrderHistory = (
+    orderId: string, 
+    previousStatus: OrderStatus, 
+    newStatus: OrderStatus,
+    orderNumber: string
+  ) => {
+    const historyKey = `orderHistory_${orderId}`;
+    const existingHistory = localStorage.getItem(historyKey);
+    const history = existingHistory ? JSON.parse(existingHistory) : { orderId, events: [] };
+    
+    const getPhaseFromStatus = (status: OrderStatus): string => {
+      const phaseMap: Record<string, string> = {
+        "pending": "Preparação",
+        "in_analysis": "Preparação",
+        "awaiting_approval": "Preparação",
+        "planned": "Preparação",
+        "separation_started": "Produção",
+        "in_production": "Produção",
+        "awaiting_material": "Produção",
+        "separation_completed": "Produção",
+        "production_completed": "Produção",
+        "in_quality_check": "Embalagem",
+        "in_packaging": "Embalagem",
+        "ready_for_shipping": "Embalagem",
+        "released_for_shipping": "Expedição",
+        "in_expedition": "Expedição",
+        "in_transit": "Expedição",
+        "pickup_scheduled": "Expedição",
+        "awaiting_pickup": "Expedição",
+        "collected": "Expedição",
+        "delivered": "Conclusão",
+        "completed": "Conclusão",
+        "cancelled": "Exceção",
+        "on_hold": "Exceção",
+        "delayed": "Exceção",
+        "returned": "Exceção",
+      };
+      return phaseMap[status] || "Outro";
+    };
+
+    const newEvent = {
+      id: `evt_${Date.now()}`,
+      timestamp: new Date().toISOString(),
+      date: new Date().toISOString().split('T')[0],
+      time: new Date().toTimeString().split(' ')[0].substring(0, 5),
+      type: "status_change",
+      action: "Mudança de Status",
+      description: `Status alterado de "${getStatusLabel(previousStatus)}" para "${getStatusLabel(newStatus)}"`,
+      userId: userId,
+      userName: `Usuário ${userId}`,
+      previousStatus: previousStatus,
+      newStatus: newStatus,
+      previousPhase: getPhaseFromStatus(previousStatus),
+      newPhase: getPhaseFromStatus(newStatus),
+      orderNumber: orderNumber,
+    };
+
+    history.events.push(newEvent);
+    localStorage.setItem(historyKey, JSON.stringify(history));
   };
 
   const getStatusLabel = (status: string) => {
@@ -484,6 +553,7 @@ export const Dashboard = () => {
           onDuplicate={handleDuplicateOrder}
           onApprove={handleApproveOrder}
           onCancel={handleCancelOrder}
+          onStatusChange={handleStatusChange}
           onRowClick={(order) => {
             setSelectedOrder(order);
             setShowEditDialog(true);

@@ -338,6 +338,14 @@ All colors MUST be HSL.
     @apply px-2 py-1 rounded-full text-xs font-medium;
   }
 
+  .order-card {
+    @apply transition-all duration-200;
+  }
+
+  .order-card:hover {
+    @apply scale-[1.01] shadow-xl;
+  }
+
   @keyframes priorityBlink {
     0%, 100% {
       color: hsl(var(--priority-high));
@@ -345,5 +353,24 @@ All colors MUST be HSL.
     50% {
       color: hsl(var(--destructive));
     }
+  }
+
+  @keyframes statusChange {
+    0% {
+      transform: scale(1);
+      box-shadow: 0 0 0 0 hsl(var(--primary) / 0.4);
+    }
+    50% {
+      transform: scale(1.02);
+      box-shadow: 0 0 0 10px hsl(var(--primary) / 0);
+    }
+    100% {
+      transform: scale(1);
+      box-shadow: 0 0 0 0 hsl(var(--primary) / 0);
+    }
+  }
+
+  .order-card.status-changing {
+    animation: statusChange 0.6s ease-out;
   }
 }

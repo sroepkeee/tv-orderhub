@@ -22,45 +22,41 @@ interface HistoryEvent {
 }
 
 export const OrderHistoryDialog = ({ order, open, onOpenChange }: OrderHistoryDialogProps) => {
-  // Mock history data - in real app this would come from API
-  const historyEvents: HistoryEvent[] = [
-    {
-      id: "1",
-      date: "2024-01-15",
-      time: "14:30",
-      action: "Pedido Criado",
-      description: `Pedido ${order?.orderNumber} criado com prioridade ${order?.priority}`,
-      user: "João Silva",
-      type: "created"
-    },
-    {
-      id: "2",
-      date: "2024-01-15",
-      time: "14:45",
-      action: "Documento Anexado",
-      description: "Especificações técnicas anexadas",
-      user: "Maria Santos",
-      type: "attachment"
-    },
-    {
-      id: "3",
-      date: "2024-01-16",
-      time: "09:15",
-      action: "Pedido Atualizado",
-      description: "Quantidade alterada de 50 para 75 unidades",
-      user: "Carlos Oliveira",
-      type: "updated"
-    },
-    {
-      id: "4",
-      date: "2024-01-16",
-      time: "11:20",
-      action: "Pedido Aprovado",
-      description: "Pedido aprovado para produção",
-      user: "Ana Costa",
-      type: "approved"
-    },
-  ];
+  // Load history from localStorage
+  const getOrderHistory = (): HistoryEvent[] => {
+    if (!order) return [];
+    
+    const historyKey = `orderHistory_${order.id}`;
+    const savedHistory = localStorage.getItem(historyKey);
+    
+    if (savedHistory) {
+      const history = JSON.parse(savedHistory);
+      return history.events.map((event: any) => ({
+        id: event.id,
+        date: event.date,
+        time: event.time,
+        action: event.action,
+        description: event.description,
+        user: event.userName || "Sistema",
+        type: event.type === "status_change" ? "updated" : event.type,
+      }));
+    }
+    
+    // Default initial event if no history exists
+    return [
+      {
+        id: "1",
+        date: order.createdDate,
+        time: "00:00",
+        action: "Pedido Criado",
+        description: `Pedido ${order.orderNumber} criado com prioridade ${order.priority}`,
+        user: "Sistema",
+        type: "created" as const
+      },
+    ];
+  };
+
+  const historyEvents = getOrderHistory();
 
   const getEventIcon = (type: HistoryEvent["type"]) => {
     switch (type) {
