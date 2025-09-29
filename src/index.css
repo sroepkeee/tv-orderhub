@@ -474,4 +474,10 @@ All colors MUST be HSL.
       transform: translateY(0);
     }
   }
+
+  /* Vertical text for minimized kanban columns */
+  .writing-mode-vertical {
+    writing-mode: vertical-rl;
+    text-orientation: mixed;
+  }
 }
