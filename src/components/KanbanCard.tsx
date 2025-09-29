@@ -1,7 +1,7 @@
 import React from "react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Clock, AlertCircle } from "lucide-react";
+import { Clock, AlertCircle, GripVertical } from "lucide-react";
 import { Order } from "@/components/Dashboard";
 import { useDraggable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
@@ -103,13 +103,21 @@ export const KanbanCard = ({ order, onEdit, onStatusChange }: KanbanCardProps) =
       className={isDragging ? "dragging" : ""}
     >
       <Card
-        {...listeners}
-        {...attributes}
         onClick={() => onEdit(order)}
-        className={`kanban-card p-3 cursor-pointer hover:shadow-lg transition-all duration-200 ${getPriorityClass(
+        className={`relative kanban-card p-3 cursor-pointer hover:shadow-lg transition-all duration-200 ${getPriorityClass(
           order.priority
         )}`}
       >
+        {/* Drag handle */}
+        <button
+          className="absolute right-2 top-2 p-1 rounded hover:bg-muted text-muted-foreground cursor-grab active:cursor-grabbing"
+          {...listeners}
+          {...attributes}
+          onClick={(e) => e.stopPropagation()}
+          aria-label="Arrastar"
+        >
+          <GripVertical className="h-4 w-4" />
+        </button>
       {/* Header */}
       <div className="flex items-start justify-between mb-2">
         <div className="flex flex-col gap-1">
