@@ -8,28 +8,33 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ArrowUpDown, Filter, Layers } from "lucide-react";
+import { ArrowUpDown, Filter, Layers, LayoutGrid, List } from "lucide-react";
 
 export type SortOption = "priority" | "deadline" | "created" | "status";
 export type GroupOption = "priority" | "phase" | "type" | "none";
 export type PhaseFilter = "all" | "preparation" | "production" | "packaging" | "logistics" | "completion";
+export type ViewMode = "list" | "kanban";
 
 interface ViewControlsProps {
   sortBy: SortOption;
   groupBy: GroupOption;
   phaseFilter: PhaseFilter;
+  viewMode: ViewMode;
   onSortChange: (sort: SortOption) => void;
   onGroupChange: (group: GroupOption) => void;
   onPhaseFilterChange: (phase: PhaseFilter) => void;
+  onViewModeChange: (mode: ViewMode) => void;
 }
 
 export const ViewControls = ({
   sortBy,
   groupBy,
   phaseFilter,
+  viewMode,
   onSortChange,
   onGroupChange,
   onPhaseFilterChange,
+  onViewModeChange,
 }: ViewControlsProps) => {
   const sortOptions = [
     { value: "priority" as SortOption, label: "Prioridade" },
@@ -55,8 +60,31 @@ export const ViewControls = ({
   ];
 
   return (
-    <div className="flex items-center gap-3 mb-6">
-      {/* Sort Control */}
+    <div className="flex items-center gap-3 mb-6 flex-wrap">
+      {/* View Mode Toggle */}
+      <div className="flex items-center gap-1 border rounded-lg p-1">
+        <Button
+          variant={viewMode === "list" ? "default" : "ghost"}
+          size="sm"
+          className="gap-2"
+          onClick={() => onViewModeChange("list")}
+        >
+          <List className="h-4 w-4" />
+          Lista
+        </Button>
+        <Button
+          variant={viewMode === "kanban" ? "default" : "ghost"}
+          size="sm"
+          className="gap-2"
+          onClick={() => onViewModeChange("kanban")}
+        >
+          <LayoutGrid className="h-4 w-4" />
+          Kanban
+        </Button>
+      </div>
+
+      {/* Sort Control (hidden in Kanban view) */}
+      {viewMode === "list" && (
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button variant="outline" size="sm" className="gap-2">
@@ -78,8 +106,10 @@ export const ViewControls = ({
           ))}
         </DropdownMenuContent>
       </DropdownMenu>
+      )}
 
-      {/* Group Control */}
+      {/* Group Control (hidden in Kanban view) */}
+      {viewMode === "list" && (
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button variant="outline" size="sm" className="gap-2">
@@ -101,6 +131,7 @@ export const ViewControls = ({
           ))}
         </DropdownMenuContent>
       </DropdownMenu>
+      )}
 
       {/* Phase Filter */}
       <DropdownMenu>

@@ -4,7 +4,8 @@ import { Progress } from "@/components/ui/progress";
 import { Order } from "./Dashboard";
 import { ActionButtons } from "./ActionButtons";
 import { PhaseButtons } from "./PhaseButtons";
-import { ViewControls, SortOption, GroupOption, PhaseFilter } from "./ViewControls";
+import { ViewControls, SortOption, GroupOption, PhaseFilter, ViewMode } from "./ViewControls";
+import { KanbanView } from "./KanbanView";
 import { ClipboardList, PackageCheck, Boxes, Truck, CheckCircle2 } from "lucide-react";
 
 interface PriorityViewProps {
@@ -29,6 +30,15 @@ export const PriorityView = ({
   const [sortBy, setSortBy] = React.useState<SortOption>("priority");
   const [groupBy, setGroupBy] = React.useState<GroupOption>("priority");
   const [phaseFilter, setPhaseFilter] = React.useState<PhaseFilter>("all");
+  const [viewMode, setViewMode] = React.useState<ViewMode>(() => {
+    const saved = localStorage.getItem("viewMode");
+    return (saved as ViewMode) || "list";
+  });
+
+  const handleViewModeChange = (mode: ViewMode) => {
+    setViewMode(mode);
+    localStorage.setItem("viewMode", mode);
+  };
 
   // Phase mapping helper
   const getPhaseFromStatus = (status: Order["status"]): string => {
@@ -362,20 +372,33 @@ export const PriorityView = ({
         sortBy={sortBy}
         groupBy={groupBy}
         phaseFilter={phaseFilter}
+        viewMode={viewMode}
         onSortChange={setSortBy}
         onGroupChange={setGroupBy}
         onPhaseFilterChange={setPhaseFilter}
+        onViewModeChange={handleViewModeChange}
       />
       
-      {/* Render Groups */}
-      {Object.entries(groupedOrders).map(([groupLabel, orders]) => 
-        renderOrderGroup(groupLabel, orders)
-      )}
-      
-      {sortedOrders.length === 0 && (
-        <div className="text-center py-12 text-muted-foreground">
-          <p className="text-lg">Nenhum pedido encontrado.</p>
-        </div>
+      {/* Orders Display */}
+      {viewMode === "kanban" ? (
+        <KanbanView
+          orders={sortedOrders}
+          onEdit={onEdit}
+          onStatusChange={onStatusChange}
+        />
+      ) : (
+        <>
+          {/* Render Groups */}
+          {Object.entries(groupedOrders).map(([groupLabel, orders]) => 
+            renderOrderGroup(groupLabel, orders)
+          )}
+          
+          {sortedOrders.length === 0 && (
+            <div className="text-center py-12 text-muted-foreground">
+              <p className="text-lg">Nenhum pedido encontrado.</p>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
