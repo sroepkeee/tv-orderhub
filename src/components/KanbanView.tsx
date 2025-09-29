@@ -20,7 +20,7 @@ import {
 } from "@dnd-kit/core";
 import { KanbanCard } from "./KanbanCard";
 
-export type Phase = "preparation" | "production" | "packaging" | "logistics" | "completion";
+export type Phase = "preparation" | "production" | "packaging" | "logistics" | "in_transit" | "completion";
 
 interface KanbanViewProps {
   orders: Order[];
@@ -60,11 +60,12 @@ export const KanbanView = ({ orders, onEdit, onStatusChange }: KanbanViewProps) 
         return "packaging";
       case "released_for_shipping":
       case "in_expedition":
-      case "in_transit":
       case "pickup_scheduled":
       case "awaiting_pickup":
-      case "collected":
         return "logistics";
+      case "in_transit":
+      case "collected":
+        return "in_transit";
       case "delivered":
       case "completed":
       case "cancelled":
@@ -100,6 +101,12 @@ export const KanbanView = ({ orders, onEdit, onStatusChange }: KanbanViewProps) 
       colorClass: "bg-cyan-100 text-cyan-900 dark:bg-cyan-900/30 dark:text-cyan-100",
     },
     {
+      id: "in_transit" as Phase,
+      title: "Em Trânsito",
+      icon: Truck,
+      colorClass: "bg-indigo-100 text-indigo-900 dark:bg-indigo-900/30 dark:text-indigo-100",
+    },
+    {
       id: "completion" as Phase,
       title: "Conclusão",
       icon: CheckCircle2,
@@ -121,6 +128,8 @@ export const KanbanView = ({ orders, onEdit, onStatusChange }: KanbanViewProps) 
         return "in_packaging";
       case "logistics":
         return "in_expedition";
+      case "in_transit":
+        return "in_transit";
       case "completion":
         return "completed";
     }
