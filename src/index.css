@@ -124,8 +124,10 @@ All colors MUST be HSL.
     /* Dashboard specific */
     --dashboard-header: 220 25% 25%;
     --dashboard-nav: 220 20% 30%;
-    --tab-active: 220 25% 25%;
-    --tab-inactive: 220 10% 75%;
+    --dashboard-tabs-bg: 220 20% 92%;
+    --dashboard-tabs-border: 220 15% 85%;
+    --tab-active: 220 70% 50%;
+    --tab-inactive: 220 10% 50%;
 
     --radius: 0.5rem;
 
@@ -258,8 +260,10 @@ All colors MUST be HSL.
     /* Dashboard specific - Dark Mode */
     --dashboard-header: 220 10% 92%;
     --dashboard-nav: 220 20% 15%;
-    --tab-active: 220 10% 85%;
-    --tab-inactive: 220 15% 35%;
+    --dashboard-tabs-bg: 220 25% 15%;
+    --dashboard-tabs-border: 220 20% 22%;
+    --tab-active: 220 70% 60%;
+    --tab-inactive: 220 10% 65%;
 
     --sidebar-background: 240 5.9% 10%;
 

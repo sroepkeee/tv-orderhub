@@ -528,16 +528,25 @@ export const Dashboard = () => {
 
       {/* Tab Navigation */}
       <div className="mb-8">
-        <div className="flex space-x-1 bg-muted p-2 rounded-lg">
+        <div className="flex space-x-1 p-2 rounded-lg border-2" style={{ 
+          background: 'hsl(var(--dashboard-tabs-bg))',
+          borderColor: 'hsl(var(--dashboard-tabs-border))'
+        }}>
           {tabs.map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
               className={`px-6 py-4 rounded-md text-lg font-semibold transition-all duration-200 ${
                 activeTab === tab.id
-                  ? "bg-tab-active text-primary-foreground shadow-md"
-                  : "bg-transparent text-tab-inactive hover:bg-accent hover:text-accent-foreground"
+                  ? "shadow-md"
+                  : "bg-transparent hover:bg-accent/50 hover:text-accent-foreground"
               }`}
+              style={activeTab === tab.id ? {
+                background: 'hsl(var(--tab-active))',
+                color: 'white'
+              } : {
+                color: 'hsl(var(--tab-inactive))'
+              }}
             >
               {tab.name}
             </button>
