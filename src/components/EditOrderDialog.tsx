@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import React, { useState, useEffect } from "react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -8,19 +8,18 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card } from "@/components/ui/card";
-import { Calendar, User, FileText, CheckCircle, XCircle, Clock, History, Edit, Plus, Trash2 } from "lucide-react";
+import { Calendar, User, FileText, CheckCircle, XCircle, Clock, History, Edit, Plus, Trash2, Loader2 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { Order } from "./Dashboard";
 import { OrderItem } from "./AddOrderDialog";
+import { supabase } from "@/integrations/supabase/client";
 
 interface HistoryEvent {
   id: string;
-  date: string;
-  time: string;
-  action: string;
-  description: string;
-  user: string;
-  type: "created" | "updated" | "approved" | "cancelled" | "completed" | "attachment";
+  changed_at: string;
+  old_status: string;
+  new_status: string;
+  user_id: string;
 }
 
 interface EditOrderDialogProps {
@@ -34,14 +33,63 @@ export const EditOrderDialog = ({ order, open, onOpenChange, onSave }: EditOrder
   const { register, handleSubmit, setValue, reset } = useForm<Order>();
   const [activeTab, setActiveTab] = useState("edit");
   const [items, setItems] = useState<OrderItem[]>([]);
+  const [historyEvents, setHistoryEvents] = useState<HistoryEvent[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
 
-  React.useEffect(() => {
+  // Load history from database
+  const loadHistory = async () => {
+    if (!order?.id) return;
+    
+    setLoadingHistory(true);
+    try {
+      const { data, error } = await supabase
+        .from('order_history')
+        .select('*')
+        .eq('order_id', order.id)
+        .order('changed_at', { ascending: false });
+
+      if (error) throw error;
+      setHistoryEvents(data || []);
+    } catch (error) {
+      console.error("Error loading history:", error);
+    } finally {
+      setLoadingHistory(false);
+    }
+  };
+
+  useEffect(() => {
     if (open && order) {
       reset(order);
       setItems(order.items || []);
       setActiveTab("edit");
+      loadHistory();
     }
   }, [open, order, reset]);
+
+  // Real-time subscription for history updates
+  useEffect(() => {
+    if (!open || !order?.id) return;
+
+    const channel = supabase
+      .channel(`order_history_${order.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'order_history',
+          filter: `order_id=eq.${order.id}`
+        },
+        () => {
+          loadHistory();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [open, order?.id]);
 
   const addItem = () => {
     setItems([...items, {
@@ -71,75 +119,47 @@ export const EditOrderDialog = ({ order, open, onOpenChange, onSave }: EditOrder
     onOpenChange(false);
   };
 
-  const getTypeLabel = (type: string) => {
-    switch (type) {
-      case "production": return "Produção";
-      case "sales": return "Vendas";
-      case "materials": return "Materiais";
-      default: return type;
-    }
+  const getStatusLabel = (status: string) => {
+    const statusMap: Record<string, string> = {
+      pending: "Pendente",
+      planned: "Planejado",
+      in_production: "Em Produção",
+      in_transit: "Em Trânsito",
+      delivered: "Entregue",
+      completed: "Concluído",
+      cancelled: "Cancelado",
+      in_analysis: "Em Análise",
+      awaiting_approval: "Aguardando Aprovação",
+      separation_started: "Separação Iniciada",
+      awaiting_material: "Aguardando Material",
+      separation_completed: "Separação Concluída",
+      production_completed: "Produção Concluída",
+      in_quality_check: "Em Conferência de Qualidade",
+      in_packaging: "Em Embalagem",
+      ready_for_shipping: "Pronto para Expedição",
+      released_for_shipping: "Liberado para Expedição",
+      in_expedition: "Em Expedição",
+      pickup_scheduled: "Coleta Agendada",
+      awaiting_pickup: "Aguardando Coleta",
+      collected: "Coletado",
+      on_hold: "Em Espera",
+      delayed: "Atrasado",
+      returned: "Devolvido"
+    };
+    return statusMap[status] || status;
   };
 
-  // Mock history data
-  const historyEvents: HistoryEvent[] = [
-    {
-      id: "1",
-      date: order?.createdDate || "2024-01-15",
-      time: "14:30",
-      action: "Pedido Criado",
-      description: `Pedido ${order?.orderNumber} criado com prioridade ${order?.priority}`,
-      user: "João Silva",
-      type: "created"
-    },
-    {
-      id: "2",
-      date: order?.createdDate || "2024-01-15",
-      time: "14:45",
-      action: "Documento Anexado",
-      description: "Especificações técnicas anexadas",
-      user: "Maria Santos",
-      type: "attachment"
-    },
-    {
-      id: "3",
-      date: order?.createdDate || "2024-01-16",
-      time: "09:15",
-      action: "Pedido Atualizado",
-      description: "Quantidade alterada",
-      user: "Carlos Oliveira",
-      type: "updated"
-    },
-  ];
-
-  const getEventIcon = (type: HistoryEvent["type"]) => {
-    switch (type) {
-      case "created":
-        return <FileText className="h-4 w-4 text-blue-500" />;
-      case "updated":
-        return <Clock className="h-4 w-4 text-yellow-500" />;
-      case "approved":
-        return <CheckCircle className="h-4 w-4 text-green-500" />;
-      case "cancelled":
-        return <XCircle className="h-4 w-4 text-red-500" />;
-      case "completed":
-        return <CheckCircle className="h-4 w-4 text-green-600" />;
-      case "attachment":
-        return <FileText className="h-4 w-4 text-purple-500" />;
-      default:
-        return <Clock className="h-4 w-4 text-gray-500" />;
-    }
+  const getEventIcon = (oldStatus: string, newStatus: string) => {
+    if (newStatus === "cancelled") return <XCircle className="h-4 w-4 text-red-500" />;
+    if (newStatus === "completed" || newStatus === "delivered") return <CheckCircle className="h-4 w-4 text-green-500" />;
+    if (newStatus === "pending") return <FileText className="h-4 w-4 text-blue-500" />;
+    return <Clock className="h-4 w-4 text-yellow-500" />;
   };
 
-  const getEventBadgeVariant = (type: HistoryEvent["type"]) => {
-    switch (type) {
-      case "approved":
-      case "completed":
-        return "default" as const;
-      case "cancelled":
-        return "destructive" as const;
-      default:
-        return "secondary" as const;
-    }
+  const getEventBadgeVariant = (status: string): "default" | "destructive" | "secondary" => {
+    if (status === "completed" || status === "delivered") return "default";
+    if (status === "cancelled") return "destructive";
+    return "secondary";
   };
 
   return (
@@ -147,6 +167,9 @@ export const EditOrderDialog = ({ order, open, onOpenChange, onSave }: EditOrder
       <DialogContent className="max-w-4xl max-h-[90vh]">
         <DialogHeader>
           <DialogTitle>Pedido #{order?.orderNumber}</DialogTitle>
+          <DialogDescription>
+            Visualize e edite os detalhes do pedido ou acompanhe seu histórico de movimentações
+          </DialogDescription>
         </DialogHeader>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
@@ -354,36 +377,54 @@ export const EditOrderDialog = ({ order, open, onOpenChange, onSave }: EditOrder
                 </div>
               </div>
 
-              <ScrollArea className="h-[500px]">
-                <div className="space-y-4">
-                  {historyEvents.map((event) => (
-                    <div key={event.id} className="flex gap-4 p-4 border rounded-lg">
-                      <div className="flex-shrink-0">
-                        {getEventIcon(event.type)}
-                      </div>
-                      <div className="flex-1 space-y-2">
-                        <div className="flex items-center justify-between">
-                          <h4 className="font-medium">{event.action}</h4>
-                          <Badge variant={getEventBadgeVariant(event.type)} className="text-xs">
-                            {event.type}
-                          </Badge>
-                        </div>
-                        <p className="text-sm text-muted-foreground">{event.description}</p>
-                        <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                          <span className="flex items-center gap-1">
-                            <Calendar className="h-3 w-3" />
-                            {new Date(event.date).toLocaleDateString('pt-BR')} às {event.time}
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <User className="h-3 w-3" />
-                            {event.user}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
+              {loadingHistory ? (
+                <div className="flex items-center justify-center h-[400px]">
+                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                 </div>
-              </ScrollArea>
+              ) : historyEvents.length === 0 ? (
+                <Card className="p-8 text-center">
+                  <History className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                  <p className="text-muted-foreground">
+                    Nenhuma movimentação registrada ainda
+                  </p>
+                </Card>
+              ) : (
+                <ScrollArea className="h-[500px]">
+                  <div className="space-y-4">
+                    {historyEvents.map((event) => (
+                      <div key={event.id} className="flex gap-4 p-4 border rounded-lg">
+                        <div className="flex-shrink-0">
+                          {getEventIcon(event.old_status, event.new_status)}
+                        </div>
+                        <div className="flex-1 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <h4 className="font-medium">Mudança de Status</h4>
+                            <Badge variant={getEventBadgeVariant(event.new_status)} className="text-xs">
+                              {getStatusLabel(event.new_status)}
+                            </Badge>
+                          </div>
+                          <p className="text-sm text-muted-foreground">
+                            De <span className="font-medium">{getStatusLabel(event.old_status)}</span> para{" "}
+                            <span className="font-medium">{getStatusLabel(event.new_status)}</span>
+                          </p>
+                          <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                            <span className="flex items-center gap-1">
+                              <Calendar className="h-3 w-3" />
+                              {new Date(event.changed_at).toLocaleString('pt-BR', {
+                                day: '2-digit',
+                                month: '2-digit',
+                                year: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              })}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </ScrollArea>
+              )}
             </div>
           </TabsContent>
         </Tabs>

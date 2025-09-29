@@ -378,9 +378,11 @@ export const PriorityView = ({
       ) : (
         <>
           {/* Render Groups */}
-          {Object.entries(groupedOrders).map(([groupLabel, orders]) => 
-            renderOrderGroup(groupLabel, orders)
-          )}
+          {Object.entries(groupedOrders).map(([groupLabel, orders]) => (
+            <React.Fragment key={groupLabel}>
+              {renderOrderGroup(groupLabel, orders)}
+            </React.Fragment>
+          ))}
           
           {sortedOrders.length === 0 && (
             <div className="text-center py-12 text-muted-foreground">

@@ -346,6 +346,16 @@ export const Dashboard = () => {
 
       if (orderError) throw orderError;
 
+      // Register creation in history
+      await supabase
+        .from('order_history')
+        .insert({
+          order_id: orderRow.id,
+          user_id: user.id,
+          old_status: 'pending',
+          new_status: 'pending'
+        });
+
       // Insert all items
       if (orderData.items && orderData.items.length > 0) {
         const itemsToInsert = orderData.items.map((item: any) => ({
@@ -495,6 +505,9 @@ export const Dashboard = () => {
   const handleApproveOrder = async (orderId: string) => {
     if (!user) return;
 
+    const order = orders.find(o => o.id === orderId);
+    if (!order) return;
+
     try {
       const { error } = await supabase
         .from('orders')
@@ -503,6 +516,9 @@ export const Dashboard = () => {
         .eq('user_id', user.id);
 
       if (error) throw error;
+
+      // Register in history
+      await saveOrderHistory(orderId, order.status, "planned", order.orderNumber);
 
       await loadOrders();
       
@@ -522,6 +538,9 @@ export const Dashboard = () => {
   const handleCancelOrder = async (orderId: string) => {
     if (!user) return;
 
+    const order = orders.find(o => o.id === orderId);
+    if (!order) return;
+
     try {
       const { error } = await supabase
         .from('orders')
@@ -530,6 +549,9 @@ export const Dashboard = () => {
         .eq('user_id', user.id);
 
       if (error) throw error;
+
+      // Register in history
+      await saveOrderHistory(orderId, order.status, "cancelled", order.orderNumber);
 
       await loadOrders();
       
