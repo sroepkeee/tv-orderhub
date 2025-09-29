@@ -14,7 +14,10 @@ import { PhaseButtons } from "./PhaseButtons";
 import { ColumnSettings, ColumnVisibility } from "./ColumnSettings";
 import { DateRangeFilter } from "./DateRangeFilter";
 import { UserMenu } from "./UserMenu";
+
 import { toast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
 
 // Types
 type Priority = "high" | "medium" | "low";
@@ -147,27 +150,18 @@ const tabs = [
 ];
 
 export const Dashboard = () => {
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
-  const [orders, setOrders] = useState<Order[]>(mockOrders);
+  const [orders, setOrders] = useState<Order[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
-  
-  // User ID state with localStorage persistence
-  const [userId, setUserId] = useState<string>(() => {
-    const saved = localStorage.getItem("currentUserId");
-    return saved || "default-user";
-  });
-
-  // Save user ID to localStorage whenever it changes
-  useEffect(() => {
-    localStorage.setItem("currentUserId", userId);
-  }, [userId]);
+  const [loading, setLoading] = useState(true);
   
   // Column visibility state with user-specific localStorage persistence
   const [columnVisibility, setColumnVisibility] = useState<ColumnVisibility>(() => {
-    const saved = localStorage.getItem(`columnVisibility_${userId}`);
+    const saved = user ? localStorage.getItem(`columnVisibility_${user.id}`) : null;
     return saved ? JSON.parse(saved) : {
       priority: true,
       orderNumber: true,
@@ -185,18 +179,60 @@ export const Dashboard = () => {
     };
   });
 
-  // Save column visibility to localStorage whenever it changes or user changes
+  // Save column visibility to localStorage whenever it changes
   useEffect(() => {
-    localStorage.setItem(`columnVisibility_${userId}`, JSON.stringify(columnVisibility));
-  }, [columnVisibility, userId]);
-
-  // Reload column visibility when user changes
-  useEffect(() => {
-    const saved = localStorage.getItem(`columnVisibility_${userId}`);
-    if (saved) {
-      setColumnVisibility(JSON.parse(saved));
+    if (user) {
+      localStorage.setItem(`columnVisibility_${user.id}`, JSON.stringify(columnVisibility));
     }
-  }, [userId]);
+  }, [columnVisibility, user]);
+
+  // Load orders from Supabase
+  useEffect(() => {
+    if (user) {
+      loadOrders();
+    }
+  }, [user]);
+
+  const loadOrders = async () => {
+    if (!user) return;
+    
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('orders')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      // Transform data from database to match Order interface
+      const transformedOrders: Order[] = (data || []).map((dbOrder) => ({
+        id: dbOrder.id,
+        type: dbOrder.order_type as OrderType,
+        priority: dbOrder.priority as Priority,
+        orderNumber: dbOrder.order_number,
+        item: dbOrder.customer_name, // Usando customer_name como item
+        description: dbOrder.notes || "",
+        quantity: 0, // Não temos quantidade no schema atual
+        createdDate: new Date(dbOrder.created_at).toISOString().split('T')[0],
+        status: dbOrder.status as OrderStatus,
+        client: dbOrder.customer_name,
+        deliveryDeadline: dbOrder.delivery_date,
+        deskTicket: dbOrder.order_number, // Usando order_number como deskTicket
+      }));
+
+      setOrders(transformedOrders);
+    } catch (error: any) {
+      toast({
+        title: "Erro ao carregar pedidos",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const getPriorityClass = (priority: Priority) => {
     switch (priority) {
@@ -262,15 +298,42 @@ export const Dashboard = () => {
   });
 
   // Action handlers
-  const handleAddOrder = (orderData: any) => {
-    const newOrder: Order = {
-      ...orderData,
-      id: Date.now().toString(),
-      orderNumber: generateOrderNumber(orderData.type),
-      createdDate: new Date().toISOString().split('T')[0],
-      status: "pending" as OrderStatus,
-    };
-    setOrders(prev => [newOrder, ...prev]);
+  const handleAddOrder = async (orderData: any) => {
+    if (!user) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('orders')
+        .insert({
+          user_id: user.id,
+          order_number: generateOrderNumber(orderData.type),
+          customer_name: orderData.client,
+          delivery_address: orderData.client, // Usando client como endereço por enquanto
+          delivery_date: orderData.deliveryDeadline,
+          status: "pending",
+          priority: orderData.priority,
+          order_type: orderData.type,
+          notes: orderData.description,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      // Reload orders
+      await loadOrders();
+      
+      toast({
+        title: "Pedido criado com sucesso!",
+        description: `Novo pedido foi adicionado.`,
+      });
+    } catch (error: any) {
+      toast({
+        title: "Erro ao criar pedido",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
   };
 
   const generateOrderNumber = (type: OrderType) => {
@@ -280,121 +343,191 @@ export const Dashboard = () => {
     return `${prefix}-${year}-${count.toString().padStart(3, '0')}`;
   };
 
-  const handleEditOrder = (updatedOrder: Order) => {
-    setOrders(prev => prev.map(order => 
-      order.id === updatedOrder.id ? updatedOrder : order
-    ));
-    toast({
-      title: "Pedido atualizado",
-      description: `Pedido ${updatedOrder.orderNumber} foi atualizado com sucesso.`,
-    });
+  const handleEditOrder = async (updatedOrder: Order) => {
+    if (!user) return;
+
+    try {
+      const { error } = await supabase
+        .from('orders')
+        .update({
+          customer_name: updatedOrder.client,
+          delivery_address: updatedOrder.client,
+          delivery_date: updatedOrder.deliveryDeadline,
+          status: updatedOrder.status,
+          priority: updatedOrder.priority,
+          order_type: updatedOrder.type,
+          notes: updatedOrder.description,
+        })
+        .eq('id', updatedOrder.id)
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+
+      // Reload orders
+      await loadOrders();
+      
+      toast({
+        title: "Pedido atualizado",
+        description: `Pedido ${updatedOrder.orderNumber} foi atualizado com sucesso.`,
+      });
+    } catch (error: any) {
+      toast({
+        title: "Erro ao atualizar pedido",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
   };
 
-  const handleDuplicateOrder = (originalOrder: Order) => {
-    const duplicatedOrder: Order = {
-      ...originalOrder,
-      id: Date.now().toString(),
-      orderNumber: generateOrderNumber(originalOrder.type),
-      createdDate: new Date().toISOString().split('T')[0],
-      status: "pending" as OrderStatus,
-    };
-    setOrders(prev => [duplicatedOrder, ...prev]);
+  const handleDuplicateOrder = async (originalOrder: Order) => {
+    if (!user) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('orders')
+        .insert({
+          user_id: user.id,
+          order_number: generateOrderNumber(originalOrder.type),
+          customer_name: originalOrder.client,
+          delivery_address: originalOrder.client,
+          delivery_date: originalOrder.deliveryDeadline,
+          status: "pending",
+          priority: originalOrder.priority,
+          order_type: originalOrder.type,
+          notes: originalOrder.description,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      await loadOrders();
+      
+      toast({
+        title: "Pedido duplicado",
+        description: "Um novo pedido foi criado com base no original.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Erro ao duplicar pedido",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
   };
 
-  const handleApproveOrder = (orderId: string) => {
-    setOrders(prev => prev.map(order => 
-      order.id === orderId ? { ...order, status: "planned" as OrderStatus } : order
-    ));
-    toast({
-      title: "Pedido aprovado",
-      description: "Pedido foi planejado e aprovado para produção.",
-    });
+  const handleApproveOrder = async (orderId: string) => {
+    if (!user) return;
+
+    try {
+      const { error } = await supabase
+        .from('orders')
+        .update({ status: "planned" })
+        .eq('id', orderId)
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+
+      await loadOrders();
+      
+      toast({
+        title: "Pedido aprovado",
+        description: "Pedido foi planejado e aprovado para produção.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Erro ao aprovar pedido",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
   };
 
-  const handleCancelOrder = (orderId: string) => {
-    setOrders(prev => prev.map(order => 
-      order.id === orderId ? { ...order, status: "cancelled" as OrderStatus } : order
-    ));
+  const handleCancelOrder = async (orderId: string) => {
+    if (!user) return;
+
+    try {
+      const { error } = await supabase
+        .from('orders')
+        .update({ status: "cancelled" })
+        .eq('id', orderId)
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+
+      await loadOrders();
+      
+      toast({
+        title: "Pedido cancelado",
+        description: "Pedido foi marcado como cancelado.",
+        variant: "destructive",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Erro ao cancelar pedido",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
   };
 
-  const handleStatusChange = (orderId: string, newStatus: OrderStatus) => {
+  const handleStatusChange = async (orderId: string, newStatus: OrderStatus) => {
+    if (!user) return;
+
     const order = orders.find(o => o.id === orderId);
     const previousStatus = order?.status;
     
-    setOrders(prev => prev.map(order => 
-      order.id === orderId ? { ...order, status: newStatus } : order
-    ));
-    
-    // Save to history
-    if (order && previousStatus) {
-      saveOrderHistory(orderId, previousStatus, newStatus, order.orderNumber);
+    try {
+      const { error } = await supabase
+        .from('orders')
+        .update({ status: newStatus })
+        .eq('id', orderId)
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+
+      // Save to history
+      if (order && previousStatus) {
+        await saveOrderHistory(orderId, previousStatus, newStatus, order.orderNumber);
+      }
+
+      await loadOrders();
+      
+      toast({
+        title: "Status atualizado",
+        description: `Pedido ${order?.orderNumber} movido para ${getStatusLabel(newStatus)}`,
+      });
+    } catch (error: any) {
+      toast({
+        title: "Erro ao atualizar status",
+        description: error.message,
+        variant: "destructive",
+      });
     }
-    
-    toast({
-      title: "Status atualizado",
-      description: `Pedido ${order?.orderNumber} movido para ${getStatusLabel(newStatus)}`,
-    });
   };
 
-  const saveOrderHistory = (
+  const saveOrderHistory = async (
     orderId: string, 
     previousStatus: OrderStatus, 
     newStatus: OrderStatus,
     orderNumber: string
   ) => {
-    const historyKey = `orderHistory_${orderId}`;
-    const existingHistory = localStorage.getItem(historyKey);
-    const history = existingHistory ? JSON.parse(existingHistory) : { orderId, events: [] };
-    
-    const getPhaseFromStatus = (status: OrderStatus): string => {
-      const phaseMap: Record<string, string> = {
-        "pending": "Preparação",
-        "in_analysis": "Preparação",
-        "awaiting_approval": "Preparação",
-        "planned": "Preparação",
-        "separation_started": "Produção",
-        "in_production": "Produção",
-        "awaiting_material": "Produção",
-        "separation_completed": "Produção",
-        "production_completed": "Produção",
-        "in_quality_check": "Embalagem",
-        "in_packaging": "Embalagem",
-        "ready_for_shipping": "Embalagem",
-        "released_for_shipping": "Expedição",
-        "in_expedition": "Expedição",
-        "in_transit": "Expedição",
-        "pickup_scheduled": "Expedição",
-        "awaiting_pickup": "Expedição",
-        "collected": "Expedição",
-        "delivered": "Conclusão",
-        "completed": "Conclusão",
-        "cancelled": "Exceção",
-        "on_hold": "Exceção",
-        "delayed": "Exceção",
-        "returned": "Exceção",
-      };
-      return phaseMap[status] || "Outro";
-    };
+    if (!user) return;
 
-    const newEvent = {
-      id: `evt_${Date.now()}`,
-      timestamp: new Date().toISOString(),
-      date: new Date().toISOString().split('T')[0],
-      time: new Date().toTimeString().split(' ')[0].substring(0, 5),
-      type: "status_change",
-      action: "Mudança de Status",
-      description: `Status alterado de "${getStatusLabel(previousStatus)}" para "${getStatusLabel(newStatus)}"`,
-      userId: userId,
-      userName: `Usuário ${userId}`,
-      previousStatus: previousStatus,
-      newStatus: newStatus,
-      previousPhase: getPhaseFromStatus(previousStatus),
-      newPhase: getPhaseFromStatus(newStatus),
-      orderNumber: orderNumber,
-    };
+    try {
+      const { error } = await supabase
+        .from('order_history')
+        .insert({
+          order_id: orderId,
+          user_id: user.id,
+          old_status: previousStatus,
+          new_status: newStatus,
+        });
 
-    history.events.push(newEvent);
-    localStorage.setItem(historyKey, JSON.stringify(history));
+      if (error) throw error;
+    } catch (error: any) {
+      console.error("Erro ao salvar histórico:", error.message);
+    }
   };
 
   const getStatusLabel = (status: string) => {
@@ -520,10 +653,7 @@ export const Dashboard = () => {
             visibility={columnVisibility}
             onVisibilityChange={setColumnVisibility}
           />
-          <UserMenu
-            currentUserId={userId}
-            onUserIdChange={setUserId}
-          />
+          <UserMenu />
           <AddOrderDialog onAddOrder={handleAddOrder} />
         </div>
       </div>
@@ -557,8 +687,15 @@ export const Dashboard = () => {
       </div>
 
       {/* Content */}
-      {activeTab === "all" ? (
-        <PriorityView 
+      {loading ? (
+        <div className="flex items-center justify-center py-20">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+            <p className="text-muted-foreground">Carregando pedidos...</p>
+          </div>
+        </div>
+      ) : activeTab === "all" ? (
+        <PriorityView
           orders={filteredOrders}
           onEdit={handleEditOrder}
           onDuplicate={handleDuplicateOrder}

@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+import React from "react";
+import { useNavigate } from "react-router-dom";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -8,50 +9,35 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { User, Sun, Moon, LogOut, Settings } from "lucide-react";
+import { User, Sun, Moon, LogOut } from "lucide-react";
 import { useTheme } from "next-themes";
 import { toast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
 
-interface UserMenuProps {
-  currentUserId: string;
-  onUserIdChange: (userId: string) => void;
-}
-
-export const UserMenu = ({ currentUserId, onUserIdChange }: UserMenuProps) => {
+export const UserMenu = () => {
   const { theme, setTheme } = useTheme();
-  const [userDialogOpen, setUserDialogOpen] = useState(false);
-  const [tempUserId, setTempUserId] = useState(currentUserId);
+  const { user, signOut } = useAuth();
+  const navigate = useNavigate();
 
   const handleThemeToggle = () => {
     setTheme(theme === "dark" ? "light" : "dark");
   };
 
-  const handleUserIdSave = () => {
-    if (!tempUserId.trim()) {
+  const handleLogout = async () => {
+    try {
+      await signOut();
+      toast({
+        title: "Desconectado",
+        description: "Você foi desconectado com sucesso.",
+      });
+      navigate("/auth");
+    } catch (error: any) {
       toast({
         title: "Erro",
-        description: "O ID do usuário não pode estar vazio.",
+        description: "Não foi possível desconectar.",
         variant: "destructive",
       });
-      return;
     }
-
-    onUserIdChange(tempUserId.trim());
-    setUserDialogOpen(false);
-    toast({
-      title: "Usuário atualizado",
-      description: `Usuário configurado como: ${tempUserId.trim()}`,
-    });
-  };
-
-  const handleLogout = () => {
-    toast({
-      title: "Saindo...",
-      description: "Você será desconectado do sistema.",
-    });
-    // Aqui você pode adicionar lógica de logout real no futuro
   };
 
   return (
@@ -65,16 +51,11 @@ export const UserMenu = ({ currentUserId, onUserIdChange }: UserMenuProps) => {
         <DropdownMenuContent align="end" className="w-56 bg-popover z-50">
           <DropdownMenuLabel>
             <div className="flex flex-col">
-              <span className="text-sm font-medium">Usuário</span>
-              <span className="text-xs text-muted-foreground">{currentUserId}</span>
+              <span className="text-sm font-medium">Conta</span>
+              <span className="text-xs text-muted-foreground">{user?.email}</span>
             </div>
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
-          
-          <DropdownMenuItem onClick={() => setUserDialogOpen(true)}>
-            <Settings className="mr-2 h-4 w-4" />
-            <span>Configurações</span>
-          </DropdownMenuItem>
 
           <DropdownMenuItem onClick={handleThemeToggle}>
             {theme === "dark" ? (
@@ -98,42 +79,6 @@ export const UserMenu = ({ currentUserId, onUserIdChange }: UserMenuProps) => {
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
-
-      {/* Dialog para editar usuário */}
-      <Dialog open={userDialogOpen} onOpenChange={setUserDialogOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Settings className="h-5 w-5" />
-              Configurações do Usuário
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <label htmlFor="userId" className="text-sm font-medium">
-                ID do Usuário
-              </label>
-              <Input
-                id="userId"
-                value={tempUserId}
-                onChange={(e) => setTempUserId(e.target.value)}
-                placeholder="Digite seu ID"
-              />
-              <p className="text-sm text-muted-foreground">
-                Suas preferências de visualização de colunas serão salvas com este ID.
-              </p>
-            </div>
-          </div>
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => setUserDialogOpen(false)}>
-              Cancelar
-            </Button>
-            <Button onClick={handleUserIdSave}>
-              Salvar
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
     </>
   );
 };
