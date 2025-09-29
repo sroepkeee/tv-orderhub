@@ -6,7 +6,6 @@ import { Search, Calendar } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { AddOrderDialog } from "./AddOrderDialog";
 import { EditOrderDialog } from "./EditOrderDialog";
-import { OrderHistoryDialog } from "./OrderHistoryDialog";
 import { ActionButtons } from "./ActionButtons";
 import { PriorityView } from "./PriorityView";
 import { PhaseButtons } from "./PhaseButtons";
@@ -147,7 +146,6 @@ export const Dashboard = () => {
   const [orders, setOrders] = useState<Order[]>(mockOrders);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [showEditDialog, setShowEditDialog] = useState(false);
-  const [showHistoryDialog, setShowHistoryDialog] = useState(false);
   
   // Column visibility state with localStorage persistence
   const [columnVisibility, setColumnVisibility] = useState<ColumnVisibility>(() => {
@@ -368,7 +366,6 @@ export const Dashboard = () => {
     
     setSelectedOrder(order);
     setShowEditDialog(true);
-    setShowHistoryDialog(true);
   };
 
   return (
@@ -428,7 +425,6 @@ export const Dashboard = () => {
           onRowClick={(order) => {
             setSelectedOrder(order);
             setShowEditDialog(true);
-            setShowHistoryDialog(true);
           }}
         />
       ) : (
@@ -527,21 +523,14 @@ export const Dashboard = () => {
         </div>
       )}
 
-      {/* Edit and History Dialogs */}
+      {/* Edit Dialog with integrated History */}
       {selectedOrder && (
-        <>
-          <EditOrderDialog
-            order={selectedOrder}
-            open={showEditDialog}
-            onOpenChange={setShowEditDialog}
-            onSave={handleEditOrder}
-          />
-          <OrderHistoryDialog
-            order={selectedOrder}
-            open={showHistoryDialog}
-            onOpenChange={setShowHistoryDialog}
-          />
-        </>
+        <EditOrderDialog
+          order={selectedOrder}
+          open={showEditDialog}
+          onOpenChange={setShowEditDialog}
+          onSave={handleEditOrder}
+        />
       )}
     </div>
   );
