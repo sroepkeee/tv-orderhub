@@ -13,7 +13,7 @@ interface KanbanCardProps {
 }
 
 export const KanbanCard = ({ order, onEdit, onStatusChange }: KanbanCardProps) => {
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+  const { attributes, listeners, setNodeRef, transform, isDragging, setActivatorNodeRef } = useDraggable({
     id: order.id,
   });
 
@@ -110,10 +110,12 @@ export const KanbanCard = ({ order, onEdit, onStatusChange }: KanbanCardProps) =
         >
         {/* Drag handle */}
         <button
+          ref={setActivatorNodeRef}
           className="absolute right-2 top-2 p-1 rounded hover:bg-muted text-muted-foreground cursor-grab active:cursor-grabbing"
           {...listeners}
           {...attributes}
           onClick={(e) => e.stopPropagation()}
+          onPointerDown={(e) => e.stopPropagation()}
           aria-label="Arrastar"
         >
           <GripVertical className="h-4 w-4" />
