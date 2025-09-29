@@ -131,11 +131,17 @@ export const KanbanCard = ({ order, onEdit, onStatusChange }: KanbanCardProps) =
         </Badge>
       </div>
 
-      {/* Item and Description */}
+      {/* Items Summary */}
       <div className="mb-2">
-        <p className="text-sm font-medium truncate">{order.item}</p>
+        <p className="text-sm font-medium">
+          {order.items && order.items.length > 0 
+            ? `${order.items.length} item(ns)`
+            : order.item}
+        </p>
         <p className="text-xs text-muted-foreground line-clamp-2">
-          {order.description}
+          {order.items && order.items.length > 0 
+            ? order.items.map(item => item.itemCode).join(", ")
+            : order.description}
         </p>
       </div>
 
@@ -177,7 +183,12 @@ export const KanbanCard = ({ order, onEdit, onStatusChange }: KanbanCardProps) =
       {/* Quantity */}
       <div className="mt-2 pt-2 border-t">
         <p className="text-xs text-muted-foreground">
-          <span className="font-medium">Qtd:</span> {order.quantity}
+          <span className="font-medium">Qtd Total:</span> {order.quantity}
+          {order.items && order.items.length > 0 && (
+            <span className="ml-2">
+              ({order.items.reduce((sum, item) => sum + item.deliveredQuantity, 0)} entregue)
+            </span>
+          )}
         </p>
       </div>
       </Card>

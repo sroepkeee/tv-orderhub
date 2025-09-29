@@ -4,22 +4,29 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
-import { Plus } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { toast } from "@/hooks/use-toast";
+import { Card } from "@/components/ui/card";
+
+export interface OrderItem {
+  id?: string;
+  itemCode: string;
+  itemDescription: string;
+  unit: string;
+  requestedQuantity: number;
+  warehouse: string;
+  deliveryDate: string;
+  deliveredQuantity: number;
+}
 
 interface OrderFormData {
   type: string;
   priority: string;
-  itemCode: string;
-  itemDescription: string;
-  requestedQuantity: number;
-  receivedQuantity: number;
-  deliveryStatus: string;
   client: string;
   deliveryDeadline: string;
   deskTicket: string;
+  items: OrderItem[];
 }
 
 interface AddOrderDialogProps {
@@ -28,17 +35,51 @@ interface AddOrderDialogProps {
 
 export const AddOrderDialog = ({ onAddOrder }: AddOrderDialogProps) => {
   const [open, setOpen] = React.useState(false);
+  const [items, setItems] = React.useState<OrderItem[]>([]);
   const { register, handleSubmit, reset, setValue, watch } = useForm<OrderFormData>();
 
   const orderType = watch("type");
 
+  const addItem = () => {
+    setItems([...items, {
+      itemCode: "",
+      itemDescription: "",
+      unit: "UND",
+      requestedQuantity: 0,
+      warehouse: "",
+      deliveryDate: "",
+      deliveredQuantity: 0
+    }]);
+  };
+
+  const removeItem = (index: number) => {
+    setItems(items.filter((_, i) => i !== index));
+  };
+
+  const updateItem = (index: number, field: keyof OrderItem, value: any) => {
+    const newItems = [...items];
+    newItems[index] = { ...newItems[index], [field]: value };
+    setItems(newItems);
+  };
+
   const onSubmit = (data: OrderFormData) => {
-    onAddOrder(data);
+    if (items.length === 0) {
+      toast({
+        title: "Erro",
+        description: "Adicione pelo menos um item ao pedido.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const orderData = { ...data, items };
+    onAddOrder(orderData);
     toast({
       title: "Pedido criado com sucesso!",
-      description: `Novo ${getTypeLabel(data.type)} foi adicionado.`,
+      description: `Novo ${getTypeLabel(data.type)} foi adicionado com ${items.length} item(ns).`,
     });
     reset();
+    setItems([]);
     setOpen(false);
   };
 
@@ -95,53 +136,6 @@ export const AddOrderDialog = ({ onAddOrder }: AddOrderDialogProps) => {
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <Label htmlFor="itemCode">Código do Item</Label>
-              <Input {...register("itemCode", { required: true })} placeholder="Ex: ITEM-001" />
-            </div>
-            <div>
-              <Label htmlFor="requestedQuantity">Quantidade Solicitada</Label>
-              <Input 
-                {...register("requestedQuantity", { required: true, valueAsNumber: true })} 
-                type="number" 
-                placeholder="Quantidade solicitada" 
-                min="0"
-              />
-            </div>
-          </div>
-
-          <div>
-            <Label htmlFor="itemDescription">Descrição do Item</Label>
-            <Textarea {...register("itemDescription", { required: true })} placeholder="Descrição detalhada do item" rows={3} />
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="receivedQuantity">Quantidade Recebida</Label>
-              <Input 
-                {...register("receivedQuantity", { valueAsNumber: true })} 
-                type="number" 
-                placeholder="Quantidade recebida" 
-                min="0"
-                defaultValue={0}
-              />
-            </div>
-            <div>
-              <Label htmlFor="deliveryStatus">Status de Entrega</Label>
-              <Select onValueChange={(value) => setValue("deliveryStatus", value)} defaultValue="pending">
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione o status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="pending">Pendente</SelectItem>
-                  <SelectItem value="complete">Entregue - Pedido Completo</SelectItem>
-                  <SelectItem value="partial">Entregue - Parcial</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
               <Label htmlFor="client">Cliente</Label>
               <Input {...register("client", { required: true })} placeholder="Nome do cliente" />
             </div>
@@ -157,6 +151,109 @@ export const AddOrderDialog = ({ onAddOrder }: AddOrderDialogProps) => {
               {...register("deliveryDeadline", { required: true })} 
               type="date" 
             />
+          </div>
+
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <Label className="text-lg font-semibold">Itens do Pedido</Label>
+              <Button type="button" onClick={addItem} size="sm" className="gap-2">
+                <Plus className="h-4 w-4" />
+                Adicionar Item
+              </Button>
+            </div>
+
+            {items.length === 0 ? (
+              <Card className="p-6 text-center text-muted-foreground">
+                Nenhum item adicionado. Clique em "Adicionar Item" para começar.
+              </Card>
+            ) : (
+              <div className="space-y-4 max-h-[400px] overflow-y-auto">
+                {items.map((item, index) => (
+                  <Card key={index} className="p-4 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <Label className="font-semibold">Item {index + 1}</Label>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => removeItem(index)}
+                        className="text-destructive hover:text-destructive"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label>Código</Label>
+                        <Input
+                          value={item.itemCode}
+                          onChange={(e) => updateItem(index, "itemCode", e.target.value)}
+                          placeholder="Ex: ITEM-001"
+                        />
+                      </div>
+                      <div>
+                        <Label>UND</Label>
+                        <Input
+                          value={item.unit}
+                          onChange={(e) => updateItem(index, "unit", e.target.value)}
+                          placeholder="Ex: UND, KG, M"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <Label>Descrição</Label>
+                      <Input
+                        value={item.itemDescription}
+                        onChange={(e) => updateItem(index, "itemDescription", e.target.value)}
+                        placeholder="Descrição do item"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label>Quantidade Solicitada</Label>
+                        <Input
+                          type="number"
+                          value={item.requestedQuantity}
+                          onChange={(e) => updateItem(index, "requestedQuantity", parseInt(e.target.value) || 0)}
+                          min="0"
+                        />
+                      </div>
+                      <div>
+                        <Label>Armazém</Label>
+                        <Input
+                          value={item.warehouse}
+                          onChange={(e) => updateItem(index, "warehouse", e.target.value)}
+                          placeholder="Local de armazenamento"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label>Data de Entrega</Label>
+                        <Input
+                          type="date"
+                          value={item.deliveryDate}
+                          onChange={(e) => updateItem(index, "deliveryDate", e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <Label>Quantidade Entregue</Label>
+                        <Input
+                          type="number"
+                          value={item.deliveredQuantity}
+                          onChange={(e) => updateItem(index, "deliveredQuantity", parseInt(e.target.value) || 0)}
+                          min="0"
+                        />
+                      </div>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="flex justify-end gap-2 pt-4">

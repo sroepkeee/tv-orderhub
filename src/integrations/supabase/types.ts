@@ -49,23 +49,71 @@ export type Database = {
           },
         ]
       }
+      order_items: {
+        Row: {
+          created_at: string
+          delivered_quantity: number
+          delivery_date: string
+          id: string
+          item_code: string
+          item_description: string
+          order_id: string
+          requested_quantity: number
+          unit: string
+          updated_at: string
+          user_id: string
+          warehouse: string
+        }
+        Insert: {
+          created_at?: string
+          delivered_quantity?: number
+          delivery_date: string
+          id?: string
+          item_code: string
+          item_description: string
+          order_id: string
+          requested_quantity?: number
+          unit?: string
+          updated_at?: string
+          user_id: string
+          warehouse: string
+        }
+        Update: {
+          created_at?: string
+          delivered_quantity?: number
+          delivery_date?: string
+          id?: string
+          item_code?: string
+          item_description?: string
+          order_id?: string
+          requested_quantity?: number
+          unit?: string
+          updated_at?: string
+          user_id?: string
+          warehouse?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_items_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       orders: {
         Row: {
           created_at: string
           customer_name: string
           delivery_address: string
           delivery_date: string
-          delivery_status: string | null
           driver_name: string | null
           id: string
-          item_code: string | null
-          item_description: string | null
           notes: string | null
           order_number: string
           order_type: string
           priority: string
-          received_quantity: number | null
-          requested_quantity: number | null
           status: string
           updated_at: string
           user_id: string
@@ -76,17 +124,12 @@ export type Database = {
           customer_name: string
           delivery_address: string
           delivery_date: string
-          delivery_status?: string | null
           driver_name?: string | null
           id?: string
-          item_code?: string | null
-          item_description?: string | null
           notes?: string | null
           order_number: string
           order_type: string
           priority: string
-          received_quantity?: number | null
-          requested_quantity?: number | null
           status: string
           updated_at?: string
           user_id: string
@@ -97,17 +140,12 @@ export type Database = {
           customer_name?: string
           delivery_address?: string
           delivery_date?: string
-          delivery_status?: string | null
           driver_name?: string | null
           id?: string
-          item_code?: string | null
-          item_description?: string | null
           notes?: string | null
           order_number?: string
           order_type?: string
           priority?: string
-          received_quantity?: number | null
-          requested_quantity?: number | null
           status?: string
           updated_at?: string
           user_id?: string

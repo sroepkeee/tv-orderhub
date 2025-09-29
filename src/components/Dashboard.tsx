@@ -49,11 +49,7 @@ export interface Order {
   client: string;
   deliveryDeadline: string;
   deskTicket: string;
-  itemCode?: string;
-  itemDescription?: string;
-  requestedQuantity?: number;
-  receivedQuantity?: number;
-  deliveryStatus?: string;
+  items?: import("./AddOrderDialog").OrderItem[];
 }
 
 // Mock data
@@ -211,28 +207,48 @@ export const Dashboard = () => {
 
       if (error) throw error;
 
-      // Transform data from database to match Order interface
-      const transformedOrders: Order[] = (data || []).map((dbOrder) => ({
-        id: dbOrder.id,
-        type: dbOrder.order_type as OrderType,
-        priority: dbOrder.priority as Priority,
-        orderNumber: dbOrder.order_number,
-        item: dbOrder.item_code || dbOrder.customer_name,
-        description: dbOrder.item_description || dbOrder.notes || "",
-        quantity: dbOrder.requested_quantity || 0,
-        createdDate: new Date(dbOrder.created_at).toISOString().split('T')[0],
-        status: dbOrder.status as OrderStatus,
-        client: dbOrder.customer_name,
-        deliveryDeadline: dbOrder.delivery_date,
-        deskTicket: dbOrder.notes || dbOrder.order_number,
-        itemCode: dbOrder.item_code,
-        itemDescription: dbOrder.item_description,
-        requestedQuantity: dbOrder.requested_quantity,
-        receivedQuantity: dbOrder.received_quantity,
-        deliveryStatus: dbOrder.delivery_status,
-      }));
+      // Load items for each order
+      const ordersWithItems = await Promise.all(
+        (data || []).map(async (dbOrder) => {
+          const { data: itemsData } = await supabase
+            .from('order_items')
+            .select('*')
+            .eq('order_id', dbOrder.id)
+            .eq('user_id', user.id);
 
-      setOrders(transformedOrders);
+          const items = (itemsData || []).map(item => ({
+            id: item.id,
+            itemCode: item.item_code,
+            itemDescription: item.item_description,
+            unit: item.unit,
+            requestedQuantity: item.requested_quantity,
+            warehouse: item.warehouse,
+            deliveryDate: item.delivery_date,
+            deliveredQuantity: item.delivered_quantity
+          }));
+
+          const totalRequested = items.reduce((sum, item) => sum + item.requestedQuantity, 0);
+          const firstItem = items[0];
+
+          return {
+            id: dbOrder.id,
+            type: dbOrder.order_type as OrderType,
+            priority: dbOrder.priority as Priority,
+            orderNumber: dbOrder.order_number,
+            item: firstItem ? `${firstItem.itemCode} (+${items.length - 1})` : dbOrder.customer_name,
+            description: firstItem?.itemDescription || dbOrder.notes || "",
+            quantity: totalRequested,
+            createdDate: new Date(dbOrder.created_at).toISOString().split('T')[0],
+            status: dbOrder.status as OrderStatus,
+            client: dbOrder.customer_name,
+            deliveryDeadline: dbOrder.delivery_date,
+            deskTicket: dbOrder.notes || dbOrder.order_number,
+            items
+          };
+        })
+      );
+
+      setOrders(ordersWithItems);
     } catch (error: any) {
       toast({
         title: "Erro ao carregar pedidos",
@@ -312,45 +328,50 @@ export const Dashboard = () => {
     if (!user) return;
 
     try {
-      const { data, error } = await supabase
+      const { data: orderRow, error: orderError } = await supabase
         .from('orders')
         .insert({
           user_id: user.id,
           order_number: generateOrderNumber(orderData.type),
           customer_name: orderData.client,
-          delivery_address: orderData.client, // Usando client como endereço por enquanto
+          delivery_address: orderData.client,
           delivery_date: orderData.deliveryDeadline,
           status: "pending",
           priority: orderData.priority,
           order_type: orderData.type,
           notes: orderData.deskTicket,
-          item_code: orderData.itemCode,
-          item_description: orderData.itemDescription,
-          requested_quantity: orderData.requestedQuantity,
-          received_quantity: orderData.receivedQuantity || 0,
-          delivery_status: orderData.deliveryStatus || 'pending',
         })
         .select()
         .single();
 
-      if (error) throw error;
+      if (orderError) throw orderError;
 
-      // Save to history if delivery status changed
-      if (data && orderData.deliveryStatus && orderData.deliveryStatus !== 'pending') {
-        await supabase.from('order_history').insert({
-          order_id: data.id,
+      // Insert all items
+      if (orderData.items && orderData.items.length > 0) {
+        const itemsToInsert = orderData.items.map((item: any) => ({
+          order_id: orderRow.id,
           user_id: user.id,
-          old_status: 'pending',
-          new_status: orderData.deliveryStatus,
-        });
+          item_code: item.itemCode,
+          item_description: item.itemDescription,
+          unit: item.unit,
+          requested_quantity: item.requestedQuantity,
+          warehouse: item.warehouse,
+          delivery_date: item.deliveryDate,
+          delivered_quantity: item.deliveredQuantity
+        }));
+
+        const { error: itemsError } = await supabase
+          .from('order_items')
+          .insert(itemsToInsert);
+
+        if (itemsError) throw itemsError;
       }
 
-      // Reload orders
       await loadOrders();
       
       toast({
         title: "Pedido criado com sucesso!",
-        description: `Novo pedido foi adicionado.`,
+        description: `Novo pedido com ${orderData.items?.length || 0} item(ns) foi adicionado.`,
       });
     } catch (error: any) {
       toast({
@@ -372,11 +393,7 @@ export const Dashboard = () => {
     if (!user) return;
 
     try {
-      // Find the old order to compare delivery status
-      const oldOrder = orders.find(o => o.id === updatedOrder.id);
-      const deliveryStatusChanged = oldOrder && oldOrder.deliveryStatus !== updatedOrder.deliveryStatus;
-
-      const { error } = await supabase
+      const { error: orderError } = await supabase
         .from('orders')
         .update({
           customer_name: updatedOrder.client,
@@ -386,28 +403,43 @@ export const Dashboard = () => {
           priority: updatedOrder.priority,
           order_type: updatedOrder.type,
           notes: updatedOrder.deskTicket,
-          item_code: updatedOrder.itemCode,
-          item_description: updatedOrder.itemDescription,
-          requested_quantity: updatedOrder.requestedQuantity,
-          received_quantity: updatedOrder.receivedQuantity,
-          delivery_status: updatedOrder.deliveryStatus,
         })
         .eq('id', updatedOrder.id)
         .eq('user_id', user.id);
 
-      if (error) throw error;
+      if (orderError) throw orderError;
 
-      // Save to history if delivery status changed
-      if (deliveryStatusChanged) {
-        await supabase.from('order_history').insert({
-          order_id: updatedOrder.id,
-          user_id: user.id,
-          old_status: oldOrder.deliveryStatus || 'pending',
-          new_status: updatedOrder.deliveryStatus || 'pending',
-        });
+      // Update items - delete old ones and insert new ones
+      if (updatedOrder.items) {
+        const { error: deleteError } = await supabase
+          .from('order_items')
+          .delete()
+          .eq('order_id', updatedOrder.id)
+          .eq('user_id', user.id);
+
+        if (deleteError) throw deleteError;
+
+        if (updatedOrder.items.length > 0) {
+          const itemsToInsert = updatedOrder.items.map((item: any) => ({
+            order_id: updatedOrder.id,
+            user_id: user.id,
+            item_code: item.itemCode,
+            item_description: item.itemDescription,
+            unit: item.unit,
+            requested_quantity: item.requestedQuantity,
+            warehouse: item.warehouse,
+            delivery_date: item.deliveryDate,
+            delivered_quantity: item.deliveredQuantity
+          }));
+
+          const { error: itemsError } = await supabase
+            .from('order_items')
+            .insert(itemsToInsert);
+
+          if (itemsError) throw itemsError;
+        }
       }
 
-      // Reload orders
       await loadOrders();
       
       toast({

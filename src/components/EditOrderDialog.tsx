@@ -4,13 +4,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Calendar, User, FileText, CheckCircle, XCircle, Clock, History, Edit } from "lucide-react";
+import { Card } from "@/components/ui/card";
+import { Calendar, User, FileText, CheckCircle, XCircle, Clock, History, Edit, Plus, Trash2 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { Order } from "./Dashboard";
+import { OrderItem } from "./AddOrderDialog";
 
 interface HistoryEvent {
   id: string;
@@ -32,16 +33,41 @@ interface EditOrderDialogProps {
 export const EditOrderDialog = ({ order, open, onOpenChange, onSave }: EditOrderDialogProps) => {
   const { register, handleSubmit, setValue, reset } = useForm<Order>();
   const [activeTab, setActiveTab] = useState("edit");
+  const [items, setItems] = useState<OrderItem[]>([]);
 
   React.useEffect(() => {
     if (open && order) {
       reset(order);
-      setActiveTab("edit"); // Reset to edit tab when opening
+      setItems(order.items || []);
+      setActiveTab("edit");
     }
   }, [open, order, reset]);
 
+  const addItem = () => {
+    setItems([...items, {
+      itemCode: "",
+      itemDescription: "",
+      unit: "UND",
+      requestedQuantity: 0,
+      warehouse: "",
+      deliveryDate: "",
+      deliveredQuantity: 0
+    }]);
+  };
+
+  const removeItem = (index: number) => {
+    setItems(items.filter((_, i) => i !== index));
+  };
+
+  const updateItem = (index: number, field: keyof OrderItem, value: any) => {
+    const newItems = [...items];
+    newItems[index] = { ...newItems[index], [field]: value };
+    setItems(newItems);
+  };
+
   const onSubmit = (data: Order) => {
-    onSave({ ...data, id: order.id });
+    const updatedOrder = { ...data, id: order.id, items };
+    onSave(updatedOrder);
     onOpenChange(false);
   };
 
@@ -54,7 +80,7 @@ export const EditOrderDialog = ({ order, open, onOpenChange, onSave }: EditOrder
     }
   };
 
-  // Mock history data - in real app this would come from API
+  // Mock history data
   const historyEvents: HistoryEvent[] = [
     {
       id: "1",
@@ -82,15 +108,6 @@ export const EditOrderDialog = ({ order, open, onOpenChange, onSave }: EditOrder
       description: "Quantidade alterada",
       user: "Carlos Oliveira",
       type: "updated"
-    },
-    {
-      id: "4",
-      date: order?.createdDate || "2024-01-16",
-      time: "11:20",
-      action: "Status Alterado",
-      description: `Status alterado para ${order?.status}`,
-      user: "Ana Costa",
-      type: "approved"
     },
   ];
 
@@ -127,7 +144,7 @@ export const EditOrderDialog = ({ order, open, onOpenChange, onSave }: EditOrder
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[90vh]">
+      <DialogContent className="max-w-4xl max-h-[90vh]">
         <DialogHeader>
           <DialogTitle>Pedido #{order?.orderNumber}</DialogTitle>
         </DialogHeader>
@@ -145,114 +162,183 @@ export const EditOrderDialog = ({ order, open, onOpenChange, onSave }: EditOrder
           </TabsList>
 
           <TabsContent value="edit" className="mt-4">
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="type">Tipo</Label>
-                  <Select onValueChange={(value) => setValue("type", value as any)} defaultValue={order?.type}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="production">Produção</SelectItem>
-                      <SelectItem value="sales">Vendas</SelectItem>
-                      <SelectItem value="materials">Materiais</SelectItem>
-                    </SelectContent>
-                  </Select>
+            <ScrollArea className="h-[600px] pr-4">
+              <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="type">Tipo</Label>
+                    <Select onValueChange={(value) => setValue("type", value as any)} defaultValue={order?.type}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="production">Produção</SelectItem>
+                        <SelectItem value="sales">Vendas</SelectItem>
+                        <SelectItem value="materials">Materiais</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label htmlFor="priority">Prioridade</Label>
+                    <Select onValueChange={(value) => setValue("priority", value as any)} defaultValue={order?.priority}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="high">Alta</SelectItem>
+                        <SelectItem value="medium">Média</SelectItem>
+                        <SelectItem value="low">Baixa</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
-                <div>
-                  <Label htmlFor="priority">Prioridade</Label>
-                  <Select onValueChange={(value) => setValue("priority", value as any)} defaultValue={order?.priority}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="high">Alta</SelectItem>
-                      <SelectItem value="medium">Média</SelectItem>
-                      <SelectItem value="low">Baixa</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="itemCode">Código do Item</Label>
-                  <Input {...register("itemCode", { required: false })} placeholder="Ex: ITEM-001" />
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="client">Cliente</Label>
+                    <Input {...register("client", { required: true })} />
+                  </div>
+                  <div>
+                    <Label htmlFor="deskTicket">Nº Chamado Desk</Label>
+                    <Input {...register("deskTicket", { required: true })} />
+                  </div>
                 </div>
-                <div>
-                  <Label htmlFor="requestedQuantity">Quantidade Solicitada</Label>
-                  <Input {...register("requestedQuantity", { valueAsNumber: true })} type="number" min="0" />
-                </div>
-              </div>
 
-              <div>
-                <Label htmlFor="itemDescription">Descrição do Item</Label>
-                <Textarea {...register("itemDescription")} placeholder="Descrição detalhada do item" rows={3} />
-              </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="status">Status</Label>
+                    <Select onValueChange={(value) => setValue("status", value as any)} defaultValue={order?.status}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="pending">Pendente</SelectItem>
+                        <SelectItem value="planned">Planejado</SelectItem>
+                        <SelectItem value="in_production">Em Produção</SelectItem>
+                        <SelectItem value="completed">Concluído</SelectItem>
+                        <SelectItem value="cancelled">Cancelado</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label htmlFor="deliveryDeadline">Prazo de Entrega</Label>
+                    <Input {...register("deliveryDeadline", { required: true })} type="date" />
+                  </div>
+                </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="receivedQuantity">Quantidade Recebida</Label>
-                  <Input {...register("receivedQuantity", { valueAsNumber: true })} type="number" min="0" />
-                </div>
-                <div>
-                  <Label htmlFor="deliveryStatus">Status de Entrega</Label>
-                  <Select onValueChange={(value) => setValue("deliveryStatus" as any, value)} defaultValue={order?.deliveryStatus || "pending"}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="pending">Pendente</SelectItem>
-                      <SelectItem value="complete">Entregue - Pedido Completo</SelectItem>
-                      <SelectItem value="partial">Entregue - Parcial</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
+                <div className="space-y-4 pt-4">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-lg font-semibold">Itens do Pedido</Label>
+                    <Button type="button" onClick={addItem} size="sm" className="gap-2">
+                      <Plus className="h-4 w-4" />
+                      Adicionar Item
+                    </Button>
+                  </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="client">Cliente</Label>
-                  <Input {...register("client", { required: true })} />
-                </div>
-                <div>
-                  <Label htmlFor="deskTicket">Nº Chamado Desk</Label>
-                  <Input {...register("deskTicket", { required: true })} />
-                </div>
-              </div>
+                  {items.length === 0 ? (
+                    <Card className="p-6 text-center text-muted-foreground">
+                      Nenhum item adicionado. Clique em "Adicionar Item" para começar.
+                    </Card>
+                  ) : (
+                    <div className="space-y-4">
+                      {items.map((item, index) => (
+                        <Card key={index} className="p-4 space-y-4">
+                          <div className="flex items-center justify-between">
+                            <Label className="font-semibold">Item {index + 1}</Label>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => removeItem(index)}
+                              className="text-destructive hover:text-destructive"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                          
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <Label>Código</Label>
+                              <Input
+                                value={item.itemCode}
+                                onChange={(e) => updateItem(index, "itemCode", e.target.value)}
+                                placeholder="Ex: ITEM-001"
+                              />
+                            </div>
+                            <div>
+                              <Label>UND</Label>
+                              <Input
+                                value={item.unit}
+                                onChange={(e) => updateItem(index, "unit", e.target.value)}
+                                placeholder="Ex: UND, KG, M"
+                              />
+                            </div>
+                          </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="status">Status</Label>
-                  <Select onValueChange={(value) => setValue("status", value as any)} defaultValue={order?.status}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="pending">Pendente</SelectItem>
-                      <SelectItem value="planned">Planejado</SelectItem>
-                      <SelectItem value="in_production">Em Produção</SelectItem>
-                      <SelectItem value="completed">Concluído</SelectItem>
-                      <SelectItem value="cancelled">Cancelado</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label htmlFor="deliveryDeadline">Prazo de Entrega</Label>
-                  <Input {...register("deliveryDeadline", { required: true })} type="date" />
-                </div>
-              </div>
+                          <div>
+                            <Label>Descrição</Label>
+                            <Input
+                              value={item.itemDescription}
+                              onChange={(e) => updateItem(index, "itemDescription", e.target.value)}
+                              placeholder="Descrição do item"
+                            />
+                          </div>
 
-              <div className="flex justify-end gap-2 pt-4">
-                <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-                  Cancelar
-                </Button>
-                <Button type="submit">
-                  Salvar Alterações
-                </Button>
-              </div>
-            </form>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <Label>Quantidade Solicitada</Label>
+                              <Input
+                                type="number"
+                                value={item.requestedQuantity}
+                                onChange={(e) => updateItem(index, "requestedQuantity", parseInt(e.target.value) || 0)}
+                                min="0"
+                              />
+                            </div>
+                            <div>
+                              <Label>Armazém</Label>
+                              <Input
+                                value={item.warehouse}
+                                onChange={(e) => updateItem(index, "warehouse", e.target.value)}
+                                placeholder="Local de armazenamento"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <Label>Data de Entrega</Label>
+                              <Input
+                                type="date"
+                                value={item.deliveryDate}
+                                onChange={(e) => updateItem(index, "deliveryDate", e.target.value)}
+                              />
+                            </div>
+                            <div>
+                              <Label>Quantidade Entregue</Label>
+                              <Input
+                                type="number"
+                                value={item.deliveredQuantity}
+                                onChange={(e) => updateItem(index, "deliveredQuantity", parseInt(e.target.value) || 0)}
+                                min="0"
+                              />
+                            </div>
+                          </div>
+                        </Card>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex justify-end gap-2 pt-4 sticky bottom-0 bg-background">
+                  <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+                    Cancelar
+                  </Button>
+                  <Button type="submit">
+                    Salvar Alterações
+                  </Button>
+                </div>
+              </form>
+            </ScrollArea>
           </TabsContent>
 
           <TabsContent value="history" className="mt-4">
@@ -268,7 +354,7 @@ export const EditOrderDialog = ({ order, open, onOpenChange, onSave }: EditOrder
                 </div>
               </div>
 
-              <ScrollArea className="h-[400px]">
+              <ScrollArea className="h-[500px]">
                 <div className="space-y-4">
                   {historyEvents.map((event) => (
                     <div key={event.id} className="flex gap-4 p-4 border rounded-lg">
