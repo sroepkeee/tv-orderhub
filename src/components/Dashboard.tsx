@@ -774,7 +774,7 @@ export const Dashboard = () => {
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div className="flex items-center gap-4">
-          <img src={logo} alt="Imply Logo" className="h-12 w-auto" />
+          <img src={logo} alt="Imply Logo" className="h-24 w-auto" />
           <h1 className="text-3xl font-bold text-dashboard-header">Logística SSM</h1>
         </div>
         <div className="flex items-center gap-4">
