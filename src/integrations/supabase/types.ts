@@ -14,6 +14,41 @@ export type Database = {
   }
   public: {
     Tables: {
+      order_comments: {
+        Row: {
+          comment: string
+          created_at: string
+          id: string
+          order_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          comment: string
+          created_at?: string
+          id?: string
+          order_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          comment?: string
+          created_at?: string
+          id?: string
+          order_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_comments_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       order_history: {
         Row: {
           changed_at: string

@@ -3,17 +3,20 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Calendar, User, FileText, CheckCircle, XCircle, Clock, History, Edit, Plus, Trash2, Loader2 } from "lucide-react";
+import { Calendar, User, FileText, CheckCircle, XCircle, Clock, History, Edit, Plus, Trash2, Loader2, MessageSquare } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { Order } from "./Dashboard";
 import { OrderItem } from "./AddOrderDialog";
 import { supabase } from "@/integrations/supabase/client";
+import { format } from "date-fns";
+import { useToast } from "@/hooks/use-toast";
 
 interface HistoryEvent {
   id: string;
@@ -21,6 +24,14 @@ interface HistoryEvent {
   old_status: string;
   new_status: string;
   user_id: string;
+}
+
+interface OrderComment {
+  id: string;
+  comment: string;
+  created_at: string;
+  user_id: string;
+  user_name?: string;
 }
 
 interface EditOrderDialogProps {
@@ -32,10 +43,16 @@ interface EditOrderDialogProps {
 
 export const EditOrderDialog = ({ order, open, onOpenChange, onSave }: EditOrderDialogProps) => {
   const { register, handleSubmit, setValue, reset } = useForm<Order>();
+  const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("edit");
   const [items, setItems] = useState<OrderItem[]>([]);
   const [historyEvents, setHistoryEvents] = useState<HistoryEvent[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
+  const [comments, setComments] = useState<OrderComment[]>([]);
+  const [newComment, setNewComment] = useState("");
+  const [loadingComments, setLoadingComments] = useState(false);
+  const [savingComment, setSavingComment] = useState(false);
+  const [showCommentInput, setShowCommentInput] = useState(false);
 
   // Load history from database
   const loadHistory = async () => {
@@ -58,20 +75,98 @@ export const EditOrderDialog = ({ order, open, onOpenChange, onSave }: EditOrder
     }
   };
 
+  // Load comments from database
+  const loadComments = async () => {
+    if (!order?.id) return;
+    
+    setLoadingComments(true);
+    try {
+      const { data: commentsData, error } = await supabase
+        .from('order_comments')
+        .select('*')
+        .eq('order_id', order.id)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      // Load user profiles for comments
+      const userIds = [...new Set(commentsData?.map(c => c.user_id) || [])];
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, full_name, email')
+        .in('id', userIds);
+
+      const commentsWithNames = commentsData?.map(comment => ({
+        ...comment,
+        user_name: profiles?.find(p => p.id === comment.user_id)?.full_name || 
+                   profiles?.find(p => p.id === comment.user_id)?.email || 
+                   'Usuário'
+      })) || [];
+
+      setComments(commentsWithNames);
+    } catch (error) {
+      console.error("Error loading comments:", error);
+    } finally {
+      setLoadingComments(false);
+    }
+  };
+
+  // Save new comment
+  const handleSaveComment = async () => {
+    if (!newComment.trim() || !order?.id) return;
+
+    setSavingComment(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Usuário não autenticado");
+
+      const { error } = await supabase
+        .from('order_comments')
+        .insert({
+          order_id: order.id,
+          user_id: user.id,
+          comment: newComment.trim()
+        });
+
+      if (error) throw error;
+
+      setNewComment("");
+      setShowCommentInput(false);
+      toast({
+        title: "Comentário adicionado",
+        description: "O comentário foi salvo com sucesso."
+      });
+      
+      loadComments();
+    } catch (error) {
+      console.error("Error saving comment:", error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível salvar o comentário.",
+        variant: "destructive"
+      });
+    } finally {
+      setSavingComment(false);
+    }
+  };
+
   useEffect(() => {
     if (open && order) {
       reset(order);
       setItems(order.items || []);
       setActiveTab("edit");
+      setShowCommentInput(false);
+      setNewComment("");
       loadHistory();
+      loadComments();
     }
   }, [open, order, reset]);
 
-  // Real-time subscription for history updates
+  // Real-time subscription for history and comments updates
   useEffect(() => {
     if (!open || !order?.id) return;
 
-    const channel = supabase
+    const historyChannel = supabase
       .channel(`order_history_${order.id}`)
       .on(
         'postgres_changes',
@@ -87,8 +182,25 @@ export const EditOrderDialog = ({ order, open, onOpenChange, onSave }: EditOrder
       )
       .subscribe();
 
+    const commentsChannel = supabase
+      .channel(`order_comments_${order.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'order_comments',
+          filter: `order_id=eq.${order.id}`
+        },
+        () => {
+          loadComments();
+        }
+      )
+      .subscribe();
+
     return () => {
-      supabase.removeChannel(channel);
+      supabase.removeChannel(historyChannel);
+      supabase.removeChannel(commentsChannel);
     };
   }, [open, order?.id]);
 
@@ -165,7 +277,7 @@ export const EditOrderDialog = ({ order, open, onOpenChange, onSave }: EditOrder
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh]">
+      <DialogContent className="max-w-6xl max-h-[95vh]">
         <DialogHeader>
           <DialogTitle>Pedido #{order?.orderNumber}</DialogTitle>
           <DialogDescription>
@@ -174,7 +286,7 @@ export const EditOrderDialog = ({ order, open, onOpenChange, onSave }: EditOrder
         </DialogHeader>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="edit" className="flex items-center gap-2">
               <Edit className="h-4 w-4" />
               Editar
@@ -183,10 +295,14 @@ export const EditOrderDialog = ({ order, open, onOpenChange, onSave }: EditOrder
               <History className="h-4 w-4" />
               Histórico
             </TabsTrigger>
+            <TabsTrigger value="comments" className="flex items-center gap-2">
+              <MessageSquare className="h-4 w-4" />
+              Comentários
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="edit" className="mt-4">
-            <ScrollArea className="h-[600px] pr-4">
+            <ScrollArea className="h-[calc(95vh-200px)] pr-4">
               <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
@@ -395,7 +511,7 @@ export const EditOrderDialog = ({ order, open, onOpenChange, onSave }: EditOrder
                   </p>
                 </Card>
               ) : (
-                <ScrollArea className="h-[500px]">
+                <ScrollArea className="h-[calc(95vh-300px)]">
                   <div className="space-y-4">
                     {historyEvents.map((event) => (
                       <div key={event.id} className="flex gap-4 p-4 border rounded-lg">
@@ -426,6 +542,109 @@ export const EditOrderDialog = ({ order, open, onOpenChange, onSave }: EditOrder
                             </span>
                           </div>
                         </div>
+                      </div>
+                    ))}
+                  </div>
+                </ScrollArea>
+              )}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="comments" className="mt-4">
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4 p-4 bg-muted rounded-lg">
+                <div>
+                  <p className="text-sm font-medium">Cliente</p>
+                  <p className="text-sm text-muted-foreground">{order?.client}</p>
+                </div>
+                <div>
+                  <p className="text-sm font-medium">Chamado Desk</p>
+                  <p className="text-sm text-muted-foreground">{order?.deskTicket}</p>
+                </div>
+              </div>
+
+              {/* Add new comment section */}
+              <div className="border rounded-lg p-4 space-y-3">
+                {!showCommentInput ? (
+                  <Button 
+                    onClick={() => setShowCommentInput(true)}
+                    className="w-full gap-2 bg-blue-600 hover:bg-blue-700"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Adicionar Comentário
+                  </Button>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2 text-sm font-medium">
+                      <MessageSquare className="h-4 w-4 text-blue-600" />
+                      <span>Novo Comentário</span>
+                    </div>
+                    <Textarea
+                      placeholder="Digite seu comentário aqui..."
+                      value={newComment}
+                      onChange={(e) => setNewComment(e.target.value)}
+                      className="min-h-[100px]"
+                    />
+                    <div className="flex gap-2 justify-end">
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          setShowCommentInput(false);
+                          setNewComment("");
+                        }}
+                        disabled={savingComment}
+                      >
+                        Cancelar
+                      </Button>
+                      <Button
+                        onClick={handleSaveComment}
+                        disabled={!newComment.trim() || savingComment}
+                        className="gap-2"
+                      >
+                        {savingComment ? (
+                          <>
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            Salvando...
+                          </>
+                        ) : (
+                          "Salvar Comentário"
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Comments list */}
+              {loadingComments ? (
+                <div className="flex items-center justify-center h-[300px]">
+                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                </div>
+              ) : comments.length === 0 ? (
+                <Card className="p-8 text-center">
+                  <MessageSquare className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                  <p className="text-muted-foreground">
+                    Nenhum comentário registrado ainda
+                  </p>
+                </Card>
+              ) : (
+                <ScrollArea className="h-[calc(95vh-450px)]">
+                  <div className="space-y-4">
+                    {comments.map((comment) => (
+                      <div key={comment.id} className="border rounded-lg p-4 space-y-2">
+                        <div className="flex items-start justify-between">
+                          <div className="flex items-center gap-2">
+                            <User className="h-4 w-4 text-muted-foreground" />
+                            <span className="font-medium text-sm">{comment.user_name}</span>
+                          </div>
+                          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                            <Calendar className="h-3 w-3" />
+                            {format(new Date(comment.created_at), "dd/MM/yyyy HH:mm")}
+                          </div>
+                        </div>
+                        <p className="text-sm text-muted-foreground whitespace-pre-wrap pl-6">
+                          {comment.comment}
+                        </p>
                       </div>
                     ))}
                   </div>
