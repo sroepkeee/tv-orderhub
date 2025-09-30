@@ -101,12 +101,12 @@ export const KanbanCard = ({ order, onEdit, onStatusChange }: KanbanCardProps) =
         ref={setNodeRef}
         style={style}
         className={isDragging ? "dragging" : ""}
-        onClick={() => onEdit(order)}
       >
         <Card
           className={`relative kanban-card p-3 cursor-pointer hover:shadow-lg transition-all duration-200 ${getPriorityClass(
             order.priority
           )}`}
+          onClick={() => onEdit(order)}
         >
         {/* Drag handle */}
         <button
