@@ -13,13 +13,31 @@ interface KanbanCardProps {
 }
 
 export const KanbanCard = ({ order, onEdit, onStatusChange }: KanbanCardProps) => {
+  const [isDraggingCard, setIsDraggingCard] = React.useState(false);
+  
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: order.id,
   });
 
+  React.useEffect(() => {
+    if (isDragging) {
+      setIsDraggingCard(true);
+    } else {
+      // Reset após um pequeno delay para evitar click após drag
+      const timer = setTimeout(() => setIsDraggingCard(false), 100);
+      return () => clearTimeout(timer);
+    }
+  }, [isDragging]);
+
   const style = {
     transform: CSS.Translate.toString(transform),
     opacity: isDragging ? 0.5 : 1,
+  };
+
+  const handleCardClick = () => {
+    if (!isDraggingCard) {
+      onEdit(order);
+    }
   };
 
   const getPriorityClass = (priority: Order["priority"]) => {
@@ -106,7 +124,7 @@ export const KanbanCard = ({ order, onEdit, onStatusChange }: KanbanCardProps) =
           className={`relative kanban-card p-3 cursor-pointer hover:shadow-lg transition-all duration-200 ${getPriorityClass(
             order.priority
           )}`}
-          onClick={() => onEdit(order)}
+          onClick={handleCardClick}
         >
         {/* Drag handle */}
         <button
