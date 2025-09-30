@@ -32,7 +32,7 @@ export const PriorityView = ({
   const [phaseFilter, setPhaseFilter] = React.useState<PhaseFilter>("all");
   const [viewMode, setViewMode] = React.useState<ViewMode>(() => {
     const saved = localStorage.getItem("viewMode");
-    return (saved as ViewMode) || "list";
+    return (saved as ViewMode) || "kanban";
   });
 
   const handleViewModeChange = (mode: ViewMode) => {
