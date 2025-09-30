@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Calendar, User, FileText, CheckCircle, XCircle, Clock, History, Edit, Plus, Trash2, Loader2 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { Order } from "./Dashboard";
@@ -263,91 +264,96 @@ export const EditOrderDialog = ({ order, open, onOpenChange, onSave }: EditOrder
                       Nenhum item adicionado. Clique em "Adicionar Item" para começar.
                     </Card>
                   ) : (
-                    <div className="space-y-4">
-                      {items.map((item, index) => (
-                        <Card key={index} className="p-4 space-y-4">
-                          <div className="flex items-center justify-between">
-                            <Label className="font-semibold">Item {index + 1}</Label>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => removeItem(index)}
-                              className="text-destructive hover:text-destructive"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                          
-                          <div className="grid grid-cols-2 gap-4">
-                            <div>
-                              <Label>Código</Label>
-                              <Input
-                                value={item.itemCode}
-                                onChange={(e) => updateItem(index, "itemCode", e.target.value)}
-                                placeholder="Ex: ITEM-001"
-                              />
-                            </div>
-                            <div>
-                              <Label>UND</Label>
-                              <Input
-                                value={item.unit}
-                                onChange={(e) => updateItem(index, "unit", e.target.value)}
-                                placeholder="Ex: UND, KG, M"
-                              />
-                            </div>
-                          </div>
-
-                          <div>
-                            <Label>Descrição</Label>
-                            <Input
-                              value={item.itemDescription}
-                              onChange={(e) => updateItem(index, "itemDescription", e.target.value)}
-                              placeholder="Descrição do item"
-                            />
-                          </div>
-
-                          <div className="grid grid-cols-2 gap-4">
-                            <div>
-                              <Label>Quantidade Solicitada</Label>
-                              <Input
-                                type="number"
-                                value={item.requestedQuantity}
-                                onChange={(e) => updateItem(index, "requestedQuantity", parseInt(e.target.value) || 0)}
-                                min="0"
-                              />
-                            </div>
-                            <div>
-                              <Label>Armazém</Label>
-                              <Input
-                                value={item.warehouse}
-                                onChange={(e) => updateItem(index, "warehouse", e.target.value)}
-                                placeholder="Local de armazenamento"
-                              />
-                            </div>
-                          </div>
-
-                          <div className="grid grid-cols-2 gap-4">
-                            <div>
-                              <Label>Data de Entrega</Label>
-                              <Input
-                                type="date"
-                                value={item.deliveryDate}
-                                onChange={(e) => updateItem(index, "deliveryDate", e.target.value)}
-                              />
-                            </div>
-                            <div>
-                              <Label>Quantidade Entregue</Label>
-                              <Input
-                                type="number"
-                                value={item.deliveredQuantity}
-                                onChange={(e) => updateItem(index, "deliveredQuantity", parseInt(e.target.value) || 0)}
-                                min="0"
-                              />
-                            </div>
-                          </div>
-                        </Card>
-                      ))}
+                    <div className="border rounded-lg">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="w-[100px]">Código</TableHead>
+                            <TableHead className="min-w-[200px]">Descrição</TableHead>
+                            <TableHead className="w-[80px]">UND</TableHead>
+                            <TableHead className="w-[100px]">Qtd. Sol.</TableHead>
+                            <TableHead className="w-[120px]">Armazém</TableHead>
+                            <TableHead className="w-[130px]">Data Entrega</TableHead>
+                            <TableHead className="w-[100px]">Qtd. Ent.</TableHead>
+                            <TableHead className="w-[60px]"></TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {items.map((item, index) => (
+                            <TableRow key={index}>
+                              <TableCell>
+                                <Input
+                                  value={item.itemCode}
+                                  onChange={(e) => updateItem(index, "itemCode", e.target.value)}
+                                  placeholder="ITEM-001"
+                                  className="h-8 text-sm"
+                                />
+                              </TableCell>
+                              <TableCell>
+                                <Input
+                                  value={item.itemDescription}
+                                  onChange={(e) => updateItem(index, "itemDescription", e.target.value)}
+                                  placeholder="Descrição"
+                                  className="h-8 text-sm"
+                                />
+                              </TableCell>
+                              <TableCell>
+                                <Input
+                                  value={item.unit}
+                                  onChange={(e) => updateItem(index, "unit", e.target.value)}
+                                  placeholder="UND"
+                                  className="h-8 text-sm"
+                                />
+                              </TableCell>
+                              <TableCell>
+                                <Input
+                                  type="number"
+                                  value={item.requestedQuantity}
+                                  onChange={(e) => updateItem(index, "requestedQuantity", parseInt(e.target.value) || 0)}
+                                  min="0"
+                                  className="h-8 text-sm"
+                                />
+                              </TableCell>
+                              <TableCell>
+                                <Input
+                                  value={item.warehouse}
+                                  onChange={(e) => updateItem(index, "warehouse", e.target.value)}
+                                  placeholder="Armazém"
+                                  className="h-8 text-sm"
+                                />
+                              </TableCell>
+                              <TableCell>
+                                <Input
+                                  type="date"
+                                  value={item.deliveryDate}
+                                  onChange={(e) => updateItem(index, "deliveryDate", e.target.value)}
+                                  className="h-8 text-sm"
+                                />
+                              </TableCell>
+                              <TableCell>
+                                <Input
+                                  type="number"
+                                  value={item.deliveredQuantity}
+                                  onChange={(e) => updateItem(index, "deliveredQuantity", parseInt(e.target.value) || 0)}
+                                  min="0"
+                                  className="h-8 text-sm"
+                                />
+                              </TableCell>
+                              <TableCell>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => removeItem(index)}
+                                  className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
                     </div>
                   )}
                 </div>
