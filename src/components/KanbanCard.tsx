@@ -13,29 +13,17 @@ interface KanbanCardProps {
 }
 
 export const KanbanCard = ({ order, onEdit, onStatusChange }: KanbanCardProps) => {
-  const [isDraggingCard, setIsDraggingCard] = React.useState(false);
-  
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: order.id,
   });
-
-  React.useEffect(() => {
-    if (isDragging) {
-      setIsDraggingCard(true);
-    } else {
-      // Reset após um pequeno delay para evitar click após drag
-      const timer = setTimeout(() => setIsDraggingCard(false), 100);
-      return () => clearTimeout(timer);
-    }
-  }, [isDragging]);
 
   const style = {
     transform: CSS.Translate.toString(transform),
     opacity: isDragging ? 0.5 : 1,
   };
 
-  const handleCardClick = () => {
-    if (!isDraggingCard) {
+  const handleCardClick = (e: React.MouseEvent) => {
+    if (!isDragging) {
       onEdit(order);
     }
   };
