@@ -121,42 +121,42 @@ export const KanbanCard = ({ order, onEdit, onStatusChange }: KanbanCardProps) =
         className={isDragging ? "dragging" : ""}
       >
         <Card
-          className={`relative kanban-card p-3 cursor-pointer hover:shadow-lg transition-all duration-200 ${getPriorityClass(
+          className={`relative kanban-card p-2 cursor-pointer hover:shadow-md transition-all duration-200 ${getPriorityClass(
             order.priority
           )}`}
           onClick={handleCardClick}
         >
         {/* Drag handle */}
         <button
-          className="absolute right-2 top-2 p-1 rounded hover:bg-muted text-muted-foreground cursor-grab active:cursor-grabbing"
+          className="absolute right-1 top-1 p-0.5 rounded hover:bg-muted text-muted-foreground cursor-grab active:cursor-grabbing"
           {...listeners}
           {...attributes}
           onClick={(e) => e.stopPropagation()}
           aria-label="Arrastar"
         >
-          <GripVertical className="h-4 w-4" />
+          <GripVertical className="h-3 w-3" />
         </button>
       {/* Header */}
-      <div className="flex items-start justify-between mb-2">
-        <div className="flex flex-col gap-1">
-          <span className="font-bold text-sm">Pedido #{order.orderNumber}</span>
-          <Badge className={`${getTypeColor(order.type)} text-xs`}>
+      <div className="flex items-start justify-between mb-1">
+        <div className="flex flex-col gap-0.5">
+          <span className="font-bold text-xs">#{order.orderNumber}</span>
+          <Badge className={`${getTypeColor(order.type)} text-xs px-1 py-0`}>
             {getTypeLabel(order.type)}
           </Badge>
         </div>
-        <Badge className={`${getPriorityBadgeClass(order.priority)} text-xs`}>
+        <Badge className={`${getPriorityBadgeClass(order.priority)} text-xs px-1 py-0`}>
           {getPriorityLabel(order.priority)}
         </Badge>
       </div>
 
       {/* Items Summary */}
-      <div className="mb-2">
-        <p className="text-sm font-medium">
+      <div className="mb-1">
+        <p className="text-xs font-medium truncate">
           {order.items && order.items.length > 0 
             ? `${order.items.length} item(ns)`
             : order.item}
         </p>
-        <p className="text-xs text-muted-foreground line-clamp-2">
+        <p className="text-xs text-muted-foreground line-clamp-1">
           {order.items && order.items.length > 0 
             ? order.items.map(item => item.itemCode).join(", ")
             : order.description}
@@ -164,49 +164,44 @@ export const KanbanCard = ({ order, onEdit, onStatusChange }: KanbanCardProps) =
       </div>
 
       {/* Client */}
-      <div className="mb-2">
-        <p className="text-xs text-muted-foreground">
-          <span className="font-medium">Cliente:</span> {order.client}
+      <div className="mb-1">
+        <p className="text-xs text-muted-foreground truncate">
+          {order.client}
         </p>
       </div>
 
       {/* Deadline */}
-      <div className="space-y-1">
+      <div className="space-y-0.5">
         <div className="flex items-center justify-between text-xs">
-          <div className="flex items-center gap-1">
-            <Clock className="h-3 w-3" />
-            <span>Prazo:</span>
+          <div className="flex items-center gap-0.5">
+            <Clock className="h-2 w-2" />
+            <span className="text-xs">Prazo:</span>
           </div>
-          <span className="font-medium">
-            {new Date(order.deliveryDeadline).toLocaleDateString("pt-BR")}
+          <span className="font-medium text-xs">
+            {new Date(order.deliveryDeadline).toLocaleDateString("pt-BR", { day: '2-digit', month: '2-digit' })}
           </span>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="flex-1 h-1.5 bg-secondary rounded-full overflow-hidden">
+        <div className="flex items-center gap-1">
+          <div className="flex-1 h-1 bg-secondary rounded-full overflow-hidden">
             <div className={`h-full ${progressBarColor} transition-all`} style={{ width: "100%" }} />
           </div>
           {daysRemaining < 3 && (
-            <AlertCircle className="h-3 w-3 text-progress-critical" />
+            <AlertCircle className="h-2 w-2 text-progress-critical" />
           )}
         </div>
         <p className="text-xs text-center">
           {daysRemaining < 0
-            ? `${Math.abs(daysRemaining)} dias atrasado`
+            ? `${Math.abs(daysRemaining)}d atraso`
             : daysRemaining === 0
-            ? "Entrega hoje"
-            : `${daysRemaining} dias restantes`}
+            ? "Hoje"
+            : `${daysRemaining}d`}
         </p>
       </div>
 
       {/* Quantity */}
-      <div className="mt-2 pt-2 border-t">
+      <div className="mt-1 pt-1 border-t">
         <p className="text-xs text-muted-foreground">
-          <span className="font-medium">Qtd Total:</span> {order.quantity}
-          {order.items && order.items.length > 0 && (
-            <span className="ml-2">
-              ({order.items.reduce((sum, item) => sum + item.deliveredQuantity, 0)} entregue)
-            </span>
-          )}
+          <span className="font-medium">Qtd:</span> {order.quantity}
         </p>
       </div>
       </Card>

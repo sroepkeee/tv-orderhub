@@ -237,14 +237,14 @@ export const PriorityView = ({
     if (orders.length === 0) return null;
 
     return (
-      <div className="mb-8">
-        <div className="sticky top-0 bg-background z-10 py-3 mb-4 border-b-2">
-          <h3 className="text-xl font-bold flex items-center gap-2">
-            {groupLabel} ({orders.length} {orders.length === 1 ? 'pedido' : 'pedidos'})
+      <div className="mb-4">
+        <div className="sticky top-0 bg-background z-10 py-2 mb-2 border-b">
+          <h3 className="text-base font-bold flex items-center gap-2">
+            {groupLabel} ({orders.length})
           </h3>
         </div>
         
-        <div className="space-y-4">
+        <div className="space-y-2">
           {orders.map((order) => {
             const daysRemaining = calculateDaysRemaining(order.deliveryDeadline);
             const phaseBadge = getPhaseBadge(order.status);
@@ -254,63 +254,63 @@ export const PriorityView = ({
               <div 
                 key={order.id} 
                 onClick={(e) => handleRowClick(order, e)}
-                className={`${getPriorityClass(order.priority)} p-6 rounded-lg border-2 cursor-pointer hover:shadow-lg transition-all duration-200 order-card`}
+                className={`${getPriorityClass(order.priority)} p-3 rounded-lg border cursor-pointer hover:shadow-md transition-all duration-200 order-card`}
               >
                 {/* Header Row */}
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex items-center gap-3">
-                    <Badge className={`order-type-badge ${getTypeColor(order.type)} text-sm px-3 py-1`}>
+                <div className="flex items-start justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <Badge className={`order-type-badge ${getTypeColor(order.type)} text-xs px-2 py-0.5`}>
                       {getTypeLabel(order.type)}
                     </Badge>
-                    <div className="font-mono text-lg font-bold">
+                    <div className="font-mono text-sm font-bold">
                       {order.orderNumber}
                     </div>
-                    <Badge className={`${phaseBadge.color} text-sm px-3 py-1 flex items-center gap-1`}>
+                    <Badge className={`${phaseBadge.color} text-xs px-2 py-0.5 flex items-center gap-1`}>
                       <PhaseIcon className="h-3 w-3" />
                       {phaseBadge.label}
                     </Badge>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className={`text-lg font-bold ${order.priority === "high" ? "priority-blink" : ""}`}>
+                    <span className={`text-sm font-bold ${order.priority === "high" ? "priority-blink" : ""}`}>
                       {getPriorityLabel(order.priority)}
                     </span>
                   </div>
                 </div>
 
                 {/* Main Content */}
-                <div className="grid grid-cols-12 gap-6 mb-4">
+                <div className="grid grid-cols-12 gap-3 mb-2">
                   <div className="col-span-3">
-                    <div className="text-sm text-muted-foreground mb-1">Item</div>
-                    <div className="font-semibold text-lg">{order.item}</div>
+                    <div className="text-xs text-muted-foreground mb-0.5">Item</div>
+                    <div className="font-semibold text-sm">{order.item}</div>
                   </div>
                   
                   <div className="col-span-4">
-                    <div className="text-sm text-muted-foreground mb-1">Descrição</div>
-                    <div className="text-base">{order.description}</div>
+                    <div className="text-xs text-muted-foreground mb-0.5">Descrição</div>
+                    <div className="text-xs truncate">{order.description}</div>
                   </div>
                   
                   <div className="col-span-2">
-                    <div className="text-sm text-muted-foreground mb-1">Cliente</div>
-                    <div className="font-medium text-base">{order.client}</div>
+                    <div className="text-xs text-muted-foreground mb-0.5">Cliente</div>
+                    <div className="font-medium text-xs">{order.client}</div>
                   </div>
                   
                   <div className="col-span-1">
-                    <div className="text-sm text-muted-foreground mb-1">Qtd</div>
-                    <div className="font-bold text-lg text-center">{order.quantity}</div>
+                    <div className="text-xs text-muted-foreground mb-0.5">Qtd</div>
+                    <div className="font-bold text-sm text-center">{order.quantity}</div>
                   </div>
 
                   <div className="col-span-2">
-                    <div className="text-sm text-muted-foreground mb-1">Prazo</div>
-                    <div className="space-y-2">
-                      <div className="text-sm font-medium">
+                    <div className="text-xs text-muted-foreground mb-0.5">Prazo</div>
+                    <div className="space-y-1">
+                      <div className="text-xs font-medium">
                         {new Date(order.deliveryDeadline).toLocaleDateString('pt-BR')}
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1">
                         <Progress 
                           value={getProgressWidth(daysRemaining)} 
-                          className="h-3 flex-1"
+                          className="h-2 flex-1"
                         />
-                        <span className="text-sm font-bold w-14 text-right">
+                        <span className="text-xs font-bold w-10 text-right">
                           {daysRemaining}d
                         </span>
                       </div>
@@ -319,20 +319,20 @@ export const PriorityView = ({
                 </div>
 
                 {/* Status and Actions Row */}
-                <div className="flex items-center justify-between pt-4 border-t">
-                  <div className="flex items-center gap-4">
-                    <Badge className={`status-badge ${getStatusColor(order.status)} text-sm px-3 py-1`}>
+                <div className="flex items-center justify-between pt-2 border-t">
+                  <div className="flex items-center gap-2">
+                    <Badge className={`status-badge ${getStatusColor(order.status)} text-xs px-2 py-0.5`}>
                       {getStatusLabel(order.status)}
                     </Badge>
-                    <span className="text-sm text-muted-foreground">
+                    <span className="text-xs text-muted-foreground">
                       Desk: <span className="font-medium">{order.deskTicket}</span>
                     </span>
-                    <span className="text-sm text-muted-foreground">
+                    <span className="text-xs text-muted-foreground">
                       Criado: <span className="font-medium">{new Date(order.createdDate).toLocaleDateString('pt-BR')}</span>
                     </span>
                   </div>
                   
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1">
                     <ActionButtons
                       order={order}
                       onEdit={onEdit}
@@ -344,8 +344,8 @@ export const PriorityView = ({
                 </div>
 
                 {/* Phase Management Buttons */}
-                <div className="mt-4 pt-4 border-t" onClick={(e) => e.stopPropagation()}>
-                  <div className="text-sm font-medium text-muted-foreground mb-2">Gestão de Fase:</div>
+                <div className="mt-2 pt-2 border-t" onClick={(e) => e.stopPropagation()}>
+                  <div className="text-xs font-medium text-muted-foreground mb-1">Gestão de Fase:</div>
                   <PhaseButtons 
                     order={order} 
                     onStatusChange={onStatusChange}
@@ -360,7 +360,7 @@ export const PriorityView = ({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="h-full flex flex-col overflow-hidden">
 
       <ViewControls
         sortBy={sortBy}
@@ -375,13 +375,15 @@ export const PriorityView = ({
       
       {/* Orders Display */}
       {viewMode === "kanban" ? (
-        <KanbanView
-          orders={sortedOrders}
-          onEdit={onEdit}
-          onStatusChange={onStatusChange}
-        />
+        <div className="flex-1 overflow-hidden">
+          <KanbanView
+            orders={sortedOrders}
+            onEdit={onEdit}
+            onStatusChange={onStatusChange}
+          />
+        </div>
       ) : (
-        <>
+        <div className="flex-1 overflow-y-auto pr-2">
           {/* Render Groups */}
           {Object.entries(groupedOrders).map(([groupLabel, orders]) => (
             <React.Fragment key={groupLabel}>
@@ -390,11 +392,11 @@ export const PriorityView = ({
           ))}
           
           {sortedOrders.length === 0 && (
-            <div className="text-center py-12 text-muted-foreground">
-              <p className="text-lg">Nenhum pedido encontrado.</p>
+            <div className="text-center py-8 text-muted-foreground">
+              <p className="text-base">Nenhum pedido encontrado.</p>
             </div>
           )}
-        </>
+        </div>
       )}
     </div>
   );

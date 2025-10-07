@@ -795,21 +795,21 @@ export const Dashboard = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background p-6">
+    <div className="h-screen overflow-hidden bg-background flex flex-col">
       {/* Header */}
-      <div className="flex items-center justify-between mb-8">
-        <div className="flex items-center gap-4">
-          <img src={logo} alt="Imply Logo" className="h-24 w-auto" />
-          <h1 className="text-3xl font-bold text-dashboard-header">Logística SSM</h1>
+      <div className="flex items-center justify-between px-3 py-2 border-b flex-shrink-0">
+        <div className="flex items-center gap-2">
+          <img src={logo} alt="Imply Logo" className="h-12 w-auto" />
+          <h1 className="text-xl font-bold text-dashboard-header">Logística SSM</h1>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+            <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 text-muted-foreground h-3 w-3" />
             <Input
-              placeholder="Buscar pedidos..."
+              placeholder="Buscar..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 w-80"
+              className="pl-8 w-48 h-8 text-sm"
             />
           </div>
           <DateRangeFilter 
@@ -826,8 +826,8 @@ export const Dashboard = () => {
       </div>
 
       {/* Tab Navigation */}
-      <div className="mb-8">
-        <div className="flex space-x-1 p-2 rounded-lg border-2" style={{ 
+      <div className="px-3 py-2 flex-shrink-0">
+        <div className="flex space-x-1 p-1 rounded-lg border" style={{ 
           background: 'hsl(var(--dashboard-tabs-bg))',
           borderColor: 'hsl(var(--dashboard-tabs-border))'
         }}>
@@ -835,7 +835,7 @@ export const Dashboard = () => {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`px-6 py-4 rounded-md text-lg font-semibold transition-all duration-200 ${
+              className={`px-3 py-1 rounded-md text-xs font-semibold transition-all duration-200 ${
                 activeTab === tab.id
                   ? "shadow-md"
                   : "bg-transparent hover:bg-accent/50 hover:text-accent-foreground"
@@ -854,136 +854,138 @@ export const Dashboard = () => {
       </div>
 
       {/* Content */}
-      {loading ? (
-        <div className="flex items-center justify-center py-20">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-            <p className="text-muted-foreground">Carregando pedidos...</p>
-          </div>
-        </div>
-      ) : activeTab === "all" ? (
-        <PriorityView
-          orders={filteredOrders}
-          onEdit={handleEditOrder}
-          onDuplicate={handleDuplicateOrder}
-          onApprove={handleApproveOrder}
-          onCancel={handleCancelOrder}
-          onStatusChange={handleStatusChange}
-          onRowClick={(order) => {
-            setSelectedOrder(order);
-            setShowEditDialog(true);
-          }}
-        />
-      ) : (
-        <div className="bg-card rounded-lg border overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-               <thead className="dashboard-header">
-                <tr>
-                  {columnVisibility.priority && <th className="text-left p-4 font-semibold">Prioridade</th>}
-                  {columnVisibility.orderNumber && <th className="text-left p-4 font-semibold">Número do Pedido</th>}
-                  {columnVisibility.item && <th className="text-left p-4 font-semibold">Item</th>}
-                  {columnVisibility.description && <th className="text-left p-4 font-semibold">Descrição</th>}
-                  {columnVisibility.quantity && <th className="text-left p-4 font-semibold">Quantidade</th>}
-                  {columnVisibility.createdDate && <th className="text-left p-4 font-semibold">Data de Criação</th>}
-                  {columnVisibility.status && <th className="text-left p-4 font-semibold">Status</th>}
-                  {columnVisibility.client && <th className="text-left p-4 font-semibold">Cliente</th>}
-                  {columnVisibility.deskTicket && <th className="text-left p-4 font-semibold">Chamado Desk</th>}
-                  {columnVisibility.deliveryDeadline && <th className="text-left p-4 font-semibold">Prazo de Entrega</th>}
-                  {columnVisibility.daysRemaining && <th className="text-left p-4 font-semibold">Dias Restantes</th>}
-                  {columnVisibility.labStatus && <th className="text-left p-4 font-semibold">Status Laboratório</th>}
-                  {columnVisibility.phaseManagement && <th className="text-left p-4 font-semibold">Gestão de Fase</th>}
-                  {columnVisibility.actions && <th className="text-center p-4 font-semibold">Ações</th>}
-                </tr>
-              </thead>
-              <tbody>
-                {filteredOrders.map((order) => {
-                  const daysRemaining = calculateDaysRemaining(order.deliveryDeadline);
-                  return (
-                    <tr 
-                      key={order.id} 
-                      onClick={(e) => handleRowClick(order, e)}
-                      className={`border-t transition-colors hover:bg-muted/50 cursor-pointer ${getPriorityClass(order.priority)}`}
-                    >
-                      {columnVisibility.priority && (
-                        <td className="p-4">
-                          <span className={`font-medium ${order.priority === "high" ? "priority-blink" : ""}`}>
-                            {getPriorityLabel(order.priority)}
-                          </span>
-                        </td>
-                      )}
-                      {columnVisibility.orderNumber && <td className="p-4 font-mono text-sm">{order.orderNumber}</td>}
-                      {columnVisibility.item && <td className="p-4 font-medium">{order.item}</td>}
-                      {columnVisibility.description && <td className="p-4 text-sm text-muted-foreground">{order.description}</td>}
-                      {columnVisibility.quantity && <td className="p-4 text-center">{order.quantity}</td>}
-                      {columnVisibility.createdDate && <td className="p-4 text-sm">{new Date(order.createdDate).toLocaleDateString('pt-BR')}</td>}
-                      {columnVisibility.status && (
-                        <td className="p-4">
-                          <Badge className={`status-badge ${getStatusColor(order.status)}`}>
-                            {getStatusLabel(order.status)}
-                          </Badge>
-                        </td>
-                      )}
-                      {columnVisibility.client && <td className="p-4 text-sm">{order.client}</td>}
-                      {columnVisibility.deskTicket && <td className="p-4 text-sm font-mono">{order.deskTicket}</td>}
-                      {columnVisibility.deliveryDeadline && <td className="p-4 text-sm">{new Date(order.deliveryDeadline).toLocaleDateString('pt-BR')}</td>}
-                      {columnVisibility.daysRemaining && (
-                        <td className="p-4">
-                          <div className="flex items-center gap-2">
-                            <Progress 
-                              value={getProgressWidth(daysRemaining)} 
-                              className="h-2 flex-1"
-                            />
-                            <span className="text-xs font-medium w-8 text-right">{daysRemaining}d</span>
-                          </div>
-                        </td>
-                      )}
-                      {columnVisibility.labStatus && (
-                        <td className="p-4">
-                          <div className="flex flex-col gap-1">
-                            {(order as any).lab_ticket_id && (
-                              <span className="text-xs font-mono text-muted-foreground">
-                                #{(order as any).lab_ticket_id}
-                              </span>
-                            )}
-                            <Badge className={getLabStatusColor((order as any).lab_status)}>
-                              {getLabStatusLabel((order as any).lab_status)}
-                            </Badge>
-                          </div>
-                        </td>
-                      )}
-                      {columnVisibility.phaseManagement && (
-                        <td className="p-4">
-                          <PhaseButtons
-                            order={order}
-                            onStatusChange={handleStatusChange}
-                          />
-                        </td>
-                      )}
-                      {columnVisibility.actions && (
-                        <td className="p-4">
-                          <ActionButtons
-                            order={order}
-                            onEdit={handleEditOrder}
-                            onDuplicate={handleDuplicateOrder}
-                            onApprove={handleApproveOrder}
-                            onCancel={handleCancelOrder}
-                          />
-                        </td>
-                      )}
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-          {filteredOrders.length === 0 && (
-            <div className="text-center py-8 text-muted-foreground">
-              <p>Nenhum pedido encontrado para os filtros aplicados.</p>
+      <div className="flex-1 overflow-hidden px-3 pb-2">
+        {loading ? (
+          <div className="flex items-center justify-center h-full">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-2"></div>
+              <p className="text-sm text-muted-foreground">Carregando...</p>
             </div>
-          )}
-        </div>
-      )}
+          </div>
+        ) : activeTab === "all" ? (
+          <PriorityView
+            orders={filteredOrders}
+            onEdit={handleEditOrder}
+            onDuplicate={handleDuplicateOrder}
+            onApprove={handleApproveOrder}
+            onCancel={handleCancelOrder}
+            onStatusChange={handleStatusChange}
+            onRowClick={(order) => {
+              setSelectedOrder(order);
+              setShowEditDialog(true);
+            }}
+          />
+        ) : (
+          <div className="bg-card rounded-lg border overflow-hidden h-full flex flex-col">
+            <div className="overflow-auto flex-1">
+              <table className="w-full text-xs">
+                <thead className="dashboard-header sticky top-0">
+                  <tr>
+                    {columnVisibility.priority && <th className="text-left p-2 font-semibold">Prioridade</th>}
+                    {columnVisibility.orderNumber && <th className="text-left p-2 font-semibold">Pedido</th>}
+                    {columnVisibility.item && <th className="text-left p-2 font-semibold">Item</th>}
+                    {columnVisibility.description && <th className="text-left p-2 font-semibold">Descrição</th>}
+                    {columnVisibility.quantity && <th className="text-left p-2 font-semibold">Qtd</th>}
+                    {columnVisibility.createdDate && <th className="text-left p-2 font-semibold">Criado</th>}
+                    {columnVisibility.status && <th className="text-left p-2 font-semibold">Status</th>}
+                    {columnVisibility.client && <th className="text-left p-2 font-semibold">Cliente</th>}
+                    {columnVisibility.deskTicket && <th className="text-left p-2 font-semibold">Desk</th>}
+                    {columnVisibility.deliveryDeadline && <th className="text-left p-2 font-semibold">Prazo</th>}
+                    {columnVisibility.daysRemaining && <th className="text-left p-2 font-semibold">Dias</th>}
+                    {columnVisibility.labStatus && <th className="text-left p-2 font-semibold">Lab</th>}
+                    {columnVisibility.phaseManagement && <th className="text-left p-2 font-semibold">Fase</th>}
+                    {columnVisibility.actions && <th className="text-center p-2 font-semibold">Ações</th>}
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredOrders.map((order) => {
+                    const daysRemaining = calculateDaysRemaining(order.deliveryDeadline);
+                    return (
+                      <tr 
+                        key={order.id} 
+                        onClick={(e) => handleRowClick(order, e)}
+                        className={`border-t transition-colors hover:bg-muted/50 cursor-pointer ${getPriorityClass(order.priority)}`}
+                      >
+                        {columnVisibility.priority && (
+                          <td className="p-2">
+                            <span className={`font-medium text-xs ${order.priority === "high" ? "priority-blink" : ""}`}>
+                              {getPriorityLabel(order.priority)}
+                            </span>
+                          </td>
+                        )}
+                        {columnVisibility.orderNumber && <td className="p-2 font-mono">{order.orderNumber}</td>}
+                        {columnVisibility.item && <td className="p-2 font-medium">{order.item}</td>}
+                        {columnVisibility.description && <td className="p-2 text-muted-foreground truncate max-w-[150px]">{order.description}</td>}
+                        {columnVisibility.quantity && <td className="p-2 text-center">{order.quantity}</td>}
+                        {columnVisibility.createdDate && <td className="p-2">{new Date(order.createdDate).toLocaleDateString('pt-BR')}</td>}
+                        {columnVisibility.status && (
+                          <td className="p-2">
+                            <Badge className={`status-badge text-xs ${getStatusColor(order.status)}`}>
+                              {getStatusLabel(order.status)}
+                            </Badge>
+                          </td>
+                        )}
+                        {columnVisibility.client && <td className="p-2">{order.client}</td>}
+                        {columnVisibility.deskTicket && <td className="p-2 font-mono">{order.deskTicket}</td>}
+                        {columnVisibility.deliveryDeadline && <td className="p-2">{new Date(order.deliveryDeadline).toLocaleDateString('pt-BR')}</td>}
+                        {columnVisibility.daysRemaining && (
+                          <td className="p-2">
+                            <div className="flex items-center gap-1">
+                              <Progress 
+                                value={getProgressWidth(daysRemaining)} 
+                                className="h-1.5 flex-1"
+                              />
+                              <span className="text-xs font-medium w-6 text-right">{daysRemaining}d</span>
+                            </div>
+                          </td>
+                        )}
+                        {columnVisibility.labStatus && (
+                          <td className="p-2">
+                            <div className="flex flex-col gap-0.5">
+                              {(order as any).lab_ticket_id && (
+                                <span className="text-xs font-mono text-muted-foreground">
+                                  #{(order as any).lab_ticket_id}
+                                </span>
+                              )}
+                              <Badge className={`text-xs ${getLabStatusColor((order as any).lab_status)}`}>
+                                {getLabStatusLabel((order as any).lab_status)}
+                              </Badge>
+                            </div>
+                          </td>
+                        )}
+                        {columnVisibility.phaseManagement && (
+                          <td className="p-2">
+                            <PhaseButtons
+                              order={order}
+                              onStatusChange={handleStatusChange}
+                            />
+                          </td>
+                        )}
+                        {columnVisibility.actions && (
+                          <td className="p-2">
+                            <ActionButtons
+                              order={order}
+                              onEdit={handleEditOrder}
+                              onDuplicate={handleDuplicateOrder}
+                              onApprove={handleApproveOrder}
+                              onCancel={handleCancelOrder}
+                            />
+                          </td>
+                        )}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+            {filteredOrders.length === 0 && (
+              <div className="text-center py-4 text-sm text-muted-foreground">
+                <p>Nenhum pedido encontrado.</p>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* Edit Dialog with integrated History */}
       {selectedOrder && (
