@@ -7,6 +7,7 @@ import {
   Box,
   Truck,
   CheckCircle2,
+  Microscope,
 } from "lucide-react";
 import {
   DndContext,
@@ -20,7 +21,7 @@ import {
 } from "@dnd-kit/core";
 import { KanbanCard } from "./KanbanCard";
 
-export type Phase = "preparation" | "production" | "packaging" | "logistics" | "in_transit" | "completion";
+export type Phase = "preparation" | "production" | "laboratory" | "packaging" | "logistics" | "in_transit" | "completion";
 
 interface KanbanViewProps {
   orders: Order[];
@@ -56,6 +57,10 @@ export const KanbanView = ({ orders, onEdit, onStatusChange }: KanbanViewProps) 
       case "separation_completed":
       case "production_completed":
         return "production";
+      case "awaiting_lab":
+      case "in_lab_analysis":
+      case "lab_completed":
+        return "laboratory";
       case "in_quality_check":
       case "in_packaging":
       case "ready_for_shipping":
@@ -89,6 +94,12 @@ export const KanbanView = ({ orders, onEdit, onStatusChange }: KanbanViewProps) 
       title: "Produção",
       icon: PackageCheck,
       colorClass: "bg-purple-100 text-purple-900 dark:bg-purple-900/30 dark:text-purple-100",
+    },
+    {
+      id: "laboratory" as Phase,
+      title: "Laboratório",
+      icon: Microscope,
+      colorClass: "bg-pink-100 text-pink-900 dark:bg-pink-900/30 dark:text-pink-100",
     },
     {
       id: "packaging" as Phase,
@@ -126,6 +137,8 @@ export const KanbanView = ({ orders, onEdit, onStatusChange }: KanbanViewProps) 
         return "pending";
       case "production":
         return "in_production";
+      case "laboratory":
+        return "in_lab_analysis";
       case "packaging":
         return "in_packaging";
       case "logistics":

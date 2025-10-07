@@ -145,6 +145,11 @@ export type Database = {
           delivery_date: string
           driver_name: string | null
           id: string
+          lab_completed_at: string | null
+          lab_notes: string | null
+          lab_requested_at: string | null
+          lab_status: string | null
+          lab_ticket_id: string | null
           notes: string | null
           order_number: string
           order_type: string
@@ -161,6 +166,11 @@ export type Database = {
           delivery_date: string
           driver_name?: string | null
           id?: string
+          lab_completed_at?: string | null
+          lab_notes?: string | null
+          lab_requested_at?: string | null
+          lab_status?: string | null
+          lab_ticket_id?: string | null
           notes?: string | null
           order_number: string
           order_type: string
@@ -177,6 +187,11 @@ export type Database = {
           delivery_date?: string
           driver_name?: string | null
           id?: string
+          lab_completed_at?: string | null
+          lab_notes?: string | null
+          lab_requested_at?: string | null
+          lab_status?: string | null
+          lab_ticket_id?: string | null
           notes?: string | null
           order_number?: string
           order_type?: string

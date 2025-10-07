@@ -26,6 +26,8 @@ type OrderStatus =
   | "pending" | "in_analysis" | "awaiting_approval" | "planned"
   // Fase de Separação/Produção
   | "separation_started" | "in_production" | "awaiting_material" | "separation_completed" | "production_completed"
+  // Fase de Laboratório
+  | "awaiting_lab" | "in_lab_analysis" | "lab_completed"
   // Fase de Embalagem/Conferência
   | "in_quality_check" | "in_packaging" | "ready_for_shipping"
   // Fase de Expedição/Logística

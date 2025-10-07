@@ -6,7 +6,7 @@ import { ActionButtons } from "./ActionButtons";
 import { PhaseButtons } from "./PhaseButtons";
 import { ViewControls, SortOption, GroupOption, PhaseFilter, ViewMode } from "./ViewControls";
 import { KanbanView } from "./KanbanView";
-import { ClipboardList, PackageCheck, Boxes, Truck, CheckCircle2 } from "lucide-react";
+import { ClipboardList, PackageCheck, Microscope, Boxes, Truck, CheckCircle2 } from "lucide-react";
 
 interface PriorityViewProps {
   orders: Order[];
@@ -52,6 +52,9 @@ export const PriorityView = ({
       "awaiting_material": "production",
       "separation_completed": "production",
       "production_completed": "production",
+      "awaiting_lab": "laboratory",
+      "in_lab_analysis": "laboratory",
+      "lab_completed": "laboratory",
       "in_quality_check": "packaging",
       "in_packaging": "packaging",
       "ready_for_shipping": "packaging",
@@ -184,6 +187,7 @@ export const PriorityView = ({
     const phaseConfig: Record<string, { label: string; icon: any; color: string }> = {
       preparation: { label: "Preparação", icon: ClipboardList, color: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300" },
       production: { label: "Produção", icon: PackageCheck, color: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300" },
+      laboratory: { label: "Laboratório", icon: Microscope, color: "bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-300" },
       packaging: { label: "Embalagem", icon: Boxes, color: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300" },
       logistics: { label: "Expedição", icon: Truck, color: "bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-300" },
       completion: { label: "Conclusão", icon: CheckCircle2, color: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300" },
@@ -209,6 +213,7 @@ export const PriorityView = ({
       return {
         "Preparação": sortedOrders.filter(order => getPhaseFromStatus(order.status) === "preparation"),
         "Produção": sortedOrders.filter(order => getPhaseFromStatus(order.status) === "production"),
+        "Laboratório": sortedOrders.filter(order => getPhaseFromStatus(order.status) === "laboratory"),
         "Embalagem": sortedOrders.filter(order => getPhaseFromStatus(order.status) === "packaging"),
         "Expedição": sortedOrders.filter(order => getPhaseFromStatus(order.status) === "logistics"),
         "Conclusão": sortedOrders.filter(order => getPhaseFromStatus(order.status) === "completion"),
