@@ -197,7 +197,7 @@ export const Dashboard = () => {
     }
   }, [user]);
 
-  // Realtime subscription for orders
+  // Realtime subscription for orders - shared view for all users
   useEffect(() => {
     if (!user) return;
 
@@ -208,8 +208,7 @@ export const Dashboard = () => {
         {
           event: '*',
           schema: 'public',
-          table: 'orders',
-          filter: `user_id=eq.${user.id}`
+          table: 'orders'
         },
         () => {
           loadOrders();
@@ -220,8 +219,7 @@ export const Dashboard = () => {
         {
           event: '*',
           schema: 'public',
-          table: 'order_items',
-          filter: `user_id=eq.${user.id}`
+          table: 'order_items'
         },
         () => {
           loadOrders();
@@ -239,10 +237,10 @@ export const Dashboard = () => {
     
     setLoading(true);
     try {
+      // Load all orders for shared viewing
       const { data, error } = await supabase
         .from('orders')
         .select('*')
-        .eq('user_id', user.id)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -253,8 +251,7 @@ export const Dashboard = () => {
           const { data: itemsData } = await supabase
             .from('order_items')
             .select('*')
-            .eq('order_id', dbOrder.id)
-            .eq('user_id', user.id);
+            .eq('order_id', dbOrder.id);
 
           const items = (itemsData || []).map(item => ({
             id: item.id,
