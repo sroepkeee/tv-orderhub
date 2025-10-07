@@ -1,1 +1,7 @@
 project_id = "wejkyyjhckdlttieuyku"
+
+[functions.notify-lab]
+verify_jwt = false
+
+[functions.receive-lab-update]
+verify_jwt = false
