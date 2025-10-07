@@ -189,8 +189,8 @@ export const KanbanView = ({ orders, onEdit, onStatusChange }: KanbanViewProps) 
       onDragEnd={handleDragEnd}
       onDragCancel={handleDragCancel}
     >
-      <div className="kanban-view h-full overflow-hidden">
-        <div className="kanban-container flex gap-2 overflow-x-auto h-full pb-2">
+      <div className="kanban-view">
+        <div className="kanban-container flex gap-4 overflow-x-auto pb-4 min-h-[calc(100vh-300px)]">
           {columns.map((column) => (
             <KanbanColumn
               key={column.id}

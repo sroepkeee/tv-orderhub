@@ -60,7 +60,7 @@ export const ViewControls = ({
   ];
 
   return (
-    <div className="flex items-center gap-2 mb-3 flex-wrap flex-shrink-0">
+    <div className="flex items-center gap-3 mb-6 flex-wrap">
       {/* View Mode Toggle */}
       <div className="flex items-center gap-1 border rounded-lg p-1">
         <Button
