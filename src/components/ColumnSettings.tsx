@@ -22,6 +22,7 @@ export interface ColumnVisibility {
   deskTicket: boolean;
   deliveryDeadline: boolean;
   daysRemaining: boolean;
+  labStatus: boolean;
   phaseManagement: boolean;
   actions: boolean;
 }
@@ -44,6 +45,7 @@ export const ColumnSettings = ({ visibility, onVisibilityChange }: ColumnSetting
     { key: "deskTicket", label: "Chamado Desk" },
     { key: "deliveryDeadline", label: "Prazo de Entrega" },
     { key: "daysRemaining", label: "Dias Restantes" },
+    { key: "labStatus", label: "Status Laboratório" },
     { key: "phaseManagement", label: "Gestão de Fase" },
     { key: "actions", label: "Ações" },
   ];

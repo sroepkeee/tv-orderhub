@@ -8,7 +8,8 @@ import {
   Paperclip, 
   History,
   Trash2,
-  Eye
+  Eye,
+  Microscope
 } from "lucide-react";
 import { Order } from "./Dashboard";
 import { EditOrderDialog } from "./EditOrderDialog";
@@ -16,6 +17,7 @@ import { OrderHistoryDialog } from "./OrderHistoryDialog";
 import { FileUploadDialog } from "./FileUploadDialog";
 import { ConfirmationDialog } from "./ConfirmationDialog";
 import { toast } from "@/hooks/use-toast";
+import { useSendToLab } from "@/hooks/useSendToLab";
 
 interface ActionButtonsProps {
   order: Order;
@@ -36,6 +38,8 @@ export const ActionButtons = ({
   const [historyOpen, setHistoryOpen] = React.useState(false);
   const [uploadOpen, setUploadOpen] = React.useState(false);
   const [cancelOpen, setCancelOpen] = React.useState(false);
+  const [sendToLabOpen, setSendToLabOpen] = React.useState(false);
+  const { sendToLab, loading: sendingToLab } = useSendToLab();
 
   const handleDuplicate = () => {
     onDuplicate(order);
@@ -68,6 +72,23 @@ export const ActionButtons = ({
       title: "Arquivos anexados",
       description: `${files.length} arquivo(s) anexado(s) ao pedido ${order.orderNumber}.`,
     });
+  };
+
+  const handleSendToLab = async () => {
+    try {
+      const result = await sendToLab(order);
+      toast({
+        title: "Pedido enviado ao laboratório",
+        description: `Ticket #${result.labTicketId} criado com sucesso.`,
+      });
+      setSendToLabOpen(false);
+    } catch (error: any) {
+      toast({
+        title: "Erro ao enviar",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
   };
 
   return (
@@ -129,6 +150,29 @@ export const ActionButtons = ({
             title="Cancelar pedido"
           >
             <X className="h-4 w-4" />
+          </Button>
+        </>
+      )}
+
+      {order.status === "awaiting_lab" && !(order as any).lab_ticket_id && (
+        <>
+          <ConfirmationDialog
+            open={sendToLabOpen}
+            onOpenChange={setSendToLabOpen}
+            title="Enviar ao Laboratório"
+            description={`Deseja enviar o pedido ${order.orderNumber} ao laboratório Imply? O laboratório será notificado e iniciará o processamento.`}
+            onConfirm={handleSendToLab}
+            confirmText="Enviar"
+          />
+          <Button
+            variant="ghost"
+            size="icon"
+            className="action-button h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+            onClick={() => setSendToLabOpen(true)}
+            title="Enviar ao Laboratório"
+            disabled={sendingToLab}
+          >
+            <Microscope className="h-4 w-4" />
           </Button>
         </>
       )}

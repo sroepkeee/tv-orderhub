@@ -177,6 +177,7 @@ export const Dashboard = () => {
       deskTicket: true,
       deliveryDeadline: true,
       daysRemaining: true,
+      labStatus: false,
       phaseManagement: true,
       actions: false,
     };
@@ -753,6 +754,28 @@ export const Dashboard = () => {
     return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
   };
 
+  const getLabStatusLabel = (labStatus: string | null | undefined) => {
+    if (!labStatus) return "-";
+    const labels: Record<string, string> = {
+      "in_production": "Em Produção",
+      "quality_check": "Controle de Qualidade",
+      "ready": "Pronto",
+      "error": "Erro de Produção"
+    };
+    return labels[labStatus] || labStatus;
+  };
+
+  const getLabStatusColor = (labStatus: string | null | undefined) => {
+    if (!labStatus) return "bg-gray-100 text-gray-600";
+    const colors: Record<string, string> = {
+      "in_production": "bg-yellow-100 text-yellow-700",
+      "quality_check": "bg-blue-100 text-blue-700",
+      "ready": "bg-green-100 text-green-700",
+      "error": "bg-red-100 text-red-700"
+    };
+    return colors[labStatus] || "bg-gray-100 text-gray-600";
+  };
+
   const handleRowClick = (order: Order, e: React.MouseEvent) => {
     // Prevent opening if clicking on buttons or interactive elements
     const target = e.target as HTMLElement;
@@ -855,7 +878,7 @@ export const Dashboard = () => {
         <div className="bg-card rounded-lg border overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className="dashboard-header">
+               <thead className="dashboard-header">
                 <tr>
                   {columnVisibility.priority && <th className="text-left p-4 font-semibold">Prioridade</th>}
                   {columnVisibility.orderNumber && <th className="text-left p-4 font-semibold">Número do Pedido</th>}
@@ -868,6 +891,7 @@ export const Dashboard = () => {
                   {columnVisibility.deskTicket && <th className="text-left p-4 font-semibold">Chamado Desk</th>}
                   {columnVisibility.deliveryDeadline && <th className="text-left p-4 font-semibold">Prazo de Entrega</th>}
                   {columnVisibility.daysRemaining && <th className="text-left p-4 font-semibold">Dias Restantes</th>}
+                  {columnVisibility.labStatus && <th className="text-left p-4 font-semibold">Status Laboratório</th>}
                   {columnVisibility.phaseManagement && <th className="text-left p-4 font-semibold">Gestão de Fase</th>}
                   {columnVisibility.actions && <th className="text-center p-4 font-semibold">Ações</th>}
                 </tr>
@@ -911,6 +935,20 @@ export const Dashboard = () => {
                               className="h-2 flex-1"
                             />
                             <span className="text-xs font-medium w-8 text-right">{daysRemaining}d</span>
+                          </div>
+                        </td>
+                      )}
+                      {columnVisibility.labStatus && (
+                        <td className="p-4">
+                          <div className="flex flex-col gap-1">
+                            {(order as any).lab_ticket_id && (
+                              <span className="text-xs font-mono text-muted-foreground">
+                                #{(order as any).lab_ticket_id}
+                              </span>
+                            )}
+                            <Badge className={getLabStatusColor((order as any).lab_status)}>
+                              {getLabStatusLabel((order as any).lab_status)}
+                            </Badge>
                           </div>
                         </td>
                       )}
