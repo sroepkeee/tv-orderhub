@@ -579,19 +579,19 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="edit" className="flex items-center gap-2">
+            <TabsTrigger value="edit" className="flex items-center gap-2 data-[state=active]:bg-blue-500 data-[state=active]:text-white">
               <Edit className="h-4 w-4" />
               Editar
             </TabsTrigger>
-            <TabsTrigger value="lab" className="flex items-center gap-2" disabled={!(order as any)?.lab_ticket_id}>
+            <TabsTrigger value="lab" className="flex items-center gap-2 data-[state=active]:bg-purple-500 data-[state=active]:text-white" disabled={!(order as any)?.lab_ticket_id}>
               <FileText className="h-4 w-4" />
               Laboratório
             </TabsTrigger>
-            <TabsTrigger value="history" className="flex items-center gap-2">
+            <TabsTrigger value="history" className="flex items-center gap-2 data-[state=active]:bg-green-500 data-[state=active]:text-white">
               <History className="h-4 w-4" />
               Histórico
             </TabsTrigger>
-            <TabsTrigger value="comments" className="flex items-center gap-2">
+            <TabsTrigger value="comments" className="flex items-center gap-2 data-[state=active]:bg-orange-500 data-[state=active]:text-white">
               <MessageSquare className="h-4 w-4" />
               Comentários
             </TabsTrigger>
