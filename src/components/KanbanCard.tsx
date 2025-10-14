@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Clock, AlertCircle, GripVertical } from "lucide-react";
@@ -13,19 +13,36 @@ interface KanbanCardProps {
 }
 
 export const KanbanCard = ({ order, onEdit, onStatusChange }: KanbanCardProps) => {
+  const [isActuallyDragging, setIsActuallyDragging] = useState(false);
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: order.id,
   });
 
   const style = {
     transform: CSS.Translate.toString(transform),
-    opacity: isDragging ? 0.5 : 1,
   };
 
-  const handleCardClick = (e: React.MouseEvent) => {
-    if (!isDragging) {
-      onEdit(order);
+  // Detectar quando realmente começa a arrastar
+  useEffect(() => {
+    if (isDragging) {
+      const timer = setTimeout(() => {
+        setIsActuallyDragging(true);
+      }, 100);
+      return () => clearTimeout(timer);
+    } else {
+      setIsActuallyDragging(false);
     }
+  }, [isDragging]);
+
+  const handleCardClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    
+    if (isActuallyDragging) {
+      setIsActuallyDragging(false);
+      return;
+    }
+    
+    onEdit(order);
   };
 
   const getPriorityClass = (priority: Order["priority"]) => {
@@ -109,21 +126,26 @@ export const KanbanCard = ({ order, onEdit, onStatusChange }: KanbanCardProps) =
         className={isDragging ? "dragging" : ""}
       >
         <Card
-          className={`relative kanban-card p-3 cursor-pointer hover:shadow-lg transition-all duration-200 ${getPriorityClass(
+          className={`relative kanban-card p-3 transition-all duration-200 ${getPriorityClass(
             order.priority
-          )}`}
+          )} ${
+            isDragging 
+              ? 'cursor-grabbing opacity-50 scale-105 shadow-2xl' 
+              : 'cursor-pointer hover:shadow-lg hover:scale-[1.02]'
+          }`}
           onClick={handleCardClick}
         >
-        {/* Drag handle */}
-        <button
-          className="absolute right-2 top-2 p-1 rounded hover:bg-muted text-muted-foreground cursor-grab active:cursor-grabbing"
+        {/* Drag handle - maior e mais visível */}
+        <div
+          className="absolute right-1 top-1 p-2 rounded-md hover:bg-primary/10 text-muted-foreground cursor-grab active:cursor-grabbing transition-colors"
           {...listeners}
           {...attributes}
           onClick={(e) => e.stopPropagation()}
-          aria-label="Arrastar"
+          aria-label="Arrastar pedido"
+          title="Arraste para mover entre fases"
         >
-          <GripVertical className="h-4 w-4" />
-        </button>
+          <GripVertical className="h-5 w-5" />
+        </div>
       {/* Header */}
       <div className="flex items-start justify-between mb-2">
         <div className="flex flex-col gap-1">

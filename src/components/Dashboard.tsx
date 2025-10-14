@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import logo from "@/assets/logo.png";
 import { DateRange } from "react-day-picker";
 import { Badge } from "@/components/ui/badge";
@@ -161,6 +161,7 @@ export const Dashboard = () => {
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
   const [loading, setLoading] = useState(true);
+  const isUpdatingRef = useRef(false);
   
   // Column visibility state with user-specific localStorage persistence
   const [columnVisibility, setColumnVisibility] = useState<ColumnVisibility>(() => {
@@ -197,9 +198,11 @@ export const Dashboard = () => {
     }
   }, [user]);
 
-  // Realtime subscription for orders - shared view for all users
+  // Realtime subscription for orders - shared view with debounce
   useEffect(() => {
     if (!user) return;
+
+    let timeoutId: NodeJS.Timeout;
 
     const channel = supabase
       .channel('orders-changes')
@@ -211,7 +214,12 @@ export const Dashboard = () => {
           table: 'orders'
         },
         () => {
-          loadOrders();
+          clearTimeout(timeoutId);
+          timeoutId = setTimeout(() => {
+            if (!isUpdatingRef.current) {
+              loadOrders();
+            }
+          }, 500);
         }
       )
       .on(
@@ -222,12 +230,18 @@ export const Dashboard = () => {
           table: 'order_items'
         },
         () => {
-          loadOrders();
+          clearTimeout(timeoutId);
+          timeoutId = setTimeout(() => {
+            if (!isUpdatingRef.current) {
+              loadOrders();
+            }
+          }, 500);
         }
       )
       .subscribe();
 
     return () => {
+      clearTimeout(timeoutId);
       supabase.removeChannel(channel);
     };
   }, [user]);
@@ -446,6 +460,9 @@ export const Dashboard = () => {
   const handleEditOrder = async (updatedOrder: Order) => {
     if (!user) return;
 
+    // Marcar que estamos atualizando localmente
+    isUpdatingRef.current = true;
+
     try {
       const { error: orderError } = await supabase
         .from('orders')
@@ -496,6 +513,7 @@ export const Dashboard = () => {
 
       await loadOrders();
       
+      // Só mostrar toast após confirmar sucesso da atualização local
       toast({
         title: "Pedido atualizado",
         description: `Pedido ${updatedOrder.orderNumber} foi atualizado com sucesso.`,
@@ -506,6 +524,12 @@ export const Dashboard = () => {
         description: error.message,
         variant: "destructive",
       });
+    } finally {
+      setSelectedOrder(null);
+      // Resetar flag após 1 segundo
+      setTimeout(() => {
+        isUpdatingRef.current = false;
+      }, 1000);
     }
   };
 
