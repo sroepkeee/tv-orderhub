@@ -4,8 +4,9 @@ import { DateRange } from "react-day-picker";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Search, Calendar } from "lucide-react";
+import { Search, Calendar, BarChart3 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
+import { useNavigate } from "react-router-dom";
 import { AddOrderDialog } from "./AddOrderDialog";
 import { EditOrderDialog } from "./EditOrderDialog";
 import { ActionButtons } from "./ActionButtons";
@@ -154,6 +155,7 @@ const tabs = [
 
 export const Dashboard = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [orders, setOrders] = useState<Order[]>([]);
@@ -845,6 +847,14 @@ export const Dashboard = () => {
             visibility={columnVisibility}
             onVisibilityChange={setColumnVisibility}
           />
+          <Button 
+            variant="outline" 
+            onClick={() => navigate('/metrics')}
+            className="gap-2"
+          >
+            <BarChart3 className="h-4 w-4" />
+            Indicadores
+          </Button>
           <UserMenu />
           <AddOrderDialog onAddOrder={handleAddOrder} />
         </div>

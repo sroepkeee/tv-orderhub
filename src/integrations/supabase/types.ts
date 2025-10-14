@@ -14,6 +14,57 @@ export type Database = {
   }
   public: {
     Tables: {
+      delivery_date_changes: {
+        Row: {
+          change_source: string | null
+          changed_at: string | null
+          changed_by: string
+          id: string
+          new_date: string
+          old_date: string
+          order_id: string
+          order_item_id: string
+          reason: string | null
+        }
+        Insert: {
+          change_source?: string | null
+          changed_at?: string | null
+          changed_by: string
+          id?: string
+          new_date: string
+          old_date: string
+          order_id: string
+          order_item_id: string
+          reason?: string | null
+        }
+        Update: {
+          change_source?: string | null
+          changed_at?: string | null
+          changed_by?: string
+          id?: string
+          new_date?: string
+          old_date?: string
+          order_id?: string
+          order_item_id?: string
+          reason?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "delivery_date_changes_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_date_changes_order_item_id_fkey"
+            columns: ["order_item_id"]
+            isOneToOne: false
+            referencedRelation: "order_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       order_comments: {
         Row: {
           comment: string

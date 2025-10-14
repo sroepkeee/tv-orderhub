@@ -1,0 +1,129 @@
+import { differenceInDays, differenceInHours, parseISO } from 'date-fns';
+import type { Order } from '@/components/Dashboard';
+import { supabase } from '@/integrations/supabase/client';
+
+// Calcular tempo médio em uma fase (em dias)
+export const calculateAverageTimeInPhase = (
+  orders: Order[], 
+  phase: string
+): number => {
+  const phaseOrders = orders.filter(o => isInPhase(o.status, phase));
+  
+  if (phaseOrders.length === 0) return 0;
+  
+  const totalDays = phaseOrders.reduce((sum, order) => {
+    const start = parseISO(order.createdDate);
+    const end = new Date();
+    return sum + differenceInDays(end, start);
+  }, 0);
+  
+  return Math.round(totalDays / phaseOrders.length);
+};
+
+// Taxa de cumprimento de prazo (%)
+export const calculateOnTimeRate = (
+  orders: Order[], 
+  targetDays: number
+): number => {
+  const completedOrders = orders.filter(o => 
+    o.status === 'completed' || o.status === 'delivered'
+  );
+  
+  if (completedOrders.length === 0) return 100;
+  
+  const onTimeCount = completedOrders.filter(order => {
+    const start = parseISO(order.createdDate);
+    const end = parseISO(order.deliveryDeadline);
+    const actualDays = differenceInDays(end, start);
+    return actualDays <= targetDays;
+  }).length;
+  
+  return Math.round((onTimeCount / completedOrders.length) * 100);
+};
+
+// Contar mudanças de prazo por período
+export const countDateChanges = async (
+  days: number = 7
+): Promise<number> => {
+  const startDate = new Date();
+  startDate.setDate(startDate.getDate() - days);
+  
+  const { count, error } = await supabase
+    .from('delivery_date_changes')
+    .select('*', { count: 'exact', head: true })
+    .gte('changed_at', startDate.toISOString());
+  
+  if (error) {
+    console.error('Error counting date changes:', error);
+    return 0;
+  }
+  
+  return count || 0;
+};
+
+// Identificar pedidos com múltiplas mudanças
+export const findProblematicOrders = async (
+  threshold: number = 3
+): Promise<Array<{ order_id: string; change_count: number }>> => {
+  try {
+    const { data, error } = await supabase
+      .from('delivery_date_changes')
+      .select('order_id');
+    
+    if (error) throw error;
+    if (!data) return [];
+    
+    // Contar mudanças por pedido
+    const countMap = new Map<string, number>();
+    data.forEach(item => {
+      const count = countMap.get(item.order_id) || 0;
+      countMap.set(item.order_id, count + 1);
+    });
+    
+    // Filtrar pedidos acima do threshold
+    return Array.from(countMap.entries())
+      .filter(([_, count]) => count >= threshold)
+      .map(([order_id, change_count]) => ({ order_id, change_count }))
+      .sort((a, b) => b.change_count - a.change_count);
+  } catch (error) {
+    console.error('Error finding problematic orders:', error);
+    return [];
+  }
+};
+
+// Calcular tempo médio de produção para SSM (em dias)
+export const calculateAverageProductionTime = (orders: Order[]): number => {
+  const productionOrders = orders.filter(o => 
+    ['in_production', 'separation_started', 'production_completed', 'completed'].includes(o.status)
+  );
+  
+  if (productionOrders.length === 0) return 0;
+  
+  const totalDays = productionOrders.reduce((sum, order) => {
+    const start = parseISO(order.createdDate);
+    const end = order.status === 'completed' || order.status === 'delivered'
+      ? parseISO(order.deliveryDeadline)
+      : new Date();
+    return sum + differenceInDays(end, start);
+  }, 0);
+  
+  return Math.round(totalDays / productionOrders.length);
+};
+
+// Helper para verificar se um status pertence a uma fase
+const isInPhase = (status: string, phase: string): boolean => {
+  const phaseMap: Record<string, string[]> = {
+    preparation: ['pending', 'in_analysis', 'awaiting_approval', 'planned'],
+    production: ['separation_started', 'in_production', 'awaiting_material', 'production_completed'],
+    lab: ['awaiting_lab', 'in_lab_analysis', 'lab_completed'],
+    packaging: ['in_quality_check', 'in_packaging', 'ready_for_shipping'],
+    logistics: ['released_for_shipping', 'in_expedition', 'in_transit', 'pickup_scheduled', 'awaiting_pickup', 'collected']
+  };
+  
+  return phaseMap[phase]?.includes(status) || false;
+};
+
+// Obter contagem de pedidos por fase
+export const getOrderCountByPhase = (orders: Order[], phase: string): number => {
+  return orders.filter(o => isInPhase(o.status, phase)).length;
+};
