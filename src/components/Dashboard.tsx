@@ -350,6 +350,24 @@ export const Dashboard = () => {
     return ["separation_started", "in_production", "awaiting_material", "separation_completed", "production_completed"].includes(status);
   };
 
+  // Helper function to check if ecommerce order should appear in sales tab
+  const isEcommerceInSalesPhase = (status: OrderStatus) => {
+    const salesPhaseStatuses: OrderStatus[] = [
+      // Preparação
+      "pending", "in_analysis", "awaiting_approval", "planned",
+      // Produção
+      "separation_started", "in_production", "awaiting_material", 
+      "separation_completed", "production_completed",
+      // Laboratório
+      "awaiting_lab", "in_lab_analysis", "lab_completed",
+      // Embalagem
+      "in_quality_check", "in_packaging", "ready_for_shipping",
+      // Expedição
+      "released_for_shipping", "in_expedition", "pickup_scheduled", "awaiting_pickup"
+    ];
+    return salesPhaseStatuses.includes(status);
+  };
+
   // Filter orders based on active tab, search, and date range
   const filteredOrders = orders.filter((order) => {
     let matchesTab = false;
@@ -362,8 +380,12 @@ export const Dashboard = () => {
       matchesTab = order.status === "collected" || order.status === "in_transit";
     } else if (activeTab === "completed") {
       matchesTab = order.status === "delivered" || order.status === "completed";
-    } else if (activeTab === "sales" || activeTab === "materials") {
-      matchesTab = order.type === activeTab;
+    } else if (activeTab === "sales") {
+      matchesTab = 
+        order.type === "sales" || 
+        (order.type === "ecommerce" && isEcommerceInSalesPhase(order.status));
+    } else if (activeTab === "materials") {
+      matchesTab = order.type === "materials";
     }
     
     const matchesSearch = 
