@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Calendar, User, FileText, CheckCircle, XCircle, Clock, History, Edit, Plus, Trash2, Loader2, MessageSquare, Download, Package } from "lucide-react";
+import { Calendar, User, FileText, CheckCircle, XCircle, Clock, History, Edit, Plus, Trash2, Loader2, MessageSquare, Download, Package, AlertCircle } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { Order } from "./Dashboard";
 import { OrderItem } from "./AddOrderDialog";
@@ -18,6 +18,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { CompleteOrderDialog } from "./CompleteOrderDialog";
+import { ExceptionCommentDialog } from "./ExceptionCommentDialog";
 
 interface HistoryEvent {
   id: string;
@@ -57,6 +58,9 @@ export const EditOrderDialog = ({ order, open, onOpenChange, onSave }: EditOrder
   const [showCommentInput, setShowCommentInput] = useState(false);
   const [showCompleteDialog, setShowCompleteDialog] = useState(false);
   const [pendingCompletionStatus, setPendingCompletionStatus] = useState<string | null>(null);
+  const [showExceptionDialog, setShowExceptionDialog] = useState(false);
+  const [pendingExceptionStatus, setPendingExceptionStatus] = useState<string | null>(null);
+  const [savingException, setSavingException] = useState(false);
 
   // Load history from database
   const loadHistory = async () => {
@@ -378,6 +382,13 @@ export const EditOrderDialog = ({ order, open, onOpenChange, onSave }: EditOrder
 
   // Handle status change with validation
   const handleStatusChange = (newStatus: string) => {
+    // Check if it's exception status
+    if (newStatus === 'exception') {
+      setPendingExceptionStatus(newStatus);
+      setShowExceptionDialog(true);
+      return;
+    }
+    
     if (newStatus === 'completed') {
       // Check for pending items
       const pending = items.filter(item => 
@@ -442,6 +453,56 @@ export const EditOrderDialog = ({ order, open, onOpenChange, onSave }: EditOrder
     
     setShowCompleteDialog(false);
     setPendingCompletionStatus(null);
+  };
+
+  // Confirm exception with mandatory comment
+  const handleConfirmException = async (comment: string, responsible: string) => {
+    if (!pendingExceptionStatus) return;
+    
+    setSavingException(true);
+    
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Usuário não autenticado");
+      
+      // Format the comment with structured information
+      const formattedComment = `🚨 EXCEÇÃO REGISTRADA\n\n📋 Descrição:\n${comment}\n\n👤 Responsável: ${responsible}\n\n⏰ Registrado em: ${format(new Date(), "dd/MM/yyyy 'às' HH:mm")}`;
+      
+      // Insert comment in order_comments table
+      const { error: commentError } = await supabase
+        .from('order_comments')
+        .insert({
+          order_id: order.id,
+          user_id: user.id,
+          comment: formattedComment
+        });
+      
+      if (commentError) throw commentError;
+      
+      // Apply exception status
+      setValue("status", pendingExceptionStatus as any);
+      
+      toast({
+        title: "Exceção registrada",
+        description: "O comentário foi salvo e o status foi atualizado para Exceção.",
+        variant: "default"
+      });
+      
+      // Reload comments to display the new one
+      loadComments();
+      
+    } catch (error) {
+      console.error("Error saving exception:", error);
+      toast({
+        title: "Erro ao registrar exceção",
+        description: "Não foi possível salvar o comentário da exceção.",
+        variant: "destructive"
+      });
+    } finally {
+      setSavingException(false);
+      setShowExceptionDialog(false);
+      setPendingExceptionStatus(null);
+    }
   };
 
   // Download order summary
@@ -519,6 +580,7 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
       delivered: "Entregue",
       completed: "Concluído",
       cancelled: "Cancelado",
+      exception: "Exceção",
       in_analysis: "Em Análise",
       awaiting_approval: "Aguardando Aprovação",
       separation_started: "Separação Iniciada",
@@ -543,6 +605,7 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
   const getEventIcon = (oldStatus: string, newStatus: string) => {
     if (newStatus === "cancelled") return <XCircle className="h-4 w-4 text-red-500" />;
     if (newStatus === "completed" || newStatus === "delivered") return <CheckCircle className="h-4 w-4 text-green-500" />;
+    if (newStatus === "exception") return <AlertCircle className="h-4 w-4 text-orange-500" />;
     if (newStatus === "pending") return <FileText className="h-4 w-4 text-blue-500" />;
     return <Clock className="h-4 w-4 text-yellow-500" />;
   };
@@ -550,6 +613,7 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
   const getEventBadgeVariant = (status: string): "default" | "destructive" | "secondary" => {
     if (status === "completed" || status === "delivered") return "default";
     if (status === "cancelled") return "destructive";
+    if (status === "exception") return "destructive";
     return "secondary";
   };
 
@@ -667,6 +731,7 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                         <SelectItem value="pending">Pendente</SelectItem>
                         <SelectItem value="planned">Planejado</SelectItem>
                         <SelectItem value="in_production">Em Produção</SelectItem>
+                        <SelectItem value="exception">⚠️ Exceção</SelectItem>
                         <SelectItem value="completed">Concluído</SelectItem>
                         <SelectItem value="cancelled">Cancelado</SelectItem>
                       </SelectContent>
@@ -1149,6 +1214,16 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
           setShowCompleteDialog(false);
           setPendingCompletionStatus(null);
         }}
+      />
+
+      <ExceptionCommentDialog
+        open={showExceptionDialog}
+        onConfirm={handleConfirmException}
+        onCancel={() => {
+          setShowExceptionDialog(false);
+          setPendingExceptionStatus(null);
+        }}
+        saving={savingException}
       />
     </>
   );
