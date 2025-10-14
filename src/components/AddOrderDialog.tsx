@@ -90,6 +90,7 @@ export const AddOrderDialog = ({ onAddOrder }: AddOrderDialogProps) => {
       case "production": return "Pedido de Produção";
       case "sales": return "Pedido de Venda";
       case "materials": return "Remessa de Materiais";
+      case "ecommerce": return "Pedido E-commerce";
       default: return "Pedido";
     }
   };
@@ -118,6 +119,7 @@ export const AddOrderDialog = ({ onAddOrder }: AddOrderDialogProps) => {
                   <SelectItem value="production">Pedidos de Produção</SelectItem>
                   <SelectItem value="sales">Pedidos de Venda</SelectItem>
                   <SelectItem value="materials">Remessa de Materiais</SelectItem>
+                  <SelectItem value="ecommerce">E-commerce</SelectItem>
                 </SelectContent>
               </Select>
             </div>

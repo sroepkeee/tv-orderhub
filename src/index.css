@@ -120,6 +120,8 @@ All colors MUST be HSL.
     --type-sales-bg: 280 40% 96%;
     --type-materials: 160 50% 45%;
     --type-materials-bg: 160 40% 96%;
+    --type-ecommerce: 200 80% 50%;
+    --type-ecommerce-bg: 200 80% 96%;
 
     /* Dashboard specific */
     --dashboard-header: 220 25% 25%;
@@ -256,6 +258,8 @@ All colors MUST be HSL.
     --type-sales-bg: 280 40% 12%;
     --type-materials: 160 50% 65%;
     --type-materials-bg: 160 40% 12%;
+    --type-ecommerce: 200 80% 65%;
+    --type-ecommerce-bg: 200 70% 12%;
 
     /* Dashboard specific - Dark Mode */
     --dashboard-header: 220 10% 92%;

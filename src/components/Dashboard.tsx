@@ -37,7 +37,7 @@ type OrderStatus =
   | "delivered" | "completed"
   // Status de Exceção/Problemas
   | "cancelled" | "on_hold" | "delayed" | "returned";
-type OrderType = "production" | "sales" | "materials";
+type OrderType = "production" | "sales" | "materials" | "ecommerce";
 
 export interface Order {
   id: string;
@@ -456,7 +456,10 @@ export const Dashboard = () => {
   };
 
   const generateOrderNumber = (type: OrderType) => {
-    const prefix = type === "production" ? "PRD" : type === "sales" ? "VND" : "MAT";
+    const prefix = type === "production" ? "PRD" : 
+                   type === "sales" ? "VND" : 
+                   type === "ecommerce" ? "ECOM" : 
+                   "MAT";
     const year = new Date().getFullYear();
     const count = orders.filter(o => o.type === type).length + 1;
     return `${prefix}-${year}-${count.toString().padStart(3, '0')}`;

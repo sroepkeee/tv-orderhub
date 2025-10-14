@@ -563,6 +563,7 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                         <SelectItem value="production">Produção</SelectItem>
                         <SelectItem value="sales">Vendas</SelectItem>
                         <SelectItem value="materials">Materiais</SelectItem>
+                        <SelectItem value="ecommerce">E-commerce</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
