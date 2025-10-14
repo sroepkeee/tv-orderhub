@@ -64,6 +64,7 @@ export const EditOrderDialog = ({ order, open, onOpenChange, onSave }: EditOrder
   const [savingException, setSavingException] = useState(false);
   const [attachments, setAttachments] = useState<any[]>([]);
   const [loadingAttachments, setLoadingAttachments] = useState(false);
+  const [uploadingAttachment, setUploadingAttachment] = useState(false);
 
   // Load history from database
   const loadHistory = async () => {
@@ -207,6 +208,80 @@ export const EditOrderDialog = ({ order, open, onOpenChange, onSave }: EditOrder
         description: "Não foi possível baixar o arquivo.",
         variant: "destructive"
       });
+    }
+  };
+
+  // Upload new PDF attachment
+  const handleUploadAttachment = async (file: File) => {
+    if (!order?.id) return;
+
+    setUploadingAttachment(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Usuário não autenticado");
+
+      // Validate file
+      if (file.size > 10 * 1024 * 1024) {
+        toast({
+          title: "Arquivo muito grande",
+          description: "O PDF deve ter no máximo 10MB.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      if (file.type !== 'application/pdf') {
+        toast({
+          title: "Tipo inválido",
+          description: "Apenas arquivos PDF são aceitos.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Upload to storage
+      const fileName = `${order.orderNumber}_${Date.now()}.pdf`;
+      const filePath = `${user.id}/${fileName}`;
+
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('order-attachments')
+        .upload(filePath, file, {
+          contentType: 'application/pdf',
+          cacheControl: '3600',
+          upsert: false
+        });
+
+      if (uploadError) throw uploadError;
+
+      // Save metadata
+      const { error: attachmentError } = await supabase
+        .from('order_attachments')
+        .insert({
+          order_id: order.id,
+          file_name: file.name,
+          file_path: uploadData.path,
+          file_size: file.size,
+          file_type: file.type,
+          uploaded_by: user.id
+        });
+
+      if (attachmentError) throw attachmentError;
+
+      toast({
+        title: "Anexo adicionado",
+        description: `${file.name} foi anexado com sucesso.`
+      });
+
+      loadAttachments();
+    } catch (error: any) {
+      console.error("Error uploading attachment:", error);
+      toast({
+        title: "Erro ao anexar arquivo",
+        description: error.message || "Não foi possível anexar o arquivo.",
+        variant: "destructive"
+      });
+    } finally {
+      setUploadingAttachment(false);
     }
   };
 
@@ -1276,7 +1351,40 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-semibold">Anexos do Pedido</h3>
-                <Badge variant="outline">{attachments.length} arquivo(s)</Badge>
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline">{attachments.length} arquivo(s)</Badge>
+                  <Button
+                    size="sm"
+                    onClick={() => document.getElementById('attachment-upload')?.click()}
+                    disabled={uploadingAttachment}
+                    className="gap-2"
+                  >
+                    {uploadingAttachment ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Enviando...
+                      </>
+                    ) : (
+                      <>
+                        <Plus className="h-4 w-4" />
+                        Anexar PDF
+                      </>
+                    )}
+                  </Button>
+                  <input
+                    id="attachment-upload"
+                    type="file"
+                    accept=".pdf,application/pdf"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        handleUploadAttachment(file);
+                        e.target.value = '';
+                      }
+                    }}
+                  />
+                </div>
               </div>
 
               {loadingAttachments ? (
