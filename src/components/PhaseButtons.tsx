@@ -9,7 +9,8 @@ import {
   AlertCircle,
   Play,
   Pause,
-  XCircle
+  XCircle,
+  Check
 } from "lucide-react";
 import { Order } from "./Dashboard";
 import {
@@ -27,6 +28,9 @@ interface PhaseButtonsProps {
 }
 
 export const PhaseButtons = ({ order, onStatusChange }: PhaseButtonsProps) => {
+  const [optimisticStatus, setOptimisticStatus] = React.useState<string | null>(null);
+  const currentStatus = optimisticStatus || order.status;
+
   const phases = [
     {
       id: "preparation",
@@ -106,7 +110,7 @@ export const PhaseButtons = ({ order, onStatusChange }: PhaseButtonsProps) => {
     <div className="flex gap-2">
       {phases.map((phase) => {
         const Icon = phase.icon;
-        const isCurrentPhase = phase.statuses.some(s => s.value === order.status);
+        const isCurrentPhase = phase.statuses.some(s => s.value === currentStatus);
         
         return (
           <DropdownMenu key={phase.id}>
@@ -120,17 +124,21 @@ export const PhaseButtons = ({ order, onStatusChange }: PhaseButtonsProps) => {
                 {phase.label}
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="w-56">
+            <DropdownMenuContent align="start" className="w-56" onCloseAutoFocus={(e) => e.preventDefault()}>
               <DropdownMenuLabel>{phase.label}</DropdownMenuLabel>
               <DropdownMenuSeparator />
               {phase.statuses.map((status) => (
                 <DropdownMenuItem
                   key={status.value}
-                  onClick={() => onStatusChange(order.id, status.value as Order["status"])}
-                  className={order.status === status.value ? "bg-accent" : ""}
+                  onClick={() => {
+                    setOptimisticStatus(status.value);
+                    onStatusChange(order.id, status.value as Order["status"]);
+                    setTimeout(() => setOptimisticStatus(null), 2000);
+                  }}
+                  className={currentStatus === status.value ? "bg-accent" : ""}
                 >
-                  {order.status === status.value && (
-                    <Play className="h-3 w-3 mr-2 text-green-600" />
+                  {currentStatus === status.value && (
+                    <Check className="h-4 w-4 mr-2 text-green-600 font-bold" />
                   )}
                   {status.label}
                 </DropdownMenuItem>
