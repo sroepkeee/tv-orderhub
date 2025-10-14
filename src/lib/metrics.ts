@@ -166,3 +166,66 @@ const isInPhase = (status: string, phase: string): boolean => {
 export const getOrderCountByPhase = (orders: Order[], phase: string): number => {
   return orders.filter(o => isInPhase(o.status, phase)).length;
 };
+
+// Calcular dias desde criação do pedido
+export const calculateDaysOpen = (createdDate: string): number => {
+  const created = parseISO(createdDate);
+  const today = new Date();
+  return differenceInDays(today, created);
+};
+
+// Calcular dias até o prazo de entrega
+export const calculateDaysUntilDeadline = (deliveryDate: string): number => {
+  const deadline = parseISO(deliveryDate);
+  const today = new Date();
+  return differenceInDays(deadline, today);
+};
+
+// Determinar status do prazo baseado nos dias restantes
+export const getDeadlineStatus = (daysUntil: number): 'good' | 'warning' | 'critical' => {
+  if (daysUntil < 0) return 'critical'; // Atrasado
+  if (daysUntil < 3) return 'critical'; // Menos de 3 dias
+  if (daysUntil <= 7) return 'warning'; // 3-7 dias
+  return 'good'; // Mais de 7 dias
+};
+
+// Calcular informações de entrega parcial
+export const getPartialDeliveryInfo = (items: OrderItem[]): {
+  delivered: number;
+  total: number;
+  percentage: number;
+} => {
+  if (items.length === 0) {
+    return { delivered: 0, total: 0, percentage: 0 };
+  }
+
+  const totalRequested = items.reduce((sum, item) => sum + item.requestedQuantity, 0);
+  const totalDelivered = items.reduce((sum, item) => sum + item.deliveredQuantity, 0);
+  const percentage = totalRequested > 0 ? Math.round((totalDelivered / totalRequested) * 100) : 0;
+
+  return {
+    delivered: totalDelivered,
+    total: totalRequested,
+    percentage
+  };
+};
+
+// Contar mudanças de prazo de um pedido específico
+export const countOrderDateChanges = async (orderId: string): Promise<number> => {
+  try {
+    const { count, error } = await supabase
+      .from('delivery_date_changes')
+      .select('*', { count: 'exact', head: true })
+      .eq('order_id', orderId);
+
+    if (error) {
+      console.error('Error counting order date changes:', error);
+      return 0;
+    }
+
+    return count || 0;
+  } catch (error) {
+    console.error('Error in countOrderDateChanges:', error);
+    return 0;
+  }
+};

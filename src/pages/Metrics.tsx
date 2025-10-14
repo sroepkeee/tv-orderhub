@@ -12,6 +12,8 @@ import { OrderTotvsMetrics } from "@/components/metrics/OrderTotvsMetrics";
 import { ItemSourceMetrics } from "@/components/metrics/ItemSourceMetrics";
 import { CriticalItemsAlert } from "@/components/metrics/CriticalItemsAlert";
 import { ProductionTimeBySource } from "@/components/metrics/ProductionTimeBySource";
+import { OrdersTrackingTable } from "@/components/metrics/OrdersTrackingTable";
+import { EditOrderDialog } from "@/components/EditOrderDialog";
 import type { Order } from "@/components/Dashboard";
 import { 
   calculateAverageProductionTime, 
@@ -31,6 +33,8 @@ export default function Metrics() {
   const [weeklyChanges, setWeeklyChanges] = useState(0);
   const [problematicCount, setProblematicCount] = useState(0);
   const [itemsBySource, setItemsBySource] = useState({ inStock: 0, production: 0, outOfStock: 0 });
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [showEditDialog, setShowEditDialog] = useState(false);
   
   useEffect(() => {
     if (user) {
@@ -202,10 +206,34 @@ export default function Metrics() {
         <OrderTotvsMetrics orders={orders} />
       </div>
       
+      {/* Tabela de Acompanhamento Detalhado */}
+      <div className="mb-6">
+        <OrdersTrackingTable 
+          orders={orders}
+          onOrderClick={(order) => {
+            setSelectedOrder(order);
+            setShowEditDialog(true);
+          }}
+        />
+      </div>
+
       {/* Histórico de Mudanças */}
       <div>
         <DateChangeHistory limit={15} />
       </div>
+
+      {/* Dialog de Edição */}
+      {selectedOrder && (
+        <EditOrderDialog
+          order={selectedOrder}
+          open={showEditDialog}
+          onOpenChange={setShowEditDialog}
+          onSave={(updatedOrder) => {
+            loadData();
+            setShowEditDialog(false);
+          }}
+        />
+      )}
     </div>
   );
 }
