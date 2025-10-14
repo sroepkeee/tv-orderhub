@@ -10,13 +10,14 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Calendar, User, FileText, CheckCircle, XCircle, Clock, History, Edit, Plus, Trash2, Loader2, MessageSquare } from "lucide-react";
+import { Calendar, User, FileText, CheckCircle, XCircle, Clock, History, Edit, Plus, Trash2, Loader2, MessageSquare, Download, Package } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { Order } from "./Dashboard";
 import { OrderItem } from "./AddOrderDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
+import { CompleteOrderDialog } from "./CompleteOrderDialog";
 
 interface HistoryEvent {
   id: string;
@@ -53,6 +54,8 @@ export const EditOrderDialog = ({ order, open, onOpenChange, onSave }: EditOrder
   const [loadingComments, setLoadingComments] = useState(false);
   const [savingComment, setSavingComment] = useState(false);
   const [showCommentInput, setShowCommentInput] = useState(false);
+  const [showCompleteDialog, setShowCompleteDialog] = useState(false);
+  const [pendingCompletionStatus, setPendingCompletionStatus] = useState<string | null>(null);
 
   // Load history from database
   const loadHistory = async () => {
@@ -226,6 +229,233 @@ export const EditOrderDialog = ({ order, open, onOpenChange, onSave }: EditOrder
     setItems(newItems);
   };
 
+  // Update received quantity and status
+  const handleUpdateReceivedQuantity = async (itemId: string, receivedQty: number, requestedQty: number) => {
+    let newStatus = 'pending';
+    
+    if (receivedQty === 0) {
+      newStatus = 'pending';
+    } else if (receivedQty < requestedQty) {
+      newStatus = 'partial';
+    } else if (receivedQty >= requestedQty) {
+      newStatus = 'completed';
+    }
+    
+    try {
+      const { error } = await supabase
+        .from('order_items')
+        .update({ 
+          delivered_quantity: receivedQty,
+          received_status: newStatus 
+        })
+        .eq('id', itemId);
+        
+      if (error) throw error;
+      
+      // Reload items from database
+      const { data: updatedItems } = await supabase
+        .from('order_items')
+        .select('*')
+        .eq('order_id', order.id);
+        
+      if (updatedItems) {
+        setItems(updatedItems.map(item => ({
+          id: item.id,
+          itemCode: item.item_code,
+          itemDescription: item.item_description,
+          unit: item.unit,
+          requestedQuantity: item.requested_quantity,
+          warehouse: item.warehouse,
+          deliveryDate: item.delivery_date,
+          deliveredQuantity: item.delivered_quantity,
+          received_status: (item.received_status as 'pending' | 'partial' | 'completed') || 'pending'
+        })));
+      }
+      
+      toast({
+        title: "Quantidade atualizada",
+        description: "O status de recebimento foi atualizado."
+      });
+    } catch (error) {
+      console.error("Error updating received quantity:", error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível atualizar a quantidade recebida.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  // Mark item as completed (OK button)
+  const handleMarkAsCompleted = async (item: OrderItem) => {
+    if (!item.id) return;
+    
+    await handleUpdateReceivedQuantity(
+      item.id, 
+      item.requestedQuantity, 
+      item.requestedQuantity
+    );
+  };
+
+  // Get badge for received status
+  const getReceiveStatusBadge = (status?: string, deliveredQty?: number, requestedQty?: number) => {
+    let actualStatus = status || 'pending';
+    
+    // Recalculate status if not set
+    if (!status && deliveredQty !== undefined && requestedQty !== undefined) {
+      if (deliveredQty === 0) {
+        actualStatus = 'pending';
+      } else if (deliveredQty < requestedQty) {
+        actualStatus = 'partial';
+      } else {
+        actualStatus = 'completed';
+      }
+    }
+    
+    const variants = {
+      pending: { className: 'bg-yellow-100 text-yellow-800 border-yellow-300', label: 'Pendente', icon: '⏳' },
+      partial: { className: 'bg-blue-100 text-blue-800 border-blue-300', label: 'Parcial', icon: '📦' },
+      completed: { className: 'bg-green-100 text-green-800 border-green-300', label: 'Completo', icon: '✓' }
+    };
+    
+    const config = variants[actualStatus as keyof typeof variants] || variants.pending;
+    
+    return (
+      <Badge className={config.className} variant="outline">
+        <span className="mr-1">{config.icon}</span>
+        {config.label}
+      </Badge>
+    );
+  };
+
+  // Handle status change with validation
+  const handleStatusChange = (newStatus: string) => {
+    if (newStatus === 'completed') {
+      // Check for pending items
+      const pending = items.filter(item => 
+        (item.received_status !== 'completed' && item.received_status !== undefined) || 
+        (item.deliveredQuantity < item.requestedQuantity)
+      );
+      
+      if (pending.length > 0) {
+        setPendingCompletionStatus(newStatus);
+        setShowCompleteDialog(true);
+        return;
+      }
+    }
+    
+    setValue("status", newStatus as any);
+  };
+
+  // Confirm completion with or without justification
+  const handleConfirmCompletion = async (note?: string) => {
+    if (pendingCompletionStatus) {
+      setValue("status", pendingCompletionStatus as any);
+      
+      if (note) {
+        try {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (!user) throw new Error("Usuário não autenticado");
+          
+          const pending = items.filter(item => 
+            (item.received_status !== 'completed' && item.received_status !== undefined) || 
+            (item.deliveredQuantity < item.requestedQuantity)
+          );
+          
+          const { error } = await supabase.from('order_completion_notes').insert({
+            order_id: order.id,
+            user_id: user.id,
+            note: note,
+            pending_items: pending.map(i => ({
+              itemCode: i.itemCode,
+              itemDescription: i.itemDescription,
+              requested: i.requestedQuantity,
+              delivered: i.deliveredQuantity,
+              status: i.received_status
+            }))
+          });
+          
+          if (error) throw error;
+          
+          toast({
+            title: "Pedido concluído com justificativa",
+            description: "A observação foi registrada no sistema."
+          });
+        } catch (error) {
+          console.error("Error saving completion note:", error);
+          toast({
+            title: "Erro",
+            description: "Não foi possível salvar a justificativa.",
+            variant: "destructive"
+          });
+        }
+      }
+    }
+    
+    setShowCompleteDialog(false);
+    setPendingCompletionStatus(null);
+  };
+
+  // Download order summary
+  const downloadOrderSummary = () => {
+    const summary = `
+=====================================
+        RESUMO DO PEDIDO
+=====================================
+
+Pedido Nº: ${order.orderNumber}
+Data: ${format(new Date(order.createdDate), 'dd/MM/yyyy HH:mm')}
+Tipo: ${order.type === 'production' ? 'Produção' : order.type === 'sales' ? 'Vendas' : 'Materiais'}
+Cliente: ${order.client}
+Status: ${getStatusLabel(order.status)}
+Prioridade: ${order.priority === 'high' ? 'Alta' : order.priority === 'medium' ? 'Média' : 'Baixa'}
+
+-------------------------------------
+            ITENS
+-------------------------------------
+${items.map((item, i) => `
+${i + 1}. ${item.itemCode} - ${item.itemDescription}
+   Solicitado: ${item.requestedQuantity} ${item.unit}
+   Entregue: ${item.deliveredQuantity} ${item.unit}
+   Status Recebimento: ${item.received_status === 'completed' ? 'Completo' : item.received_status === 'partial' ? 'Parcial' : 'Pendente'}
+   Armazém: ${item.warehouse}
+   Data Entrega: ${format(new Date(item.deliveryDate), 'dd/MM/yyyy')}
+`).join('\n')}
+
+-------------------------------------
+         INFORMAÇÕES ADICIONAIS
+-------------------------------------
+Prazo de Entrega: ${format(new Date(order.deliveryDeadline), 'dd/MM/yyyy')}
+Chamado Desk: ${order.deskTicket || 'N/A'}
+
+${(order as any).lab_ticket_id ? `
+-------------------------------------
+          LABORATÓRIO
+-------------------------------------
+Ticket ID: ${(order as any).lab_ticket_id}
+Status Lab: ${(order as any).lab_status || 'N/A'}
+Notas: ${(order as any).lab_notes || 'Nenhuma'}
+` : ''}
+
+=====================================
+    Gerado em ${format(new Date(), 'dd/MM/yyyy HH:mm')}
+=====================================
+    `;
+    
+    const blob = new Blob([summary], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `pedido_${order.orderNumber}_${format(new Date(), 'yyyyMMdd_HHmmss')}.txt`;
+    link.click();
+    URL.revokeObjectURL(url);
+    
+    toast({
+      title: "Download iniciado",
+      description: `Resumo do pedido ${order.orderNumber} está sendo baixado.`
+    });
+  };
+
   const onSubmit = (data: Order) => {
     const updatedOrder = { ...data, id: order.id, items };
     onSave(updatedOrder);
@@ -276,14 +506,28 @@ export const EditOrderDialog = ({ order, open, onOpenChange, onSave }: EditOrder
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-6xl max-h-[95vh]">
-        <DialogHeader>
-          <DialogTitle>Pedido #{order?.orderNumber}</DialogTitle>
-          <DialogDescription>
-            Visualize e edite os detalhes do pedido ou acompanhe seu histórico de movimentações
-          </DialogDescription>
-        </DialogHeader>
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-6xl max-h-[95vh]">
+          <DialogHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <DialogTitle>Pedido #{order?.orderNumber}</DialogTitle>
+                <DialogDescription>
+                  Visualize e edite os detalhes do pedido ou acompanhe seu histórico de movimentações
+                </DialogDescription>
+              </div>
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={downloadOrderSummary}
+                className="gap-2"
+              >
+                <Download className="h-4 w-4" />
+                Baixar Resumo
+              </Button>
+            </div>
+          </DialogHeader>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full grid-cols-4">
@@ -351,7 +595,7 @@ export const EditOrderDialog = ({ order, open, onOpenChange, onSave }: EditOrder
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="status">Status</Label>
-                    <Select onValueChange={(value) => setValue("status", value as any)} defaultValue={order?.status}>
+                    <Select onValueChange={handleStatusChange} defaultValue={order?.status}>
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
@@ -389,13 +633,14 @@ export const EditOrderDialog = ({ order, open, onOpenChange, onSave }: EditOrder
                         <TableHeader>
                           <TableRow>
                             <TableHead className="w-[100px]">Código</TableHead>
-                            <TableHead className="min-w-[200px]">Descrição</TableHead>
-                            <TableHead className="w-[80px]">UND</TableHead>
-                            <TableHead className="w-[100px]">Qtd. Sol.</TableHead>
-                            <TableHead className="w-[120px]">Armazém</TableHead>
-                            <TableHead className="w-[130px]">Data Entrega</TableHead>
-                            <TableHead className="w-[100px]">Qtd. Ent.</TableHead>
-                            <TableHead className="w-[60px]"></TableHead>
+                            <TableHead className="min-w-[150px]">Descrição</TableHead>
+                            <TableHead className="w-[70px]">UND</TableHead>
+                            <TableHead className="w-[90px]">Qtd. Sol.</TableHead>
+                            <TableHead className="w-[110px]">Armazém</TableHead>
+                            <TableHead className="w-[120px]">Data Entrega</TableHead>
+                            <TableHead className="w-[110px]">Qtd. Recebida</TableHead>
+                            <TableHead className="w-[110px]">Status</TableHead>
+                            <TableHead className="w-[100px]">Ações</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -454,21 +699,45 @@ export const EditOrderDialog = ({ order, open, onOpenChange, onSave }: EditOrder
                                 <Input
                                   type="number"
                                   value={item.deliveredQuantity}
-                                  onChange={(e) => updateItem(index, "deliveredQuantity", parseInt(e.target.value) || 0)}
+                                  onChange={(e) => {
+                                    const newQty = parseInt(e.target.value) || 0;
+                                    updateItem(index, "deliveredQuantity", newQty);
+                                    if (item.id) {
+                                      handleUpdateReceivedQuantity(item.id, newQty, item.requestedQuantity);
+                                    }
+                                  }}
                                   min="0"
+                                  max={item.requestedQuantity}
                                   className="h-8 text-sm"
                                 />
                               </TableCell>
                               <TableCell>
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => removeItem(index)}
-                                  className="h-8 w-8 p-0 text-destructive hover:text-destructive"
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
+                                {getReceiveStatusBadge(item.received_status, item.deliveredQuantity, item.requestedQuantity)}
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex gap-1">
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handleMarkAsCompleted(item)}
+                                    disabled={!item.id || item.received_status === 'completed'}
+                                    className="h-8 gap-1 text-green-700 border-green-300 hover:bg-green-50"
+                                    title="Marcar como totalmente recebido"
+                                  >
+                                    <CheckCircle className="h-3 w-3" />
+                                    OK
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => removeItem(index)}
+                                    className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </div>
                               </TableCell>
                             </TableRow>
                           ))}
@@ -786,7 +1055,21 @@ export const EditOrderDialog = ({ order, open, onOpenChange, onSave }: EditOrder
             </div>
           </TabsContent>
         </Tabs>
-      </DialogContent>
-    </Dialog>
+        </DialogContent>
+      </Dialog>
+      
+      <CompleteOrderDialog
+        pendingItems={items.filter(item => 
+          (item.received_status !== 'completed' && item.received_status !== undefined) || 
+          (item.deliveredQuantity < item.requestedQuantity)
+        )}
+        open={showCompleteDialog}
+        onConfirm={handleConfirmCompletion}
+        onCancel={() => {
+          setShowCompleteDialog(false);
+          setPendingCompletionStatus(null);
+        }}
+      />
+    </>
   );
 };

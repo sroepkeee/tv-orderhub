@@ -49,6 +49,41 @@ export type Database = {
           },
         ]
       }
+      order_completion_notes: {
+        Row: {
+          created_at: string | null
+          id: string
+          note: string
+          order_id: string
+          pending_items: Json | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          note: string
+          order_id: string
+          pending_items?: Json | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          note?: string
+          order_id?: string
+          pending_items?: Json | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_completion_notes_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       order_history: {
         Row: {
           changed_at: string
@@ -93,6 +128,7 @@ export type Database = {
           item_code: string
           item_description: string
           order_id: string
+          received_status: string | null
           requested_quantity: number
           unit: string
           updated_at: string
@@ -107,6 +143,7 @@ export type Database = {
           item_code: string
           item_description: string
           order_id: string
+          received_status?: string | null
           requested_quantity?: number
           unit?: string
           updated_at?: string
@@ -121,6 +158,7 @@ export type Database = {
           item_code?: string
           item_description?: string
           order_id?: string
+          received_status?: string | null
           requested_quantity?: number
           unit?: string
           updated_at?: string

@@ -18,6 +18,7 @@ export interface OrderItem {
   warehouse: string;
   deliveryDate: string;
   deliveredQuantity: number;
+  received_status?: 'pending' | 'partial' | 'completed';
 }
 
 interface OrderFormData {
