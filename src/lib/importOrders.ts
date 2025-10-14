@@ -68,7 +68,7 @@ export const ordersData = [
     customerName: "HUTCHY",
     deliveryDate: "2025-10-01",
     createdAt: "2025-09-24",
-    status: "completed",
+    status: "production",
     priority: "normal",
     notes: "",
     items: [
@@ -95,7 +95,7 @@ export const ordersData = [
     customerName: "CONCEBRA",
     deliveryDate: "2025-09-29",
     createdAt: "2025-09-29",
-    status: "completed",
+    status: "production",
     priority: "normal",
     notes: "",
     items: [
@@ -129,7 +129,7 @@ export const ordersData = [
     customerName: "PRIMUS IMPORT",
     deliveryDate: "2025-10-14",
     createdAt: "2025-09-30",
-    status: "completed",
+    status: "production",
     priority: "normal",
     notes: "",
     items: [
@@ -143,7 +143,7 @@ export const ordersData = [
     customerName: "AGROTURISMO",
     deliveryDate: "2025-10-10",
     createdAt: "2025-09-30",
-    status: "completed",
+    status: "production",
     priority: "normal",
     notes: "COMPRA",
     items: [
