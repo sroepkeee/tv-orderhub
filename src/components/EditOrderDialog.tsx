@@ -166,12 +166,32 @@ export const EditOrderDialog = ({ order, open, onOpenChange, onSave }: EditOrder
     try {
       const { data: attachmentsData, error } = await supabase
         .from('order_attachments')
-        .select('*, profiles:uploaded_by(full_name, email)')
+        .select('*')
         .eq('order_id', order.id)
         .order('uploaded_at', { ascending: false });
 
       if (error) throw error;
-      setAttachments(attachmentsData || []);
+
+      // Load user profiles for attachments
+      const userIds = [...new Set(attachmentsData?.map(a => a.uploaded_by) || [])];
+      
+      let profiles: any[] = [];
+      if (userIds.length > 0) {
+        const { data: profilesData } = await supabase
+          .from('profiles')
+          .select('id, full_name, email')
+          .in('id', userIds);
+        
+        profiles = profilesData || [];
+      }
+
+      // Combine attachments with user profiles
+      const attachmentsWithProfiles = attachmentsData?.map(attachment => ({
+        ...attachment,
+        profiles: profiles.find(p => p.id === attachment.uploaded_by)
+      })) || [];
+
+      setAttachments(attachmentsWithProfiles);
     } catch (error) {
       console.error("Error loading attachments:", error);
     } finally {
