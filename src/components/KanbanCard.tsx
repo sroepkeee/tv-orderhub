@@ -14,7 +14,7 @@ interface KanbanCardProps {
 }
 
 export const KanbanCard = ({ order, onEdit, onStatusChange }: KanbanCardProps) => {
-  const [isActuallyDragging, setIsActuallyDragging] = useState(false);
+  const [clickStart, setClickStart] = useState<number>(0);
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: order.id,
   });
@@ -23,27 +23,13 @@ export const KanbanCard = ({ order, onEdit, onStatusChange }: KanbanCardProps) =
     transform: CSS.Translate.toString(transform),
   };
 
-  // Detectar quando realmente começa a arrastar
-  useEffect(() => {
-    if (isDragging) {
-      const timer = setTimeout(() => {
-        setIsActuallyDragging(true);
-      }, 100);
-      return () => clearTimeout(timer);
-    } else {
-      setIsActuallyDragging(false);
-    }
-  }, [isDragging]);
-
   const handleCardClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
+    const clickDuration = Date.now() - clickStart;
     
-    if (isActuallyDragging) {
-      setIsActuallyDragging(false);
-      return;
+    // Se o click durou menos de 200ms, é um click real
+    if (clickDuration < 200) {
+      onEdit(order);
     }
-    
-    onEdit(order);
   };
 
   const getPriorityClass = (priority: Order["priority"]) => {
@@ -149,12 +135,17 @@ export const KanbanCard = ({ order, onEdit, onStatusChange }: KanbanCardProps) =
               : 'cursor-pointer hover:shadow-lg hover:scale-[1.02]'
           }`}
           onClick={handleCardClick}
+          onMouseDown={() => setClickStart(Date.now())}
         >
         {/* Drag handle - maior e mais visível */}
         <div
           className="absolute right-1 top-1 p-2 rounded-md hover:bg-primary/10 text-muted-foreground cursor-grab active:cursor-grabbing transition-colors"
           {...listeners}
           {...attributes}
+          onMouseDown={(e) => {
+            e.stopPropagation();
+            setClickStart(Date.now() + 500); // Evita click ao arrastar pelo handle
+          }}
           onClick={(e) => e.stopPropagation()}
           aria-label="Arrastar pedido"
           title="Arraste para mover entre fases"

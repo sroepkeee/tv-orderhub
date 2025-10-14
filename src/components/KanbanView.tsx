@@ -35,9 +35,7 @@ export const KanbanView = ({ orders, onEdit, onStatusChange }: KanbanViewProps) 
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
-        distance: 15,
-        delay: 150,
-        tolerance: 5,
+        distance: 3,
       },
     }),
     useSensor(KeyboardSensor)
