@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, FileText, CheckCircle } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { toast } from "@/hooks/use-toast";
 import { Card } from "@/components/ui/card";
@@ -32,6 +32,7 @@ interface OrderFormData {
   deskTicket: string;
   totvsOrderNumber?: string;
   items: OrderItem[];
+  pdfFile?: File;
 }
 
 interface AddOrderDialogProps {
@@ -41,6 +42,7 @@ interface AddOrderDialogProps {
 export const AddOrderDialog = ({ onAddOrder }: AddOrderDialogProps) => {
   const [open, setOpen] = React.useState(false);
   const [items, setItems] = React.useState<OrderItem[]>([]);
+  const [selectedPdfFile, setSelectedPdfFile] = React.useState<File | null>(null);
   const { register, handleSubmit, reset, setValue, watch } = useForm<OrderFormData>();
 
   const orderType = watch("type");
@@ -87,7 +89,16 @@ export const AddOrderDialog = ({ onAddOrder }: AddOrderDialogProps) => {
       return;
     }
 
-    const orderData = { ...data, items };
+    if (!selectedPdfFile) {
+      toast({
+        title: "PDF obrigatório",
+        description: "Anexe o pedido em PDF para continuar.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const orderData = { ...data, items, pdfFile: selectedPdfFile };
     onAddOrder(orderData);
     toast({
       title: "Pedido criado com sucesso!",
@@ -95,6 +106,7 @@ export const AddOrderDialog = ({ onAddOrder }: AddOrderDialogProps) => {
     });
     reset();
     setItems([]);
+    setSelectedPdfFile(null);
     setOpen(false);
   };
 
@@ -322,6 +334,88 @@ export const AddOrderDialog = ({ onAddOrder }: AddOrderDialogProps) => {
                 ))}
               </div>
             )}
+          </div>
+
+          {/* Anexar PDF Obrigatório */}
+          <div className="space-y-2 border-t pt-4">
+            <Label className="text-lg font-semibold flex items-center gap-2">
+              <FileText className="h-5 w-5" />
+              Anexar Pedido PDF <span className="text-red-500">*</span>
+            </Label>
+            <p className="text-sm text-muted-foreground">
+              Anexe o pedido ou itens do pedido em formato PDF (máx. 10MB)
+            </p>
+            
+            <Card className="p-4">
+              <Input
+                type="file"
+                accept=".pdf,application/pdf"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    if (file.size > 10 * 1024 * 1024) {
+                      toast({
+                        title: "Arquivo muito grande",
+                        description: "O PDF deve ter no máximo 10MB.",
+                        variant: "destructive"
+                      });
+                      e.target.value = "";
+                      return;
+                    }
+                    
+                    if (file.type !== 'application/pdf') {
+                      toast({
+                        title: "Tipo inválido",
+                        description: "Apenas arquivos PDF são aceitos.",
+                        variant: "destructive"
+                      });
+                      e.target.value = "";
+                      return;
+                    }
+                    
+                    setSelectedPdfFile(file);
+                    toast({
+                      title: "PDF selecionado",
+                      description: `${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`
+                    });
+                  }
+                }}
+                className="cursor-pointer"
+              />
+              
+              {selectedPdfFile && (
+                <div className="mt-3 flex items-center justify-between bg-green-50 dark:bg-green-950 p-3 rounded border border-green-200 dark:border-green-800">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle className="h-5 w-5 text-green-600" />
+                    <div>
+                      <p className="font-medium text-sm">{selectedPdfFile.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {(selectedPdfFile.size / 1024 / 1024).toFixed(2)} MB
+                      </p>
+                    </div>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setSelectedPdfFile(null);
+                      const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+                      if (input) input.value = "";
+                    }}
+                    className="text-red-600 hover:text-red-700"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              )}
+              
+              {!selectedPdfFile && (
+                <p className="text-xs text-muted-foreground mt-2">
+                  ⚠️ O anexo do PDF é obrigatório para criar o pedido
+                </p>
+              )}
+            </Card>
           </div>
 
           <div className="flex justify-end gap-2 pt-4">

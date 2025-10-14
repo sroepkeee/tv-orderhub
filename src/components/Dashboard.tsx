@@ -457,19 +457,55 @@ export const Dashboard = () => {
           delivered_quantity: item.deliveredQuantity
         }));
 
-        const { error: itemsError } = await supabase
-          .from('order_items')
-          .insert(itemsToInsert);
+      const { error: itemsError } = await supabase
+        .from('order_items')
+        .insert(itemsToInsert);
 
-        if (itemsError) throw itemsError;
+      if (itemsError) throw itemsError;
+    }
+
+    // Upload PDF to Storage
+    if (orderData.pdfFile) {
+      const fileName = `${orderNumber}_${Date.now()}.pdf`;
+      const filePath = `${user.id}/${fileName}`;
+      
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('order-attachments')
+        .upload(filePath, orderData.pdfFile, {
+          contentType: 'application/pdf',
+          cacheControl: '3600',
+          upsert: false
+        });
+
+      if (uploadError) {
+        console.error("Error uploading PDF:", uploadError);
+        throw new Error(`Erro ao fazer upload do PDF: ${uploadError.message}`);
       }
 
-      await loadOrders();
+      // Save attachment metadata
+      const { error: attachmentError } = await supabase
+        .from('order_attachments')
+        .insert({
+          order_id: orderRow.id,
+          file_name: orderData.pdfFile.name,
+          file_path: uploadData.path,
+          file_size: orderData.pdfFile.size,
+          file_type: orderData.pdfFile.type,
+          uploaded_by: user.id
+        });
+
+      if (attachmentError) {
+        console.error("Error saving attachment metadata:", attachmentError);
+        throw new Error("Erro ao salvar informações do anexo");
+      }
+    }
+
+    await loadOrders();
       
-      toast({
-        title: "Pedido criado com sucesso!",
-        description: `Novo pedido com ${orderData.items?.length || 0} item(ns) foi adicionado.`,
-      });
+    toast({
+      title: "Pedido criado com sucesso!",
+      description: `${orderNumber} foi criado com ${orderData.items?.length || 0} item(ns) e PDF anexado.`,
+    });
     } catch (error: any) {
       toast({
         title: "Erro ao criar pedido",

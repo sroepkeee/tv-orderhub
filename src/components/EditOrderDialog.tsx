@@ -62,6 +62,8 @@ export const EditOrderDialog = ({ order, open, onOpenChange, onSave }: EditOrder
   const [showExceptionDialog, setShowExceptionDialog] = useState(false);
   const [pendingExceptionStatus, setPendingExceptionStatus] = useState<string | null>(null);
   const [savingException, setSavingException] = useState(false);
+  const [attachments, setAttachments] = useState<any[]>([]);
+  const [loadingAttachments, setLoadingAttachments] = useState(false);
 
   // Load history from database
   const loadHistory = async () => {
@@ -155,6 +157,59 @@ export const EditOrderDialog = ({ order, open, onOpenChange, onSave }: EditOrder
     }
   };
 
+  // Load attachments from database
+  const loadAttachments = async () => {
+    if (!order?.id) return;
+    
+    setLoadingAttachments(true);
+    try {
+      const { data: attachmentsData, error } = await supabase
+        .from('order_attachments')
+        .select('*, profiles:uploaded_by(full_name, email)')
+        .eq('order_id', order.id)
+        .order('uploaded_at', { ascending: false });
+
+      if (error) throw error;
+      setAttachments(attachmentsData || []);
+    } catch (error) {
+      console.error("Error loading attachments:", error);
+    } finally {
+      setLoadingAttachments(false);
+    }
+  };
+
+  // Download PDF attachment
+  const handleDownloadPDF = async (filePath: string, fileName: string) => {
+    try {
+      const { data, error } = await supabase.storage
+        .from('order-attachments')
+        .download(filePath);
+
+      if (error) throw error;
+
+      const url = window.URL.createObjectURL(data);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      toast({
+        title: "Download iniciado",
+        description: `Baixando ${fileName}...`
+      });
+    } catch (error) {
+      console.error("Error downloading PDF:", error);
+      toast({
+        title: "Erro no download",
+        description: "Não foi possível baixar o arquivo.",
+        variant: "destructive"
+      });
+    }
+  };
+
   // Save new comment
   const handleSaveComment = async () => {
     if (!newComment.trim() || !order?.id) return;
@@ -203,6 +258,7 @@ export const EditOrderDialog = ({ order, open, onOpenChange, onSave }: EditOrder
       setNewComment("");
       loadHistory();
       loadComments();
+      loadAttachments();
     }
   }, [open, order, reset]);
 
@@ -643,7 +699,7 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
           </DialogHeader>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="edit" className="flex items-center gap-2 data-[state=active]:bg-blue-500 data-[state=active]:text-white">
               <Edit className="h-4 w-4" />
               Editar
@@ -659,6 +715,13 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
             <TabsTrigger value="comments" className="flex items-center gap-2 data-[state=active]:bg-orange-500 data-[state=active]:text-white">
               <MessageSquare className="h-4 w-4" />
               Comentários
+            </TabsTrigger>
+            <TabsTrigger value="attachments" className="flex items-center gap-2 data-[state=active]:bg-red-500 data-[state=active]:text-white">
+              <FileText className="h-4 w-4" />
+              Anexos
+              {attachments.length > 0 && (
+                <Badge variant="secondary" className="ml-1">{attachments.length}</Badge>
+              )}
             </TabsTrigger>
           </TabsList>
 
@@ -1202,6 +1265,61 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                           {comment.comment}
                         </p>
                       </div>
+                    ))}
+                  </div>
+                </ScrollArea>
+              )}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="attachments" className="mt-4">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold">Anexos do Pedido</h3>
+                <Badge variant="outline">{attachments.length} arquivo(s)</Badge>
+              </div>
+
+              {loadingAttachments ? (
+                <div className="flex justify-center items-center py-8">
+                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                </div>
+              ) : attachments.length === 0 ? (
+                <Card className="p-6 text-center text-muted-foreground">
+                  <FileText className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                  <p>Nenhum anexo encontrado</p>
+                </Card>
+              ) : (
+                <ScrollArea className="h-[400px]">
+                  <div className="space-y-3">
+                    {attachments.map((attachment) => (
+                      <Card key={attachment.id} className="p-4">
+                        <div className="flex items-start justify-between">
+                          <div className="flex items-start gap-3 flex-1">
+                            <FileText className="h-10 w-10 text-red-600" />
+                            <div className="flex-1">
+                              <p className="font-medium">{attachment.file_name}</p>
+                              <div className="flex items-center gap-4 text-sm text-muted-foreground mt-1">
+                                <span>{(attachment.file_size / 1024 / 1024).toFixed(2)} MB</span>
+                                <span>•</span>
+                                <span>{format(new Date(attachment.uploaded_at), "dd/MM/yyyy 'às' HH:mm")}</span>
+                              </div>
+                              <p className="text-xs text-muted-foreground mt-1">
+                                Enviado por: {attachment.profiles?.full_name || attachment.profiles?.email || 'Usuário'}
+                              </p>
+                            </div>
+                          </div>
+                          
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleDownloadPDF(attachment.file_path, attachment.file_name)}
+                            className="gap-2"
+                          >
+                            <Download className="h-4 w-4" />
+                            Baixar
+                          </Button>
+                        </div>
+                      </Card>
                     ))}
                   </div>
                 </ScrollArea>
