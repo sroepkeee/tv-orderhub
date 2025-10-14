@@ -9,10 +9,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
-import { User, Sun, Moon, LogOut } from "lucide-react";
+import { User, Sun, Moon, LogOut, KeyRound } from "lucide-react";
 import { useTheme } from "next-themes";
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
+import { ChangePasswordDialog } from "@/components/ChangePasswordDialog";
 
 export const UserMenu = () => {
   const { theme, setTheme } = useTheme();
@@ -70,6 +71,15 @@ export const UserMenu = () => {
               </>
             )}
           </DropdownMenuItem>
+
+          <ChangePasswordDialog
+            trigger={
+              <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                <KeyRound className="mr-2 h-4 w-4" />
+                <span>Alterar senha</span>
+              </DropdownMenuItem>
+            }
+          />
 
           <DropdownMenuSeparator />
           
