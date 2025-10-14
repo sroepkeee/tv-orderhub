@@ -14,6 +14,11 @@ import { CriticalItemsAlert } from "@/components/metrics/CriticalItemsAlert";
 import { ProductionTimeBySource } from "@/components/metrics/ProductionTimeBySource";
 import { OrdersTrackingTable } from "@/components/metrics/OrdersTrackingTable";
 import { EditOrderDialog } from "@/components/EditOrderDialog";
+import { ComparativeMetrics } from "@/components/metrics/ComparativeMetrics";
+import { StatusDistribution } from "@/components/metrics/StatusDistribution";
+import { VolumeByType } from "@/components/metrics/VolumeByType";
+import { ActivityTimeline } from "@/components/metrics/ActivityTimeline";
+import { TrendCard } from "@/components/metrics/TrendCard";
 import type { Order } from "@/components/Dashboard";
 import { 
   calculateAverageProductionTime, 
@@ -35,6 +40,11 @@ export default function Metrics() {
   const [itemsBySource, setItemsBySource] = useState({ inStock: 0, production: 0, outOfStock: 0 });
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [showEditDialog, setShowEditDialog] = useState(false);
+  const [previousWeekData, setPreviousWeekData] = useState({
+    avgProductionTime: 0,
+    onTimeRate: 0,
+    weeklyChanges: 0
+  });
   
   useEffect(() => {
     if (user) {
@@ -83,6 +93,19 @@ export default function Metrics() {
       const allItems = transformedOrders.flatMap(o => o.items || []);
       const itemsSource = countItemsBySource(allItems);
       setItemsBySource(itemsSource);
+
+      // Calcular dados da semana anterior para comparação
+      const oneWeekAgo = new Date();
+      oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+      const previousWeekOrders = transformedOrders.filter(o => 
+        new Date(o.createdDate) < oneWeekAgo
+      );
+      
+      setPreviousWeekData({
+        avgProductionTime: calculateAverageProductionTime(previousWeekOrders),
+        onTimeRate: calculateOnTimeRate(previousWeekOrders, 10),
+        weeklyChanges: await countDateChanges(14) - weeklyChanges // Diferença entre 14 dias e 7 dias
+      });
       
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
@@ -140,27 +163,30 @@ export default function Metrics() {
       {/* Critical Items Alert */}
       <CriticalItemsAlert orders={orders} />
       
-      {/* Grid de Cards Principais */}
+      {/* Grid de Cards Principais com Tendências */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-8">
-        <MetricCard
+        <TrendCard
           title="Tempo Médio SSM"
           value={`${avgProductionTime}d`}
+          previousValue={previousWeekData.avgProductionTime}
           subtitle="Meta: 10 dias"
           icon={Clock}
           status={getTimeStatus(avgProductionTime)}
         />
         
-        <MetricCard
+        <TrendCard
           title="Taxa de Cumprimento"
           value={`${onTimeRate}%`}
+          previousValue={previousWeekData.onTimeRate}
           subtitle="Entregas no prazo"
           icon={CheckCircle}
           status={onTimeRate >= 85 ? 'good' : onTimeRate >= 70 ? 'warning' : 'critical'}
         />
         
-        <MetricCard
+        <TrendCard
           title="Mudanças de Prazo"
           value={weeklyChanges}
+          previousValue={previousWeekData.weeklyChanges}
           subtitle="Últimos 7 dias"
           icon={AlertTriangle}
           status={weeklyChanges <= 5 ? 'good' : weeklyChanges <= 10 ? 'warning' : 'critical'}
@@ -198,6 +224,18 @@ export default function Metrics() {
             setShowEditDialog(true);
           }}
         />
+      </div>
+
+      {/* Evolução e Comparativos */}
+      <div className="mb-6">
+        <ComparativeMetrics orders={orders} />
+      </div>
+
+      {/* Distribuições e Atividades */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+        <StatusDistribution orders={orders} />
+        <VolumeByType orders={orders} />
+        <ActivityTimeline />
       </div>
       
       {/* Seções de Indicadores Detalhados */}

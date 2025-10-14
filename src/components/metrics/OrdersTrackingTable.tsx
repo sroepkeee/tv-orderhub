@@ -14,6 +14,7 @@ import {
   countOrderDateChanges
 } from "@/lib/metrics";
 import { Calendar, TrendingUp, Package, AlertCircle } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface OrdersTrackingTableProps {
   orders: Order[];
@@ -239,10 +240,15 @@ export function OrdersTrackingTable({ orders, onOrderClick }: OrdersTrackingTabl
                 // Calcular quantidade total de itens do pedido
                 const totalItemsQuantity = (order.items || []).reduce((sum, item) => sum + item.requestedQuantity, 0);
 
+                const isCritical = daysUntil <= 2 && daysUntil >= 0;
+
                 return (
                   <TableRow 
                     key={order.id}
-                    className="cursor-pointer hover:bg-muted/50 transition-colors"
+                    className={cn(
+                      "cursor-pointer hover:bg-muted/50 transition-colors",
+                      isCritical && "animate-pulse-critical"
+                    )}
                     onClick={() => onOrderClick(order)}
                   >
                     <TableCell className="font-medium">{order.orderNumber}</TableCell>

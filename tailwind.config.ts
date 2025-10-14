@@ -156,10 +156,21 @@ export default {
             height: "0",
           },
         },
+        "pulse-critical": {
+          "0%, 100%": {
+            backgroundColor: "hsl(var(--card))",
+            boxShadow: "0 0 0 0 hsl(var(--progress-critical) / 0)"
+          },
+          "50%": {
+            backgroundColor: "hsl(var(--progress-critical) / 0.05)",
+            boxShadow: "0 0 0 4px hsl(var(--progress-critical) / 0.1)"
+          },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
+        "pulse-critical": "pulse-critical 3s ease-in-out infinite",
       },
     },
   },
