@@ -25,6 +25,7 @@ interface HistoryEvent {
   old_status: string;
   new_status: string;
   user_id: string;
+  user_name?: string;
 }
 
 interface OrderComment {
@@ -63,14 +64,49 @@ export const EditOrderDialog = ({ order, open, onOpenChange, onSave }: EditOrder
     
     setLoadingHistory(true);
     try {
-      const { data, error } = await supabase
+      const { data: historyData, error } = await supabase
         .from('order_history')
         .select('*')
         .eq('order_id', order.id)
         .order('changed_at', { ascending: false });
 
       if (error) throw error;
-      setHistoryEvents(data || []);
+
+      // Load user profiles for history events
+      const userIds = [...new Set(
+        historyData
+          ?.filter(h => h.user_id && h.user_id !== '00000000-0000-0000-0000-000000000000')
+          ?.map(h => h.user_id) || []
+      )];
+
+      let profiles: any[] = [];
+      if (userIds.length > 0) {
+        const { data: profilesData } = await supabase
+          .from('profiles')
+          .select('id, full_name, email')
+          .in('id', userIds);
+        
+        profiles = profilesData || [];
+      }
+
+      // Combine history with user names
+      const historyWithNames = historyData?.map(event => {
+        let userName = 'Sistema';
+        
+        if (event.user_id === '00000000-0000-0000-0000-000000000000') {
+          userName = 'Sistema Laboratório';
+        } else if (event.user_id) {
+          const profile = profiles.find(p => p.id === event.user_id);
+          userName = profile?.full_name || profile?.email || 'Usuário';
+        }
+        
+        return {
+          ...event,
+          user_name: userName
+        };
+      }) || [];
+
+      setHistoryEvents(historyWithNames);
     } catch (error) {
       console.error("Error loading history:", error);
     } finally {
@@ -981,6 +1017,10 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                                 hour: '2-digit',
                                 minute: '2-digit'
                               })}
+                            </span>
+                            <span className="flex items-center gap-1">
+                              <User className="h-3 w-3" />
+                              {event.user_name || 'Sistema'}
                             </span>
                           </div>
                         </div>
