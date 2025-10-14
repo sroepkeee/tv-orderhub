@@ -377,7 +377,7 @@ export const PriorityView = ({
       {viewMode === "kanban" ? (
         <KanbanView
           orders={sortedOrders}
-          onEdit={onEdit}
+          onEdit={(order) => onRowClick ? onRowClick(order) : onEdit(order)}
           onStatusChange={onStatusChange}
         />
       ) : (

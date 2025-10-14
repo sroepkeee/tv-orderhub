@@ -797,12 +797,16 @@ export const Dashboard = () => {
     return colors[labStatus] || "bg-gray-100 text-gray-600";
   };
 
-  const handleRowClick = (order: Order, e: React.MouseEvent) => {
+  const handleRowClick = (order: Order, e?: React.MouseEvent) => {
     // Prevent opening if clicking on buttons or interactive elements
-    const target = e.target as HTMLElement;
-    if (target.closest('button') || target.closest('[role="button"]')) {
-      return;
+    if (e) {
+      const target = e.target as HTMLElement;
+      if (target.closest('button') || target.closest('[role="button"]')) {
+        return;
+      }
     }
+    
+    console.log('Opening edit dialog for order:', order.orderNumber);
     
     // Auto-navigate to appropriate tab based on order status
     if (order.status === "collected" || order.status === "in_transit") {
