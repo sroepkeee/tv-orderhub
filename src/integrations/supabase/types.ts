@@ -244,6 +244,7 @@ export type Database = {
           order_type: string
           priority: string
           status: string
+          totvs_order_number: string | null
           updated_at: string
           user_id: string
           vehicle_plate: string | null
@@ -265,6 +266,7 @@ export type Database = {
           order_type: string
           priority: string
           status: string
+          totvs_order_number?: string | null
           updated_at?: string
           user_id: string
           vehicle_plate?: string | null
@@ -286,6 +288,7 @@ export type Database = {
           order_type?: string
           priority?: string
           status?: string
+          totvs_order_number?: string | null
           updated_at?: string
           user_id?: string
           vehicle_plate?: string | null

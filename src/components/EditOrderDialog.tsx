@@ -594,6 +594,21 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
+                    <Label htmlFor="totvsOrderNumber">Nº Pedido TOTVS</Label>
+                    <Input 
+                      {...register("totvsOrderNumber" as any)} 
+                      placeholder="Ex: 123456"
+                      maxLength={50}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="deliveryDeadline">Prazo de Entrega</Label>
+                    <Input {...register("deliveryDeadline", { required: true })} type="date" />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 gap-4">
+                  <div>
                     <Label htmlFor="status">Status</Label>
                     <Select onValueChange={handleStatusChange} defaultValue={order?.status}>
                       <SelectTrigger>
@@ -607,10 +622,6 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                         <SelectItem value="cancelled">Cancelado</SelectItem>
                       </SelectContent>
                     </Select>
-                  </div>
-                  <div>
-                    <Label htmlFor="deliveryDeadline">Prazo de Entrega</Label>
-                    <Input {...register("deliveryDeadline", { required: true })} type="date" />
                   </div>
                 </div>
 

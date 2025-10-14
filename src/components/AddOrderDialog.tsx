@@ -27,6 +27,7 @@ interface OrderFormData {
   client: string;
   deliveryDeadline: string;
   deskTicket: string;
+  totvsOrderNumber?: string;
   items: OrderItem[];
 }
 
@@ -146,12 +147,22 @@ export const AddOrderDialog = ({ onAddOrder }: AddOrderDialogProps) => {
             </div>
           </div>
 
-          <div>
-            <Label htmlFor="deliveryDeadline">Prazo de Entrega</Label>
-            <Input 
-              {...register("deliveryDeadline", { required: true })} 
-              type="date" 
-            />
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="totvsOrderNumber">Nº Pedido TOTVS</Label>
+              <Input 
+                {...register("totvsOrderNumber")} 
+                placeholder="Ex: 123456"
+                maxLength={50}
+              />
+            </div>
+            <div>
+              <Label htmlFor="deliveryDeadline">Prazo de Entrega</Label>
+              <Input 
+                {...register("deliveryDeadline", { required: true })} 
+                type="date" 
+              />
+            </div>
           </div>
 
           <div className="space-y-4">

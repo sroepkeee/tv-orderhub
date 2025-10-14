@@ -52,6 +52,7 @@ export interface Order {
   client: string;
   deliveryDeadline: string;
   deskTicket: string;
+  totvsOrderNumber?: string;
   items?: import("./AddOrderDialog").OrderItem[];
 }
 
@@ -296,6 +297,7 @@ export const Dashboard = () => {
             client: dbOrder.customer_name,
             deliveryDeadline: dbOrder.delivery_date,
             deskTicket: dbOrder.notes || dbOrder.order_number,
+            totvsOrderNumber: dbOrder.totvs_order_number || undefined,
             items
           };
         })
@@ -400,6 +402,7 @@ export const Dashboard = () => {
           priority: orderData.priority,
           order_type: orderData.type,
           notes: orderData.deskTicket,
+          totvs_order_number: orderData.totvsOrderNumber || null,
         })
         .select()
         .single();
@@ -476,6 +479,7 @@ export const Dashboard = () => {
           priority: updatedOrder.priority,
           order_type: updatedOrder.type,
           notes: updatedOrder.deskTicket,
+          totvs_order_number: updatedOrder.totvsOrderNumber || null,
         })
         .eq('id', updatedOrder.id)
         .eq('user_id', user.id);

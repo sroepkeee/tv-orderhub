@@ -8,6 +8,7 @@ import { ProductionMetrics } from "@/components/metrics/ProductionMetrics";
 import { PhaseTimeMetrics } from "@/components/metrics/PhaseTimeMetrics";
 import { DateChangeHistory } from "@/components/metrics/DateChangeHistory";
 import { SLAAlert } from "@/components/metrics/SLAAlert";
+import { OrderTotvsMetrics } from "@/components/metrics/OrderTotvsMetrics";
 import type { Order } from "@/components/Dashboard";
 import { 
   calculateAverageProductionTime, 
@@ -172,13 +173,18 @@ export default function Metrics() {
       </div>
       
       {/* Seções de Indicadores Detalhados */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         <ProductionMetrics orders={orders} />
         <PhaseTimeMetrics orders={orders} />
       </div>
       
+      {/* Integração TOTVS */}
+      <div className="mb-6">
+        <OrderTotvsMetrics orders={orders} />
+      </div>
+      
       {/* Histórico de Mudanças */}
-      <div className="mt-6">
+      <div>
         <DateChangeHistory limit={15} />
       </div>
     </div>
