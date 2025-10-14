@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Clock, CheckCircle, AlertTriangle, Package, Truck, TrendingDown } from "lucide-react";
+import { ArrowLeft, Clock, CheckCircle, AlertTriangle, Package, Truck, TrendingDown, Box } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { MetricCard } from "@/components/metrics/MetricCard";
@@ -9,13 +9,17 @@ import { PhaseTimeMetrics } from "@/components/metrics/PhaseTimeMetrics";
 import { DateChangeHistory } from "@/components/metrics/DateChangeHistory";
 import { SLAAlert } from "@/components/metrics/SLAAlert";
 import { OrderTotvsMetrics } from "@/components/metrics/OrderTotvsMetrics";
+import { ItemSourceMetrics } from "@/components/metrics/ItemSourceMetrics";
+import { CriticalItemsAlert } from "@/components/metrics/CriticalItemsAlert";
+import { ProductionTimeBySource } from "@/components/metrics/ProductionTimeBySource";
 import type { Order } from "@/components/Dashboard";
 import { 
   calculateAverageProductionTime, 
   calculateOnTimeRate, 
   countDateChanges,
   getOrderCountByPhase,
-  findProblematicOrders
+  findProblematicOrders,
+  countItemsBySource
 } from "@/lib/metrics";
 import { useNavigate } from "react-router-dom";
 
@@ -26,6 +30,7 @@ export default function Metrics() {
   const [loading, setLoading] = useState(true);
   const [weeklyChanges, setWeeklyChanges] = useState(0);
   const [problematicCount, setProblematicCount] = useState(0);
+  const [itemsBySource, setItemsBySource] = useState({ inStock: 0, production: 0, outOfStock: 0 });
   
   useEffect(() => {
     if (user) {
@@ -69,6 +74,11 @@ export default function Metrics() {
       // Carregar pedidos problemáticos
       const problematic = await findProblematicOrders(3);
       setProblematicCount(problematic.length);
+      
+      // Calcular distribuição de itens por origem
+      const allItems = transformedOrders.flatMap(o => o.items || []);
+      const itemsSource = countItemsBySource(allItems);
+      setItemsBySource(itemsSource);
       
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
@@ -123,6 +133,9 @@ export default function Metrics() {
       {/* SLA Alerts */}
       <SLAAlert orders={orders} threshold={2} />
       
+      {/* Critical Items Alert */}
+      <CriticalItemsAlert orders={orders} />
+      
       {/* Grid de Cards Principais */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-8">
         <MetricCard
@@ -164,11 +177,11 @@ export default function Metrics() {
         />
         
         <MetricCard
-          title="Atrasos Críticos"
-          value={problematicCount}
-          subtitle=">3 mudanças de prazo"
-          icon={TrendingDown}
-          status={problematicCount === 0 ? 'good' : problematicCount <= 3 ? 'warning' : 'critical'}
+          title="Itens sem Estoque"
+          value={itemsBySource.outOfStock}
+          subtitle={`${itemsBySource.production} em produção`}
+          icon={Box}
+          status={itemsBySource.outOfStock === 0 ? 'good' : itemsBySource.outOfStock <= 5 ? 'warning' : 'critical'}
         />
       </div>
       
@@ -176,6 +189,12 @@ export default function Metrics() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         <ProductionMetrics orders={orders} />
         <PhaseTimeMetrics orders={orders} />
+      </div>
+      
+      {/* Indicadores de Origem dos Itens */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        <ItemSourceMetrics orders={orders} />
+        <ProductionTimeBySource orders={orders} />
       </div>
       
       {/* Integração TOTVS */}

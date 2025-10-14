@@ -1,6 +1,45 @@
 import { differenceInDays, differenceInHours, parseISO } from 'date-fns';
 import type { Order } from '@/components/Dashboard';
 import { supabase } from '@/integrations/supabase/client';
+import type { OrderItem } from '@/components/AddOrderDialog';
+
+// Contar itens por origem
+export const countItemsBySource = (items: OrderItem[]) => {
+  return {
+    inStock: items.filter(i => i.item_source_type === 'in_stock' || !i.item_source_type).length,
+    production: items.filter(i => i.item_source_type === 'production').length,
+    outOfStock: items.filter(i => i.item_source_type === 'out_of_stock').length
+  };
+};
+
+// Calcular tempo médio de produção apenas para itens de produção
+export const calculateAverageProductionTimeForItems = (items: OrderItem[]): number => {
+  const productionItems = items.filter(i => 
+    i.item_source_type === 'production' && i.production_estimated_date
+  );
+  
+  if (productionItems.length === 0) return 0;
+  
+  const totalDays = productionItems.reduce((sum, item) => {
+    const requested = new Date(item.deliveryDate);
+    const completed = item.production_estimated_date 
+      ? new Date(item.production_estimated_date)
+      : new Date();
+    return sum + Math.abs(differenceInDays(completed, requested));
+  }, 0);
+  
+  return Math.round(totalDays / productionItems.length);
+};
+
+// Identificar pedidos com muitos itens sem estoque
+export const findOrdersWithStockIssues = (orders: Order[]): Order[] => {
+  return orders.filter(order => {
+    const items = order.items || [];
+    if (items.length === 0) return false;
+    const outOfStockCount = items.filter(i => i.item_source_type === 'out_of_stock').length;
+    return outOfStockCount > 0 && outOfStockCount / items.length >= 0.3; // 30% ou mais sem estoque
+  });
+};
 
 // Calcular tempo médio em uma fase (em dias)
 export const calculateAverageTimeInPhase = (

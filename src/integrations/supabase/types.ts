@@ -178,7 +178,9 @@ export type Database = {
           id: string
           item_code: string
           item_description: string
+          item_source_type: string | null
           order_id: string
+          production_estimated_date: string | null
           received_status: string | null
           requested_quantity: number
           unit: string
@@ -193,7 +195,9 @@ export type Database = {
           id?: string
           item_code: string
           item_description: string
+          item_source_type?: string | null
           order_id: string
+          production_estimated_date?: string | null
           received_status?: string | null
           requested_quantity?: number
           unit?: string
@@ -208,7 +212,9 @@ export type Database = {
           id?: string
           item_code?: string
           item_description?: string
+          item_source_type?: string | null
           order_id?: string
+          production_estimated_date?: string | null
           received_status?: string | null
           requested_quantity?: number
           unit?: string

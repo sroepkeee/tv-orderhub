@@ -3,6 +3,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Clock, AlertCircle, GripVertical } from "lucide-react";
 import { Order } from "@/components/Dashboard";
+import { OrderItem } from "@/components/AddOrderDialog";
 import { useDraggable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
 
@@ -86,6 +87,8 @@ export const KanbanCard = ({ order, onEdit, onStatusChange }: KanbanCardProps) =
         return "Vendas";
       case "materials":
         return "Materiais";
+      case "ecommerce":
+        return "E-commerce";
     }
   };
 
@@ -97,7 +100,19 @@ export const KanbanCard = ({ order, onEdit, onStatusChange }: KanbanCardProps) =
         return "bg-orderType-sales-bg text-orderType-sales";
       case "materials":
         return "bg-orderType-materials-bg text-orderType-materials";
+      case "ecommerce":
+        return "bg-orderType-ecommerce-bg text-orderType-ecommerce";
     }
+  };
+
+  const countItemsBySource = (items?: OrderItem[]) => {
+    if (!items || items.length === 0) return { inStock: 0, production: 0, outOfStock: 0 };
+    
+    return {
+      inStock: items.filter(i => i.item_source_type === 'in_stock' || !i.item_source_type).length,
+      production: items.filter(i => i.item_source_type === 'production').length,
+      outOfStock: items.filter(i => i.item_source_type === 'out_of_stock').length
+    };
   };
 
   const calculateDaysRemaining = (deadline: string) => {
@@ -171,6 +186,27 @@ export const KanbanCard = ({ order, onEdit, onStatusChange }: KanbanCardProps) =
             ? order.items.map(item => item.itemCode).join(", ")
             : order.description}
         </p>
+        
+        {/* Item Source Badges */}
+        {order.items && order.items.length > 0 && (
+          <div className="flex gap-1 mt-1 flex-wrap">
+            {countItemsBySource(order.items).inStock > 0 && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-green-100 text-green-700">
+                ✅ {countItemsBySource(order.items).inStock}
+              </span>
+            )}
+            {countItemsBySource(order.items).production > 0 && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-700">
+                🏭 {countItemsBySource(order.items).production}
+              </span>
+            )}
+            {countItemsBySource(order.items).outOfStock > 0 && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-100 text-red-700">
+                ⚠️ {countItemsBySource(order.items).outOfStock}
+              </span>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Client */}

@@ -215,8 +215,18 @@ export const EditOrderDialog = ({ order, open, onOpenChange, onSave }: EditOrder
       requestedQuantity: 0,
       warehouse: "",
       deliveryDate: "",
-      deliveredQuantity: 0
+      deliveredQuantity: 0,
+      item_source_type: "in_stock"
     }]);
+  };
+
+  const getSourceBadge = (type?: 'in_stock' | 'production' | 'out_of_stock') => {
+    const badges = {
+      in_stock: <Badge variant="outline" className="bg-green-50 text-green-700 border-green-300">✅ Estoque</Badge>,
+      production: <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-300">🏭 Produção</Badge>,
+      out_of_stock: <Badge variant="outline" className="bg-red-50 text-red-700 border-red-300">⚠️ Sem Estoque</Badge>
+    };
+    return type ? badges[type] : badges.in_stock;
   };
 
   const removeItem = (index: number) => {
@@ -268,7 +278,9 @@ export const EditOrderDialog = ({ order, open, onOpenChange, onSave }: EditOrder
           warehouse: item.warehouse,
           deliveryDate: item.delivery_date,
           deliveredQuantity: item.delivered_quantity,
-          received_status: (item.received_status as 'pending' | 'partial' | 'completed') || 'pending'
+          received_status: (item.received_status as 'pending' | 'partial' | 'completed') || 'pending',
+          item_source_type: (item.item_source_type as 'in_stock' | 'production' | 'out_of_stock') || 'in_stock',
+          production_estimated_date: item.production_estimated_date
         })));
       }
       
@@ -650,6 +662,7 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                             <TableHead className="w-[90px]">Qtd. Sol.</TableHead>
                             <TableHead className="w-[110px]">Armazém</TableHead>
                             <TableHead className="w-[120px]">Data Entrega</TableHead>
+                            <TableHead className="w-[110px]">Situação</TableHead>
                             <TableHead className="w-[110px]">Qtd. Recebida</TableHead>
                             <TableHead className="w-[110px]">Status</TableHead>
                             <TableHead className="w-[100px]">Ações</TableHead>
@@ -706,6 +719,21 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                                   onChange={(e) => updateItem(index, "deliveryDate", e.target.value)}
                                   className="h-8 text-sm"
                                 />
+                              </TableCell>
+                              <TableCell>
+                                <Select 
+                                  value={item.item_source_type || 'in_stock'}
+                                  onValueChange={(value: 'in_stock' | 'production' | 'out_of_stock') => updateItem(index, "item_source_type", value)}
+                                >
+                                  <SelectTrigger className="h-8 text-sm">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="in_stock">✅ Estoque</SelectItem>
+                                    <SelectItem value="production">🏭 Produção</SelectItem>
+                                    <SelectItem value="out_of_stock">⚠️ Sem Estoque</SelectItem>
+                                  </SelectContent>
+                                </Select>
                               </TableCell>
                               <TableCell>
                                 <Input

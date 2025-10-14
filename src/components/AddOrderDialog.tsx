@@ -8,6 +8,7 @@ import { Plus, Trash2 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { toast } from "@/hooks/use-toast";
 import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 
 export interface OrderItem {
   id?: string;
@@ -19,6 +20,8 @@ export interface OrderItem {
   deliveryDate: string;
   deliveredQuantity: number;
   received_status?: 'pending' | 'partial' | 'completed';
+  item_source_type?: 'in_stock' | 'production' | 'out_of_stock';
+  production_estimated_date?: string;
 }
 
 interface OrderFormData {
@@ -50,8 +53,18 @@ export const AddOrderDialog = ({ onAddOrder }: AddOrderDialogProps) => {
       requestedQuantity: 0,
       warehouse: "",
       deliveryDate: "",
-      deliveredQuantity: 0
+      deliveredQuantity: 0,
+      item_source_type: "in_stock"
     }]);
+  };
+
+  const getSourceBadge = (type?: 'in_stock' | 'production' | 'out_of_stock') => {
+    const badges = {
+      in_stock: <Badge variant="outline" className="bg-green-50 text-green-700 border-green-300">✅ Em Estoque</Badge>,
+      production: <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-300">🏭 Produção</Badge>,
+      out_of_stock: <Badge variant="outline" className="bg-red-50 text-red-700 border-red-300">⚠️ Sem Estoque</Badge>
+    };
+    return type ? badges[type] : badges.in_stock;
   };
 
   const removeItem = (index: number) => {
@@ -185,7 +198,10 @@ export const AddOrderDialog = ({ onAddOrder }: AddOrderDialogProps) => {
                 {items.map((item, index) => (
                   <Card key={index} className="p-4 space-y-4">
                     <div className="flex items-center justify-between">
-                      <Label className="font-semibold">Item {index + 1}</Label>
+                      <div className="flex items-center gap-2">
+                        <Label className="font-semibold">Item {index + 1}</Label>
+                        {getSourceBadge(item.item_source_type)}
+                      </div>
                       <Button
                         type="button"
                         variant="ghost"
@@ -263,6 +279,36 @@ export const AddOrderDialog = ({ onAddOrder }: AddOrderDialogProps) => {
                           min="0"
                         />
                       </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label>Situação do Item</Label>
+                        <Select 
+                          value={item.item_source_type || 'in_stock'}
+                          onValueChange={(value: 'in_stock' | 'production' | 'out_of_stock') => updateItem(index, "item_source_type", value)}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="in_stock">✅ Disponível em Estoque</SelectItem>
+                            <SelectItem value="production">🏭 Enviar para Produção</SelectItem>
+                            <SelectItem value="out_of_stock">⚠️ Sem Estoque / Sem Controle</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      
+                      {item.item_source_type === 'production' && (
+                        <div>
+                          <Label>Previsão Produção</Label>
+                          <Input
+                            type="date"
+                            value={item.production_estimated_date || ''}
+                            onChange={(e) => updateItem(index, "production_estimated_date", e.target.value)}
+                          />
+                        </div>
+                      )}
                     </div>
                   </Card>
                 ))}
