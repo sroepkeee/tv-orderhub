@@ -1045,9 +1045,6 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                                   onChange={(e) => {
                                     const newQty = parseInt(e.target.value) || 0;
                                     updateItem(index, "deliveredQuantity", newQty);
-                                    if (item.id) {
-                                      handleUpdateReceivedQuantity(item.id, newQty, item.requestedQuantity);
-                                    }
                                   }}
                                   min="0"
                                   max={item.requestedQuantity}
