@@ -209,6 +209,7 @@ export function OrdersTrackingTable({ orders, onOrderClick }: OrdersTrackingTabl
             <TableRow>
               <TableHead className="min-w-[120px]">Nº Pedido</TableHead>
               <TableHead className="min-w-[150px]">Cliente</TableHead>
+              <TableHead className="min-w-[90px] text-center">Qtd. Itens</TableHead>
               <TableHead className="min-w-[120px]">Status</TableHead>
               <TableHead className="min-w-[100px]">Prazo Original</TableHead>
               <TableHead className="min-w-[100px]">Prazo Atual</TableHead>
@@ -222,7 +223,7 @@ export function OrdersTrackingTable({ orders, onOrderClick }: OrdersTrackingTabl
           <TableBody>
             {filteredOrders.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={11} className="text-center py-8 text-muted-foreground">
                   Nenhum pedido encontrado com os filtros selecionados
                 </TableCell>
               </TableRow>
@@ -234,6 +235,9 @@ export function OrdersTrackingTable({ orders, onOrderClick }: OrdersTrackingTabl
                 const deliveryPercentage = deliveryInfo.total > 0 
                   ? Math.round((deliveryInfo.delivered / deliveryInfo.total) * 100) 
                   : 0;
+                
+                // Calcular quantidade total de itens do pedido
+                const totalItemsQuantity = (order.items || []).reduce((sum, item) => sum + item.requestedQuantity, 0);
 
                 return (
                   <TableRow 
@@ -243,6 +247,12 @@ export function OrdersTrackingTable({ orders, onOrderClick }: OrdersTrackingTabl
                   >
                     <TableCell className="font-medium">{order.orderNumber}</TableCell>
                     <TableCell>{order.client}</TableCell>
+                    <TableCell className="text-center">
+                      <Badge variant="secondary" className="text-sm font-semibold">
+                        <Package className="h-3 w-3 mr-1" />
+                        {totalItemsQuantity}
+                      </Badge>
+                    </TableCell>
                     <TableCell>{getStatusBadge(order.status)}</TableCell>
                     <TableCell className="text-sm">
                       <div className="flex items-center gap-1">
