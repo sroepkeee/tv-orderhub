@@ -172,6 +172,7 @@ export async function importOrders(userId: string) {
             order_type: 'standard',
             delivery_date: orderData.deliveryDate,
             notes: orderData.notes,
+            totvs_order_number: orderData.orderNumber,
             created_at: orderData.createdAt
           })
           .select()
