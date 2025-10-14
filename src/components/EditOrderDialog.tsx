@@ -656,15 +656,15 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                       <Table>
                         <TableHeader>
                           <TableRow>
-                            <TableHead className="w-[100px]">Código</TableHead>
-                            <TableHead className="min-w-[150px]">Descrição</TableHead>
-                            <TableHead className="w-[70px]">UND</TableHead>
-                            <TableHead className="w-[90px]">Qtd. Sol.</TableHead>
-                            <TableHead className="w-[110px]">Armazém</TableHead>
-                            <TableHead className="w-[120px]">Data Entrega</TableHead>
-                            <TableHead className="w-[110px]">Situação</TableHead>
-                            <TableHead className="w-[110px]">Qtd. Recebida</TableHead>
-                            <TableHead className="w-[110px]">Status</TableHead>
+                            <TableHead className="w-[120px]">Código</TableHead>
+                            <TableHead className="min-w-[200px]">Descrição</TableHead>
+                            <TableHead className="w-[80px]">UND</TableHead>
+                            <TableHead className="w-[100px]">Qtd. Sol.</TableHead>
+                            <TableHead className="w-[130px]">Armazém</TableHead>
+                            <TableHead className="w-[140px]">Data Entrega</TableHead>
+                            <TableHead className="w-[150px]">Situação</TableHead>
+                            <TableHead className="w-[120px]">Qtd. Recebida</TableHead>
+                            <TableHead className="w-[120px]">Status</TableHead>
                             <TableHead className="w-[100px]">Ações</TableHead>
                           </TableRow>
                         </TableHeader>
@@ -748,7 +748,7 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                                   }}
                                   min="0"
                                   max={item.requestedQuantity}
-                                  className="h-8 text-sm"
+                                  className="h-10 text-base"
                                 />
                               </TableCell>
                               <TableCell>

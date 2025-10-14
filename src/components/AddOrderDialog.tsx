@@ -220,6 +220,7 @@ export const AddOrderDialog = ({ onAddOrder }: AddOrderDialogProps) => {
                           value={item.itemCode}
                           onChange={(e) => updateItem(index, "itemCode", e.target.value)}
                           placeholder="Ex: ITEM-001"
+                          className="h-10 text-base"
                         />
                       </div>
                       <div>
@@ -228,6 +229,7 @@ export const AddOrderDialog = ({ onAddOrder }: AddOrderDialogProps) => {
                           value={item.unit}
                           onChange={(e) => updateItem(index, "unit", e.target.value)}
                           placeholder="Ex: UND, KG, M"
+                          className="h-10 text-base"
                         />
                       </div>
                     </div>
@@ -238,6 +240,7 @@ export const AddOrderDialog = ({ onAddOrder }: AddOrderDialogProps) => {
                         value={item.itemDescription}
                         onChange={(e) => updateItem(index, "itemDescription", e.target.value)}
                         placeholder="Descrição do item"
+                        className="h-10 text-base"
                       />
                     </div>
 
@@ -249,6 +252,7 @@ export const AddOrderDialog = ({ onAddOrder }: AddOrderDialogProps) => {
                           value={item.requestedQuantity}
                           onChange={(e) => updateItem(index, "requestedQuantity", parseInt(e.target.value) || 0)}
                           min="0"
+                          className="h-10 text-base"
                         />
                       </div>
                       <div>
@@ -257,6 +261,7 @@ export const AddOrderDialog = ({ onAddOrder }: AddOrderDialogProps) => {
                           value={item.warehouse}
                           onChange={(e) => updateItem(index, "warehouse", e.target.value)}
                           placeholder="Local de armazenamento"
+                          className="h-10 text-base"
                         />
                       </div>
                     </div>
@@ -268,6 +273,7 @@ export const AddOrderDialog = ({ onAddOrder }: AddOrderDialogProps) => {
                           type="date"
                           value={item.deliveryDate}
                           onChange={(e) => updateItem(index, "deliveryDate", e.target.value)}
+                          className="h-10 text-base"
                         />
                       </div>
                       <div>
@@ -277,6 +283,7 @@ export const AddOrderDialog = ({ onAddOrder }: AddOrderDialogProps) => {
                           value={item.deliveredQuantity}
                           onChange={(e) => updateItem(index, "deliveredQuantity", parseInt(e.target.value) || 0)}
                           min="0"
+                          className="h-10 text-base"
                         />
                       </div>
                     </div>
@@ -288,7 +295,7 @@ export const AddOrderDialog = ({ onAddOrder }: AddOrderDialogProps) => {
                           value={item.item_source_type || 'in_stock'}
                           onValueChange={(value: 'in_stock' | 'production' | 'out_of_stock') => updateItem(index, "item_source_type", value)}
                         >
-                          <SelectTrigger>
+                          <SelectTrigger className="h-10 text-base">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
@@ -306,6 +313,7 @@ export const AddOrderDialog = ({ onAddOrder }: AddOrderDialogProps) => {
                             type="date"
                             value={item.production_estimated_date || ''}
                             onChange={(e) => updateItem(index, "production_estimated_date", e.target.value)}
+                            className="h-10 text-base"
                           />
                         </div>
                       )}
