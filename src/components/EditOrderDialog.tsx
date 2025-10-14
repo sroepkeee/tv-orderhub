@@ -520,7 +520,7 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-6xl max-h-[95vh]">
+        <DialogContent className="max-w-[95vw] max-h-[95vh]">
           <DialogHeader>
             <div className="flex items-center justify-between">
               <div>
