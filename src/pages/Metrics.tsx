@@ -189,6 +189,17 @@ export default function Metrics() {
         />
       </div>
       
+      {/* Tabela de Acompanhamento Detalhado */}
+      <div className="mb-6">
+        <OrdersTrackingTable 
+          orders={orders}
+          onOrderClick={(order) => {
+            setSelectedOrder(order);
+            setShowEditDialog(true);
+          }}
+        />
+      </div>
+      
       {/* Seções de Indicadores Detalhados */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         <ProductionMetrics orders={orders} />
@@ -204,17 +215,6 @@ export default function Metrics() {
       {/* Integração TOTVS */}
       <div className="mb-6">
         <OrderTotvsMetrics orders={orders} />
-      </div>
-      
-      {/* Tabela de Acompanhamento Detalhado */}
-      <div className="mb-6">
-        <OrdersTrackingTable 
-          orders={orders}
-          onOrderClick={(order) => {
-            setSelectedOrder(order);
-            setShowEditDialog(true);
-          }}
-        />
       </div>
 
       {/* Histórico de Mudanças */}
