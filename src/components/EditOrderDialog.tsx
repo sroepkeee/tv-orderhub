@@ -19,6 +19,7 @@ import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { CompleteOrderDialog } from "./CompleteOrderDialog";
 import { ExceptionCommentDialog } from "./ExceptionCommentDialog";
+import { PhaseButtons } from "./PhaseButtons";
 
 interface HistoryEvent {
   id: string;
@@ -737,6 +738,14 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                       </SelectContent>
                     </Select>
                   </div>
+                </div>
+
+                <div className="pt-4 border-t">
+                  <Label className="text-sm font-medium mb-3 block">Atualização Rápida de Status</Label>
+                  <PhaseButtons 
+                    order={order} 
+                    onStatusChange={(orderId, newStatus) => handleStatusChange(newStatus)}
+                  />
                 </div>
 
                 <div className="space-y-4 pt-4">
