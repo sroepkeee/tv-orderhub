@@ -413,11 +413,12 @@ export const Dashboard = () => {
     if (!user) return;
 
     try {
+      const orderNumber = generateOrderNumber(orderData.type);
       const { data: orderRow, error: orderError } = await supabase
         .from('orders')
         .insert({
           user_id: user.id,
-          order_number: generateOrderNumber(orderData.type),
+          order_number: orderNumber,
           customer_name: orderData.client,
           delivery_address: orderData.client,
           delivery_date: orderData.deliveryDeadline,
@@ -425,7 +426,7 @@ export const Dashboard = () => {
           priority: orderData.priority,
           order_type: orderData.type,
           notes: orderData.deskTicket,
-          totvs_order_number: orderData.totvsOrderNumber || null,
+          totvs_order_number: orderData.totvsOrderNumber || orderNumber,
         })
         .select()
         .single();
