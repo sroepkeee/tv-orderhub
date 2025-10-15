@@ -549,34 +549,70 @@ export const Dashboard = () => {
 
       if (orderError) throw orderError;
 
-      // Update items - delete old ones and insert new ones
+      // Update items - handle existing, new, and deleted items
       if (updatedOrder.items) {
-        const { error: deleteError } = await supabase
+        // Get existing item IDs from database
+        const { data: existingItems } = await supabase
           .from('order_items')
-          .delete()
-          .eq('order_id', updatedOrder.id)
-          .eq('user_id', user.id);
+          .select('id')
+          .eq('order_id', updatedOrder.id);
 
-        if (deleteError) throw deleteError;
+        const existingItemIds = new Set(existingItems?.map(item => item.id) || []);
+        const currentItemIds = new Set(updatedOrder.items.filter(item => item.id).map(item => item.id));
 
-        if (updatedOrder.items.length > 0) {
-          const itemsToInsert = updatedOrder.items.map((item: any) => ({
-            order_id: updatedOrder.id,
-            user_id: user.id,
-            item_code: item.itemCode,
-            item_description: item.itemDescription,
-            unit: item.unit,
-            requested_quantity: item.requestedQuantity,
-            warehouse: item.warehouse,
-            delivery_date: item.deliveryDate,
-            delivered_quantity: item.deliveredQuantity
-          }));
-
-          const { error: itemsError } = await supabase
+        // Delete items that are no longer in the list
+        const itemsToDelete = Array.from(existingItemIds).filter(id => !currentItemIds.has(id));
+        if (itemsToDelete.length > 0) {
+          const { error: deleteError } = await supabase
             .from('order_items')
-            .insert(itemsToInsert);
+            .delete()
+            .in('id', itemsToDelete);
 
-          if (itemsError) throw itemsError;
+          if (deleteError) throw deleteError;
+        }
+
+        // Update existing items and insert new ones
+        for (const item of updatedOrder.items) {
+          if (item.id) {
+            // Update existing item
+            const { error: updateError } = await supabase
+              .from('order_items')
+              .update({
+                item_code: item.itemCode,
+                item_description: item.itemDescription,
+                unit: item.unit,
+                requested_quantity: item.requestedQuantity,
+                warehouse: item.warehouse,
+                delivery_date: item.deliveryDate,
+                delivered_quantity: item.deliveredQuantity,
+                item_source_type: item.item_source_type || 'in_stock',
+                received_status: item.received_status || 'pending',
+                production_estimated_date: item.production_estimated_date || null
+              })
+              .eq('id', item.id);
+
+            if (updateError) throw updateError;
+          } else {
+            // Insert new item
+            const { error: insertError } = await supabase
+              .from('order_items')
+              .insert({
+                order_id: updatedOrder.id,
+                user_id: user.id,
+                item_code: item.itemCode,
+                item_description: item.itemDescription,
+                unit: item.unit,
+                requested_quantity: item.requestedQuantity,
+                warehouse: item.warehouse,
+                delivery_date: item.deliveryDate,
+                delivered_quantity: item.deliveredQuantity,
+                item_source_type: item.item_source_type || 'in_stock',
+                received_status: item.received_status || 'pending',
+                production_estimated_date: item.production_estimated_date || null
+              });
+
+            if (insertError) throw insertError;
+          }
         }
       }
 
