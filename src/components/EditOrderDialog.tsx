@@ -805,10 +805,12 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
       setShowDeleteConfirm(false);
       onOpenChange(false);
       
-      // Chamar callback para recarregar lista
-      if (onDelete) {
-        onDelete();
-      }
+      // Aguardar fechamento do dialog antes de recarregar
+      setTimeout(() => {
+        if (onDelete) {
+          onDelete();
+        }
+      }, 100);
     } catch (error: any) {
       console.error('Erro ao excluir pedido:', error);
       toast({

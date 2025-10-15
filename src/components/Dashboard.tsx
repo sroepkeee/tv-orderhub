@@ -201,6 +201,14 @@ export const Dashboard = () => {
     }
   }, [user]);
 
+  // Limpar dialog se o pedido selecionado não existir mais
+  useEffect(() => {
+    if (selectedOrder && !orders.find(o => o.id === selectedOrder.id)) {
+      setShowEditDialog(false);
+      setSelectedOrder(null);
+    }
+  }, [orders, selectedOrder]);
+
   // Realtime subscription for orders - shared view with debounce
   useEffect(() => {
     if (!user) return;
@@ -317,6 +325,18 @@ export const Dashboard = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleDeleteOrder = async () => {
+    // Atualização otimista: remove o pedido do estado imediatamente
+    if (selectedOrder) {
+      setOrders(prevOrders => prevOrders.filter(o => o.id !== selectedOrder.id));
+      setSelectedOrder(null);
+      setShowEditDialog(false);
+    }
+    
+    // Recarrega do banco para garantir sincronização
+    await loadOrders();
   };
 
   const getPriorityClass = (priority: Priority) => {
@@ -1158,7 +1178,7 @@ export const Dashboard = () => {
           open={showEditDialog}
           onOpenChange={setShowEditDialog}
           onSave={handleEditOrder}
-          onDelete={loadOrders}
+          onDelete={handleDeleteOrder}
         />
       )}
     </div>
