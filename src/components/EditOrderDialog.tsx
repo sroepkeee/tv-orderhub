@@ -942,6 +942,17 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
       if (!user) throw new Error("Usuário não autenticado");
       
       // NOVO: Inserir mudança de data DIRETAMENTE (sem setTimeout)
+      console.log('🔄 Registrando mudança de prazo:', {
+        order_id: order.id,
+        order_number: order.orderNumber,
+        order_item_id: null,
+        old_date: order.deliveryDeadline,
+        new_date: pendingOrderData.deliveryDeadline,
+        category: dateChangeCategory,
+        reason: dateChangeReason || '(sem descrição)',
+        factory_followup: factoryFollowupRequired
+      });
+
       const { error: changeError } = await supabase
         .from('delivery_date_changes')
         .insert({
@@ -956,7 +967,12 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
           factory_followup_required: factoryFollowupRequired
         });
       
-      if (changeError) throw changeError;
+      if (changeError) {
+        console.error('❌ Erro ao inserir delivery_date_changes:', changeError);
+        throw changeError;
+      }
+
+      console.log('✅ Mudança de prazo registrada com sucesso');
       
       // Agora salvar o pedido
       onSave(pendingOrderData);

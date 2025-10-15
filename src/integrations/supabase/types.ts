@@ -29,7 +29,7 @@ export type Database = {
           notes: string | null
           old_date: string
           order_id: string
-          order_item_id: string
+          order_item_id: string | null
           reason: string | null
         }
         Insert: {
@@ -46,7 +46,7 @@ export type Database = {
           notes?: string | null
           old_date: string
           order_id: string
-          order_item_id: string
+          order_item_id?: string | null
           reason?: string | null
         }
         Update: {
@@ -63,7 +63,7 @@ export type Database = {
           notes?: string | null
           old_date?: string
           order_id?: string
-          order_item_id?: string
+          order_item_id?: string | null
           reason?: string | null
         }
         Relationships: [
