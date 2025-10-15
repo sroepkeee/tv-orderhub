@@ -2,6 +2,7 @@ import type { ParsedOrderData } from './excelParser';
 
 // Lazy load pdfjs to avoid conflicts with React
 let pdfjsLib: any = null;
+let pdfWorker: Worker | null = null;
 
 async function getPdfJs() {
   if (!pdfjsLib) {
@@ -16,8 +17,20 @@ async function getPdfJs() {
     if (typeof window !== 'undefined') {
       const workerUrlRaw = (workerUrlMod as any).default ?? workerUrlMod;
       const workerUrl = typeof workerUrlRaw === 'string' ? workerUrlRaw : String(workerUrlRaw);
-      pdfjsLib.GlobalWorkerOptions.workerSrc = workerUrl;
-      console.log('📄 PDF.js worker (local):', workerUrl);
+
+      if (!pdfWorker) {
+        pdfWorker = new Worker(workerUrl, { type: 'module' });
+        pdfWorker.onerror = (ev: ErrorEvent) => {
+          console.warn('⚠️ Erro no PDF.js worker:', (ev && ev.message) || ev);
+        };
+      }
+
+      // Force PDF.js to use this local worker port
+      pdfjsLib.GlobalWorkerOptions.workerPort = pdfWorker;
+      // Avoid using workerSrc/CDN paths
+      pdfjsLib.GlobalWorkerOptions.workerSrc = undefined as unknown as string;
+
+      console.log('📄 PDF.js worker (port):', workerUrl);
     }
   }
   return pdfjsLib;
