@@ -15,4 +15,11 @@ export default defineConfig(({ mode }) => ({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  optimizeDeps: {
+    exclude: ['pdfjs-dist'],
+    esbuildOptions: {
+      // Prevent esbuild from bundling pdfjs-dist incorrectly
+      target: 'esnext',
+    },
+  },
 }));

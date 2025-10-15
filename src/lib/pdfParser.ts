@@ -1,8 +1,16 @@
-import * as pdfjsLib from 'pdfjs-dist';
 import type { ParsedOrderData } from './excelParser';
 
-// Configure PDF.js worker
-pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+// Lazy load pdfjs to avoid conflicts with React
+let pdfjsLib: any = null;
+
+async function getPdfJs() {
+  if (!pdfjsLib) {
+    pdfjsLib = await import('pdfjs-dist');
+    // Configure PDF.js worker
+    pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+  }
+  return pdfjsLib;
+}
 
 interface ExtractionQuality {
   orderNumber: boolean;
@@ -16,8 +24,11 @@ interface ExtractionQuality {
 export async function parsePdfOrder(file: File): Promise<ParsedOrderData & { quality?: ExtractionQuality }> {
   console.log('📄 PDF parsing iniciado:', file.name);
   
+  // Get pdfjs dynamically to avoid React conflicts
+  const pdfjs = await getPdfJs();
+  
   const arrayBuffer = await file.arrayBuffer();
-  const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+  const pdf = await pdfjs.getDocument({ data: arrayBuffer }).promise;
   
   let fullText = '';
   
