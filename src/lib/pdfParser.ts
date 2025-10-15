@@ -81,7 +81,7 @@ export async function parsePdfOrder(file: File): Promise<ParsedOrderData & { qua
     fullText += pageText + '\n';
   }
   
-  console.log('📊 Texto extraído (primeiros 500 chars):', fullText.substring(0, 500));
+  console.log('📊 Texto extraído (primeiros 1000 chars):', fullText.substring(0, 1000));
   
   const orderInfo = extractOrderHeader(fullText);
   const items = extractItemsTable(fullText);
@@ -142,10 +142,19 @@ function extractOrderHeader(text: string): ParsedOrderData['orderInfo'] {
     orderInfo.deliveryDate = orderInfo.issueDate;
   }
   
-  // CLIENTE
-  const clientMatch = text.match(/CLIENTE:\s*([^\n]+?)(?=\s+LOJA:|$)/i);
+  // CLIENTE - múltiplos padrões para maior flexibilidade
+  let clientMatch = text.match(/CLIENTE:\s*([^\n]+?)(?=\s+LOJA:|$)/i);
+  if (!clientMatch) {
+    clientMatch = text.match(/CLIENTE:\s*(.+?)(?=\s+(?:LOJA|ENDERE|CPF|CNPJ)|$)/i);
+  }
+  if (!clientMatch) {
+    clientMatch = text.match(/(?:RAZ[ÃA]O SOCIAL|NOME):\s*(.+?)(?=\n|$)/i);
+  }
   if (clientMatch) {
     orderInfo.customerName = clientMatch[1].trim();
+    console.log('✅ Cliente extraído:', orderInfo.customerName);
+  } else {
+    console.warn('⚠️ Nome do cliente não encontrado no PDF');
   }
   
   // ENDEREÇO
@@ -208,8 +217,9 @@ function extractItemsTable(text: string): ParsedOrderData['items'] {
   }
   
   const tableText = text.substring(composicaoIndex);
+  console.log('📋 Primeiras linhas da tabela:', tableText.substring(0, 500));
   
-  // Padrões para linhas de itens
+  // Padrão 1: Tabela com pipes (formato TOTVS)
   // Formato: | 01 | 052289 | 4,00 | PC | 785,85 | 0,00 | 5,00 | 18,00 | 3.143,40 | TINTA...
   const itemRegex = /\|\s*(\d+)\s*\|\s*([\d]+)\s*\|\s*([\d,]+)\s*\|\s*([A-Z]+)\s*\|\s*([\d.,]+)\s*\|\s*([\d.,]+)\s*\|\s*([\d.,]+)\s*\|\s*([\d.,]+)\s*\|\s*([\d.,]+)\s*\|\s*([^\|]+?)(?=\s*\||\s*$)/gi;
   
@@ -235,16 +245,16 @@ function extractItemsTable(text: string): ParsedOrderData['items'] {
     });
   }
   
-  // Fallback: tentar padrão mais simples se não encontrar itens
+  // Padrão 2: Tabela sem pipes (fallback)
   if (items.length === 0) {
-    console.warn('⚠️ Tentando padrão alternativo de extração');
+    console.warn('⚠️ Tentando padrão alternativo sem pipes');
     const lines = tableText.split('\n');
     
     for (const line of lines) {
-      // Procurar por linhas com código de produto (números no início)
-      const simpleMatch = line.match(/(\d{6})\s+([\d,]+)\s+([A-Z]{2,3})\s+([\d.,]+)/);
-      if (simpleMatch) {
-        const [, codigo, qtd, unidade, vlrUnit] = simpleMatch;
+      // Padrão mais flexível: código (6 dígitos) seguido de quantidade, unidade e valores
+      const flexMatch = line.match(/(\d{6})\s+([\d,]+)\s+([A-Z]{2,3})\s+([\d.,]+)/);
+      if (flexMatch) {
+        const [, codigo, qtd, unidade, vlrUnit] = flexMatch;
         
         // Extrair descrição (texto após os números)
         const descMatch = line.match(/[A-Z]{2,3}\s+[\d.,]+\s+[\d.,]+\s+[\d.,]+\s+[\d.,]+\s+[\d.,]+\s+(.+)$/);
@@ -259,6 +269,39 @@ function extractItemsTable(text: string): ParsedOrderData['items'] {
           deliveryDate: '',
           sourceType: 'in_stock',
           unitPrice: parseFloat(vlrUnit.replace(/\./g, '').replace(',', '.')),
+          discount: 0,
+          ipiPercent: 0,
+          icmsPercent: 0,
+          totalValue: 0
+        });
+      }
+    }
+  }
+  
+  // Padrão 3: Buscar qualquer linha com código de produto (6 dígitos) e descrição
+  if (items.length === 0) {
+    console.warn('⚠️ Tentando padrão ultra-flexível (código + texto)');
+    const lines = tableText.split('\n');
+    
+    for (const line of lines) {
+      // Qualquer linha com código de 6 dígitos seguido de texto
+      const ultraMatch = line.match(/(\d{6})\s+(.+)/);
+      if (ultraMatch) {
+        const [, codigo, resto] = ultraMatch;
+        
+        // Tentar extrair quantidade e unidade do resto
+        const qtyMatch = resto.match(/([\d,]+)\s+([A-Z]{2,3})/);
+        
+        items.push({
+          itemNumber: String(items.length + 1),
+          itemCode: codigo.trim(),
+          description: resto.substring(0, 100).trim(),
+          quantity: qtyMatch ? parseFloat(qtyMatch[1].replace(',', '.')) : 1,
+          unit: qtyMatch ? qtyMatch[2].trim() : 'UN',
+          warehouse: 'PRINCIPAL',
+          deliveryDate: '',
+          sourceType: 'in_stock',
+          unitPrice: 0,
           discount: 0,
           ipiPercent: 0,
           icmsPercent: 0,
