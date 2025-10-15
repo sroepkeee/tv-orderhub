@@ -428,9 +428,26 @@ export const EditOrderDialog = ({ order, open, onOpenChange, onSave, onDelete }:
       )
       .subscribe();
 
+    const attachmentsChannel = supabase
+      .channel(`order_attachments_${order.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'order_attachments',
+          filter: `order_id=eq.${order.id}`
+        },
+        () => {
+          loadAttachments();
+        }
+      )
+      .subscribe();
+
     return () => {
       supabase.removeChannel(historyChannel);
       supabase.removeChannel(commentsChannel);
+      supabase.removeChannel(attachmentsChannel);
     };
   }, [open, order?.id]);
 
