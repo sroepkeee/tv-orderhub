@@ -532,6 +532,13 @@ export const Dashboard = () => {
     return `${prefix}-${year}-${count.toString().padStart(3, '0')}`;
   };
 
+  // Compute received_status based on quantities
+  const computeReceivedStatus = (delivered: number, requested: number): 'pending' | 'partial' | 'completed' => {
+    if (!requested || delivered <= 0) return 'pending';
+    if (delivered < requested) return 'partial';
+    return 'completed';
+  };
+
   const handleEditOrder = async (updatedOrder: Order) => {
     if (!user) return;
 
@@ -539,7 +546,7 @@ export const Dashboard = () => {
     isUpdatingRef.current = true;
 
     try {
-      const { error: orderError } = await supabase
+      const { data: updatedRow, error: orderError } = await supabase
         .from('orders')
         .update({
           customer_name: updatedOrder.client,
@@ -552,9 +559,11 @@ export const Dashboard = () => {
           totvs_order_number: updatedOrder.totvsOrderNumber || null,
         })
         .eq('id', updatedOrder.id)
-        .eq('user_id', user.id);
+        .select('id')
+        .single();
 
       if (orderError) throw orderError;
+      if (!updatedRow) throw new Error("Sem permissão para atualizar este pedido.");
 
       // Update items - handle existing, new, and deleted items
       if (updatedOrder.items) {
@@ -583,6 +592,9 @@ export const Dashboard = () => {
 
         // Update existing items (only own items) and insert new ones
         for (const item of updatedOrder.items) {
+          // Calculate correct status based on quantities
+          const statusToSave = computeReceivedStatus(item.deliveredQuantity, item.requestedQuantity);
+
           if (item.id) {
             // Skip updating items not owned by current user (RLS)
             if (item.userId && item.userId !== user.id) continue;
@@ -596,9 +608,9 @@ export const Dashboard = () => {
                 requested_quantity: item.requestedQuantity,
                 warehouse: item.warehouse,
                 delivery_date: item.deliveryDate,
-                delivered_quantity: item.deliveredQuantity,
+                delivered_quantity: Math.max(0, Math.min(item.deliveredQuantity, item.requestedQuantity)),
                 item_source_type: item.item_source_type || 'in_stock',
-                received_status: item.received_status || 'pending',
+                received_status: statusToSave,
                 production_estimated_date: item.production_estimated_date || null
               })
               .eq('id', item.id);
@@ -617,9 +629,9 @@ export const Dashboard = () => {
                 requested_quantity: item.requestedQuantity,
                 warehouse: item.warehouse,
                 delivery_date: item.deliveryDate,
-                delivered_quantity: item.deliveredQuantity,
+                delivered_quantity: Math.max(0, Math.min(item.deliveredQuantity, item.requestedQuantity)),
                 item_source_type: item.item_source_type || 'in_stock',
-                received_status: item.received_status || 'pending',
+                received_status: statusToSave,
                 production_estimated_date: item.production_estimated_date || null
               });
 

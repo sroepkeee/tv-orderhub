@@ -489,7 +489,8 @@ export const EditOrderDialog = ({ order, open, onOpenChange, onSave }: EditOrder
           deliveredQuantity: item.delivered_quantity,
           received_status: (item.received_status as 'pending' | 'partial' | 'completed') || 'pending',
           item_source_type: (item.item_source_type as 'in_stock' | 'production' | 'out_of_stock') || 'in_stock',
-          production_estimated_date: item.production_estimated_date
+          production_estimated_date: item.production_estimated_date,
+          userId: item.user_id
         })));
       }
       
@@ -1060,8 +1061,10 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                                   type="number"
                                   value={item.deliveredQuantity}
                                   onChange={(e) => {
-                                    const newQty = parseInt(e.target.value) || 0;
+                                    const newQty = Math.max(0, Math.min(parseInt(e.target.value) || 0, item.requestedQuantity));
+                                    const newStatus = newQty === 0 ? 'pending' : (newQty < item.requestedQuantity ? 'partial' : 'completed');
                                     updateItem(index, "deliveredQuantity", newQty);
+                                    updateItem(index, "received_status", newStatus);
                                   }}
                                   min="0"
                                   max={item.requestedQuantity}
