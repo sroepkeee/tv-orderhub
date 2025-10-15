@@ -126,6 +126,16 @@ export const ImportOrderDialog = ({ open, onOpenChange, onImportSuccess }: Impor
 
       if (orderError) throw orderError;
 
+      // Registrar no histórico como "Importação"
+      await supabase
+        .from('order_history')
+        .insert({
+          order_id: order.id,
+          user_id: user.id,
+          old_status: 'imported',
+          new_status: 'pending'
+        });
+
       // Fazer upload do PDF para o storage (se for PDF)
       if (file && file.name.endsWith('.pdf')) {
         try {
@@ -141,9 +151,12 @@ export const ImportOrderDialog = ({ open, onOpenChange, onImportSuccess }: Impor
             });
           
           if (uploadError) {
-            console.error('Erro ao fazer upload do PDF:', uploadError);
-            toast.warning('Pedido criado, mas não foi possível anexar o PDF');
+            console.error('❌ Erro ao fazer upload do PDF:', uploadError);
+            console.error('❌ Detalhes:', { filePath, fileName: file.name, fileSize: file.size });
+            toast.warning('Pedido criado, mas não foi possível anexar o PDF: ' + uploadError.message);
           } else {
+            console.log('✅ PDF uploaded com sucesso:', filePath);
+            
             // Registrar o anexo na tabela order_attachments
             const { error: attachmentError } = await supabase
               .from('order_attachments')
@@ -157,7 +170,11 @@ export const ImportOrderDialog = ({ open, onOpenChange, onImportSuccess }: Impor
               });
             
             if (attachmentError) {
-              console.error('Erro ao registrar anexo:', attachmentError);
+              console.error('❌ Erro ao registrar anexo:', attachmentError);
+              console.error('❌ Detalhes:', { order_id: order.id, file_name: file.name });
+              toast.warning('PDF enviado, mas não foi possível registrar no banco');
+            } else {
+              console.log('✅ Anexo registrado com sucesso no banco');
             }
           }
         } catch (uploadErr) {
@@ -190,8 +207,12 @@ export const ImportOrderDialog = ({ open, onOpenChange, onImportSuccess }: Impor
 
       if (itemsError) throw itemsError;
 
-      const pdfAttached = file?.name.endsWith('.pdf') ? ' PDF anexado automaticamente.' : '';
-      toast.success(`Pedido ${parsedData.orderInfo.orderNumber} criado na fase Preparação!${pdfAttached}`);
+      const pdfAttached = file?.name.endsWith('.pdf') ? '\n✅ PDF anexado automaticamente' : '';
+      toast.success(`Pedido ${parsedData.orderInfo.orderNumber} importado com sucesso na fase Preparação!${pdfAttached}`);
+      
+      // Forçar atualização da lista de pedidos
+      window.dispatchEvent(new CustomEvent('ordersUpdated'));
+      
       onImportSuccess();
       onOpenChange(false);
       

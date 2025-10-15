@@ -259,6 +259,21 @@ export const Dashboard = () => {
     };
   }, [user]);
 
+  // Listener for custom order import events
+  useEffect(() => {
+    const handleOrdersUpdated = () => {
+      if (user && !isUpdatingRef.current) {
+        loadOrders();
+      }
+    };
+
+    window.addEventListener('ordersUpdated', handleOrdersUpdated);
+
+    return () => {
+      window.removeEventListener('ordersUpdated', handleOrdersUpdated);
+    };
+  }, [user]);
+
   const loadOrders = async () => {
     if (!user) return;
     
