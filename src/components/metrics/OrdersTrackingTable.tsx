@@ -212,8 +212,7 @@ export function OrdersTrackingTable({ orders, onOrderClick }: OrdersTrackingTabl
               <TableHead className="min-w-[150px]">Cliente</TableHead>
               <TableHead className="min-w-[90px] text-center">Qtd. Itens</TableHead>
               <TableHead className="min-w-[120px]">Status</TableHead>
-              <TableHead className="min-w-[100px]">Prazo Original</TableHead>
-              <TableHead className="min-w-[100px]">Prazo Atual</TableHead>
+              <TableHead className="min-w-[120px]">Data de Entrega</TableHead>
               <TableHead className="min-w-[90px] text-center">Dias Aberto</TableHead>
               <TableHead className="min-w-[120px] text-center">Prazo</TableHead>
               <TableHead className="min-w-[150px]">Entregas Parciais</TableHead>
@@ -224,7 +223,7 @@ export function OrdersTrackingTable({ orders, onOrderClick }: OrdersTrackingTabl
           <TableBody>
             {filteredOrders.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={11} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
                   Nenhum pedido encontrado com os filtros selecionados
                 </TableCell>
               </TableRow>
@@ -260,12 +259,6 @@ export function OrdersTrackingTable({ orders, onOrderClick }: OrdersTrackingTabl
                       </Badge>
                     </TableCell>
                     <TableCell>{getStatusBadge(order.status)}</TableCell>
-                    <TableCell className="text-sm">
-                      <div className="flex items-center gap-1">
-                        <Calendar className="h-3 w-3 text-muted-foreground" />
-                        {order.createdDate}
-                      </div>
-                    </TableCell>
                     <TableCell className="text-sm">
                       <div className="flex items-center gap-1">
                         <Calendar className="h-3 w-3 text-muted-foreground" />

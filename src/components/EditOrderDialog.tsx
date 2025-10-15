@@ -20,6 +20,7 @@ import { useToast } from "@/hooks/use-toast";
 import { CompleteOrderDialog } from "./CompleteOrderDialog";
 import { ExceptionCommentDialog } from "./ExceptionCommentDialog";
 import { PhaseButtons } from "./PhaseButtons";
+import { ConfirmationDialog } from "./ConfirmationDialog";
 
 interface HistoryEvent {
   id: string;
@@ -43,9 +44,10 @@ interface EditOrderDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSave: (order: Order) => void;
+  onDelete?: () => void;
 }
 
-export const EditOrderDialog = ({ order, open, onOpenChange, onSave }: EditOrderDialogProps) => {
+export const EditOrderDialog = ({ order, open, onOpenChange, onSave, onDelete }: EditOrderDialogProps) => {
   const { register, handleSubmit, setValue, reset } = useForm<Order>();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("edit");
@@ -66,6 +68,8 @@ export const EditOrderDialog = ({ order, open, onOpenChange, onSave }: EditOrder
   const [loadingAttachments, setLoadingAttachments] = useState(false);
   const [uploadingAttachment, setUploadingAttachment] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -735,6 +739,88 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
     });
   };
 
+  const handleDelete = async () => {
+    if (!order?.id) return;
+    
+    setDeleting(true);
+    try {
+      // 1. Excluir itens do pedido
+      const { error: itemsError } = await supabase
+        .from('order_items')
+        .delete()
+        .eq('order_id', order.id);
+      
+      if (itemsError) throw itemsError;
+      
+      // 2. Excluir anexos do storage e da tabela
+      if (attachments.length > 0) {
+        // Excluir arquivos do storage
+        const filePaths = attachments.map(a => a.file_path);
+        await supabase.storage.from('order-attachments').remove(filePaths);
+        
+        // Excluir registros da tabela
+        await supabase
+          .from('order_attachments')
+          .delete()
+          .eq('order_id', order.id);
+      }
+      
+      // 3. Excluir comentários
+      await supabase
+        .from('order_comments')
+        .delete()
+        .eq('order_id', order.id);
+      
+      // 4. Excluir histórico
+      await supabase
+        .from('order_history')
+        .delete()
+        .eq('order_id', order.id);
+      
+      // 5. Excluir notas de conclusão
+      await supabase
+        .from('order_completion_notes')
+        .delete()
+        .eq('order_id', order.id);
+      
+      // 6. Excluir mudanças de data
+      await supabase
+        .from('delivery_date_changes')
+        .delete()
+        .eq('order_id', order.id);
+      
+      // 7. Excluir pedido
+      const { error: orderError } = await supabase
+        .from('orders')
+        .delete()
+        .eq('id', order.id);
+      
+      if (orderError) throw orderError;
+      
+      toast({
+        title: "Pedido excluído",
+        description: `Pedido ${order.orderNumber} foi excluído com sucesso.`,
+      });
+      
+      setShowDeleteConfirm(false);
+      onOpenChange(false);
+      
+      // Chamar callback para recarregar lista
+      if (onDelete) {
+        onDelete();
+      }
+    } catch (error: any) {
+      console.error('Erro ao excluir pedido:', error);
+      toast({
+        title: "Erro ao excluir",
+        description: error.message || "Não foi possível excluir o pedido.",
+        variant: "destructive",
+      });
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   const onSubmit = (data: Order) => {
     const updatedOrder = { ...data, id: order.id, items };
     onSave(updatedOrder);
@@ -1107,13 +1193,24 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                   )}
                 </div>
 
-                <div className="flex justify-end gap-2 pt-4 sticky bottom-0 bg-background">
-                  <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-                    Cancelar
+                <div className="flex justify-between items-center gap-2 pt-4 sticky bottom-0 bg-background">
+                  <Button 
+                    type="button" 
+                    variant="destructive" 
+                    onClick={() => setShowDeleteConfirm(true)}
+                    className="gap-2"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    Excluir Pedido
                   </Button>
-                  <Button type="submit">
-                    Salvar Alterações
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+                      Cancelar
+                    </Button>
+                    <Button type="submit">
+                      Salvar Alterações
+                    </Button>
+                  </div>
                 </div>
               </form>
             </ScrollArea>
@@ -1531,6 +1628,17 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
           setPendingExceptionStatus(null);
         }}
         saving={savingException}
+      />
+      
+      <ConfirmationDialog
+        open={showDeleteConfirm}
+        onOpenChange={setShowDeleteConfirm}
+        title="Excluir Pedido"
+        description={`Tem certeza que deseja excluir o pedido ${order?.orderNumber}? Esta ação é irreversível e excluirá o pedido e todos os seus itens, comentários, anexos e histórico do sistema.`}
+        onConfirm={handleDelete}
+        variant="destructive"
+        confirmText={deleting ? "Excluindo..." : "Sim, excluir"}
+        cancelText="Cancelar"
       />
     </>
   );

@@ -1158,6 +1158,7 @@ export const Dashboard = () => {
           open={showEditDialog}
           onOpenChange={setShowEditDialog}
           onSave={handleEditOrder}
+          onDelete={loadOrders}
         />
       )}
     </div>
