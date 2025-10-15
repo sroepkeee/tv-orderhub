@@ -147,27 +147,17 @@ function extractOrderHeader(text: string): ParsedOrderData['orderInfo'] {
     console.log('⚠️ Usando data de emissão como entrega');
   }
   
-  // CLIENTE - padrão mais específico para evitar capturar texto extra
-  // Padrão 1: CLIENTE: NOME até próximo campo (LOJA, CNPJ, CPF, ENDEREÇO)
-  let clientMatch = text.match(/CLIENTE:?\s*([A-Z0-9\s\-\.]+?)(?=\s*(?:LOJA|CNPJ|CPF|ENDERE[ÇC]O|INSCRI[ÇC][ÃA]O|\n\n))/i);
-  
-  // Padrão 2: Se não encontrou, tentar pegar até quebra de linha dupla
-  if (!clientMatch) {
-    clientMatch = text.match(/CLIENTE:?\s*([^\n]+?)(?=\s*CNPJ|CPF|LOJA)/i);
-  }
-  
-  // Padrão 3: Razão Social como alternativa
-  if (!clientMatch) {
-    clientMatch = text.match(/RAZ[ÃA]O\s+SOCIAL:?\s*([A-Z0-9\s\-\.]+?)(?=\s*(?:CNPJ|CPF|INSCRI[ÇC][ÃA]O|\n))/i);
-  }
+  // CLIENTE - Suporta múltiplos formatos: CLIENTE:, RAZÃO SOCIAL:, NOME/RAZÃO SOCIAL:
+  let clientMatch = text.match(/(?:NOME\/RAZ[ÃA]O\s+SOCIAL|RAZ[ÃA]O\s+SOCIAL|CLIENTE):?\s*(.+?)(?=\s*(?:CPF\/CNPJ|CNPJ|CPF|LOJA|INSC\s+EST|CONTATO))/i);
   
   if (clientMatch) {
-    // Limpar nome: remover espaços extras, números isolados no final
+    // Limpar nome: remover código numérico inicial (ex: "005161 - ") e espaços extras
     let cleanName = clientMatch[1]
       .trim()
-      .replace(/\s+/g, ' ') // Normalizar espaços
-      .replace(/\s+\d+$/, '') // Remover código de loja no final
-      .replace(/LOJA\s*\d*$/i, ''); // Remover "LOJA" no final
+      .replace(/^\d+\s*-\s*/, '') // Remove código inicial "005161 - "
+      .replace(/\s+/g, ' ') // Normaliza espaços
+      .replace(/\s+\d+$/, '') // Remove código de loja no final
+      .replace(/LOJA\s*\d*$/i, ''); // Remove "LOJA" no final
     
     orderInfo.customerName = cleanName;
     console.log('✅ Cliente:', orderInfo.customerName);
@@ -175,10 +165,10 @@ function extractOrderHeader(text: string): ParsedOrderData['orderInfo'] {
     console.warn('⚠️ Nome do cliente não encontrado');
   }
   
-  // CNPJ/CPF - extrair primeiro para evitar contaminar outros campos
-  const docMatch = text.match(/(?:CNPJ|CPF):?\s*([\d.\-\/]+)/i);
+  // CNPJ/CPF - Suporta ambos os formatos
+  const docMatch = text.match(/(?:CPF\/CNPJ|CNPJ\/CPF|CNPJ|CPF):?\s*([\d.\-\/]+)/i);
   if (docMatch) {
-    orderInfo.customerDocument = docMatch[1].trim();
+    orderInfo.customerDocument = docMatch[1].replace(/[.\-\/]/g, '').trim(); // Remove formatação
     console.log('✅ CNPJ/CPF:', orderInfo.customerDocument);
   }
   
@@ -189,10 +179,11 @@ function extractOrderHeader(text: string): ParsedOrderData['orderInfo'] {
     console.log('✅ Endereço:', orderInfo.deliveryAddress);
   }
   
-  // MUNICÍPIO - separar de UF
-  const municipioMatch = text.match(/MUNIC[ÍI]PIO:?\s*([A-Z\s]+?)(?=\s*(?:ESTADO|UF|CEP|\d{5}|\n))/i);
+  // MUNICÍPIO - Suporta "MUNICÍPIO:" e "MUNICÍPIO/UF:", remove UF no final
+  const municipioMatch = text.match(/MUNIC[ÍI]PIO(?:\/UF)?:?\s*([A-Z\s]+?)(?=\s*(?:-\s*[A-Z]{2}|UF:|CEP|\d{5}|\n))/i);
   if (municipioMatch) {
-    orderInfo.municipality = municipioMatch[1].trim();
+    // Remove " - PB" ou similar do final
+    orderInfo.municipality = municipioMatch[1].trim().replace(/\s*-\s*[A-Z]{2}\s*$/, '');
     console.log('✅ Município:', orderInfo.municipality);
   }
   
@@ -203,28 +194,31 @@ function extractOrderHeader(text: string): ParsedOrderData['orderInfo'] {
     console.log('✅ Transportadora:', orderInfo.carrier);
   }
   
-  // FRETE/TIPO e VALOR - padrões separados
-  const freightTypeMatch = text.match(/(?:FRETE\/TIPO|TIPO\s+FRETE):?\s*(CIF|FOB|[A-Z]+)/i);
+  // FRETE/TIPO - Extrai apenas o tipo (CIF, FOB) removendo prefixo "C-", "F-"
+  const freightTypeMatch = text.match(/FRETE\/TIPO:?\s*(?:[A-Z]-)?([A-Z]{3})/i);
   if (freightTypeMatch) {
     orderInfo.freightType = freightTypeMatch[1].trim().toUpperCase();
     console.log('✅ Tipo Frete:', orderInfo.freightType);
   }
   
-  const freightValueMatch = text.match(/(?:VALOR\s+FRETE|FRETE.*?VALOR):?\s*R?\$?\s*([\d.,]+)/i);
+  // VALOR FRETE - Busca na seção TRANSPORTE
+  const freightValueMatch = text.match(/FRETE\/TIPO:.*?VALOR:?\s*R?\$?\s*([\d.,]+)/is);
   if (freightValueMatch) {
-    orderInfo.freightValue = parseFloat(freightValueMatch[1].replace(/\./g, '').replace(',', '.'));
+    const value = freightValueMatch[1].replace(/\./g, '').replace(',', '.');
+    orderInfo.freightValue = parseFloat(value);
     console.log('✅ Valor Frete:', orderInfo.freightValue);
   }
   
-  // OPERAÇÃO - código numérico
-  const operacaoMatch = text.match(/(?:OPERA[ÇC][ÃA]O|C[ÓO]D\.?\s*OPERA[ÇC][ÃA]O):?\s*(\d+)/i);
+  // OPERAÇÃO - Busca "Operação 535REMESSA..." e extrai código com descrição
+  const operacaoMatch = text.match(/Opera[çc][ãa]o\s+(\d+[A-Z\s]+?)(?=\s+Descri[çc][ãa]o|\n)/i);
   if (operacaoMatch) {
-    orderInfo.operationCode = operacaoMatch[1];
+    orderInfo.operationCode = operacaoMatch[1].trim();
     console.log('✅ Código Operação:', orderInfo.operationCode);
   }
   
-  // EXECUTIVO/REPRESENTANTE - evitar capturar código
-  const execMatch = text.match(/(?:EXECUTIVO|REPRESENTANTE|VENDEDOR):?\s*([A-Z\s]+?)(?=\s*(?:C[ÓO]DIGO|COMISS[ÃA]O|\d{4}|\n))/i);
+  // EXECUTIVO/REPRESENTANTE - Busca em CENTRO CUSTO, ITEM, CONTA ou campos similares
+  // Exemplo: "SSM - CUSTOMER SERVICE" ou "SSM - PAINEIS"
+  const execMatch = text.match(/(?:CENTRO\s+CUSTO|ITEM|CONTA)\s+([A-Z\s\-]+?)(?=\s+(?:PROJETO|POS\s+VENDA|TRANSPORTE|\n\n))/i);
   if (execMatch) {
     orderInfo.executiveName = execMatch[1].trim();
     console.log('✅ Executivo:', orderInfo.executiveName);
@@ -233,17 +227,35 @@ function extractOrderHeader(text: string): ParsedOrderData['orderInfo'] {
   // Valores padrão
   orderInfo.priority = 'normal';
   
+  // Relatório de qualidade da extração
+  const extractedCount = [
+    orderInfo.orderNumber,
+    orderInfo.customerName,
+    orderInfo.deliveryAddress,
+    orderInfo.municipality,
+    orderInfo.carrier,
+    orderInfo.freightType,
+    orderInfo.operationCode,
+    orderInfo.executiveName,
+    orderInfo.customerDocument,
+    orderInfo.deliveryDate,
+    orderInfo.freightValue
+  ].filter(Boolean).length;
+  
   console.log('📊 Resumo da extração:', {
     pedido: !!orderInfo.orderNumber,
     cliente: !!orderInfo.customerName,
+    documento: !!orderInfo.customerDocument,
     endereco: !!orderInfo.deliveryAddress,
     municipio: !!orderInfo.municipality,
     transportadora: !!orderInfo.carrier,
     frete: !!orderInfo.freightType,
+    valorFrete: !!orderInfo.freightValue,
     operacao: !!orderInfo.operationCode,
     executivo: !!orderInfo.executiveName,
-    documento: !!orderInfo.customerDocument
+    dataEntrega: !!orderInfo.deliveryDate
   });
+  console.log(`✅ Campos extraídos: ${extractedCount}/11`);
   
   return orderInfo;
 }
