@@ -111,7 +111,7 @@ export const ImportOrderDialog = ({ open, onOpenChange, onImportSuccess }: Impor
           municipality: parsedData.orderInfo.municipality || null,
           delivery_date: convertDate(parsedData.orderInfo.deliveryDate)!,
           shipping_date: convertDate(parsedData.orderInfo.shippingDate || '') || null,
-          status: 'production',
+          status: 'pending',
           priority: parsedData.orderInfo.priority || 'normal',
           order_type: 'standard',
           notes: parsedData.orderInfo.notes || '',
@@ -125,6 +125,45 @@ export const ImportOrderDialog = ({ open, onOpenChange, onImportSuccess }: Impor
         .single();
 
       if (orderError) throw orderError;
+
+      // Fazer upload do PDF para o storage (se for PDF)
+      if (file && file.name.endsWith('.pdf')) {
+        try {
+          const timestamp = Date.now();
+          const sanitizedFileName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+          const filePath = `${order.id}/${timestamp}-${sanitizedFileName}`;
+          
+          const { error: uploadError } = await supabase.storage
+            .from('order-attachments')
+            .upload(filePath, file, {
+              cacheControl: '3600',
+              upsert: false
+            });
+          
+          if (uploadError) {
+            console.error('Erro ao fazer upload do PDF:', uploadError);
+            toast.warning('Pedido criado, mas não foi possível anexar o PDF');
+          } else {
+            // Registrar o anexo na tabela order_attachments
+            const { error: attachmentError } = await supabase
+              .from('order_attachments')
+              .insert({
+                order_id: order.id,
+                file_name: file.name,
+                file_path: filePath,
+                file_size: file.size,
+                file_type: file.type || 'application/pdf',
+                uploaded_by: user.id
+              });
+            
+            if (attachmentError) {
+              console.error('Erro ao registrar anexo:', attachmentError);
+            }
+          }
+        } catch (uploadErr) {
+          console.error('Erro no processo de upload:', uploadErr);
+        }
+      }
 
       // Inserir itens
       const itemsToInsert = parsedData.items.map(item => ({
@@ -151,7 +190,8 @@ export const ImportOrderDialog = ({ open, onOpenChange, onImportSuccess }: Impor
 
       if (itemsError) throw itemsError;
 
-      toast.success(`Pedido ${parsedData.orderInfo.orderNumber} importado com sucesso!`);
+      const pdfAttached = file?.name.endsWith('.pdf') ? ' PDF anexado automaticamente.' : '';
+      toast.success(`Pedido ${parsedData.orderInfo.orderNumber} criado na fase Preparação!${pdfAttached}`);
       onImportSuccess();
       onOpenChange(false);
       
