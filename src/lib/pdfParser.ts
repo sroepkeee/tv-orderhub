@@ -219,95 +219,82 @@ function extractItemsTable(text: string): ParsedOrderData['items'] {
   const tableText = text.substring(composicaoIndex);
   console.log('📋 Primeiras linhas da tabela:', tableText.substring(0, 500));
   
-  // Padrão 1: Tabela com pipes (formato TOTVS)
-  // Formato: | 01 | 052289 | 4,00 | PC | 785,85 | 0,00 | 5,00 | 18,00 | 3.143,40 | TINTA...
-  const itemRegex = /\|\s*(\d+)\s*\|\s*([\d]+)\s*\|\s*([\d,]+)\s*\|\s*([A-Z]+)\s*\|\s*([\d.,]+)\s*\|\s*([\d.,]+)\s*\|\s*([\d.,]+)\s*\|\s*([\d.,]+)\s*\|\s*([\d.,]+)\s*\|\s*([^\|]+?)(?=\s*\||\s*$)/gi;
+  // Padrão 1: Formato "Item XX Código XXX Qtde X,XX Uni XX V.Unit XXX" (texto corrido)
+  // Exemplo: Item 01   Código 061171 Qtde 2,00   Uni PC   V.Unit 154,41   Desc 0,00...
+  const itemTextRegex = /Item\s+(\d+)\s+C[óo]digo\s+(\d+)\s+Qtde\s+([\d,]+)\s+Uni\s+([A-Z]+)\s+V\.Unit\s+([\d.,]+)\s+Desc\s+([\d.,]+)\s+V\.\s*C\/\s*Desc\s+([\d.,]+)\s+NCM\s+\d+\s+%IPI\s+([\d.,]+)\s+Val\.\s*IPI\s+([\d.,]+)\s+%ICMS\s+([\d.,]+)\s+ICMS\s+([\d.,]+)\s+Total\s+([\d.,]+)\s+Total\s+c\/\s*IPI\s+([\d.,]+)\s+Armaz[ée]m\s+(\S+)\s+(?:Observa[çc][ãa]o\s+)?(?:Opera[çc][ãa]o\s+\S+\s+)?Descri[çc][ãa]o\s+(.+?)(?=Item\s+\d+\s+C[óo]digo|$)/gi;
   
   let match;
   let itemIndex = 1;
-  while ((match = itemRegex.exec(tableText)) !== null) {
-    const [, itemNum, codigo, qtd, unidade, vlrUnit, desc, ipi, icms, vlrMerc, descricao] = match;
+  while ((match = itemTextRegex.exec(tableText)) !== null) {
+    const [, itemNum, codigo, qtd, unidade, vlrUnit, desc, vlrComDesc, ipi, vlrIpi, icmsPercent, icmsValor, total, totalComIpi, armazem, descricao] = match;
     
     items.push({
       itemNumber: String(itemIndex++),
       itemCode: codigo.trim(),
       description: descricao.trim(),
-      quantity: parseFloat(qtd.replace(',', '.')),
+      quantity: Math.round(parseFloat(qtd.replace(',', '.'))), // Arredondar para inteiro
       unit: unidade.trim(),
-      warehouse: 'PRINCIPAL',
-      deliveryDate: '', // Será preenchido com a data do pedido na importação
+      warehouse: armazem.trim(),
+      deliveryDate: '',
       sourceType: 'in_stock',
       unitPrice: parseFloat(vlrUnit.replace(/\./g, '').replace(',', '.')),
       discount: parseFloat(desc.replace(',', '.')),
       ipiPercent: parseFloat(ipi.replace(',', '.')),
-      icmsPercent: parseFloat(icms.replace(',', '.')),
-      totalValue: parseFloat(vlrMerc.replace(/\./g, '').replace(',', '.'))
+      icmsPercent: parseFloat(icmsPercent.replace(',', '.')),
+      totalValue: parseFloat(total.replace(/\./g, '').replace(',', '.'))
     });
   }
   
-  // Padrão 2: Tabela sem pipes (fallback)
+  // Padrão 2: Tabela com pipes (formato TOTVS tradicional)
   if (items.length === 0) {
-    console.warn('⚠️ Tentando padrão alternativo sem pipes');
-    const lines = tableText.split('\n');
+    console.warn('⚠️ Tentando padrão com pipes');
+    const itemRegex = /\|\s*(\d+)\s*\|\s*([\d]+)\s*\|\s*([\d,]+)\s*\|\s*([A-Z]+)\s*\|\s*([\d.,]+)\s*\|\s*([\d.,]+)\s*\|\s*([\d.,]+)\s*\|\s*([\d.,]+)\s*\|\s*([\d.,]+)\s*\|\s*([^\|]+?)(?=\s*\||\s*$)/gi;
     
-    for (const line of lines) {
-      // Padrão mais flexível: código (6 dígitos) seguido de quantidade, unidade e valores
-      const flexMatch = line.match(/(\d{6})\s+([\d,]+)\s+([A-Z]{2,3})\s+([\d.,]+)/);
-      if (flexMatch) {
-        const [, codigo, qtd, unidade, vlrUnit] = flexMatch;
-        
-        // Extrair descrição (texto após os números)
-        const descMatch = line.match(/[A-Z]{2,3}\s+[\d.,]+\s+[\d.,]+\s+[\d.,]+\s+[\d.,]+\s+[\d.,]+\s+(.+)$/);
-        
-        items.push({
-          itemNumber: String(items.length + 1),
-          itemCode: codigo.trim(),
-          description: descMatch ? descMatch[1].trim() : 'Produto',
-          quantity: parseFloat(qtd.replace(',', '.')),
-          unit: unidade.trim(),
-          warehouse: 'PRINCIPAL',
-          deliveryDate: '',
-          sourceType: 'in_stock',
-          unitPrice: parseFloat(vlrUnit.replace(/\./g, '').replace(',', '.')),
-          discount: 0,
-          ipiPercent: 0,
-          icmsPercent: 0,
-          totalValue: 0
-        });
-      }
+    while ((match = itemRegex.exec(tableText)) !== null) {
+      const [, itemNum, codigo, qtd, unidade, vlrUnit, desc, ipi, icms, vlrMerc, descricao] = match;
+      
+      items.push({
+        itemNumber: String(itemIndex++),
+        itemCode: codigo.trim(),
+        description: descricao.trim(),
+        quantity: Math.round(parseFloat(qtd.replace(',', '.'))),
+        unit: unidade.trim(),
+        warehouse: 'PRINCIPAL',
+        deliveryDate: '',
+        sourceType: 'in_stock',
+        unitPrice: parseFloat(vlrUnit.replace(/\./g, '').replace(',', '.')),
+        discount: parseFloat(desc.replace(',', '.')),
+        ipiPercent: parseFloat(ipi.replace(',', '.')),
+        icmsPercent: parseFloat(icms.replace(',', '.')),
+        totalValue: parseFloat(vlrMerc.replace(/\./g, '').replace(',', '.'))
+      });
     }
   }
   
-  // Padrão 3: Buscar qualquer linha com código de produto (6 dígitos) e descrição
+  // Padrão 3: Simplificado - buscar código e quantidade
   if (items.length === 0) {
-    console.warn('⚠️ Tentando padrão ultra-flexível (código + texto)');
-    const lines = tableText.split('\n');
+    console.warn('⚠️ Tentando padrão simplificado');
+    // Buscar sequências: Código XXXXXX Qtde X,XX
+    const simpleRegex = /C[óo]digo\s+(\d+)\s+Qtde\s+([\d,]+)\s+Uni\s+([A-Z]+)/gi;
     
-    for (const line of lines) {
-      // Qualquer linha com código de 6 dígitos seguido de texto
-      const ultraMatch = line.match(/(\d{6})\s+(.+)/);
-      if (ultraMatch) {
-        const [, codigo, resto] = ultraMatch;
-        
-        // Tentar extrair quantidade e unidade do resto
-        const qtyMatch = resto.match(/([\d,]+)\s+([A-Z]{2,3})/);
-        
-        items.push({
-          itemNumber: String(items.length + 1),
-          itemCode: codigo.trim(),
-          description: resto.substring(0, 100).trim(),
-          quantity: qtyMatch ? parseFloat(qtyMatch[1].replace(',', '.')) : 1,
-          unit: qtyMatch ? qtyMatch[2].trim() : 'UN',
-          warehouse: 'PRINCIPAL',
-          deliveryDate: '',
-          sourceType: 'in_stock',
-          unitPrice: 0,
-          discount: 0,
-          ipiPercent: 0,
-          icmsPercent: 0,
-          totalValue: 0
-        });
-      }
+    while ((match = simpleRegex.exec(tableText)) !== null) {
+      const [, codigo, qtd, unidade] = match;
+      
+      items.push({
+        itemNumber: String(items.length + 1),
+        itemCode: codigo.trim(),
+        description: 'Produto',
+        quantity: Math.round(parseFloat(qtd.replace(',', '.'))),
+        unit: unidade.trim(),
+        warehouse: 'PRINCIPAL',
+        deliveryDate: '',
+        sourceType: 'in_stock',
+        unitPrice: 0,
+        discount: 0,
+        ipiPercent: 0,
+        icmsPercent: 0,
+        totalValue: 0
+      });
     }
   }
   
