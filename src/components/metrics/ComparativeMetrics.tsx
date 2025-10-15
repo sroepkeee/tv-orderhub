@@ -12,11 +12,11 @@ interface ComparativeMetricsProps {
 
 export function ComparativeMetrics({ orders }: ComparativeMetricsProps) {
   const now = new Date();
-  const daysAgo30 = subDays(now, 30);
+  const daysAgo60 = subDays(now, 60);
   
-  // Gerar todos os dias dos últimos 30 dias
+  // Gerar todos os dias dos últimos 60 dias
   const days = eachDayOfInterval({
-    start: daysAgo30,
+    start: daysAgo60,
     end: now
   });
 
@@ -68,7 +68,7 @@ export function ComparativeMetrics({ orders }: ComparativeMetricsProps) {
           <CardTitle>Evolução Diária de Pedidos</CardTitle>
         </div>
         <CardDescription>
-          Comparativo dos últimos 30 dias - Total, Concluídos e Em Produção
+          Comparativo dos últimos 60 dias - Total, Concluídos e Em Produção
         </CardDescription>
       </CardHeader>
       <CardContent>
