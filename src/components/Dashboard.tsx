@@ -15,7 +15,6 @@ import { PhaseButtons } from "./PhaseButtons";
 import { ColumnSettings, ColumnVisibility } from "./ColumnSettings";
 import { DateRangeFilter } from "./DateRangeFilter";
 import { UserMenu } from "./UserMenu";
-import { ImportOrdersButton } from "./ImportOrdersButton";
 
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
@@ -982,7 +981,6 @@ export const Dashboard = () => {
             <BarChart3 className="h-4 w-4" />
             Indicadores
           </Button>
-          <ImportOrdersButton />
           <UserMenu />
           <AddOrderDialog onAddOrder={handleAddOrder} />
         </div>
