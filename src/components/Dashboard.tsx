@@ -578,6 +578,13 @@ export const Dashboard = () => {
           order_type: updatedOrder.type,
           notes: updatedOrder.deskTicket,
           totvs_order_number: updatedOrder.totvsOrderNumber || null,
+          customer_document: (updatedOrder as any).customerDocument || null,
+          municipality: (updatedOrder as any).municipality || null,
+          operation_code: (updatedOrder as any).operationCode || null,
+          executive_name: (updatedOrder as any).executiveName || null,
+          carrier_name: (updatedOrder as any).carrierName || null,
+          freight_type: (updatedOrder as any).freightType || null,
+          freight_value: (updatedOrder as any).freightValue || null,
         })
         .eq('id', updatedOrder.id)
         .select('id')

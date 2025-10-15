@@ -371,7 +371,17 @@ export const EditOrderDialog = ({ order, open, onOpenChange, onSave, onDelete }:
 
   useEffect(() => {
     if (open && order) {
-      reset(order);
+      const orderData = {
+        ...order,
+        customerDocument: (order as any).customer_document,
+        municipality: (order as any).municipality,
+        operationCode: (order as any).operation_code,
+        executiveName: (order as any).executive_name,
+        carrierName: (order as any).carrier_name,
+        freightType: (order as any).freight_type,
+        freightValue: (order as any).freight_value,
+      };
+      reset(orderData);
       setItems(order.items || []);
       setActiveTab("edit");
       setShowCommentInput(false);
