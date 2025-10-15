@@ -279,7 +279,10 @@ export const Dashboard = () => {
             requestedQuantity: item.requested_quantity,
             warehouse: item.warehouse,
             deliveryDate: item.delivery_date,
-            deliveredQuantity: item.delivered_quantity
+            deliveredQuantity: item.delivered_quantity,
+            item_source_type: item.item_source_type as 'in_stock' | 'production' | 'out_of_stock',
+            received_status: item.received_status as 'pending' | 'partial' | 'completed',
+            production_estimated_date: item.production_estimated_date
           }));
 
           const totalRequested = items.reduce((sum, item) => sum + item.requestedQuantity, 0);
@@ -454,7 +457,10 @@ export const Dashboard = () => {
           requested_quantity: item.requestedQuantity,
           warehouse: item.warehouse,
           delivery_date: item.deliveryDate,
-          delivered_quantity: item.deliveredQuantity
+          delivered_quantity: item.deliveredQuantity,
+          item_source_type: item.item_source_type || 'in_stock',
+          received_status: item.received_status || 'pending',
+          production_estimated_date: item.production_estimated_date || null
         }));
 
       const { error: itemsError } = await supabase
