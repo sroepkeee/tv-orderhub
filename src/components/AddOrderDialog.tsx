@@ -22,6 +22,7 @@ export interface OrderItem {
   received_status?: 'pending' | 'partial' | 'completed';
   item_source_type?: 'in_stock' | 'production' | 'out_of_stock';
   production_estimated_date?: string;
+  userId?: string;
 }
 
 interface OrderFormData {

@@ -282,7 +282,8 @@ export const Dashboard = () => {
             deliveredQuantity: item.delivered_quantity,
             item_source_type: item.item_source_type as 'in_stock' | 'production' | 'out_of_stock',
             received_status: item.received_status as 'pending' | 'partial' | 'completed',
-            production_estimated_date: item.production_estimated_date
+            production_estimated_date: item.production_estimated_date,
+            userId: item.user_id
           }));
 
           const totalRequested = items.reduce((sum, item) => sum + item.requestedQuantity, 0);
@@ -557,17 +558,20 @@ export const Dashboard = () => {
 
       // Update items - handle existing, new, and deleted items
       if (updatedOrder.items) {
-        // Get existing item IDs from database
+        // Get existing item IDs and owners from database
         const { data: existingItems } = await supabase
           .from('order_items')
-          .select('id')
+          .select('id, user_id')
           .eq('order_id', updatedOrder.id);
 
-        const existingItemIds = new Set(existingItems?.map(item => item.id) || []);
-        const currentItemIds = new Set(updatedOrder.items.filter(item => item.id).map(item => item.id));
+        const existingItemIds = new Set((existingItems || []).map(item => item.id));
+        const currentItemIds = new Set(updatedOrder.items.filter(item => item.id).map(item => item.id as string));
 
-        // Delete items that are no longer in the list
-        const itemsToDelete = Array.from(existingItemIds).filter(id => !currentItemIds.has(id));
+        // Delete only items owned by current user and removed from the list
+        const itemsToDelete = (existingItems || [])
+          .filter(row => !currentItemIds.has(row.id) && row.user_id === user.id)
+          .map(row => row.id);
+
         if (itemsToDelete.length > 0) {
           const { error: deleteError } = await supabase
             .from('order_items')
@@ -577,10 +581,12 @@ export const Dashboard = () => {
           if (deleteError) throw deleteError;
         }
 
-        // Update existing items and insert new ones
+        // Update existing items (only own items) and insert new ones
         for (const item of updatedOrder.items) {
           if (item.id) {
-            // Update existing item
+            // Skip updating items not owned by current user (RLS)
+            if (item.userId && item.userId !== user.id) continue;
+
             const { error: updateError } = await supabase
               .from('order_items')
               .update({
@@ -599,7 +605,7 @@ export const Dashboard = () => {
 
             if (updateError) throw updateError;
           } else {
-            // Insert new item
+            // Insert new item (owned by current user)
             const { error: insertError } = await supabase
               .from('order_items')
               .insert({

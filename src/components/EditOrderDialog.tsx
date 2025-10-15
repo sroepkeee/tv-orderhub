@@ -65,6 +65,14 @@ export const EditOrderDialog = ({ order, open, onOpenChange, onSave }: EditOrder
   const [attachments, setAttachments] = useState<any[]>([]);
   const [loadingAttachments, setLoadingAttachments] = useState(false);
   const [uploadingAttachment, setUploadingAttachment] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      setCurrentUserId(user?.id || null);
+    });
+  }, [open]);
 
   // Load history from database
   const loadHistory = async () => {
@@ -422,6 +430,15 @@ export const EditOrderDialog = ({ order, open, onOpenChange, onSave }: EditOrder
   };
 
   const removeItem = (index: number) => {
+    const target = items[index];
+    if (target?.id && target?.userId && target.userId !== currentUserId) {
+      toast({
+        title: "Sem permissão para excluir",
+        description: "Este item foi criado por outro usuário e não pode ser removido.",
+        variant: "destructive",
+      });
+      return;
+    }
     setItems(items.filter((_, i) => i !== index));
   };
 
