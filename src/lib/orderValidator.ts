@@ -69,3 +69,36 @@ export function validateOrder(data: any): ValidationResult {
   
   return result;
 }
+
+export function validatePdfOrder(data: any): ValidationResult {
+  const result = validateOrder(data);
+  
+  // Validações específicas para PDF TOTVS
+  if (!data.orderInfo.operationCode) {
+    result.warnings.push("Código de operação não identificado no PDF");
+  }
+  
+  if (!data.orderInfo.executiveName) {
+    result.warnings.push("Nome do executivo não identificado");
+  }
+  
+  if (!data.orderInfo.customerDocument) {
+    result.warnings.push("CNPJ/CPF do cliente não identificado");
+  }
+  
+  // Verificar itens sem valores financeiros
+  const itemsWithoutPrice = data.items.filter((i: any) => !i.unitPrice || i.unitPrice === 0);
+  if (itemsWithoutPrice.length > 0) {
+    result.warnings.push(`${itemsWithoutPrice.length} item(ns) sem valor unitário`);
+  }
+  
+  // Qualidade da extração
+  if (data.quality) {
+    const qualityPercent = (data.quality.extractedFields / data.quality.totalFields) * 100;
+    if (qualityPercent < 70) {
+      result.warnings.push(`Qualidade da extração: ${qualityPercent.toFixed(0)}% - revise os dados`);
+    }
+  }
+  
+  return result;
+}

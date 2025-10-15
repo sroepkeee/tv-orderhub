@@ -4,7 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { parseExcelOrder, ParsedOrderData } from "@/lib/excelParser";
-import { validateOrder, ValidationResult } from "@/lib/orderValidator";
+import { parsePdfOrder } from "@/lib/pdfParser";
+import { validateOrder, validatePdfOrder, ValidationResult } from "@/lib/orderValidator";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Upload, FileSpreadsheet, CheckCircle2, XCircle, AlertTriangle, Download } from "lucide-react";
@@ -27,14 +28,14 @@ export const ImportOrderDialog = ({ open, onOpenChange, onImportSuccess }: Impor
     if (!selectedFile) return;
 
     // Validar tipo de arquivo
-    if (!selectedFile.name.match(/\.(xlsx|xls)$/i)) {
-      toast.error("Formato inválido. Use .xlsx ou .xls");
+    if (!selectedFile.name.match(/\.(xlsx|xls|pdf)$/i)) {
+      toast.error("Formato inválido. Use .xlsx, .xls ou .pdf");
       return;
     }
 
-    // Validar tamanho (máx 5MB)
-    if (selectedFile.size > 5 * 1024 * 1024) {
-      toast.error("Arquivo muito grande. Máximo: 5MB");
+    // Validar tamanho (máx 10MB)
+    if (selectedFile.size > 10 * 1024 * 1024) {
+      toast.error("Arquivo muito grande. Máximo: 10MB");
       return;
     }
 
@@ -42,11 +43,27 @@ export const ImportOrderDialog = ({ open, onOpenChange, onImportSuccess }: Impor
     setIsProcessing(true);
 
     try {
-      const parsed = await parseExcelOrder(selectedFile);
-      setParsedData(parsed);
-      
-      const validationResult = validateOrder(parsed);
-      setValidation(validationResult);
+      const fileExtension = selectedFile.name.split('.').pop()?.toLowerCase();
+      let parsed: any;
+      let validationResult: ValidationResult;
+
+      if (fileExtension === 'pdf') {
+        // Parse do PDF
+        parsed = await parsePdfOrder(selectedFile);
+        setParsedData(parsed);
+        
+        // Validar dados do PDF
+        validationResult = validatePdfOrder(parsed);
+        setValidation(validationResult);
+      } else {
+        // Parse do Excel
+        parsed = await parseExcelOrder(selectedFile);
+        setParsedData(parsed);
+        
+        // Validar dados
+        validationResult = validateOrder(parsed);
+        setValidation(validationResult);
+      }
       
       setStep('preview');
       
@@ -173,16 +190,27 @@ export const ImportOrderDialog = ({ open, onOpenChange, onImportSuccess }: Impor
           <div className="space-y-4">
             <div className="border-2 border-dashed rounded-lg p-8 text-center">
               <Upload className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+              <h3 className="text-lg font-medium mb-2">
+                Selecione um arquivo Excel ou PDF
+              </h3>
               <p className="text-sm text-muted-foreground mb-4">
-                Selecione um arquivo Excel (.xlsx) com os dados do pedido
+                <strong>PDF:</strong> Pedido exportado do TOTVS (recomendado)<br />
+                <strong>Excel:</strong> Arquivo com abas "PEDIDO" e "ITENS"
               </p>
               <Input
                 type="file"
-                accept=".xlsx,.xls"
+                accept=".xlsx,.xls,.pdf"
                 onChange={handleFileSelect}
                 className="max-w-xs mx-auto"
                 disabled={isProcessing}
               />
+              
+              <div className="mt-4 p-3 bg-muted rounded-md text-xs text-left max-w-md mx-auto">
+                <p className="font-medium mb-1">💡 Dica para PDFs:</p>
+                <p className="text-muted-foreground">
+                  Exporte direto do TOTVS usando "Imprimir → Salvar como PDF" para melhor qualidade
+                </p>
+              </div>
             </div>
 
             <Alert>
@@ -212,6 +240,61 @@ export const ImportOrderDialog = ({ open, onOpenChange, onImportSuccess }: Impor
         {/* STEP 2: PREVIEW */}
         {step === 'preview' && parsedData && validation && (
           <div className="space-y-4">
+            <div className="flex items-center gap-2 mb-4">
+              <CheckCircle2 className="h-5 w-5 text-green-600" />
+              <span className="font-medium">Arquivo: {file?.name}</span>
+              {file && (
+                <span className="px-2 py-1 rounded text-xs font-medium bg-primary/10 text-primary">
+                  {file.name.endsWith('.pdf') ? '📄 PDF TOTVS' : '📊 Excel'}
+                </span>
+              )}
+            </div>
+            
+            {/* Qualidade da Extração (apenas para PDF) */}
+            {file?.name.endsWith('.pdf') && (parsedData as any).quality && (
+              <Alert>
+                <AlertDescription>
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg">📊</span>
+                    <div className="flex-1">
+                      <strong>Qualidade da Extração:</strong>
+                      <div className="text-sm mt-2 space-y-1">
+                        <div className="flex items-center gap-2">
+                          {(parsedData as any).quality.orderNumber ? '✅' : '⚠️'}
+                          <span>Pedido: {parsedData.orderInfo.orderNumber || 'Não identificado'}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {(parsedData as any).quality.customerName ? '✅' : '⚠️'}
+                          <span>Cliente: {parsedData.orderInfo.customerName || 'Não identificado'}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {(parsedData as any).quality.itemsCount > 0 ? '✅' : '⚠️'}
+                          <span>Itens: {(parsedData as any).quality.itemsCount} encontrados</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {(parsedData as any).quality.itemsWithPrice === (parsedData as any).quality.itemsCount ? '✅' : '⚠️'}
+                          <span>Valores: {(parsedData as any).quality.itemsWithPrice}/{(parsedData as any).quality.itemsCount} itens com preço</span>
+                        </div>
+                        <div className="mt-2 pt-2 border-t">
+                          <div className="flex items-center gap-2">
+                            <div className="flex-1 bg-muted rounded-full h-2">
+                              <div 
+                                className="bg-primary h-2 rounded-full transition-all" 
+                                style={{ width: `${((parsedData as any).quality.extractedFields / (parsedData as any).quality.totalFields) * 100}%` }}
+                              />
+                            </div>
+                            <span className="text-sm font-medium">
+                              {Math.round(((parsedData as any).quality.extractedFields / (parsedData as any).quality.totalFields) * 100)}%
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </AlertDescription>
+              </Alert>
+            )}
+            
             {/* Erros */}
             {validation.errors.length > 0 && (
               <Alert variant="destructive">
