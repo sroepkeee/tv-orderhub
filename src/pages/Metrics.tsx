@@ -55,10 +55,11 @@ export default function Metrics() {
   const loadData = async () => {
     setLoading(true);
     try {
-      // Carregar pedidos
+      // Carregar apenas pedidos ativos (excluindo finalizados e cancelados)
       const { data: ordersData, error: ordersError } = await supabase
         .from('orders')
         .select('*')
+        .not('status', 'in', '(delivered,completed,cancelled)')
         .order('created_at', { ascending: false });
       
       if (ordersError) throw ordersError;
