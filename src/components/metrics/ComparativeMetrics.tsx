@@ -3,7 +3,7 @@ import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Legend } from "recharts";
 import type { Order } from "@/components/Dashboard";
 import { TrendingUp } from "lucide-react";
-import { startOfDay, endOfDay, eachDayOfInterval, format, subDays, isWithinInterval } from "date-fns";
+import { startOfWeek, endOfWeek, eachWeekOfInterval, format, subWeeks, isWithinInterval } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
 interface ComparativeMetricsProps {
@@ -12,34 +12,33 @@ interface ComparativeMetricsProps {
 
 export function ComparativeMetrics({ orders }: ComparativeMetricsProps) {
   const now = new Date();
-  const daysAgo60 = subDays(now, 60);
+  const weeksAgo8 = subWeeks(now, 8);
   
-  // Gerar todos os dias dos últimos 60 dias
-  const days = eachDayOfInterval({
-    start: daysAgo60,
+  // Gerar todas as semanas dos últimos 8 semanas
+  const weeks = eachWeekOfInterval({
+    start: weeksAgo8,
     end: now
   });
 
-  const chartData = days.map(day => {
-    const dayStart = startOfDay(day);
-    const dayEnd = endOfDay(day);
+  const chartData = weeks.map(weekStart => {
+    const weekEnd = endOfWeek(weekStart);
     
-    const ordersInDay = orders.filter(order => {
+    const ordersInWeek = orders.filter(order => {
       const orderDate = new Date(order.createdDate);
-      return isWithinInterval(orderDate, { start: dayStart, end: dayEnd });
+      return isWithinInterval(orderDate, { start: weekStart, end: weekEnd });
     });
 
-    const completedOrders = ordersInDay.filter(o => 
+    const completedOrders = ordersInWeek.filter(o => 
       o.status === 'completed' || o.status === 'delivered'
     ).length;
 
-    const inProductionOrders = ordersInDay.filter(o => 
+    const inProductionOrders = ordersInWeek.filter(o => 
       o.status === 'in_production' || o.status === 'separation_started'
     ).length;
 
     return {
-      week: format(day, 'dd/MM', { locale: ptBR }),
-      total: ordersInDay.length,
+      week: format(weekStart, 'dd/MMM', { locale: ptBR }),
+      total: ordersInWeek.length,
       concluidos: completedOrders,
       producao: inProductionOrders
     };
@@ -65,14 +64,14 @@ export function ComparativeMetrics({ orders }: ComparativeMetricsProps) {
       <CardHeader>
         <div className="flex items-center gap-2">
           <TrendingUp className="h-5 w-5 text-primary" />
-          <CardTitle>Evolução Diária de Pedidos</CardTitle>
+          <CardTitle>Evolução Semanal de Pedidos</CardTitle>
         </div>
         <CardDescription>
-          Comparativo dos últimos 60 dias - Total, Concluídos e Em Produção
+          Comparativo das últimas 8 semanas - Total, Concluídos e Em Produção
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <ChartContainer config={chartConfig} className="h-[500px]">
+        <ChartContainer config={chartConfig} className="h-[350px]">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={chartData}>
               <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
