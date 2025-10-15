@@ -728,8 +728,7 @@ export const Dashboard = () => {
       const { error } = await supabase
         .from('orders')
         .update({ status: "planned" })
-        .eq('id', orderId)
-        .eq('user_id', user.id);
+        .eq('id', orderId);
 
       if (error) throw error;
 
@@ -761,8 +760,7 @@ export const Dashboard = () => {
       const { error } = await supabase
         .from('orders')
         .update({ status: "cancelled" })
-        .eq('id', orderId)
-        .eq('user_id', user.id);
+        .eq('id', orderId);
 
       if (error) throw error;
 
@@ -795,8 +793,7 @@ export const Dashboard = () => {
       const { error } = await supabase
         .from('orders')
         .update({ status: newStatus })
-        .eq('id', orderId)
-        .eq('user_id', user.id);
+        .eq('id', orderId);
 
       if (error) throw error;
 
