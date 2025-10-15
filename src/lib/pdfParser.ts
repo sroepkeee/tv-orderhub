@@ -14,7 +14,8 @@ async function getPdfJs() {
     pdfjsLib = pdfjs;
     
     if (typeof window !== 'undefined') {
-      const workerUrl = (workerUrlMod as any).default || workerUrlMod;
+      const workerUrlRaw = (workerUrlMod as any).default ?? workerUrlMod;
+      const workerUrl = typeof workerUrlRaw === 'string' ? workerUrlRaw : String(workerUrlRaw);
       pdfjsLib.GlobalWorkerOptions.workerSrc = workerUrl;
       console.log('📄 PDF.js worker (local):', workerUrl);
     }
@@ -47,9 +48,8 @@ export async function parsePdfOrder(file: File): Promise<ParsedOrderData & { qua
     const errorMsg = String(e?.message || e);
     if (errorMsg.includes('Setting up fake worker failed') || errorMsg.includes('Failed to fetch')) {
       console.warn('⚠️ Worker falhou, tentando processamento inline...');
-      // Disable external worker and retry with inline processing
-      pdfjs.GlobalWorkerOptions.workerSrc = undefined as any;
-      pdf = await pdfjs.getDocument({ data: arrayBuffer }).promise;
+      // Retry with inline processing (disableWorker)
+      pdf = await pdfjs.getDocument({ data: arrayBuffer, disableWorker: true }).promise;
     } else {
       throw e;
     }
