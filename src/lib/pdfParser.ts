@@ -5,12 +5,19 @@ let pdfjsLib: any = null;
 
 async function getPdfJs() {
   if (!pdfjsLib) {
-    pdfjsLib = await import('pdfjs-dist');
-    // Use local worker from the package (no external CDN dependency)
-    pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
-      'pdfjs-dist/build/pdf.worker.mjs',
-      import.meta.url
-    ).toString();
+    // Load library and worker URL in parallel
+    const [pdfjs, workerUrlMod] = await Promise.all([
+      import('pdfjs-dist'),
+      import('pdfjs-dist/build/pdf.worker.min.mjs?url')
+    ]);
+    
+    pdfjsLib = pdfjs;
+    
+    if (typeof window !== 'undefined') {
+      const workerUrl = (workerUrlMod as any).default || workerUrlMod;
+      pdfjsLib.GlobalWorkerOptions.workerSrc = workerUrl;
+      console.log('📄 PDF.js worker (local):', workerUrl);
+    }
   }
   return pdfjsLib;
 }
@@ -31,7 +38,22 @@ export async function parsePdfOrder(file: File): Promise<ParsedOrderData & { qua
   const pdfjs = await getPdfJs();
   
   const arrayBuffer = await file.arrayBuffer();
-  const pdf = await pdfjs.getDocument({ data: arrayBuffer }).promise;
+  
+  // Try to load PDF with worker; fallback to inline processing if worker fails
+  let pdf;
+  try {
+    pdf = await pdfjs.getDocument({ data: arrayBuffer }).promise;
+  } catch (e: any) {
+    const errorMsg = String(e?.message || e);
+    if (errorMsg.includes('Setting up fake worker failed') || errorMsg.includes('Failed to fetch')) {
+      console.warn('⚠️ Worker falhou, tentando processamento inline...');
+      // Disable external worker and retry with inline processing
+      pdfjs.GlobalWorkerOptions.workerSrc = undefined as any;
+      pdf = await pdfjs.getDocument({ data: arrayBuffer }).promise;
+    } else {
+      throw e;
+    }
+  }
   
   let fullText = '';
   
