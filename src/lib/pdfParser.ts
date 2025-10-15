@@ -27,10 +27,11 @@ async function getPdfJs() {
 
       // Force PDF.js to use this local worker port
       pdfjsLib.GlobalWorkerOptions.workerPort = pdfWorker;
-      // Avoid using workerSrc/CDN paths
-      pdfjsLib.GlobalWorkerOptions.workerSrc = undefined as unknown as string;
+      // Also set a valid local workerSrc string (no CDN)
+      pdfjsLib.GlobalWorkerOptions.workerSrc = workerUrl;
 
       console.log('📄 PDF.js worker (port):', workerUrl);
+      console.log('📄 PDF.js workerSrc (local):', workerUrl);
     }
   }
   return pdfjsLib;
@@ -59,7 +60,7 @@ export async function parsePdfOrder(file: File): Promise<ParsedOrderData & { qua
     pdf = await pdfjs.getDocument({ data: arrayBuffer }).promise;
   } catch (e: any) {
     const errorMsg = String(e?.message || e);
-    if (errorMsg.includes('Setting up fake worker failed') || errorMsg.includes('Failed to fetch')) {
+    if (errorMsg.includes('Setting up fake worker failed') || errorMsg.includes('Failed to fetch') || errorMsg.includes('Invalid workerSrc type')) {
       console.warn('⚠️ Worker falhou, tentando processamento inline...');
       // Retry with inline processing (disableWorker)
       pdf = await pdfjs.getDocument({ data: arrayBuffer, disableWorker: true }).promise;
