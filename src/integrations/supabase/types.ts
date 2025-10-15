@@ -229,6 +229,57 @@ export type Database = {
           },
         ]
       }
+      order_item_history: {
+        Row: {
+          changed_at: string
+          field_changed: string
+          id: string
+          new_value: string
+          notes: string | null
+          old_value: string | null
+          order_id: string
+          order_item_id: string
+          user_id: string
+        }
+        Insert: {
+          changed_at?: string
+          field_changed: string
+          id?: string
+          new_value: string
+          notes?: string | null
+          old_value?: string | null
+          order_id: string
+          order_item_id: string
+          user_id: string
+        }
+        Update: {
+          changed_at?: string
+          field_changed?: string
+          id?: string
+          new_value?: string
+          notes?: string | null
+          old_value?: string | null
+          order_id?: string
+          order_item_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_item_history_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_item_history_order_item_id_fkey"
+            columns: ["order_item_id"]
+            isOneToOne: false
+            referencedRelation: "order_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       order_items: {
         Row: {
           created_at: string

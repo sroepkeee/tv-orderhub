@@ -26,10 +26,19 @@ import { ConfirmationDialog } from "./ConfirmationDialog";
 interface HistoryEvent {
   id: string;
   changed_at: string;
-  old_status: string;
-  new_status: string;
+  old_status?: string;
+  new_status?: string;
   user_id: string;
   user_name?: string;
+  type?: 'order' | 'item';
+  field_changed?: string;
+  old_value?: string;
+  new_value?: string;
+  notes?: string;
+  order_items?: {
+    item_code: string;
+    item_description: string;
+  };
 }
 
 interface OrderComment {
@@ -91,26 +100,40 @@ export const EditOrderDialog = ({ order, open, onOpenChange, onSave, onDelete }:
     });
   }, [open]);
 
-  // Load history from database
+  // Load history from database (order + items)
   const loadHistory = async () => {
     if (!order?.id) return;
     
     setLoadingHistory(true);
     try {
-      const { data: historyData, error } = await supabase
+      // Histórico do pedido
+      const { data: orderHistory, error: orderError } = await supabase
         .from('order_history')
         .select('*')
         .eq('order_id', order.id)
         .order('changed_at', { ascending: false });
 
-      if (error) throw error;
+      if (orderError) throw orderError;
 
-      // Load user profiles for history events
-      const userIds = [...new Set(
-        historyData
-          ?.filter(h => h.user_id && h.user_id !== '00000000-0000-0000-0000-000000000000')
-          ?.map(h => h.user_id) || []
-      )];
+      // NOVO: Histórico dos itens
+      const { data: itemHistory, error: itemError } = await supabase
+        .from('order_item_history')
+        .select(`
+          *,
+          order_items(item_code, item_description)
+        `)
+        .eq('order_id', order.id)
+        .order('changed_at', { ascending: false });
+
+      if (itemError) console.error("Error loading item history:", itemError);
+
+      // Load user profiles for all events
+      const allUserIds = [
+        ...(orderHistory?.filter(h => h.user_id && h.user_id !== '00000000-0000-0000-0000-000000000000')
+          .map(h => h.user_id) || []),
+        ...(itemHistory?.map(h => h.user_id) || [])
+      ];
+      const userIds = [...new Set(allUserIds)];
 
       let profiles: any[] = [];
       if (userIds.length > 0) {
@@ -122,8 +145,8 @@ export const EditOrderDialog = ({ order, open, onOpenChange, onSave, onDelete }:
         profiles = profilesData || [];
       }
 
-      // Combine history with user names
-      const historyWithNames = historyData?.map(event => {
+      // Mesclar histórico de pedidos e itens
+      const orderHistoryWithNames = orderHistory?.map(event => {
         let userName = 'Sistema';
         
         if (event.user_id === '00000000-0000-0000-0000-000000000000') {
@@ -135,11 +158,27 @@ export const EditOrderDialog = ({ order, open, onOpenChange, onSave, onDelete }:
         
         return {
           ...event,
-          user_name: userName
+          user_name: userName,
+          type: 'order' as const
         };
       }) || [];
 
-      setHistoryEvents(historyWithNames);
+      const itemHistoryWithNames = itemHistory?.map(event => {
+        const profile = profiles.find(p => p.id === event.user_id);
+        const userName = profile?.full_name || profile?.email || 'Usuário';
+        
+        return {
+          ...event,
+          user_name: userName,
+          type: 'item' as const
+        };
+      }) || [];
+
+      // Combinar e ordenar por data
+      const combined = [...orderHistoryWithNames, ...itemHistoryWithNames]
+        .sort((a, b) => new Date(b.changed_at).getTime() - new Date(a.changed_at).getTime());
+
+      setHistoryEvents(combined);
     } catch (error) {
       console.error("Error loading history:", error);
     } finally {
@@ -516,7 +555,35 @@ export const EditOrderDialog = ({ order, open, onOpenChange, onSave, onDelete }:
     setItems(items.filter((_, i) => i !== index));
   };
 
-  const updateItem = (index: number, field: keyof OrderItem, value: any) => {
+  // NOVO: Registrar mudança de item no histórico
+  const recordItemChange = async (
+    itemId: string,
+    field: 'received_status' | 'delivered_quantity' | 'item_source_type',
+    oldValue: any,
+    newValue: any,
+    notes?: string
+  ) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      console.log(`📝 Registrando mudança: ${field} de "${oldValue}" para "${newValue}"`);
+
+      await supabase.from('order_item_history').insert({
+        order_item_id: itemId,
+        order_id: order.id,
+        user_id: user.id,
+        field_changed: field,
+        old_value: String(oldValue),
+        new_value: String(newValue),
+        notes: notes || null
+      });
+    } catch (error) {
+      console.error("Error recording item change:", error);
+    }
+  };
+
+  const updateItem = async (index: number, field: keyof OrderItem, value: any) => {
     const oldItem = items[index];
     const newItems = [...items];
     newItems[index] = { ...newItems[index], [field]: value };
@@ -533,13 +600,47 @@ export const EditOrderDialog = ({ order, open, onOpenChange, onSave, onDelete }:
       return; // Não atualizar ainda
     }
     
+    // NOVO: Registrar mudança de situação (item_source_type)
+    if (field === 'item_source_type' && oldItem.item_source_type !== value && oldItem.id) {
+      console.log(`🔄 Situação mudou: ${oldItem.item_source_type} → ${value}`);
+      
+      // Salvar no banco
+      const { error } = await supabase
+        .from('order_items')
+        .update({ item_source_type: value })
+        .eq('id', oldItem.id);
+      
+      if (!error) {
+        await recordItemChange(
+          oldItem.id, 
+          'item_source_type', 
+          oldItem.item_source_type || 'in_stock', 
+          value,
+          `Situação alterada`
+        );
+        
+        toast({
+          title: "✅ Situação atualizada",
+          description: `Item agora está: ${value === 'in_stock' ? 'Em Estoque' : value === 'production' ? 'Em Produção' : 'Sem Estoque'}`
+        });
+        
+        // Recarregar histórico
+        loadHistory();
+      }
+    }
+    
     setItems(newItems);
   };
 
   // Update received quantity and status
   const handleUpdateReceivedQuantity = async (itemId: string, receivedQty: number, requestedQty: number) => {
-    let newStatus = 'pending';
+    const currentItem = items.find(i => i.id === itemId);
+    if (!currentItem) return;
+
+    const oldQty = currentItem.deliveredQuantity;
+    const oldStatus = currentItem.received_status || 'pending';
     
+    let newStatus = 'pending';
     if (receivedQty === 0) {
       newStatus = 'pending';
     } else if (receivedQty < requestedQty) {
@@ -558,6 +659,16 @@ export const EditOrderDialog = ({ order, open, onOpenChange, onSave, onDelete }:
         .eq('id', itemId);
         
       if (error) throw error;
+      
+      // NOVO: Registrar histórico de quantidade
+      if (oldQty !== receivedQty) {
+        await recordItemChange(itemId, 'delivered_quantity', oldQty, receivedQty);
+      }
+      
+      // NOVO: Registrar histórico de status
+      if (oldStatus !== newStatus) {
+        await recordItemChange(itemId, 'received_status', oldStatus, newStatus);
+      }
       
       // Reload items from database
       const { data: updatedItems } = await supabase
@@ -583,9 +694,12 @@ export const EditOrderDialog = ({ order, open, onOpenChange, onSave, onDelete }:
       }
       
       toast({
-        title: "Quantidade atualizada",
-        description: "O status de recebimento foi atualizado."
+        title: "✅ Quantidade atualizada",
+        description: `${receivedQty} de ${requestedQty} recebidos. Status: ${newStatus === 'completed' ? 'Completo' : newStatus === 'partial' ? 'Parcial' : 'Pendente'}`
       });
+      
+      // Recarregar histórico
+      loadHistory();
     } catch (error) {
       console.error("Error updating received quantity:", error);
       toast({
@@ -1605,19 +1719,57 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                     {historyEvents.map((event) => (
                       <div key={event.id} className="flex gap-4 p-4 border rounded-lg">
                         <div className="flex-shrink-0">
-                          {getEventIcon(event.old_status, event.new_status)}
+                          {event.type === 'order' 
+                            ? getEventIcon(event.old_status, event.new_status)
+                            : <Package className="h-5 w-5 text-blue-600" />
+                          }
                         </div>
                         <div className="flex-1 space-y-2">
-                          <div className="flex items-center justify-between">
-                            <h4 className="font-medium">Mudança de Status</h4>
-                            <Badge variant={getEventBadgeVariant(event.new_status)} className="text-xs">
-                              {getStatusLabel(event.new_status)}
-                            </Badge>
-                          </div>
-                          <p className="text-sm text-muted-foreground">
-                            De <span className="font-medium">{getStatusLabel(event.old_status)}</span> para{" "}
-                            <span className="font-medium">{getStatusLabel(event.new_status)}</span>
-                          </p>
+                          {event.type === 'order' ? (
+                            <>
+                              <div className="flex items-center justify-between">
+                                <h4 className="font-medium">Mudança de Status</h4>
+                                <Badge variant={getEventBadgeVariant(event.new_status)} className="text-xs">
+                                  {getStatusLabel(event.new_status)}
+                                </Badge>
+                              </div>
+                              <p className="text-sm text-muted-foreground">
+                                De <span className="font-medium">{getStatusLabel(event.old_status)}</span> para{" "}
+                                <span className="font-medium">{getStatusLabel(event.new_status)}</span>
+                              </p>
+                            </>
+                          ) : (
+                            <>
+                              <div className="flex items-center justify-between">
+                                <h4 className="font-medium flex items-center gap-2">
+                                  <Badge variant="secondary" className="text-xs">
+                                    {event.order_items?.item_code}
+                                  </Badge>
+                                  <span className="text-sm text-muted-foreground">
+                                    {event.field_changed === 'received_status' && '📦 Status de recebimento'}
+                                    {event.field_changed === 'delivered_quantity' && '📊 Quantidade recebida'}
+                                    {event.field_changed === 'item_source_type' && '📍 Situação'}
+                                  </span>
+                                </h4>
+                              </div>
+                              <p className="text-sm text-muted-foreground">
+                                {event.field_changed === 'received_status' && (
+                                  <>De <span className="font-medium">{event.old_value === 'pending' ? 'Pendente' : event.old_value === 'partial' ? 'Parcial' : 'Completo'}</span> para <span className="font-medium">{event.new_value === 'pending' ? 'Pendente' : event.new_value === 'partial' ? 'Parcial' : 'Completo'}</span></>
+                                )}
+                                {event.field_changed === 'delivered_quantity' && (
+                                  <>De <span className="font-medium">{event.old_value}</span> para <span className="font-medium">{event.new_value}</span> unidades</>
+                                )}
+                                {event.field_changed === 'item_source_type' && (
+                                  <>De <span className="font-medium">{event.old_value === 'in_stock' ? 'Estoque' : event.old_value === 'production' ? 'Produção' : 'Sem Estoque'}</span> para <span className="font-medium">{event.new_value === 'in_stock' ? 'Estoque' : event.new_value === 'production' ? 'Produção' : 'Sem Estoque'}</span></>
+                                )}
+                              </p>
+                              {event.notes && (
+                                <p className="text-xs text-muted-foreground italic">
+                                  {event.notes}
+                                </p>
+                              )}
+                            </>
+                          )}
                           <div className="flex items-center gap-4 text-xs text-muted-foreground">
                             <span className="flex items-center gap-1">
                               <Calendar className="h-3 w-3" />
