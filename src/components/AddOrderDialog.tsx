@@ -81,29 +81,25 @@ export const AddOrderDialog = ({ onAddOrder }: AddOrderDialogProps) => {
   };
 
   const onSubmit = (data: OrderFormData) => {
-    if (items.length === 0) {
+    const hasItems = items.length > 0;
+    const hasPdf = selectedPdfFile !== null;
+    
+    if (!hasItems && !hasPdf) {
       toast({
-        title: "Erro",
-        description: "Adicione pelo menos um item ao pedido.",
+        title: "Dados incompletos",
+        description: "Você deve adicionar itens manualmente OU anexar o pedido em PDF.",
         variant: "destructive"
       });
       return;
     }
 
-    if (!selectedPdfFile) {
-      toast({
-        title: "PDF obrigatório",
-        description: "Anexe o pedido em PDF para continuar.",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    const orderData = { ...data, items, pdfFile: selectedPdfFile };
+    const orderData = { ...data, items, pdfFile: selectedPdfFile || undefined };
     onAddOrder(orderData);
+    
+    const itemsText = hasItems ? `${items.length} item(ns)` : "PDF anexado";
     toast({
       title: "Pedido criado com sucesso!",
-      description: `Novo ${getTypeLabel(data.type)} foi adicionado com ${items.length} item(ns).`,
+      description: `Novo ${getTypeLabel(data.type)} foi adicionado com ${itemsText}.`,
     });
     reset();
     setItems([]);
@@ -201,6 +197,9 @@ export const AddOrderDialog = ({ onAddOrder }: AddOrderDialogProps) => {
                 Adicionar Item
               </Button>
             </div>
+            <p className="text-xs text-muted-foreground">
+              Opcional se você anexar o PDF do pedido
+            </p>
 
             {items.length === 0 ? (
               <Card className="p-6 text-center text-muted-foreground">
@@ -337,14 +336,14 @@ export const AddOrderDialog = ({ onAddOrder }: AddOrderDialogProps) => {
             )}
           </div>
 
-          {/* Anexar PDF Obrigatório */}
+          {/* Anexar PDF */}
           <div className="space-y-2 border-t pt-4">
             <Label className="text-lg font-semibold flex items-center gap-2">
               <FileText className="h-5 w-5" />
-              Anexar Pedido PDF <span className="text-red-500">*</span>
+              Anexar Pedido PDF
             </Label>
             <p className="text-sm text-muted-foreground">
-              Anexe o pedido ou itens do pedido em formato PDF (máx. 10MB)
+              Anexe o pedido em PDF (opcional se você adicionar itens manualmente) - máx. 10MB
             </p>
             
             <Card className="p-4">
@@ -413,7 +412,7 @@ export const AddOrderDialog = ({ onAddOrder }: AddOrderDialogProps) => {
               
               {!selectedPdfFile && (
                 <p className="text-xs text-muted-foreground mt-2">
-                  ⚠️ O anexo do PDF é obrigatório para criar o pedido
+                  💡 Dica: Anexe o PDF OU adicione os itens manualmente acima
                 </p>
               )}
             </Card>
