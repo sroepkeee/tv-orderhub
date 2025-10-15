@@ -76,6 +76,13 @@ export const EditOrderDialog = ({ order, open, onOpenChange, onSave, onDelete }:
   const [dateChangeCategory, setDateChangeCategory] = useState<string>("other");
   const [dateChangeReason, setDateChangeReason] = useState("");
   const [factoryFollowupRequired, setFactoryFollowupRequired] = useState(false);
+  const [showItemDateChangeDialog, setShowItemDateChangeDialog] = useState(false);
+  const [pendingItemDateChange, setPendingItemDateChange] = useState<{
+    itemId: string;
+    oldDate: string;
+    newDate: string;
+    itemIndex: number;
+  } | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -453,8 +460,22 @@ export const EditOrderDialog = ({ order, open, onOpenChange, onSave, onDelete }:
   };
 
   const updateItem = (index: number, field: keyof OrderItem, value: any) => {
+    const oldItem = items[index];
     const newItems = [...items];
     newItems[index] = { ...newItems[index], [field]: value };
+    
+    // NOVO: Detectar mudança de deliveryDate em itens
+    if (field === 'deliveryDate' && oldItem.deliveryDate !== value && oldItem.id) {
+      setPendingItemDateChange({
+        itemId: oldItem.id,
+        oldDate: oldItem.deliveryDate,
+        newDate: value,
+        itemIndex: index
+      });
+      setShowItemDateChangeDialog(true);
+      return; // Não atualizar ainda
+    }
+    
     setItems(newItems);
   };
 
@@ -834,6 +855,19 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
     
     // Check if delivery date changed
     if (order.deliveryDeadline !== data.deliveryDeadline) {
+      const oldDate = new Date(order.deliveryDeadline);
+      const newDate = new Date(data.deliveryDeadline);
+      const diffDays = Math.ceil((newDate.getTime() - oldDate.getTime()) / (1000 * 60 * 60 * 24));
+      
+      // Validação: Atrasos >= 3 dias exigem categorização
+      if (Math.abs(diffDays) >= 3) {
+        setPendingOrderData(updatedOrder);
+        setShowDateChangeDialog(true);
+        setDateChangeCategory("other"); // Reset para forçar seleção
+        setDateChangeReason(""); // Forçar preenchimento
+        return;
+      }
+      
       setPendingOrderData(updatedOrder);
       setShowDateChangeDialog(true);
       return;
@@ -847,35 +881,30 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
     if (!pendingOrderData) return;
     
     try {
-      // Save the order first
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Usuário não autenticado");
+      
+      // NOVO: Inserir mudança de data DIRETAMENTE (sem setTimeout)
+      const { error: changeError } = await supabase
+        .from('delivery_date_changes')
+        .insert({
+          order_id: order.id,
+          order_item_id: null, // Mudança do pedido completo, não de item
+          old_date: order.deliveryDeadline,
+          new_date: pendingOrderData.deliveryDeadline,
+          changed_by: user.id,
+          change_source: 'manual',
+          change_category: dateChangeCategory,
+          reason: dateChangeReason || null,
+          factory_followup_required: factoryFollowupRequired
+        });
+      
+      if (changeError) throw changeError;
+      
+      // Agora salvar o pedido
       onSave(pendingOrderData);
       
-      // If it's a factory delay, update the delivery_date_changes record with category
-      if (order.deliveryDeadline !== pendingOrderData.deliveryDeadline) {
-        // The trigger will create the record, but we need to update it with category info
-        // Wait a bit for the trigger to fire
-        setTimeout(async () => {
-          const { data: changes } = await supabase
-            .from('delivery_date_changes')
-            .select('id')
-            .eq('order_id', order.id)
-            .eq('new_date', pendingOrderData.deliveryDeadline)
-            .order('changed_at', { ascending: false })
-            .limit(1);
-          
-          if (changes && changes.length > 0) {
-            await supabase
-              .from('delivery_date_changes')
-              .update({
-                change_category: dateChangeCategory,
-                reason: dateChangeReason || null,
-                factory_followup_required: factoryFollowupRequired
-              })
-              .eq('id', changes[0].id);
-          }
-        }, 500);
-      }
-      
+      // Reset e fechar
       setShowDateChangeDialog(false);
       setPendingOrderData(null);
       setDateChangeCategory("other");
@@ -885,13 +914,71 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
       
       toast({
         title: "Pedido atualizado",
-        description: "As alterações foram salvas com sucesso."
+        description: "Mudança de prazo registrada com sucesso."
       });
     } catch (error) {
-      console.error("Error saving order:", error);
+      console.error("Error saving date change:", error);
       toast({
         title: "Erro",
-        description: "Não foi possível salvar as alterações.",
+        description: "Não foi possível salvar a mudança de prazo.",
+        variant: "destructive"
+      });
+    }
+  };
+  
+  const handleItemDateChangeSubmit = async () => {
+    if (!pendingItemDateChange) return;
+    
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Usuário não autenticado");
+      
+      // Inserir diretamente na tabela delivery_date_changes
+      const { error } = await supabase
+        .from('delivery_date_changes')
+        .insert({
+          order_item_id: pendingItemDateChange.itemId,
+          order_id: order.id,
+          old_date: pendingItemDateChange.oldDate,
+          new_date: pendingItemDateChange.newDate,
+          changed_by: user.id,
+          change_source: 'manual',
+          change_category: dateChangeCategory,
+          reason: dateChangeReason || null,
+          factory_followup_required: factoryFollowupRequired
+        });
+      
+      if (error) throw error;
+      
+      // Agora sim atualizar o item no banco
+      const { error: updateError } = await supabase
+        .from('order_items')
+        .update({ delivery_date: pendingItemDateChange.newDate })
+        .eq('id', pendingItemDateChange.itemId);
+      
+      if (updateError) throw updateError;
+      
+      // Atualizar estado local
+      const newItems = [...items];
+      newItems[pendingItemDateChange.itemIndex].deliveryDate = pendingItemDateChange.newDate;
+      setItems(newItems);
+      
+      // Reset states
+      setShowItemDateChangeDialog(false);
+      setPendingItemDateChange(null);
+      setDateChangeCategory("other");
+      setDateChangeReason("");
+      setFactoryFollowupRequired(false);
+      
+      toast({
+        title: "Item atualizado",
+        description: "Mudança de prazo registrada com sucesso."
+      });
+    } catch (error) {
+      console.error("Error saving item date change:", error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível salvar a mudança de prazo.",
         variant: "destructive"
       });
     }
@@ -1780,6 +1867,76 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
         confirmText={deleting ? "Excluindo..." : "Sim, excluir"}
         cancelText="Cancelar"
       />
+
+      {/* Date Change Category Dialog for Items */}
+      <Dialog open={showItemDateChangeDialog} onOpenChange={setShowItemDateChangeDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>📅 Mudança de Prazo de Item</DialogTitle>
+            <DialogDescription>
+              Categorize a mudança de prazo deste item para rastreamento
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div className="bg-muted p-3 rounded-md text-sm space-y-1">
+              <div><strong>Data anterior:</strong> {pendingItemDateChange?.oldDate ? format(new Date(pendingItemDateChange.oldDate), "dd/MM/yyyy") : '-'}</div>
+              <div><strong>Nova data:</strong> {pendingItemDateChange?.newDate ? format(new Date(pendingItemDateChange.newDate), "dd/MM/yyyy") : '-'}</div>
+            </div>
+            
+            <div>
+              <Label>Motivo da mudança</Label>
+              <select
+                value={dateChangeCategory}
+                onChange={(e) => {
+                  setDateChangeCategory(e.target.value);
+                  setFactoryFollowupRequired(e.target.value === 'factory_delay');
+                }}
+                className="w-full mt-1 px-3 py-2 border rounded-md bg-background"
+              >
+                <option value="factory_delay">🏭 Atraso da Fábrica</option>
+                <option value="justified">✅ Mudança Justificada</option>
+                <option value="client_request">👤 Pedido do Cliente</option>
+                <option value="logistics_issue">🚚 Problema Logístico</option>
+                <option value="internal_error">⚠️ Erro Interno</option>
+                <option value="other">📋 Outro</option>
+              </select>
+            </div>
+            
+            <div>
+              <Label>Descrição (opcional)</Label>
+              <Textarea
+                value={dateChangeReason}
+                onChange={(e) => setDateChangeReason(e.target.value)}
+                placeholder="Contexto adicional sobre a mudança..."
+                rows={3}
+              />
+            </div>
+            
+            {dateChangeCategory === 'factory_delay' && (
+              <div className="flex items-center space-x-2 bg-yellow-50 dark:bg-yellow-900/20 p-3 rounded-md">
+                <Checkbox
+                  id="item-followup"
+                  checked={factoryFollowupRequired}
+                  onCheckedChange={(checked) => setFactoryFollowupRequired(checked as boolean)}
+                />
+                <Label htmlFor="item-followup" className="text-sm font-normal cursor-pointer">
+                  Requer cobrança de prazo com a fábrica
+                </Label>
+              </div>
+            )}
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowItemDateChangeDialog(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleItemDateChangeSubmit}>
+              Salvar Alterações
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 };

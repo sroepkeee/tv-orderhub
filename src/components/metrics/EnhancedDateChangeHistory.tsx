@@ -1,7 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { format, differenceInDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -41,13 +43,11 @@ export function EnhancedDateChangeHistory({ limit = 20, orders }: EnhancedDateCh
   const [followupFilter, setFollowupFilter] = useState(false);
   const [selectedChange, setSelectedChange] = useState<EnhancedDateChange | null>(null);
   const [actionType, setActionType] = useState<'followup' | 'stalling' | 'note' | null>(null);
+  const [showOnlyActive, setShowOnlyActive] = useState(true);
 
   const loadDateChanges = async () => {
     try {
       setLoading(true);
-      
-      // Buscar apenas mudanças de pedidos ativos
-      const activeOrderIds = orders.map(o => o.id);
       
       let query = supabase
         .from("delivery_date_changes")
@@ -59,10 +59,15 @@ export function EnhancedDateChangeHistory({ limit = 20, orders }: EnhancedDateCh
             status
           )
         `)
-        .in('order_id', activeOrderIds)
         .order("changed_at", { ascending: false });
 
-      if (limit) {
+      // NOVO: Filtrar apenas por pedidos ativos se showOnlyActive estiver ativo
+      if (showOnlyActive) {
+        const activeOrderIds = orders.map(o => o.id);
+        query = query.in('order_id', activeOrderIds);
+      }
+
+      if (limit && showOnlyActive) {
         query = query.limit(limit);
       }
 
@@ -99,10 +104,8 @@ export function EnhancedDateChangeHistory({ limit = 20, orders }: EnhancedDateCh
   };
 
   useEffect(() => {
-    if (orders.length > 0) {
-      loadDateChanges();
-    }
-  }, [orders, limit]);
+    loadDateChanges();
+  }, [orders, limit, showOnlyActive]);
 
   const filteredChanges = dateChanges.filter(change => {
     if (categoryFilter !== "all" && change.change_category !== categoryFilter) return false;
@@ -152,6 +155,61 @@ export function EnhancedDateChangeHistory({ limit = 20, orders }: EnhancedDateCh
     setActionType(null);
   };
 
+  // NOVO: Métricas avançadas
+  const advancedMetrics = useMemo(() => {
+    // Atrasos por fornecedor/cliente
+    const byCustomer: Record<string, { count: number, totalDelay: number }> = {};
+    
+    filteredChanges.forEach(change => {
+      if (!byCustomer[change.customer_name]) {
+        byCustomer[change.customer_name] = { count: 0, totalDelay: 0 };
+      }
+      byCustomer[change.customer_name].count++;
+      byCustomer[change.customer_name].totalDelay += change.days_delayed;
+    });
+    
+    const topProblemCustomers = Object.entries(byCustomer)
+      .map(([name, data]) => ({
+        name,
+        count: data.count,
+        avgDelay: Math.round(data.totalDelay / data.count)
+      }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 3);
+    
+    // Padrões por dia da semana
+    const byWeekday = [0, 0, 0, 0, 0, 0, 0];
+    filteredChanges.forEach(change => {
+      const day = new Date(change.changed_at).getDay();
+      byWeekday[day]++;
+    });
+    const peakDay = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'][byWeekday.indexOf(Math.max(...byWeekday))];
+    
+    // Atraso médio por categoria
+    const avgDelayByCategory: Record<string, number> = {};
+    const countByCategory: Record<string, number> = {};
+    
+    filteredChanges.forEach(change => {
+      const cat = change.change_category || 'other';
+      if (!avgDelayByCategory[cat]) {
+        avgDelayByCategory[cat] = 0;
+        countByCategory[cat] = 0;
+      }
+      avgDelayByCategory[cat] += change.days_delayed;
+      countByCategory[cat]++;
+    });
+    
+    Object.keys(avgDelayByCategory).forEach(cat => {
+      avgDelayByCategory[cat] = Math.round(avgDelayByCategory[cat] / countByCategory[cat]);
+    });
+    
+    return {
+      topProblemCustomers,
+      peakDay,
+      avgDelayByCategory
+    };
+  }, [filteredChanges]);
+
   if (loading) {
     return (
       <Card className="p-6">
@@ -193,7 +251,18 @@ export function EnhancedDateChangeHistory({ limit = 20, orders }: EnhancedDateCh
           </div>
 
           {/* Filters */}
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-2 items-center">
+            <div className="flex items-center gap-2 px-3 py-1 border rounded-md bg-background">
+              <Switch 
+                checked={showOnlyActive} 
+                onCheckedChange={setShowOnlyActive}
+                id="active-only"
+              />
+              <Label htmlFor="active-only" className="text-sm cursor-pointer">
+                Apenas Ativos
+              </Label>
+            </div>
+
             <select 
               value={categoryFilter} 
               onChange={(e) => setCategoryFilter(e.target.value)}
@@ -223,6 +292,35 @@ export function EnhancedDateChangeHistory({ limit = 20, orders }: EnhancedDateCh
               📞 Aguardando Cobrança ({stats.followup})
             </Badge>
           </div>
+
+          {/* NOVO: Métricas Avançadas */}
+          {advancedMetrics.topProblemCustomers.length > 0 && (
+            <div className="bg-muted/30 rounded-lg p-4 space-y-3">
+              <h4 className="font-semibold text-sm">📊 Insights de Mudanças</h4>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
+                <div>
+                  <div className="text-muted-foreground mb-1">Clientes com Mais Atrasos:</div>
+                  {advancedMetrics.topProblemCustomers.map((customer, i) => (
+                    <div key={i} className="text-xs">
+                      {i + 1}. {customer.name} ({customer.count}x, média {customer.avgDelay}d)
+                    </div>
+                  ))}
+                </div>
+                <div>
+                  <div className="text-muted-foreground mb-1">Dia com Mais Mudanças:</div>
+                  <div className="font-semibold">{advancedMetrics.peakDay}</div>
+                </div>
+                <div>
+                  <div className="text-muted-foreground mb-1">Atraso Médio por Categoria:</div>
+                  {Object.entries(advancedMetrics.avgDelayByCategory).slice(0, 2).map(([cat, avg]) => (
+                    <div key={cat} className="text-xs">
+                      {getCategoryLabel(cat)}: {avg} dias
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Table */}
           <div className="overflow-x-auto">
