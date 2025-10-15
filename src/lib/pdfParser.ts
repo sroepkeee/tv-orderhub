@@ -121,87 +121,129 @@ export async function parsePdfOrder(file: File): Promise<ParsedOrderData & { qua
 function extractOrderHeader(text: string): ParsedOrderData['orderInfo'] {
   const orderInfo: any = {};
   
-  // PEDIDO Nº
-  const orderNumberMatch = text.match(/PEDIDO\s+N[ºo°]:\s*(\d+)/i);
+  console.log('🔍 Iniciando extração de cabeçalho...');
+  
+  // PEDIDO Nº - mais robusto
+  const orderNumberMatch = text.match(/PEDIDO\s+N[ºo°]?:?\s*(\d+)/i);
   if (orderNumberMatch) {
     orderInfo.orderNumber = orderNumberMatch[1];
+    console.log('✅ Pedido:', orderInfo.orderNumber);
   }
   
   // EMISSÃO para issueDate
-  const issueDateMatch = text.match(/EMISS[AÃ]O:\s*(\d{2}\/\d{2}\/\d{4})/i);
+  const issueDateMatch = text.match(/EMISS[AÃ]O:?\s*(\d{2}\/\d{2}\/\d{4})/i);
   if (issueDateMatch) {
     orderInfo.issueDate = issueDateMatch[1];
+    console.log('✅ Data Emissão:', orderInfo.issueDate);
   }
   
-  // DATA DE ENTREGA - procurar por padrão específico ou usar emissão como fallback
-  const deliveryDateMatch = text.match(/(?:ENTREGA|PREVIS[ÃA]O):\s*(\d{2}\/\d{2}\/\d{4})/i);
+  // DATA DE ENTREGA
+  const deliveryDateMatch = text.match(/(?:ENTREGA|PREVIS[ÃA]O|DATA\s+ENTREGA):?\s*(\d{2}\/\d{2}\/\d{4})/i);
   if (deliveryDateMatch) {
     orderInfo.deliveryDate = deliveryDateMatch[1];
+    console.log('✅ Data Entrega:', orderInfo.deliveryDate);
   } else if (orderInfo.issueDate) {
-    // Usar data de emissão como fallback
     orderInfo.deliveryDate = orderInfo.issueDate;
+    console.log('⚠️ Usando data de emissão como entrega');
   }
   
-  // CLIENTE - múltiplos padrões para maior flexibilidade
-  let clientMatch = text.match(/CLIENTE:\s*([^\n]+?)(?=\s+LOJA:|$)/i);
+  // CLIENTE - padrão mais específico para evitar capturar texto extra
+  // Padrão 1: CLIENTE: NOME até próximo campo (LOJA, CNPJ, CPF, ENDEREÇO)
+  let clientMatch = text.match(/CLIENTE:?\s*([A-Z0-9\s\-\.]+?)(?=\s*(?:LOJA|CNPJ|CPF|ENDERE[ÇC]O|INSCRI[ÇC][ÃA]O|\n\n))/i);
+  
+  // Padrão 2: Se não encontrou, tentar pegar até quebra de linha dupla
   if (!clientMatch) {
-    clientMatch = text.match(/CLIENTE:\s*(.+?)(?=\s+(?:LOJA|ENDERE|CPF|CNPJ)|$)/i);
+    clientMatch = text.match(/CLIENTE:?\s*([^\n]+?)(?=\s*CNPJ|CPF|LOJA)/i);
   }
+  
+  // Padrão 3: Razão Social como alternativa
   if (!clientMatch) {
-    clientMatch = text.match(/(?:RAZ[ÃA]O SOCIAL|NOME):\s*(.+?)(?=\n|$)/i);
+    clientMatch = text.match(/RAZ[ÃA]O\s+SOCIAL:?\s*([A-Z0-9\s\-\.]+?)(?=\s*(?:CNPJ|CPF|INSCRI[ÇC][ÃA]O|\n))/i);
   }
+  
   if (clientMatch) {
-    orderInfo.customerName = clientMatch[1].trim();
-    console.log('✅ Cliente extraído:', orderInfo.customerName);
+    // Limpar nome: remover espaços extras, números isolados no final
+    let cleanName = clientMatch[1]
+      .trim()
+      .replace(/\s+/g, ' ') // Normalizar espaços
+      .replace(/\s+\d+$/, '') // Remover código de loja no final
+      .replace(/LOJA\s*\d*$/i, ''); // Remover "LOJA" no final
+    
+    orderInfo.customerName = cleanName;
+    console.log('✅ Cliente:', orderInfo.customerName);
   } else {
-    console.warn('⚠️ Nome do cliente não encontrado no PDF');
+    console.warn('⚠️ Nome do cliente não encontrado');
   }
   
-  // ENDEREÇO
-  const addressMatch = text.match(/ENDERE[ÇC]O:\s*([^\n]+?)(?=\s+BAIRRO:|$)/i);
+  // CNPJ/CPF - extrair primeiro para evitar contaminar outros campos
+  const docMatch = text.match(/(?:CNPJ|CPF):?\s*([\d.\-\/]+)/i);
+  if (docMatch) {
+    orderInfo.customerDocument = docMatch[1].trim();
+    console.log('✅ CNPJ/CPF:', orderInfo.customerDocument);
+  }
+  
+  // ENDEREÇO - padrão mais específico
+  const addressMatch = text.match(/ENDERE[ÇC]O:?\s*([^\n]+?)(?=\s*(?:N[ºo°]|BAIRRO|MUNIC[ÍI]PIO|COMPLEMENTO|\n))/i);
   if (addressMatch) {
     orderInfo.deliveryAddress = addressMatch[1].trim();
+    console.log('✅ Endereço:', orderInfo.deliveryAddress);
   }
   
-  // MUNICÍPIO
-  const municipioMatch = text.match(/MUNIC[ÍI]PIO:\s*([^\n]+?)(?=\s+ESTADO:|UF:|$)/i);
+  // MUNICÍPIO - separar de UF
+  const municipioMatch = text.match(/MUNIC[ÍI]PIO:?\s*([A-Z\s]+?)(?=\s*(?:ESTADO|UF|CEP|\d{5}|\n))/i);
   if (municipioMatch) {
     orderInfo.municipality = municipioMatch[1].trim();
+    console.log('✅ Município:', orderInfo.municipality);
   }
   
-  // FRETE/TIPO e VALOR
-  const freteMatch = text.match(/FRETE\/TIPO:\s*([^\s]+)\s+VALOR:\s*([\d.,]+)/i);
-  if (freteMatch) {
-    orderInfo.freightType = freteMatch[1].trim();
-    orderInfo.freightValue = parseFloat(freteMatch[2].replace(/\./g, '').replace(',', '.'));
-  }
-  
-  // TRANSPORTADORA
-  const transportadoraMatch = text.match(/TRANSPORTADORA:\s*([^\n]+?)(?=\s+PLACA:|$)/i);
+  // TRANSPORTADORA - evitar capturar placa
+  const transportadoraMatch = text.match(/TRANSPORTADORA:?\s*([A-Z0-9\s\-\.]+?)(?=\s*(?:PLACA|FRETE|REDESPACHO|\n))/i);
   if (transportadoraMatch) {
     orderInfo.carrier = transportadoraMatch[1].trim();
+    console.log('✅ Transportadora:', orderInfo.carrier);
   }
   
-  // OPERAÇÃO
-  const operacaoMatch = text.match(/Opera[çc][ãa]o:\s*(\d+)/i);
+  // FRETE/TIPO e VALOR - padrões separados
+  const freightTypeMatch = text.match(/(?:FRETE\/TIPO|TIPO\s+FRETE):?\s*(CIF|FOB|[A-Z]+)/i);
+  if (freightTypeMatch) {
+    orderInfo.freightType = freightTypeMatch[1].trim().toUpperCase();
+    console.log('✅ Tipo Frete:', orderInfo.freightType);
+  }
+  
+  const freightValueMatch = text.match(/(?:VALOR\s+FRETE|FRETE.*?VALOR):?\s*R?\$?\s*([\d.,]+)/i);
+  if (freightValueMatch) {
+    orderInfo.freightValue = parseFloat(freightValueMatch[1].replace(/\./g, '').replace(',', '.'));
+    console.log('✅ Valor Frete:', orderInfo.freightValue);
+  }
+  
+  // OPERAÇÃO - código numérico
+  const operacaoMatch = text.match(/(?:OPERA[ÇC][ÃA]O|C[ÓO]D\.?\s*OPERA[ÇC][ÃA]O):?\s*(\d+)/i);
   if (operacaoMatch) {
     orderInfo.operationCode = operacaoMatch[1];
+    console.log('✅ Código Operação:', orderInfo.operationCode);
   }
   
-  // EXECUTIVO/REPRESENTANTE
-  const execMatch = text.match(/(?:EXECUTIVO|REPRESENTANTE):\s*([^\n]+?)(?=\s+|$)/i);
+  // EXECUTIVO/REPRESENTANTE - evitar capturar código
+  const execMatch = text.match(/(?:EXECUTIVO|REPRESENTANTE|VENDEDOR):?\s*([A-Z\s]+?)(?=\s*(?:C[ÓO]DIGO|COMISS[ÃA]O|\d{4}|\n))/i);
   if (execMatch) {
     orderInfo.executiveName = execMatch[1].trim();
-  }
-  
-  // CNPJ/CPF
-  const docMatch = text.match(/(?:CNPJ|CPF):\s*([\d.\/\-]+)/i);
-  if (docMatch) {
-    orderInfo.customerDocument = docMatch[1].replace(/[.\-\/]/g, '');
+    console.log('✅ Executivo:', orderInfo.executiveName);
   }
   
   // Valores padrão
   orderInfo.priority = 'normal';
+  
+  console.log('📊 Resumo da extração:', {
+    pedido: !!orderInfo.orderNumber,
+    cliente: !!orderInfo.customerName,
+    endereco: !!orderInfo.deliveryAddress,
+    municipio: !!orderInfo.municipality,
+    transportadora: !!orderInfo.carrier,
+    frete: !!orderInfo.freightType,
+    operacao: !!orderInfo.operationCode,
+    executivo: !!orderInfo.executiveName,
+    documento: !!orderInfo.customerDocument
+  });
   
   return orderInfo;
 }
