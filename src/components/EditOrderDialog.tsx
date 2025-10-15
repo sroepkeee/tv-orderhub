@@ -1491,14 +1491,28 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                                   type="number"
                                   value={item.deliveredQuantity}
                                   onChange={(e) => {
-                                    const newQty = Math.max(0, Math.min(parseInt(e.target.value) || 0, item.requestedQuantity));
-                                    const newStatus = newQty === 0 ? 'pending' : (newQty < item.requestedQuantity ? 'partial' : 'completed');
-                                    updateItem(index, "deliveredQuantity", newQty);
-                                    updateItem(index, "received_status", newStatus);
+                                    const newQty = parseInt(e.target.value) || 0;
+                                    
+                                    // Se o item já foi salvo, atualizar no banco
+                                    if (item.id) {
+                                      handleUpdateReceivedQuantity(item.id, newQty, item.requestedQuantity);
+                                    } else {
+                                      // Se ainda não foi salvo, apenas atualiza localmente
+                                      const validQty = Math.max(0, Math.min(newQty, item.requestedQuantity));
+                                      updateItem(index, "deliveredQuantity", validQty);
+                                    }
+                                  }}
+                                  onBlur={(e) => {
+                                    // Validar ao sair do campo
+                                    if (!item.id) {
+                                      const newQty = Math.max(0, Math.min(parseInt(e.target.value) || 0, item.requestedQuantity));
+                                      updateItem(index, "deliveredQuantity", newQty);
+                                    }
                                   }}
                                   min="0"
                                   max={item.requestedQuantity}
                                   className="h-10 text-base"
+                                  placeholder="0"
                                 />
                               </TableCell>
                               <TableCell>
