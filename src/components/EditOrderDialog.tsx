@@ -258,7 +258,17 @@ export const EditOrderDialog = ({ order, open, onOpenChange, onSave, onDelete }:
 
   // Upload new PDF attachment
   const handleUploadAttachment = async (file: File) => {
-    if (!order?.id) return;
+    if (!order?.id) {
+      console.error('❌ Upload cancelado: pedido não definido');
+      return;
+    }
+
+    console.log('📤 Iniciando upload de anexo:', { 
+      fileName: file.name, 
+      fileSize: file.size, 
+      orderId: order.id,
+      orderNumber: order.orderNumber
+    });
 
     setUploadingAttachment(true);
     try {
@@ -267,6 +277,7 @@ export const EditOrderDialog = ({ order, open, onOpenChange, onSave, onDelete }:
 
       // Validate file
       if (file.size > 10 * 1024 * 1024) {
+        console.error('❌ Arquivo muito grande:', file.size);
         toast({
           title: "Arquivo muito grande",
           description: "O PDF deve ter no máximo 10MB.",
@@ -276,6 +287,7 @@ export const EditOrderDialog = ({ order, open, onOpenChange, onSave, onDelete }:
       }
 
       if (file.type !== 'application/pdf') {
+        console.error('❌ Tipo inválido:', file.type);
         toast({
           title: "Tipo inválido",
           description: "Apenas arquivos PDF são aceitos.",
@@ -286,7 +298,9 @@ export const EditOrderDialog = ({ order, open, onOpenChange, onSave, onDelete }:
 
       // Upload to storage
       const fileName = `${order.orderNumber}_${Date.now()}.pdf`;
-      const filePath = `${user.id}/${fileName}`;
+      const filePath = `${order.id}/${fileName}`;
+
+      console.log('⏳ Fazendo upload para storage:', filePath);
 
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('order-attachments')
@@ -296,28 +310,44 @@ export const EditOrderDialog = ({ order, open, onOpenChange, onSave, onDelete }:
           upsert: false
         });
 
-      if (uploadError) throw uploadError;
+      if (uploadError) {
+        console.error('❌ Erro no upload para storage:', uploadError);
+        throw uploadError;
+      }
+
+      console.log('✅ Upload para storage concluído:', uploadData.path);
 
       // Save metadata
+      const attachmentData = {
+        order_id: order.id,
+        file_name: file.name,
+        file_path: uploadData.path,
+        file_size: file.size,
+        file_type: file.type,
+        uploaded_by: user.id
+      };
+
+      console.log('⏳ Registrando anexo no banco:', attachmentData);
+
       const { error: attachmentError } = await supabase
         .from('order_attachments')
-        .insert({
-          order_id: order.id,
-          file_name: file.name,
-          file_path: uploadData.path,
-          file_size: file.size,
-          file_type: file.type,
-          uploaded_by: user.id
-        });
+        .insert(attachmentData);
 
-      if (attachmentError) throw attachmentError;
+      if (attachmentError) {
+        console.error('❌ Erro ao registrar anexo no banco:', attachmentError);
+        throw attachmentError;
+      }
+
+      console.log('✅ Anexo registrado com sucesso no banco');
 
       toast({
         title: "Anexo adicionado",
         description: `${file.name} foi anexado com sucesso.`
       });
 
-      loadAttachments();
+      console.log('⏳ Recarregando lista de anexos...');
+      await loadAttachments();
+      console.log('✅ Lista de anexos recarregada');
     } catch (error: any) {
       console.error("Error uploading attachment:", error);
       toast({
