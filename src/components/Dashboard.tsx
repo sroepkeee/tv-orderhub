@@ -4,7 +4,7 @@ import { DateRange } from "react-day-picker";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Search, Calendar, BarChart3 } from "lucide-react";
+import { Search, Calendar, BarChart3, FileSpreadsheet } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { useNavigate } from "react-router-dom";
 import { AddOrderDialog } from "./AddOrderDialog";
@@ -15,6 +15,7 @@ import { PhaseButtons } from "./PhaseButtons";
 import { ColumnSettings, ColumnVisibility } from "./ColumnSettings";
 import { DateRangeFilter } from "./DateRangeFilter";
 import { UserMenu } from "./UserMenu";
+import { ImportOrderDialog } from "./ImportOrderDialog";
 
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
@@ -162,6 +163,7 @@ export const Dashboard = () => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [showEditDialog, setShowEditDialog] = useState(false);
+  const [showImportDialog, setShowImportDialog] = useState(false);
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
   const [loading, setLoading] = useState(true);
   const isUpdatingRef = useRef(false);
@@ -999,6 +1001,14 @@ export const Dashboard = () => {
             Indicadores
           </Button>
           <UserMenu />
+          <Button
+            variant="outline"
+            onClick={() => setShowImportDialog(true)}
+            className="gap-2"
+          >
+            <FileSpreadsheet className="h-4 w-4" />
+            Importar TOTVS
+          </Button>
           <AddOrderDialog onAddOrder={handleAddOrder} />
         </div>
       </div>
@@ -1178,6 +1188,13 @@ export const Dashboard = () => {
           onDelete={handleDeleteOrder}
         />
       )}
+
+      {/* Import Dialog */}
+      <ImportOrderDialog
+        open={showImportDialog}
+        onOpenChange={setShowImportDialog}
+        onImportSuccess={loadOrders}
+      />
     </div>
   );
 };

@@ -234,7 +234,10 @@ export type Database = {
           created_at: string
           delivered_quantity: number
           delivery_date: string
+          discount_percent: number | null
+          icms_percent: number | null
           id: string
+          ipi_percent: number | null
           item_code: string
           item_description: string
           item_source_type: string | null
@@ -242,7 +245,9 @@ export type Database = {
           production_estimated_date: string | null
           received_status: string | null
           requested_quantity: number
+          total_value: number | null
           unit: string
+          unit_price: number | null
           updated_at: string
           user_id: string
           warehouse: string
@@ -251,7 +256,10 @@ export type Database = {
           created_at?: string
           delivered_quantity?: number
           delivery_date: string
+          discount_percent?: number | null
+          icms_percent?: number | null
           id?: string
+          ipi_percent?: number | null
           item_code: string
           item_description: string
           item_source_type?: string | null
@@ -259,7 +267,9 @@ export type Database = {
           production_estimated_date?: string | null
           received_status?: string | null
           requested_quantity?: number
+          total_value?: number | null
           unit?: string
+          unit_price?: number | null
           updated_at?: string
           user_id: string
           warehouse: string
@@ -268,7 +278,10 @@ export type Database = {
           created_at?: string
           delivered_quantity?: number
           delivery_date?: string
+          discount_percent?: number | null
+          icms_percent?: number | null
           id?: string
+          ipi_percent?: number | null
           item_code?: string
           item_description?: string
           item_source_type?: string | null
@@ -276,7 +289,9 @@ export type Database = {
           production_estimated_date?: string | null
           received_status?: string | null
           requested_quantity?: number
+          total_value?: number | null
           unit?: string
+          unit_price?: number | null
           updated_at?: string
           user_id?: string
           warehouse?: string
@@ -293,67 +308,94 @@ export type Database = {
       }
       orders: {
         Row: {
+          carrier_name: string | null
           created_at: string
+          customer_document: string | null
           customer_name: string
           delivery_address: string
           delivery_date: string
           driver_name: string | null
+          executive_name: string | null
+          freight_type: string | null
+          freight_value: number | null
           id: string
           lab_completed_at: string | null
           lab_notes: string | null
           lab_requested_at: string | null
           lab_status: string | null
           lab_ticket_id: string | null
+          municipality: string | null
           notes: string | null
+          operation_code: string | null
           order_number: string
           order_type: string
           priority: string
+          shipping_date: string | null
           status: string
           totvs_order_number: string | null
+          tracking_code: string | null
           updated_at: string
           user_id: string
           vehicle_plate: string | null
         }
         Insert: {
+          carrier_name?: string | null
           created_at?: string
+          customer_document?: string | null
           customer_name: string
           delivery_address: string
           delivery_date: string
           driver_name?: string | null
+          executive_name?: string | null
+          freight_type?: string | null
+          freight_value?: number | null
           id?: string
           lab_completed_at?: string | null
           lab_notes?: string | null
           lab_requested_at?: string | null
           lab_status?: string | null
           lab_ticket_id?: string | null
+          municipality?: string | null
           notes?: string | null
+          operation_code?: string | null
           order_number: string
           order_type: string
           priority: string
+          shipping_date?: string | null
           status: string
           totvs_order_number?: string | null
+          tracking_code?: string | null
           updated_at?: string
           user_id: string
           vehicle_plate?: string | null
         }
         Update: {
+          carrier_name?: string | null
           created_at?: string
+          customer_document?: string | null
           customer_name?: string
           delivery_address?: string
           delivery_date?: string
           driver_name?: string | null
+          executive_name?: string | null
+          freight_type?: string | null
+          freight_value?: number | null
           id?: string
           lab_completed_at?: string | null
           lab_notes?: string | null
           lab_requested_at?: string | null
           lab_status?: string | null
           lab_ticket_id?: string | null
+          municipality?: string | null
           notes?: string | null
+          operation_code?: string | null
           order_number?: string
           order_type?: string
           priority?: string
+          shipping_date?: string | null
           status?: string
           totvs_order_number?: string | null
+          tracking_code?: string | null
           updated_at?: string
           user_id?: string
           vehicle_plate?: string | null
