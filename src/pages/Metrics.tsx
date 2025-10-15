@@ -6,7 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { MetricCard } from "@/components/metrics/MetricCard";
 import { ProductionMetrics } from "@/components/metrics/ProductionMetrics";
 import { PhaseTimeMetrics } from "@/components/metrics/PhaseTimeMetrics";
-import { DateChangeHistory } from "@/components/metrics/DateChangeHistory";
+import { EnhancedDateChangeHistory } from "@/components/metrics/EnhancedDateChangeHistory";
 import { SLAAlert } from "@/components/metrics/SLAAlert";
 import { OrderTotvsMetrics } from "@/components/metrics/OrderTotvsMetrics";
 import { ItemSourceMetrics } from "@/components/metrics/ItemSourceMetrics";
@@ -227,6 +227,11 @@ export default function Metrics() {
         />
       </div>
 
+      {/* Histórico Expandido de Mudanças de Prazos */}
+      <div className="mb-6">
+        <EnhancedDateChangeHistory limit={20} orders={orders} />
+      </div>
+
       {/* Evolução e Comparativos */}
       <div className="mb-6">
         <ComparativeMetrics orders={orders} />
@@ -254,11 +259,6 @@ export default function Metrics() {
       {/* Integração TOTVS */}
       <div className="mb-6">
         <OrderTotvsMetrics orders={orders} />
-      </div>
-
-      {/* Histórico de Mudanças */}
-      <div>
-        <DateChangeHistory limit={15} />
       </div>
 
       {/* Dialog de Edição */}

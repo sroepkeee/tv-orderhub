@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Calendar, User, FileText, CheckCircle, XCircle, Clock, History, Edit, Plus, Trash2, Loader2, MessageSquare, Download, Package, AlertCircle } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { Order } from "./Dashboard";
@@ -70,6 +71,11 @@ export const EditOrderDialog = ({ order, open, onOpenChange, onSave, onDelete }:
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [showDateChangeDialog, setShowDateChangeDialog] = useState(false);
+  const [pendingOrderData, setPendingOrderData] = useState<Order | null>(null);
+  const [dateChangeCategory, setDateChangeCategory] = useState<string>("other");
+  const [dateChangeReason, setDateChangeReason] = useState("");
+  const [factoryFollowupRequired, setFactoryFollowupRequired] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -825,8 +831,70 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
 
   const onSubmit = (data: Order) => {
     const updatedOrder = { ...data, id: order.id, items };
+    
+    // Check if delivery date changed
+    if (order.deliveryDeadline !== data.deliveryDeadline) {
+      setPendingOrderData(updatedOrder);
+      setShowDateChangeDialog(true);
+      return;
+    }
+    
     onSave(updatedOrder);
     onOpenChange(false);
+  };
+  
+  const handleDateChangeSubmit = async () => {
+    if (!pendingOrderData) return;
+    
+    try {
+      // Save the order first
+      onSave(pendingOrderData);
+      
+      // If it's a factory delay, update the delivery_date_changes record with category
+      if (order.deliveryDeadline !== pendingOrderData.deliveryDeadline) {
+        // The trigger will create the record, but we need to update it with category info
+        // Wait a bit for the trigger to fire
+        setTimeout(async () => {
+          const { data: changes } = await supabase
+            .from('delivery_date_changes')
+            .select('id')
+            .eq('order_id', order.id)
+            .eq('new_date', pendingOrderData.deliveryDeadline)
+            .order('changed_at', { ascending: false })
+            .limit(1);
+          
+          if (changes && changes.length > 0) {
+            await supabase
+              .from('delivery_date_changes')
+              .update({
+                change_category: dateChangeCategory,
+                reason: dateChangeReason || null,
+                factory_followup_required: factoryFollowupRequired
+              })
+              .eq('id', changes[0].id);
+          }
+        }, 500);
+      }
+      
+      setShowDateChangeDialog(false);
+      setPendingOrderData(null);
+      setDateChangeCategory("other");
+      setDateChangeReason("");
+      setFactoryFollowupRequired(false);
+      onOpenChange(false);
+      
+      toast({
+        title: "Pedido atualizado",
+        description: "As alterações foram salvas com sucesso."
+      });
+    } catch (error) {
+      console.error("Error saving order:", error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível salvar as alterações.",
+        variant: "destructive"
+      });
+    }
   };
 
   const getStatusLabel = (status: string) => {
@@ -1608,7 +1676,77 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
         </Tabs>
         </DialogContent>
       </Dialog>
-      
+
+      {/* Date Change Category Dialog */}
+      <Dialog open={showDateChangeDialog} onOpenChange={setShowDateChangeDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>📅 Mudança de Prazo Detectada</DialogTitle>
+            <DialogDescription>
+              Por favor, categorize o motivo desta mudança de prazo para melhor rastreamento
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div className="bg-muted p-3 rounded-md text-sm space-y-1">
+              <div><strong>Data anterior:</strong> {order?.deliveryDeadline ? format(new Date(order.deliveryDeadline), "dd/MM/yyyy") : '-'}</div>
+              <div><strong>Nova data:</strong> {pendingOrderData?.deliveryDeadline ? format(new Date(pendingOrderData.deliveryDeadline), "dd/MM/yyyy") : '-'}</div>
+            </div>
+            
+            <div>
+              <Label>Motivo da mudança</Label>
+              <select
+                value={dateChangeCategory}
+                onChange={(e) => {
+                  setDateChangeCategory(e.target.value);
+                  setFactoryFollowupRequired(e.target.value === 'factory_delay');
+                }}
+                className="w-full mt-1 px-3 py-2 border rounded-md bg-background"
+              >
+                <option value="factory_delay">🏭 Atraso da Fábrica</option>
+                <option value="justified">✅ Mudança Justificada</option>
+                <option value="client_request">👤 Pedido do Cliente</option>
+                <option value="logistics_issue">🚚 Problema Logístico</option>
+                <option value="internal_error">⚠️ Erro Interno</option>
+                <option value="other">📋 Outro</option>
+              </select>
+            </div>
+            
+            <div>
+              <Label>Descrição (opcional)</Label>
+              <Textarea
+                value={dateChangeReason}
+                onChange={(e) => setDateChangeReason(e.target.value)}
+                placeholder="Contexto adicional sobre a mudança..."
+                rows={3}
+              />
+            </div>
+            
+            {dateChangeCategory === 'factory_delay' && (
+              <div className="flex items-center space-x-2 bg-yellow-50 dark:bg-yellow-900/20 p-3 rounded-md">
+                <Checkbox
+                  id="followup"
+                  checked={factoryFollowupRequired}
+                  onCheckedChange={(checked) => setFactoryFollowupRequired(checked as boolean)}
+                />
+                <Label htmlFor="followup" className="text-sm font-normal cursor-pointer">
+                  Requer cobrança de prazo com a fábrica
+                </Label>
+              </div>
+            )}
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowDateChangeDialog(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleDateChangeSubmit}>
+              Salvar Alterações
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <CompleteOrderDialog
         pendingItems={items.filter(item => 
           (item.received_status !== 'completed' && item.received_status !== undefined) || 

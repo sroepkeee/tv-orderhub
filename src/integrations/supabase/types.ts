@@ -16,33 +16,51 @@ export type Database = {
     Tables: {
       delivery_date_changes: {
         Row: {
+          change_category: string | null
           change_source: string | null
           changed_at: string | null
           changed_by: string
+          factory_contacted_at: string | null
+          factory_followup_required: boolean | null
+          factory_response: string | null
           id: string
+          marked_as_stalling: boolean | null
           new_date: string
+          notes: string | null
           old_date: string
           order_id: string
           order_item_id: string
           reason: string | null
         }
         Insert: {
+          change_category?: string | null
           change_source?: string | null
           changed_at?: string | null
           changed_by: string
+          factory_contacted_at?: string | null
+          factory_followup_required?: boolean | null
+          factory_response?: string | null
           id?: string
+          marked_as_stalling?: boolean | null
           new_date: string
+          notes?: string | null
           old_date: string
           order_id: string
           order_item_id: string
           reason?: string | null
         }
         Update: {
+          change_category?: string | null
           change_source?: string | null
           changed_at?: string | null
           changed_by?: string
+          factory_contacted_at?: string | null
+          factory_followup_required?: boolean | null
+          factory_response?: string | null
           id?: string
+          marked_as_stalling?: boolean | null
           new_date?: string
+          notes?: string | null
           old_date?: string
           order_id?: string
           order_item_id?: string
