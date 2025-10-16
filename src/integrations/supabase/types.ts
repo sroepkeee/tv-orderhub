@@ -488,7 +488,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      subtract_business_days: {
+        Args: { business_days: number; start_date: string }
+        Returns: string
+      }
     }
     Enums: {
       [_ in never]: never
