@@ -626,6 +626,35 @@ export const EditOrderDialog = ({ order, open, onOpenChange, onSave, onDelete }:
           completed: '✓ Concluído'
         };
         
+        // Recarregar itens do banco para sincronizar UI
+        const { data: reloadedItems } = await supabase
+          .from('order_items')
+          .select('*')
+          .eq('order_id', order.id);
+        
+        if (reloadedItems) {
+          const mappedItems = reloadedItems.map(dbItem => ({
+            id: dbItem.id,
+            itemCode: dbItem.item_code,
+            itemDescription: dbItem.item_description,
+            unit: dbItem.unit,
+            requestedQuantity: dbItem.requested_quantity,
+            warehouse: dbItem.warehouse,
+            deliveryDate: dbItem.delivery_date,
+            deliveredQuantity: dbItem.delivered_quantity,
+            received_status: dbItem.received_status as 'pending' | 'partial' | 'completed',
+            item_status: dbItem.item_status as 'in_stock' | 'awaiting_production' | 'purchase_required' | 'completed',
+            item_source_type: dbItem.item_source_type as 'in_stock' | 'production' | 'out_of_stock',
+            production_estimated_date: dbItem.production_estimated_date,
+            unit_price: dbItem.unit_price,
+            discount_percent: dbItem.discount_percent,
+            ipi_percent: dbItem.ipi_percent,
+            icms_percent: dbItem.icms_percent,
+            total_value: dbItem.total_value
+          }));
+          setItems(mappedItems);
+        }
+        
         toast({
           title: "✅ Situação atualizada",
           description: `Item agora está: ${statusLabels[value as keyof typeof statusLabels]}`
