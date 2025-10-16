@@ -17,7 +17,7 @@ interface OrderWithDetails extends Order {
   items?: OrderItem[];
   dateChangesCount?: number;
 }
-type SortField = 'orderNumber' | 'client' | 'itemsQuantity' | 'status' | 'deliveryDeadline' | 'daysOpen' | 'deadline' | 'dateChanges';
+type SortField = 'orderNumber' | 'client' | 'itemsQuantity' | 'status' | 'issueDate' | 'deliveryDeadline' | 'daysOpen' | 'deadline' | 'dateChanges';
 type SortDirection = 'asc' | 'desc';
 
 export function OrdersTrackingTable({
@@ -118,6 +118,10 @@ export function OrdersTrackingTable({
           case 'status':
             aValue = a.status;
             bValue = b.status;
+            break;
+          case 'issueDate':
+            aValue = a.issueDate ? new Date(a.issueDate).getTime() : 0;
+            bValue = b.issueDate ? new Date(b.issueDate).getTime() : 0;
             break;
           case 'deliveryDeadline':
             aValue = new Date(a.deliveryDeadline).getTime();
@@ -254,6 +258,9 @@ export function OrdersTrackingTable({
               <TableHead className="min-w-[120px] cursor-pointer hover:bg-muted/50" onClick={() => handleSort('status')}>
                 Status{getSortIcon('status')}
               </TableHead>
+              <TableHead className="min-w-[120px] cursor-pointer hover:bg-muted/50" onClick={() => handleSort('issueDate')}>
+                Data de Emissão{getSortIcon('issueDate')}
+              </TableHead>
               <TableHead className="min-w-[120px] cursor-pointer hover:bg-muted/50" onClick={() => handleSort('deliveryDeadline')}>
                 Data de Entrega{getSortIcon('deliveryDeadline')}
               </TableHead>
@@ -272,7 +279,7 @@ export function OrdersTrackingTable({
           </TableHeader>
           <TableBody>
             {filteredOrders.length === 0 ? <TableRow>
-                <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={11} className="text-center py-8 text-muted-foreground">
                   Nenhum pedido encontrado com os filtros selecionados
                 </TableCell>
               </TableRow> : filteredOrders.map(order => {
@@ -294,6 +301,12 @@ export function OrdersTrackingTable({
                       </Badge>
                     </TableCell>
                     <TableCell>{getStatusBadge(order.status)}</TableCell>
+                    <TableCell className="text-sm">
+                      <div className="flex items-center gap-1">
+                        <Calendar className="h-3 w-3 text-muted-foreground" />
+                        {order.issueDate || '-'}
+                      </div>
+                    </TableCell>
                     <TableCell className="text-sm">
                       <div className="flex items-center gap-1">
                         <Calendar className="h-3 w-3 text-muted-foreground" />
