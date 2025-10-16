@@ -1037,36 +1037,25 @@ export const Dashboard = () => {
         </div>
       </div>
 
-      {/* Tab Navigation */}
-      <div className="mb-8">
-        <div className="flex justify-center items-center space-x-2 p-3 rounded-xl border-2 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950 dark:to-indigo-950" style={{ 
-          borderColor: 'hsl(var(--primary) / 0.2)'
-        }}>
-          {tabs.map((tab, index) => {
-            const colors = [
-              { bg: 'from-blue-500 to-blue-600', hover: 'hover:from-blue-600 hover:to-blue-700' },
-              { bg: 'from-purple-500 to-purple-600', hover: 'hover:from-purple-600 hover:to-purple-700' },
-              { bg: 'from-green-500 to-green-600', hover: 'hover:from-green-600 hover:to-green-700' },
-              { bg: 'from-orange-500 to-orange-600', hover: 'hover:from-orange-600 hover:to-orange-700' },
-              { bg: 'from-cyan-500 to-cyan-600', hover: 'hover:from-cyan-600 hover:to-cyan-700' },
-              { bg: 'from-emerald-500 to-emerald-600', hover: 'hover:from-emerald-600 hover:to-emerald-700' },
-            ];
-            const colorSet = colors[index % colors.length];
-            
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`px-6 py-4 rounded-lg text-base font-bold transition-all duration-300 transform ${
-                  activeTab === tab.id
-                    ? `bg-gradient-to-r ${colorSet.bg} text-white shadow-lg scale-105`
-                    : `bg-white/80 dark:bg-gray-800/80 text-gray-700 dark:text-gray-300 ${colorSet.hover} hover:scale-102 hover:shadow-md`
-                }`}
-              >
-                {tab.name}
-              </button>
-            );
-          })}
+      {/* Tab Navigation - Compacta */}
+      <div className="mb-4">
+        <div className="flex justify-center items-center gap-1 border-b border-border">
+          {tabs.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`px-4 py-2 text-sm font-medium transition-all relative ${
+                activeTab === tab.id
+                  ? 'text-primary'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              {tab.name}
+              {activeTab === tab.id && (
+                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary" />
+              )}
+            </button>
+          ))}
         </div>
       </div>
 
