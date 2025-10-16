@@ -479,6 +479,21 @@ All colors MUST be HSL.
     }
   }
 
+  /* Compact form field utility classes */
+  .form-field-compact {
+    @apply space-y-1;
+  }
+
+  .form-field-compact label {
+    @apply text-sm mb-1;
+  }
+
+  .form-field-compact input,
+  .form-field-compact select,
+  .form-field-compact textarea {
+    @apply h-9 text-sm;
+  }
+
   /* Vertical text for minimized kanban columns */
   .writing-mode-vertical {
     writing-mode: vertical-rl;

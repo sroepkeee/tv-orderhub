@@ -1275,8 +1275,8 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-[95vw] max-h-[95vh]">
-          <DialogHeader>
+        <DialogContent className="max-w-[95vw] max-h-[95vh] p-4">
+          <DialogHeader className="pb-3">
             <div className="flex items-center justify-between">
               <div>
                 <DialogTitle>Pedido #{order?.orderNumber}</DialogTitle>
@@ -1297,36 +1297,36 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
           </DialogHeader>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-5">
-            <TabsTrigger value="edit" className="flex items-center gap-2 data-[state=active]:bg-blue-500 data-[state=active]:text-white">
-              <Edit className="h-4 w-4" />
+          <TabsList className="grid w-full grid-cols-5 h-9">
+            <TabsTrigger value="edit" className="flex items-center gap-1.5 data-[state=active]:bg-blue-500 data-[state=active]:text-white text-xs">
+              <Edit className="h-3.5 w-3.5" />
               Editar
             </TabsTrigger>
-            <TabsTrigger value="lab" className="flex items-center gap-2 data-[state=active]:bg-purple-500 data-[state=active]:text-white" disabled={!(order as any)?.lab_ticket_id}>
-              <FileText className="h-4 w-4" />
+            <TabsTrigger value="lab" className="flex items-center gap-1.5 data-[state=active]:bg-purple-500 data-[state=active]:text-white text-xs" disabled={!(order as any)?.lab_ticket_id}>
+              <FileText className="h-3.5 w-3.5" />
               Laboratório
             </TabsTrigger>
-            <TabsTrigger value="history" className="flex items-center gap-2 data-[state=active]:bg-green-500 data-[state=active]:text-white">
-              <History className="h-4 w-4" />
+            <TabsTrigger value="history" className="flex items-center gap-1.5 data-[state=active]:bg-green-500 data-[state=active]:text-white text-xs">
+              <History className="h-3.5 w-3.5" />
               Histórico
             </TabsTrigger>
-            <TabsTrigger value="comments" className="flex items-center gap-2 data-[state=active]:bg-orange-500 data-[state=active]:text-white">
-              <MessageSquare className="h-4 w-4" />
+            <TabsTrigger value="comments" className="flex items-center gap-1.5 data-[state=active]:bg-orange-500 data-[state=active]:text-white text-xs">
+              <MessageSquare className="h-3.5 w-3.5" />
               Comentários
             </TabsTrigger>
-            <TabsTrigger value="attachments" className="flex items-center gap-2 data-[state=active]:bg-red-500 data-[state=active]:text-white">
-              <FileText className="h-4 w-4" />
+            <TabsTrigger value="attachments" className="flex items-center gap-1.5 data-[state=active]:bg-red-500 data-[state=active]:text-white text-xs">
+              <FileText className="h-3.5 w-3.5" />
               Anexos
               {attachments.length > 0 && (
-                <Badge variant="secondary" className="ml-1">{attachments.length}</Badge>
+                <Badge variant="secondary" className="ml-1 text-xs">{attachments.length}</Badge>
               )}
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="edit" className="mt-4">
-            <ScrollArea className="h-[calc(95vh-200px)] pr-4">
-              <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
+          <TabsContent value="edit" className="mt-3">
+            <ScrollArea className="h-[calc(95vh-200px)] pr-3">
+              <form onSubmit={handleSubmit(onSubmit)} className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
                   <div>
                     <Label htmlFor="type">Tipo</Label>
                     <Select onValueChange={(value) => setValue("type", value as any)} defaultValue={order?.type}>
@@ -1356,7 +1356,7 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 gap-3">
                   <div>
                     <Label htmlFor="client">Cliente</Label>
                     <Input {...register("client", { required: true })} />
@@ -1367,7 +1367,7 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 gap-3">
                   <div>
                     <Label htmlFor="totvsOrderNumber">Nº Pedido TOTVS</Label>
                     <Input 
@@ -1385,26 +1385,26 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                         disabled
                         className="bg-muted cursor-not-allowed"
                       />
-                      <p className="text-xs text-muted-foreground mt-1">
+                      <p className="text-xs text-muted-foreground mt-0.5">
                         Data original do pedido (não editável)
                       </p>
                     </div>
                   )}
                 </div>
 
-                <div className="grid grid-cols-1 gap-4">
+                <div className="grid grid-cols-1 gap-3">
                   <div>
                     <Label htmlFor="deliveryDeadline">Prazo de Entrega</Label>
                     <Input {...register("deliveryDeadline", { required: true })} type="date" />
                     {order.issueDate && (
-                      <p className="text-xs text-muted-foreground mt-1">
+                      <p className="text-xs text-muted-foreground mt-0.5">
                         Prazo inicial: 10 dias úteis a partir de {format(new Date(order.issueDate), 'dd/MM/yyyy')}
                       </p>
                     )}
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 gap-4">
+                <div className="grid grid-cols-1 gap-3">
                   <div>
                     <Label htmlFor="status">Status</Label>
                     <Select onValueChange={handleStatusChange} defaultValue={order?.status}>
@@ -1423,15 +1423,15 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                   </div>
                 </div>
 
-                <div className="pt-4 border-t">
-                  <Label className="text-sm font-medium mb-3 block">Atualização Rápida de Status</Label>
+                <div className="pt-3 border-t">
+                  <Label className="text-sm font-medium mb-2 block">Atualização Rápida de Status</Label>
                   <PhaseButtons 
                     order={order} 
                     onStatusChange={(orderId, newStatus) => handleStatusChange(newStatus)}
                   />
                 </div>
 
-                <div className="space-y-4 pt-4">
+                <div className="space-y-3 pt-3">
                   <div className="flex items-center justify-between">
                     <Label className="text-lg font-semibold">Itens do Pedido</Label>
                     <div className="flex items-center gap-2">
@@ -1476,7 +1476,7 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                   </div>
 
                   {items.length === 0 ? (
-                    <Card className="p-6 text-center text-muted-foreground">
+                    <Card className="p-4 text-center text-muted-foreground text-sm">
                       Nenhum item adicionado. Clique em "Adicionar Item" para começar.
                     </Card>
                   ) : (
@@ -1590,7 +1590,7 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                                   }}
                                   min="0"
                                   max={item.requestedQuantity}
-                                  className="h-10 text-base"
+                                  className="h-8 text-sm"
                                   placeholder="0"
                                 />
                               </TableCell>
@@ -1627,21 +1627,22 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                   )}
                 </div>
 
-                <div className="flex justify-between items-center gap-2 pt-4 sticky bottom-0 bg-background">
+                <div className="flex justify-between items-center gap-2 pt-3 sticky bottom-0 bg-background">
                   <Button 
                     type="button" 
                     variant="destructive" 
+                    size="sm"
                     onClick={() => setShowDeleteConfirm(true)}
-                    className="gap-2"
+                    className="gap-1.5"
                   >
-                    <Trash2 className="h-4 w-4" />
+                    <Trash2 className="h-3.5 w-3.5" />
                     Excluir Pedido
                   </Button>
                   <div className="flex gap-2">
-                    <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+                    <Button type="button" variant="outline" size="sm" onClick={() => onOpenChange(false)}>
                       Cancelar
                     </Button>
-                    <Button type="submit">
+                    <Button type="submit" size="sm">
                       Salvar Alterações
                     </Button>
                   </div>

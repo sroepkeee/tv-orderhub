@@ -34,18 +34,18 @@ export const MetricCard = ({
   };
   
   return (
-    <Card className={cn("border-l-4 transition-all hover:shadow-lg", status && statusStyles[status])}>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+    <Card className={cn("border-l-4 transition-all hover:shadow-lg p-3", status && statusStyles[status])}>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1.5 p-3">
         <CardTitle className="text-sm font-medium">{title}</CardTitle>
-        <Icon className="h-4 w-4 text-muted-foreground" />
+        <Icon className="h-3.5 w-3.5 text-muted-foreground" />
       </CardHeader>
-      <CardContent>
+      <CardContent className="p-3 pt-0">
         <div className="text-2xl font-bold">{value}</div>
         {subtitle && (
-          <p className="text-xs text-muted-foreground mt-1">{subtitle}</p>
+          <p className="text-xs text-muted-foreground mt-0.5">{subtitle}</p>
         )}
         {trend && trendValue && (
-          <div className={cn("flex items-center text-xs mt-2 font-medium", trend && trendStyles[trend])}>
+          <div className={cn("flex items-center text-xs mt-1.5 font-medium", trend && trendStyles[trend])}>
             {trendValue}
           </div>
         )}

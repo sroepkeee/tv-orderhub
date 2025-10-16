@@ -153,8 +153,8 @@ export const KanbanCard = ({ order, onEdit, onStatusChange }: KanbanCardProps) =
           <GripVertical className="h-5 w-5" />
         </div>
       {/* Header */}
-      <div className="flex items-start justify-between mb-2">
-        <div className="flex flex-col gap-1">
+      <div className="flex items-start justify-between mb-1.5">
+        <div className="flex flex-col gap-0.5">
           <span className="font-bold text-sm">Pedido #{order.orderNumber}</span>
           <Badge className={`${getTypeColor(order.type)} text-xs`}>
             {getTypeLabel(order.type)}
@@ -166,7 +166,7 @@ export const KanbanCard = ({ order, onEdit, onStatusChange }: KanbanCardProps) =
       </div>
 
       {/* Items Summary */}
-      <div className="mb-2">
+      <div className="mb-1.5">
         <p className="text-sm font-medium">
           {order.items && order.items.length > 0 
             ? `${order.items.length} item(ns)`
@@ -201,14 +201,14 @@ export const KanbanCard = ({ order, onEdit, onStatusChange }: KanbanCardProps) =
       </div>
 
       {/* Client */}
-      <div className="mb-2">
+      <div className="mb-1.5">
         <p className="text-xs text-muted-foreground">
           <span className="font-medium">Cliente:</span> {order.client}
         </p>
       </div>
 
       {/* Deadline */}
-      <div className="space-y-1">
+      <div className="space-y-0.5">
         {order.issueDate && (
           <div className="flex items-center justify-between text-[10px] text-muted-foreground">
             <span>Emissão:</span>
@@ -242,7 +242,7 @@ export const KanbanCard = ({ order, onEdit, onStatusChange }: KanbanCardProps) =
       </div>
 
       {/* Quantity */}
-      <div className="mt-2 pt-2 border-t">
+      <div className="mt-1.5 pt-1.5 border-t">
         <p className="text-xs text-muted-foreground">
           <span className="font-medium">Qtd Total:</span> {order.quantity}
           {order.items && order.items.length > 0 && (
