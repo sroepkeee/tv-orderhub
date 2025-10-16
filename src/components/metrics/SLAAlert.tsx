@@ -1,7 +1,9 @@
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, X } from "lucide-react";
 import { differenceInDays, parseISO } from "date-fns";
 import type { Order } from "@/components/Dashboard";
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
 
 interface SLAAlertProps {
   orders: Order[];
@@ -9,6 +11,8 @@ interface SLAAlertProps {
 }
 
 export const SLAAlert = ({ orders, threshold = 2 }: SLAAlertProps) => {
+  const [isVisible, setIsVisible] = useState(true);
+  
   const criticalOrders = orders.filter(o => {
     if (o.status === 'completed' || o.status === 'delivered' || o.status === 'cancelled') {
       return false;
@@ -23,11 +27,19 @@ export const SLAAlert = ({ orders, threshold = 2 }: SLAAlertProps) => {
     }
   });
   
-  if (criticalOrders.length === 0) return null;
+  if (criticalOrders.length === 0 || !isVisible) return null;
   
   return (
-    <Alert variant="destructive" className="mb-6">
+    <Alert variant="destructive" className="mb-6 relative">
       <AlertTriangle className="h-4 w-4" />
+      <Button
+        variant="ghost"
+        size="icon"
+        className="absolute top-2 right-2 h-6 w-6 hover:bg-destructive/20"
+        onClick={() => setIsVisible(false)}
+      >
+        <X className="h-4 w-4" />
+      </Button>
       <AlertTitle className="font-bold">
         ⚠️ {criticalOrders.length} {criticalOrders.length === 1 ? 'Pedido Crítico' : 'Pedidos Críticos'}
       </AlertTitle>
