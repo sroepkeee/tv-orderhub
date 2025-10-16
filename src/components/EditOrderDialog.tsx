@@ -1404,28 +1404,9 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 gap-3">
-                  <div>
-                    <Label htmlFor="status">Status</Label>
-                    <Select onValueChange={handleStatusChange} defaultValue={order?.status}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="pending">Pendente</SelectItem>
-                        <SelectItem value="planned">Planejado</SelectItem>
-                        <SelectItem value="in_production">Em Produção</SelectItem>
-                        <SelectItem value="exception">⚠️ Exceção</SelectItem>
-                        <SelectItem value="completed">Concluído</SelectItem>
-                        <SelectItem value="cancelled">Cancelado</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-
                 <div className="pt-3 border-t">
-                  <Label className="text-sm font-medium mb-2 block">Atualização Rápida de Status</Label>
-                  <PhaseButtons 
+                  <Label className="text-sm font-medium mb-2 block">Status do Pedido</Label>
+                  <PhaseButtons
                     order={order} 
                     onStatusChange={(orderId, newStatus) => handleStatusChange(newStatus)}
                   />
