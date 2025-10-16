@@ -7,7 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import type { Order } from "@/components/Dashboard";
 import type { OrderItem } from "@/components/AddOrderDialog";
 import { calculateDaysOpen, calculateDaysUntilDeadline, getDeadlineStatus, getPartialDeliveryInfo, countOrderDateChanges } from "@/lib/metrics";
-import { Calendar, TrendingUp, Package, AlertCircle } from "lucide-react";
+import { Calendar, TrendingUp, Package, AlertCircle, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 interface OrdersTrackingTableProps {
   orders: Order[];
@@ -17,6 +17,9 @@ interface OrderWithDetails extends Order {
   items?: OrderItem[];
   dateChangesCount?: number;
 }
+type SortField = 'orderNumber' | 'client' | 'itemsQuantity' | 'status' | 'deliveryDeadline' | 'daysOpen' | 'deadline' | 'dateChanges';
+type SortDirection = 'asc' | 'desc';
+
 export function OrdersTrackingTable({
   orders,
   onOrderClick
@@ -24,6 +27,8 @@ export function OrdersTrackingTable({
   const [filter, setFilter] = useState<'all' | 'critical' | 'warning' | 'good'>('all');
   const [ordersWithDetails, setOrdersWithDetails] = useState<OrderWithDetails[]>([]);
   const [loading, setLoading] = useState(true);
+  const [sortField, setSortField] = useState<SortField | null>(null);
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   useEffect(() => {
     loadOrderDetails();
   }, [orders]);
@@ -66,13 +71,81 @@ export function OrdersTrackingTable({
       setLoading(false);
     }
   };
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('asc');
+    }
+  };
+
+  const getSortIcon = (field: SortField) => {
+    if (sortField !== field) return <ArrowUpDown className="h-3 w-3 ml-1 inline opacity-50" />;
+    return sortDirection === 'asc' 
+      ? <ArrowUp className="h-3 w-3 ml-1 inline" />
+      : <ArrowDown className="h-3 w-3 ml-1 inline" />;
+  };
+
   const getFilteredOrders = () => {
-    if (filter === 'all') return ordersWithDetails;
-    return ordersWithDetails.filter(order => {
-      const daysUntil = calculateDaysUntilDeadline(order.deliveryDeadline);
-      const status = getDeadlineStatus(daysUntil);
-      return status === filter;
-    });
+    let filtered = filter === 'all' 
+      ? [...ordersWithDetails]
+      : ordersWithDetails.filter(order => {
+          const daysUntil = calculateDaysUntilDeadline(order.deliveryDeadline);
+          const status = getDeadlineStatus(daysUntil);
+          return status === filter;
+        });
+
+    // Aplicar ordenação
+    if (sortField) {
+      filtered.sort((a, b) => {
+        let aValue: any;
+        let bValue: any;
+
+        switch (sortField) {
+          case 'orderNumber':
+            aValue = a.orderNumber;
+            bValue = b.orderNumber;
+            break;
+          case 'client':
+            aValue = a.client.toLowerCase();
+            bValue = b.client.toLowerCase();
+            break;
+          case 'itemsQuantity':
+            aValue = (a.items || []).reduce((sum, item) => sum + item.requestedQuantity, 0);
+            bValue = (b.items || []).reduce((sum, item) => sum + item.requestedQuantity, 0);
+            break;
+          case 'status':
+            aValue = a.status;
+            bValue = b.status;
+            break;
+          case 'deliveryDeadline':
+            aValue = new Date(a.deliveryDeadline).getTime();
+            bValue = new Date(b.deliveryDeadline).getTime();
+            break;
+          case 'daysOpen':
+            aValue = calculateDaysOpen(a.createdDate);
+            bValue = calculateDaysOpen(b.createdDate);
+            break;
+          case 'deadline':
+            aValue = calculateDaysUntilDeadline(a.deliveryDeadline);
+            bValue = calculateDaysUntilDeadline(b.deliveryDeadline);
+            break;
+          case 'dateChanges':
+            aValue = a.dateChangesCount || 0;
+            bValue = b.dateChangesCount || 0;
+            break;
+          default:
+            return 0;
+        }
+
+        if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1;
+        if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1;
+        return 0;
+      });
+    }
+
+    return filtered;
   };
   const getStatusBadge = (status: string) => {
     const statusMap: Record<string, {
@@ -169,16 +242,32 @@ export function OrdersTrackingTable({
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="min-w-[120px]">Nº Pedido</TableHead>
-              <TableHead className="min-w-[150px]">Cliente</TableHead>
-              <TableHead className="min-w-[90px] text-center">Qtd. Itens</TableHead>
-              <TableHead className="min-w-[120px]">Status</TableHead>
-              <TableHead className="min-w-[120px]">Data de Entrega</TableHead>
-              <TableHead className="min-w-[90px] text-center">Dias Aberto</TableHead>
-              <TableHead className="min-w-[120px] text-center">Prazo</TableHead>
+              <TableHead className="min-w-[120px] cursor-pointer hover:bg-muted/50" onClick={() => handleSort('orderNumber')}>
+                Nº Pedido{getSortIcon('orderNumber')}
+              </TableHead>
+              <TableHead className="min-w-[150px] cursor-pointer hover:bg-muted/50" onClick={() => handleSort('client')}>
+                Cliente{getSortIcon('client')}
+              </TableHead>
+              <TableHead className="min-w-[90px] text-center cursor-pointer hover:bg-muted/50" onClick={() => handleSort('itemsQuantity')}>
+                Qtd. Itens{getSortIcon('itemsQuantity')}
+              </TableHead>
+              <TableHead className="min-w-[120px] cursor-pointer hover:bg-muted/50" onClick={() => handleSort('status')}>
+                Status{getSortIcon('status')}
+              </TableHead>
+              <TableHead className="min-w-[120px] cursor-pointer hover:bg-muted/50" onClick={() => handleSort('deliveryDeadline')}>
+                Data de Entrega{getSortIcon('deliveryDeadline')}
+              </TableHead>
+              <TableHead className="min-w-[90px] text-center cursor-pointer hover:bg-muted/50" onClick={() => handleSort('daysOpen')}>
+                Dias Aberto{getSortIcon('daysOpen')}
+              </TableHead>
+              <TableHead className="min-w-[120px] text-center cursor-pointer hover:bg-muted/50" onClick={() => handleSort('deadline')}>
+                Prazo{getSortIcon('deadline')}
+              </TableHead>
               <TableHead className="min-w-[150px]">Entregas Parciais</TableHead>
               <TableHead className="min-w-[140px]">Origem Itens</TableHead>
-              <TableHead className="min-w-[80px] text-center">Mudanças</TableHead>
+              <TableHead className="min-w-[80px] text-center cursor-pointer hover:bg-muted/50" onClick={() => handleSort('dateChanges')}>
+                Mudanças{getSortIcon('dateChanges')}
+              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
