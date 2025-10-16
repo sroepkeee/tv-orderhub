@@ -74,6 +74,7 @@ export default function Metrics() {
         description: dbOrder.notes || "",
         quantity: 0,
         createdDate: new Date(dbOrder.created_at).toISOString().split('T')[0],
+        issueDate: dbOrder.issue_date ? new Date(dbOrder.issue_date).toISOString().split('T')[0] : undefined,
         status: dbOrder.status as any,
         client: dbOrder.customer_name,
         deliveryDeadline: dbOrder.delivery_date,

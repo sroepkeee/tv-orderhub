@@ -7,6 +7,17 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 /**
+ * Formata data do formato YYYY-MM-DD para DD-MM-YYYY
+ * @param dateString - Data em formato YYYY-MM-DD
+ * @returns Data em formato DD-MM-YYYY
+ */
+export function formatDateBR(dateString: string): string {
+  if (!dateString) return '';
+  const [year, month, day] = dateString.split('-');
+  return `${day}-${month}-${year}`;
+}
+
+/**
  * Calcula a data após N dias úteis (excluindo sábados e domingos)
  * @param startDate - Data inicial em formato DD/MM/YYYY ou Date
  * @param businessDays - Número de dias úteis a adicionar

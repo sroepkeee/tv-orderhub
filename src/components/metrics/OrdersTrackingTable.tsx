@@ -14,7 +14,7 @@ import {
   countOrderDateChanges
 } from "@/lib/metrics";
 import { Calendar, TrendingUp, Package, AlertCircle } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, formatDateBR } from "@/lib/utils";
 
 interface OrdersTrackingTableProps {
   orders: Order[];
@@ -160,8 +160,8 @@ export function OrdersTrackingTable({ orders, onOrderClick }: OrdersTrackingTabl
   }
 
   return (
-    <div className="bg-card border rounded-lg p-6">
-      <div className="mb-4">
+    <div className="bg-card border rounded-lg p-4">
+      <div className="mb-3">
         <h2 className="text-xl font-semibold mb-2 flex items-center gap-2">
           📋 Acompanhamento Detalhado de Pedidos
         </h2>
@@ -208,13 +208,14 @@ export function OrdersTrackingTable({ orders, onOrderClick }: OrdersTrackingTabl
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="min-w-[120px]">Nº Pedido</TableHead>
+              <TableHead className="min-w-[100px]">Nº Pedido</TableHead>
+              <TableHead className="min-w-[110px]">Data de Emissão</TableHead>
               <TableHead className="min-w-[150px]">Cliente</TableHead>
-              <TableHead className="min-w-[90px] text-center">Qtd. Itens</TableHead>
-              <TableHead className="min-w-[120px]">Status</TableHead>
-              <TableHead className="min-w-[120px]">Data de Entrega</TableHead>
-              <TableHead className="min-w-[90px] text-center">Dias Aberto</TableHead>
-              <TableHead className="min-w-[120px] text-center">Prazo</TableHead>
+              <TableHead className="min-w-[80px] text-center">Qtd. Itens</TableHead>
+              <TableHead className="min-w-[100px]">Status</TableHead>
+              <TableHead className="min-w-[110px]">Data de Entrega</TableHead>
+              <TableHead className="min-w-[80px] text-center">Dias Aberto</TableHead>
+              <TableHead className="min-w-[110px] text-center">Prazo</TableHead>
               <TableHead className="min-w-[150px]">Entregas Parciais</TableHead>
               <TableHead className="min-w-[140px]">Origem Itens</TableHead>
               <TableHead className="min-w-[80px] text-center">Mudanças</TableHead>
@@ -223,7 +224,7 @@ export function OrdersTrackingTable({ orders, onOrderClick }: OrdersTrackingTabl
           <TableBody>
             {filteredOrders.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={11} className="text-center py-8 text-muted-foreground">
                   Nenhum pedido encontrado com os filtros selecionados
                 </TableCell>
               </TableRow>
@@ -251,6 +252,16 @@ export function OrdersTrackingTable({ orders, onOrderClick }: OrdersTrackingTabl
                     onClick={() => onOrderClick(order)}
                   >
                     <TableCell className="font-medium">{order.orderNumber}</TableCell>
+                    <TableCell className="text-sm">
+                      {order.issueDate ? (
+                        <div className="flex items-center gap-1">
+                          <Calendar className="h-3 w-3 text-muted-foreground" />
+                          {formatDateBR(order.issueDate)}
+                        </div>
+                      ) : (
+                        <span className="text-muted-foreground text-xs">-</span>
+                      )}
+                    </TableCell>
                     <TableCell>{order.client}</TableCell>
                     <TableCell className="text-center">
                       <Badge variant="secondary" className="text-sm font-semibold">
@@ -262,7 +273,7 @@ export function OrdersTrackingTable({ orders, onOrderClick }: OrdersTrackingTabl
                     <TableCell className="text-sm">
                       <div className="flex items-center gap-1">
                         <Calendar className="h-3 w-3 text-muted-foreground" />
-                        {order.deliveryDeadline}
+                        {formatDateBR(order.deliveryDeadline)}
                       </div>
                     </TableCell>
                     <TableCell className="text-center">
