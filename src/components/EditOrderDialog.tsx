@@ -836,8 +836,8 @@ export const EditOrderDialog = ({ order, open, onOpenChange, onSave, onDelete }:
     );
   };
 
-  // Handle status change with validation
-  const handleStatusChange = (newStatus: string) => {
+  // Handle status change with validation and immediate save
+  const handleStatusChange = async (newStatus: string) => {
     console.log('🔄 Mudando status para:', newStatus);
     
     // Check if it's exception status
@@ -861,9 +861,56 @@ export const EditOrderDialog = ({ order, open, onOpenChange, onSave, onDelete }:
       }
     }
     
-    // Atualizar o formulário com o novo status
-    setValue("status", newStatus as any, { shouldDirty: true, shouldTouch: true });
-    console.log('✅ Status atualizado no formulário:', getValues("status"));
+    // Salvar imediatamente no banco de dados
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Usuário não autenticado");
+
+      const oldStatus = order.status;
+      
+      // Atualizar status no banco
+      const { error: updateError } = await supabase
+        .from('orders')
+        .update({ status: newStatus })
+        .eq('id', order.id);
+      
+      if (updateError) throw updateError;
+
+      // Registrar no histórico
+      const { error: historyError } = await supabase
+        .from('order_history')
+        .insert({
+          order_id: order.id,
+          user_id: user.id,
+          old_status: oldStatus,
+          new_status: newStatus
+        });
+      
+      if (historyError) console.error('Erro ao registrar histórico:', historyError);
+
+      // Atualizar o formulário
+      setValue("status", newStatus as any, { shouldDirty: false, shouldTouch: false });
+      
+      // Atualizar o pedido no estado do componente pai
+      onSave({ ...order, status: newStatus as any });
+      
+      toast({
+        title: "✅ Status atualizado",
+        description: `Pedido agora está: ${getStatusLabel(newStatus)}`
+      });
+      
+      console.log('✅ Status salvo no banco:', newStatus);
+      
+      // Recarregar histórico
+      loadHistory();
+    } catch (error) {
+      console.error("Erro ao salvar status:", error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível salvar o status.",
+        variant: "destructive"
+      });
+    }
   };
 
   // Confirm completion with or without justification
