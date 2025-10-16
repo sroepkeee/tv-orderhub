@@ -273,85 +273,138 @@ function extractItemsTable(text: string): ParsedOrderData['items'] {
   const tableText = text.substring(composicaoIndex);
   console.log('📋 Primeiras linhas da tabela:', tableText.substring(0, 500));
   
-  // Padrão 1: Formato "Item XX Código XXX Qtde X,XX Uni XX V.Unit XXX" (texto corrido)
-  // Exemplo: Item 01   Código 061171 Qtde 2,00   Uni PC   V.Unit 154,41   Desc 0,00...
-  const itemTextRegex = /Item\s+(\d+)\s+C[óo]digo\s+(\d+)\s+Qtde\s+([\d,]+)\s+Uni\s+([A-Z]+)\s+V\.Unit\s+([\d.,]+)\s+Desc\s+([\d.,]+)\s+V\.\s*C\/\s*Desc\s+([\d.,]+)\s+NCM\s+\d+\s+%IPI\s+([\d.,]+)\s+Val\.\s*IPI\s+([\d.,]+)\s+%ICMS\s+([\d.,]+)\s+ICMS\s+([\d.,]+)\s+Total\s+([\d.,]+)\s+Total\s+c\/\s*IPI\s+([\d.,]+)\s+Armaz[ée]m\s+(\S+)\s+(?:Observa[çc][ãa]o\s+)?(?:Opera[çc][ãa]o\s+\S+\s+)?Descri[çc][ãa]o\s+(.+?)(?=Item\s+\d+\s+C[óo]digo|$)/gi;
+  // NOVO PADRÃO ROBUSTO: Buscar blocos "Item XX ... Código XXXXXX ... Qtde XX,XX"
+  // Permite qualquer quantidade de espaços/pipes entre os campos
+  const blockRegex = /Item\s+(\d+)\s+.*?C[óo]digo\s+(\d+)\s+.*?Qtde\s+([\d,]+)\s+.*?Uni?\s+([A-Z]+)\s+.*?V\.?\s*Unit?\s+([\d.,]+)\s+.*?(?:Desc|%Desc)\s+([\d.,]+)\s+.*?%IPI\s+([\d.,]+)\s+.*?%ICMS\s+([\d.,]+)\s+.*?Total(?:\s+c\/\s*IPI)?\s+([\d.,]+)\s+.*?Armaz[ée]m\s+(\S+)\s+.*?Descri[çc][ãa]o\s+(.+?)(?=Item\s+\d+|$)/gis;
   
   let match;
   let itemIndex = 1;
-  while ((match = itemTextRegex.exec(tableText)) !== null) {
-    const [, itemNum, codigo, qtd, unidade, vlrUnit, desc, vlrComDesc, ipi, vlrIpi, icmsPercent, icmsValor, total, totalComIpi, armazem, descricao] = match;
-    
-    items.push({
-      itemNumber: String(itemIndex++),
-      itemCode: codigo.trim(),
-      description: descricao.trim(),
-      quantity: Math.round(parseFloat(qtd.replace(',', '.'))), // Arredondar para inteiro
-      unit: unidade.trim(),
-      warehouse: armazem.trim(),
-      deliveryDate: '',
-      sourceType: 'in_stock',
-      unitPrice: parseFloat(vlrUnit.replace(/\./g, '').replace(',', '.')),
-      discount: parseFloat(desc.replace(',', '.')),
-      ipiPercent: parseFloat(ipi.replace(',', '.')),
-      icmsPercent: parseFloat(icmsPercent.replace(',', '.')),
-      totalValue: parseFloat(total.replace(/\./g, '').replace(',', '.'))
-    });
-  }
   
-  // Padrão 2: Tabela com pipes (formato TOTVS tradicional)
-  if (items.length === 0) {
-    console.warn('⚠️ Tentando padrão com pipes');
-    const itemRegex = /\|\s*(\d+)\s*\|\s*([\d]+)\s*\|\s*([\d,]+)\s*\|\s*([A-Z]+)\s*\|\s*([\d.,]+)\s*\|\s*([\d.,]+)\s*\|\s*([\d.,]+)\s*\|\s*([\d.,]+)\s*\|\s*([\d.,]+)\s*\|\s*([^\|]+?)(?=\s*\||\s*$)/gi;
-    
-    while ((match = itemRegex.exec(tableText)) !== null) {
-      const [, itemNum, codigo, qtd, unidade, vlrUnit, desc, ipi, icms, vlrMerc, descricao] = match;
+  while ((match = blockRegex.exec(tableText)) !== null) {
+    try {
+      const [, itemNum, codigo, qtd, unidade, vlrUnit, desc, ipi, icms, total, armazem, descricao] = match;
+      
+      // Converter quantidade (10,00 → 10.00 → 10)
+      const quantityStr = qtd.trim().replace(',', '.');
+      const quantity = Math.round(parseFloat(quantityStr));
+      
+      // Validar quantidade mínima
+      if (isNaN(quantity) || quantity <= 0) {
+        console.warn(`⚠️ Quantidade inválida para item ${codigo}: ${qtd}`);
+        continue;
+      }
+      
+      console.log(`📦 Item ${itemNum}: Código ${codigo}, Qtde ${quantity}, Uni ${unidade}`);
       
       items.push({
-        itemNumber: String(itemIndex++),
+        itemNumber: itemNum.trim(),
         itemCode: codigo.trim(),
-        description: descricao.trim(),
-        quantity: Math.round(parseFloat(qtd.replace(',', '.'))),
+        description: descricao.trim().split('\n')[0].substring(0, 200), // Pega primeira linha, max 200 chars
+        quantity,
         unit: unidade.trim(),
-        warehouse: 'PRINCIPAL',
+        warehouse: armazem.trim(),
         deliveryDate: '',
         sourceType: 'in_stock',
         unitPrice: parseFloat(vlrUnit.replace(/\./g, '').replace(',', '.')),
         discount: parseFloat(desc.replace(',', '.')),
         ipiPercent: parseFloat(ipi.replace(',', '.')),
         icmsPercent: parseFloat(icms.replace(',', '.')),
-        totalValue: parseFloat(vlrMerc.replace(/\./g, '').replace(',', '.'))
+        totalValue: parseFloat(total.replace(/\./g, '').replace(',', '.'))
       });
+      itemIndex++;
+    } catch (e) {
+      console.error(`❌ Erro ao parsear item:`, e);
+      continue;
     }
   }
   
-  // Padrão 3: Simplificado - buscar código e quantidade
+  // FALLBACK 1: Padrão simplificado sem todos os campos
   if (items.length === 0) {
-    console.warn('⚠️ Tentando padrão simplificado');
-    // Buscar sequências: Código XXXXXX Qtde X,XX
-    const simpleRegex = /C[óo]digo\s+(\d+)\s+Qtde\s+([\d,]+)\s+Uni\s+([A-Z]+)/gi;
+    console.warn('⚠️ Tentando fallback: padrão simplificado');
+    const simpleBlockRegex = /Item\s+(\d+)\s+.*?C[óo]digo\s+(\d+)\s+.*?Qtde\s+([\d,]+)\s+.*?Uni?\s+([A-Z]+)/gis;
     
-    while ((match = simpleRegex.exec(tableText)) !== null) {
-      const [, codigo, qtd, unidade] = match;
-      
-      items.push({
-        itemNumber: String(items.length + 1),
-        itemCode: codigo.trim(),
-        description: 'Produto',
-        quantity: Math.round(parseFloat(qtd.replace(',', '.'))),
-        unit: unidade.trim(),
-        warehouse: 'PRINCIPAL',
-        deliveryDate: '',
-        sourceType: 'in_stock',
-        unitPrice: 0,
-        discount: 0,
-        ipiPercent: 0,
-        icmsPercent: 0,
-        totalValue: 0
-      });
+    while ((match = simpleBlockRegex.exec(tableText)) !== null) {
+      try {
+        const [, itemNum, codigo, qtd, unidade] = match;
+        
+        const quantityStr = qtd.trim().replace(',', '.');
+        const quantity = Math.round(parseFloat(quantityStr));
+        
+        if (isNaN(quantity) || quantity <= 0) {
+          console.warn(`⚠️ Quantidade inválida para item ${codigo}: ${qtd}`);
+          continue;
+        }
+        
+        console.log(`📦 Item ${itemNum} (fallback): Código ${codigo}, Qtde ${quantity}`);
+        
+        items.push({
+          itemNumber: itemNum.trim(),
+          itemCode: codigo.trim(),
+          description: 'Produto TOTVS',
+          quantity,
+          unit: unidade.trim(),
+          warehouse: 'PRINCIPAL',
+          deliveryDate: '',
+          sourceType: 'in_stock',
+          unitPrice: 0,
+          discount: 0,
+          ipiPercent: 0,
+          icmsPercent: 0,
+          totalValue: 0
+        });
+      } catch (e) {
+        console.error(`❌ Erro ao parsear item (fallback):`, e);
+        continue;
+      }
+    }
+  }
+  
+  // FALLBACK 2: Buscar apenas "Código + Qtde + Uni" (mais permissivo)
+  if (items.length === 0) {
+    console.warn('⚠️ Tentando fallback final: apenas Código + Qtde');
+    const minimalRegex = /C[óo]digo\s+(\d+)\s+.*?Qtde\s+([\d,]+)\s+.*?Uni?\s+([A-Z]+)/gis;
+    
+    let fallbackIndex = 1;
+    while ((match = minimalRegex.exec(tableText)) !== null) {
+      try {
+        const [, codigo, qtd, unidade] = match;
+        
+        const quantityStr = qtd.trim().replace(',', '.');
+        const quantity = Math.round(parseFloat(quantityStr));
+        
+        if (isNaN(quantity) || quantity <= 0) {
+          continue;
+        }
+        
+        console.log(`📦 Item ${fallbackIndex} (minimal): Código ${codigo}, Qtde ${quantity}`);
+        
+        items.push({
+          itemNumber: String(fallbackIndex++),
+          itemCode: codigo.trim(),
+          description: 'Produto TOTVS',
+          quantity,
+          unit: unidade.trim(),
+          warehouse: 'PRINCIPAL',
+          deliveryDate: '',
+          sourceType: 'in_stock',
+          unitPrice: 0,
+          discount: 0,
+          ipiPercent: 0,
+          icmsPercent: 0,
+          totalValue: 0
+        });
+      } catch (e) {
+        console.error(`❌ Erro ao parsear item (minimal):`, e);
+        continue;
+      }
     }
   }
   
   console.log(`📦 Itens extraídos com sucesso: ${items.length}`);
+  
+  if (items.length === 0) {
+    console.error('❌ Nenhum item encontrado com nenhum dos padrões');
+  }
+  
   return items;
 }
