@@ -7,9 +7,10 @@ import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { format, differenceInDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Phone, Flag, MessageSquare, Eye } from "lucide-react";
+import { Phone, Flag, MessageSquare, ChevronDown, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 import { DateChangeActionDialog } from "./DateChangeActionDialog";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 interface EnhancedDateChange {
   id: string;
@@ -30,6 +31,19 @@ interface EnhancedDateChange {
   days_delayed: number;
 }
 
+interface GroupedDateChanges {
+  order_id: string;
+  order_number: string;
+  customer_name: string;
+  changes: EnhancedDateChange[];
+  total_changes: number;
+  last_change_date: string;
+  total_days_delayed: number;
+  has_stalling: boolean;
+  has_pending_followup: boolean;
+  predominant_category: string;
+}
+
 interface EnhancedDateChangeHistoryProps {
   limit?: number;
   orders: any[];
@@ -44,6 +58,7 @@ export function EnhancedDateChangeHistory({ limit = 20, orders }: EnhancedDateCh
   const [selectedChange, setSelectedChange] = useState<EnhancedDateChange | null>(null);
   const [actionType, setActionType] = useState<'followup' | 'stalling' | 'note' | null>(null);
   const [showOnlyActive, setShowOnlyActive] = useState(true);
+  const [expandedOrders, setExpandedOrders] = useState<Set<string>>(new Set());
 
   const loadDateChanges = async () => {
     try {
@@ -113,6 +128,69 @@ export function EnhancedDateChangeHistory({ limit = 20, orders }: EnhancedDateCh
     if (followupFilter && !change.factory_followup_required) return false;
     return true;
   });
+
+  // Agrupar mudanças por pedido
+  const groupedChanges = useMemo(() => {
+    const grouped = new Map<string, GroupedDateChanges>();
+    
+    filteredChanges.forEach(change => {
+      if (!grouped.has(change.order_id)) {
+        grouped.set(change.order_id, {
+          order_id: change.order_id,
+          order_number: change.order_number,
+          customer_name: change.customer_name,
+          changes: [],
+          total_changes: 0,
+          last_change_date: change.changed_at,
+          total_days_delayed: 0,
+          has_stalling: false,
+          has_pending_followup: false,
+          predominant_category: ''
+        });
+      }
+      
+      const group = grouped.get(change.order_id)!;
+      group.changes.push(change);
+      group.total_changes++;
+      group.total_days_delayed += change.days_delayed;
+      
+      if (change.marked_as_stalling) group.has_stalling = true;
+      if (change.factory_followup_required && !change.factory_contacted_at) {
+        group.has_pending_followup = true;
+      }
+      
+      // Atualizar última mudança
+      if (new Date(change.changed_at) > new Date(group.last_change_date)) {
+        group.last_change_date = change.changed_at;
+      }
+    });
+    
+    // Calcular categoria predominante para cada grupo
+    grouped.forEach(group => {
+      const categoryCounts: Record<string, number> = {};
+      group.changes.forEach(change => {
+        const cat = change.change_category || 'other';
+        categoryCounts[cat] = (categoryCounts[cat] || 0) + 1;
+      });
+      
+      group.predominant_category = Object.entries(categoryCounts)
+        .sort((a, b) => b[1] - a[1])[0]?.[0] || 'other';
+    });
+    
+    return Array.from(grouped.values()).sort((a, b) => 
+      new Date(b.last_change_date).getTime() - new Date(a.last_change_date).getTime()
+    );
+  }, [filteredChanges]);
+
+  const toggleOrder = (orderId: string) => {
+    const newExpanded = new Set(expandedOrders);
+    if (newExpanded.has(orderId)) {
+      newExpanded.delete(orderId);
+    } else {
+      newExpanded.add(orderId);
+    }
+    setExpandedOrders(newExpanded);
+  };
 
   const stats = {
     total: dateChanges.length,
@@ -327,95 +405,179 @@ export function EnhancedDateChangeHistory({ limit = 20, orders }: EnhancedDateCh
             <table className="w-full">
               <thead>
                 <tr className="border-b">
+                  <th className="w-8"></th>
                   <th className="text-left py-2 px-2 text-sm font-medium">Pedido</th>
                   <th className="text-left py-2 px-2 text-sm font-medium">Cliente</th>
-                  <th className="text-left py-2 px-2 text-sm font-medium">Data Antiga</th>
-                  <th className="text-left py-2 px-2 text-sm font-medium">Data Nova</th>
-                  <th className="text-left py-2 px-2 text-sm font-medium">Atraso</th>
+                  <th className="text-left py-2 px-2 text-sm font-medium">Mudanças</th>
+                  <th className="text-left py-2 px-2 text-sm font-medium">Última Mudança</th>
+                  <th className="text-left py-2 px-2 text-sm font-medium">Atraso Total</th>
                   <th className="text-left py-2 px-2 text-sm font-medium">Categoria</th>
                   <th className="text-left py-2 px-2 text-sm font-medium">Status</th>
-                  <th className="text-right py-2 px-2 text-sm font-medium">Ações</th>
                 </tr>
               </thead>
               <tbody>
-                {filteredChanges.length === 0 ? (
+                {groupedChanges.length === 0 ? (
                   <tr>
                     <td colSpan={8} className="text-center py-8 text-muted-foreground">
                       Nenhuma mudança de prazo encontrada
                     </td>
                   </tr>
                 ) : (
-                  filteredChanges.map((change) => (
-                    <tr key={change.id} className="border-b hover:bg-muted/50">
-                      <td className="py-3 px-2 text-sm font-medium">{change.order_number}</td>
-                      <td className="py-3 px-2 text-sm">{change.customer_name}</td>
-                      <td className="py-3 px-2 text-sm">
-                        {format(new Date(change.old_date), "dd/MM/yyyy", { locale: ptBR })}
-                      </td>
-                      <td className="py-3 px-2 text-sm">
-                        {format(new Date(change.new_date), "dd/MM/yyyy", { locale: ptBR })}
-                      </td>
-                      <td className="py-3 px-2">
-                        <Badge variant={getDelayBadgeVariant(change.days_delayed)}>
-                          +{change.days_delayed}d
-                        </Badge>
-                      </td>
-                      <td className="py-3 px-2 text-sm">
-                        {getCategoryIcon(change.change_category)} {getCategoryLabel(change.change_category)}
-                      </td>
-                      <td className="py-3 px-2">
-                        <div className="flex gap-1">
-                          {change.marked_as_stalling && (
-                            <Badge variant="destructive" className="text-xs">🚩</Badge>
-                          )}
-                          {change.factory_followup_required && !change.factory_contacted_at && (
-                            <Badge variant="secondary" className="text-xs">📞</Badge>
-                          )}
-                          {change.factory_response && (
-                            <Badge variant="default" className="text-xs">✅</Badge>
-                          )}
-                        </div>
-                      </td>
-                      <td className="py-3 px-2">
-                        <div className="flex gap-1 justify-end">
-                          {!change.factory_contacted_at && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => {
-                                setSelectedChange(change);
-                                setActionType('followup');
-                              }}
+                  groupedChanges.map((group) => {
+                    const isExpanded = expandedOrders.has(group.order_id);
+                    
+                    return (
+                      <Collapsible key={group.order_id} open={isExpanded} asChild>
+                        <>
+                          {/* Linha Principal do Pedido */}
+                          <tr className="border-b hover:bg-muted/30 cursor-pointer">
+                            <CollapsibleTrigger asChild>
+                              <td 
+                                className="py-3 px-2 text-center"
+                                onClick={() => toggleOrder(group.order_id)}
+                              >
+                                {isExpanded ? (
+                                  <ChevronDown className="h-4 w-4 inline-block" />
+                                ) : (
+                                  <ChevronRight className="h-4 w-4 inline-block" />
+                                )}
+                              </td>
+                            </CollapsibleTrigger>
+                            <td 
+                              className="py-3 px-2 text-sm font-bold"
+                              onClick={() => toggleOrder(group.order_id)}
                             >
-                              <Phone className="h-3 w-3" />
-                            </Button>
-                          )}
-                          {!change.marked_as_stalling && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => {
-                                setSelectedChange(change);
-                                setActionType('stalling');
-                              }}
+                              {group.order_number}
+                            </td>
+                            <td 
+                              className="py-3 px-2 text-sm"
+                              onClick={() => toggleOrder(group.order_id)}
                             >
-                              <Flag className="h-3 w-3" />
-                            </Button>
-                          )}
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => {
-                              setSelectedChange(change);
-                              setActionType('note');
-                            }}
-                          >
-                            <MessageSquare className="h-3 w-3" />
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
+                              {group.customer_name}
+                            </td>
+                            <td 
+                              className="py-3 px-2"
+                              onClick={() => toggleOrder(group.order_id)}
+                            >
+                              <Badge variant="outline" className="font-semibold">
+                                {group.total_changes}x
+                              </Badge>
+                            </td>
+                            <td 
+                              className="py-3 px-2 text-sm"
+                              onClick={() => toggleOrder(group.order_id)}
+                            >
+                              {format(new Date(group.last_change_date), "dd/MM/yyyy", { locale: ptBR })}
+                            </td>
+                            <td 
+                              className="py-3 px-2"
+                              onClick={() => toggleOrder(group.order_id)}
+                            >
+                              <Badge variant={getDelayBadgeVariant(group.total_days_delayed)}>
+                                +{group.total_days_delayed}d
+                              </Badge>
+                            </td>
+                            <td 
+                              className="py-3 px-2 text-sm"
+                              onClick={() => toggleOrder(group.order_id)}
+                            >
+                              {getCategoryIcon(group.predominant_category)} {getCategoryLabel(group.predominant_category)}
+                            </td>
+                            <td 
+                              className="py-3 px-2"
+                              onClick={() => toggleOrder(group.order_id)}
+                            >
+                              <div className="flex gap-1">
+                                {group.has_stalling && (
+                                  <Badge variant="destructive" className="text-xs">🚩</Badge>
+                                )}
+                                {group.has_pending_followup && (
+                                  <Badge variant="secondary" className="text-xs">📞</Badge>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+
+                          {/* Linhas Expandidas - Detalhes das Mudanças */}
+                          {group.changes.map((change) => (
+                            <CollapsibleContent key={change.id} asChild>
+                              <tr className="border-b bg-muted/20 hover:bg-muted/40">
+                                <td className="py-2 px-2"></td>
+                                <td colSpan={2} className="py-2 px-2 text-sm text-muted-foreground pl-8">
+                                  📅 {format(new Date(change.old_date), "dd/MM", { locale: ptBR })} → {format(new Date(change.new_date), "dd/MM", { locale: ptBR })}
+                                </td>
+                                <td className="py-2 px-2">
+                                  <Badge variant={getDelayBadgeVariant(change.days_delayed)} className="text-xs">
+                                    +{change.days_delayed}d
+                                  </Badge>
+                                </td>
+                                <td className="py-2 px-2 text-xs text-muted-foreground">
+                                  {format(new Date(change.changed_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}
+                                </td>
+                                <td className="py-2 px-2 text-xs">
+                                  {getCategoryIcon(change.change_category)} {getCategoryLabel(change.change_category)}
+                                </td>
+                                <td className="py-2 px-2">
+                                  <div className="flex gap-1">
+                                    {change.marked_as_stalling && (
+                                      <Badge variant="destructive" className="text-xs">🚩</Badge>
+                                    )}
+                                    {change.factory_followup_required && !change.factory_contacted_at && (
+                                      <Badge variant="secondary" className="text-xs">📞</Badge>
+                                    )}
+                                    {change.factory_response && (
+                                      <Badge variant="default" className="text-xs">✅</Badge>
+                                    )}
+                                  </div>
+                                </td>
+                                <td className="py-2 px-2">
+                                  <div className="flex gap-1 justify-end">
+                                    {!change.factory_contacted_at && (
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="h-7 w-7 p-0"
+                                        onClick={() => {
+                                          setSelectedChange(change);
+                                          setActionType('followup');
+                                        }}
+                                      >
+                                        <Phone className="h-3 w-3" />
+                                      </Button>
+                                    )}
+                                    {!change.marked_as_stalling && (
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="h-7 w-7 p-0"
+                                        onClick={() => {
+                                          setSelectedChange(change);
+                                          setActionType('stalling');
+                                        }}
+                                      >
+                                        <Flag className="h-3 w-3" />
+                                      </Button>
+                                    )}
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="h-7 w-7 p-0"
+                                      onClick={() => {
+                                        setSelectedChange(change);
+                                        setActionType('note');
+                                      }}
+                                    >
+                                      <MessageSquare className="h-3 w-3" />
+                                    </Button>
+                                  </div>
+                                </td>
+                              </tr>
+                            </CollapsibleContent>
+                          ))}
+                        </>
+                      </Collapsible>
+                    );
+                  })
                 )}
               </tbody>
             </table>
