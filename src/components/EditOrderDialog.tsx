@@ -58,7 +58,7 @@ interface EditOrderDialogProps {
 }
 
 export const EditOrderDialog = ({ order, open, onOpenChange, onSave, onDelete }: EditOrderDialogProps) => {
-  const { register, handleSubmit, setValue, reset } = useForm<Order>();
+  const { register, handleSubmit, setValue, reset, getValues } = useForm<Order>();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("edit");
   const [items, setItems] = useState<OrderItem[]>([]);
@@ -838,6 +838,8 @@ export const EditOrderDialog = ({ order, open, onOpenChange, onSave, onDelete }:
 
   // Handle status change with validation
   const handleStatusChange = (newStatus: string) => {
+    console.log('🔄 Mudando status para:', newStatus);
+    
     // Check if it's exception status
     if (newStatus === 'exception') {
       setPendingExceptionStatus(newStatus);
@@ -859,7 +861,9 @@ export const EditOrderDialog = ({ order, open, onOpenChange, onSave, onDelete }:
       }
     }
     
-    setValue("status", newStatus as any);
+    // Atualizar o formulário com o novo status
+    setValue("status", newStatus as any, { shouldDirty: true, shouldTouch: true });
+    console.log('✅ Status atualizado no formulário:', getValues("status"));
   };
 
   // Confirm completion with or without justification
@@ -1106,6 +1110,7 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
   };
 
   const onSubmit = (data: Order) => {
+    console.log('💾 Salvando pedido com dados:', data);
     const updatedOrder = { ...data, id: order.id, items };
     
     // Check if delivery date changed
@@ -1436,10 +1441,13 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                 <div className="pt-3 border-t">
                   <Label className="text-sm font-medium mb-2 block">Status do Pedido</Label>
                   <PhaseButtons
-                    order={order} 
+                    order={{...order, status: getValues("status") || order.status}}
                     onStatusChange={(orderId, newStatus) => handleStatusChange(newStatus)}
                   />
                 </div>
+                
+                {/* Hidden input para garantir que o status seja enviado no formulário */}
+                <input type="hidden" {...register("status")} />
 
                 <div className="space-y-3 pt-3">
                   <div className="flex items-center justify-between">
