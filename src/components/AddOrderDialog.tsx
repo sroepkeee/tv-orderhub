@@ -262,8 +262,9 @@ export const AddOrderDialog = ({ onAddOrder }: AddOrderDialogProps) => {
                         <Label>Quantidade Solicitada</Label>
                         <Input
                           type="number"
+                          step="0.01"
                           value={item.requestedQuantity}
-                          onChange={(e) => updateItem(index, "requestedQuantity", parseInt(e.target.value) || 0)}
+                          onChange={(e) => updateItem(index, "requestedQuantity", parseFloat(e.target.value) || 0)}
                           min="0"
                           className="h-10 text-base"
                         />
@@ -293,8 +294,9 @@ export const AddOrderDialog = ({ onAddOrder }: AddOrderDialogProps) => {
                         <Label>Quantidade Entregue</Label>
                         <Input
                           type="number"
+                          step="0.01"
                           value={item.deliveredQuantity}
-                          onChange={(e) => updateItem(index, "deliveredQuantity", parseInt(e.target.value) || 0)}
+                          onChange={(e) => updateItem(index, "deliveredQuantity", parseFloat(e.target.value) || 0)}
                           min="0"
                           className="h-10 text-base"
                         />

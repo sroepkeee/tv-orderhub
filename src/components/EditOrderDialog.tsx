@@ -1503,8 +1503,9 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                               <TableCell>
                                 <Input
                                   type="number"
+                                  step="0.01"
                                   value={item.requestedQuantity}
-                                  onChange={(e) => updateItem(index, "requestedQuantity", parseInt(e.target.value) || 0)}
+                                  onChange={(e) => updateItem(index, "requestedQuantity", parseFloat(e.target.value) || 0)}
                                   min="0"
                                   className="h-8 text-sm"
                                 />
@@ -1544,9 +1545,10 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                               <TableCell>
                                 <Input
                                   type="number"
+                                  step="0.01"
                                   value={item.deliveredQuantity}
                                   onChange={(e) => {
-                                    const newQty = parseInt(e.target.value) || 0;
+                                    const newQty = parseFloat(e.target.value) || 0;
                                     
                                     // Se o item já foi salvo, atualizar no banco
                                     if (item.id) {
@@ -1560,7 +1562,7 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                                   onBlur={(e) => {
                                     // Validar ao sair do campo
                                     if (!item.id) {
-                                      const newQty = Math.max(0, Math.min(parseInt(e.target.value) || 0, item.requestedQuantity));
+                                      const newQty = Math.max(0, Math.min(parseFloat(e.target.value) || 0, item.requestedQuantity));
                                       updateItem(index, "deliveredQuantity", newQty);
                                     }
                                   }}

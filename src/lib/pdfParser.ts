@@ -284,9 +284,9 @@ function extractItemsTable(text: string): ParsedOrderData['items'] {
     try {
       const [, itemNum, codigo, qtd, unidade, vlrUnit, desc, ipi, icms, total, armazem, descricao] = match;
       
-      // Converter quantidade (10,00 → 10.00 → 10)
+      // Convert quantity (Brazilian decimal format: 10,00 → 10.00)
       const quantityStr = qtd.trim().replace(',', '.');
-      const quantity = Math.round(parseFloat(quantityStr));
+      const quantity = parseFloat(quantityStr);
       
       // Validar quantidade mínima
       if (isNaN(quantity) || quantity <= 0) {
@@ -328,7 +328,7 @@ function extractItemsTable(text: string): ParsedOrderData['items'] {
         const [, itemNum, codigo, qtd, unidade] = match;
         
         const quantityStr = qtd.trim().replace(',', '.');
-        const quantity = Math.round(parseFloat(quantityStr));
+        const quantity = parseFloat(quantityStr);
         
         if (isNaN(quantity) || quantity <= 0) {
           console.warn(`⚠️ Quantidade inválida para item ${codigo}: ${qtd}`);
@@ -370,7 +370,7 @@ function extractItemsTable(text: string): ParsedOrderData['items'] {
         const [, codigo, qtd, unidade] = match;
         
         const quantityStr = qtd.trim().replace(',', '.');
-        const quantity = Math.round(parseFloat(quantityStr));
+        const quantity = parseFloat(quantityStr);
         
         if (isNaN(quantity) || quantity <= 0) {
           continue;
