@@ -558,7 +558,7 @@ export const EditOrderDialog = ({ order, open, onOpenChange, onSave, onDelete }:
   // NOVO: Registrar mudança de item no histórico
   const recordItemChange = async (
     itemId: string,
-    field: 'received_status' | 'delivered_quantity' | 'item_source_type',
+    field: 'received_status' | 'delivered_quantity' | 'item_source_type' | 'item_status',
     oldValue: any,
     newValue: any,
     notes?: string
@@ -600,28 +600,35 @@ export const EditOrderDialog = ({ order, open, onOpenChange, onSave, onDelete }:
       return; // Não atualizar ainda
     }
     
-    // NOVO: Registrar mudança de situação (item_source_type)
-    if (field === 'item_source_type' && oldItem.item_source_type !== value && oldItem.id) {
-      console.log(`🔄 Situação mudou: ${oldItem.item_source_type} → ${value}`);
+    // NOVO: Registrar mudança de situação (item_status)
+    if (field === 'item_status' && oldItem.item_status !== value && oldItem.id) {
+      console.log(`🔄 Situação mudou: ${oldItem.item_status} → ${value}`);
       
       // Salvar no banco
       const { error } = await supabase
         .from('order_items')
-        .update({ item_source_type: value })
+        .update({ item_status: value })
         .eq('id', oldItem.id);
       
       if (!error) {
         await recordItemChange(
           oldItem.id, 
-          'item_source_type', 
-          oldItem.item_source_type || 'in_stock', 
+          'item_status', 
+          oldItem.item_status || 'in_stock', 
           value,
           `Situação alterada`
         );
         
+        const statusLabels = {
+          in_stock: '✅ Disponível em Estoque',
+          awaiting_production: '🏭 Aguardando Produção',
+          purchase_required: '🛒 Solicitar Compra',
+          completed: '✓ Concluído'
+        };
+        
         toast({
           title: "✅ Situação atualizada",
-          description: `Item agora está: ${value === 'in_stock' ? 'Em Estoque' : value === 'production' ? 'Em Produção' : 'Sem Estoque'}`
+          description: `Item agora está: ${statusLabels[value as keyof typeof statusLabels]}`
         });
         
         // Recarregar histórico
@@ -632,21 +639,18 @@ export const EditOrderDialog = ({ order, open, onOpenChange, onSave, onDelete }:
     setItems(newItems);
   };
 
-  // Update received quantity and status
+  // Update received quantity and item status
   const handleUpdateReceivedQuantity = async (itemId: string, receivedQty: number, requestedQty: number) => {
     const currentItem = items.find(i => i.id === itemId);
     if (!currentItem) return;
 
     const oldQty = currentItem.deliveredQuantity;
-    const oldStatus = currentItem.received_status || 'pending';
+    const oldItemStatus = currentItem.item_status || 'in_stock';
     
-    let newStatus = 'pending';
-    if (receivedQty === 0) {
-      newStatus = 'pending';
-    } else if (receivedQty < requestedQty) {
-      newStatus = 'partial';
-    } else if (receivedQty >= requestedQty) {
-      newStatus = 'completed';
+    // Determinar novo status baseado na quantidade recebida
+    let newItemStatus = oldItemStatus;
+    if (receivedQty >= requestedQty) {
+      newItemStatus = 'completed';
     }
     
     try {
@@ -654,7 +658,7 @@ export const EditOrderDialog = ({ order, open, onOpenChange, onSave, onDelete }:
         .from('order_items')
         .update({ 
           delivered_quantity: receivedQty,
-          received_status: newStatus 
+          item_status: newItemStatus
         })
         .eq('id', itemId);
         
@@ -665,9 +669,9 @@ export const EditOrderDialog = ({ order, open, onOpenChange, onSave, onDelete }:
         await recordItemChange(itemId, 'delivered_quantity', oldQty, receivedQty);
       }
       
-      // NOVO: Registrar histórico de status
-      if (oldStatus !== newStatus) {
-        await recordItemChange(itemId, 'received_status', oldStatus, newStatus);
+      // NOVO: Registrar histórico de status se mudou
+      if (oldItemStatus !== newItemStatus) {
+        await recordItemChange(itemId, 'item_status', oldItemStatus, newItemStatus, 'Quantidade completada');
       }
       
       // Reload items from database
@@ -688,6 +692,7 @@ export const EditOrderDialog = ({ order, open, onOpenChange, onSave, onDelete }:
           deliveredQuantity: item.delivered_quantity,
           received_status: (item.received_status as 'pending' | 'partial' | 'completed') || 'pending',
           item_source_type: (item.item_source_type as 'in_stock' | 'production' | 'out_of_stock') || 'in_stock',
+          item_status: (item.item_status as 'in_stock' | 'awaiting_production' | 'purchase_required' | 'completed') || 'in_stock',
           production_estimated_date: item.production_estimated_date,
           userId: item.user_id
         })));
@@ -695,7 +700,9 @@ export const EditOrderDialog = ({ order, open, onOpenChange, onSave, onDelete }:
       
       toast({
         title: "✅ Quantidade atualizada",
-        description: `${receivedQty} de ${requestedQty} recebidos. Status: ${newStatus === 'completed' ? 'Completo' : newStatus === 'partial' ? 'Parcial' : 'Pendente'}`
+        description: newItemStatus === 'completed' 
+          ? `Item concluído: ${receivedQty} de ${requestedQty} recebidos` 
+          : `${receivedQty} de ${requestedQty} recebidos`
       });
       
       // Recarregar histórico
@@ -710,15 +717,63 @@ export const EditOrderDialog = ({ order, open, onOpenChange, onSave, onDelete }:
     }
   };
 
-  // Mark item as completed (OK button)
+  // Mark item as completed (OK button) - agora atualiza item_status diretamente
   const handleMarkAsCompleted = async (item: OrderItem) => {
     if (!item.id) return;
     
-    await handleUpdateReceivedQuantity(
-      item.id, 
-      item.requestedQuantity, 
-      item.requestedQuantity
-    );
+    try {
+      const { error } = await supabase
+        .from('order_items')
+        .update({ 
+          delivered_quantity: item.requestedQuantity,
+          item_status: 'completed'
+        })
+        .eq('id', item.id);
+        
+      if (error) throw error;
+      
+      // Registrar no histórico
+      await recordItemChange(item.id, 'item_status', item.item_status || 'in_stock', 'completed', 'Marcado como concluído');
+      await recordItemChange(item.id, 'delivered_quantity', item.deliveredQuantity, item.requestedQuantity);
+      
+      // Recarregar items
+      const { data: updatedItems } = await supabase
+        .from('order_items')
+        .select('*')
+        .eq('order_id', order.id);
+        
+      if (updatedItems) {
+        setItems(updatedItems.map(item => ({
+          id: item.id,
+          itemCode: item.item_code,
+          itemDescription: item.item_description,
+          unit: item.unit,
+          requestedQuantity: item.requested_quantity,
+          warehouse: item.warehouse,
+          deliveryDate: item.delivery_date,
+          deliveredQuantity: item.delivered_quantity,
+          received_status: (item.received_status as 'pending' | 'partial' | 'completed') || 'pending',
+          item_source_type: (item.item_source_type as 'in_stock' | 'production' | 'out_of_stock') || 'in_stock',
+          item_status: (item.item_status as 'in_stock' | 'awaiting_production' | 'purchase_required' | 'completed') || 'in_stock',
+          production_estimated_date: item.production_estimated_date,
+          userId: item.user_id
+        })));
+      }
+      
+      toast({
+        title: "✅ Item concluído",
+        description: "Item marcado como totalmente recebido e concluído"
+      });
+      
+      loadHistory();
+    } catch (error) {
+      console.error("Error marking as completed:", error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível marcar o item como concluído.",
+        variant: "destructive"
+      });
+    }
   };
 
   // Get badge for received status
@@ -1413,9 +1468,8 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                             <TableHead className="w-[100px]">Qtd. Sol.</TableHead>
                             <TableHead className="w-[130px]">Armazém</TableHead>
                             <TableHead className="w-[140px]">Data Entrega</TableHead>
-                            <TableHead className="w-[150px]">Situação</TableHead>
+                            <TableHead className="w-[180px]">Situação</TableHead>
                             <TableHead className="w-[120px]">Qtd. Recebida</TableHead>
-                            <TableHead className="w-[120px]">Status</TableHead>
                             <TableHead className="w-[100px]">Ações</TableHead>
                           </TableRow>
                         </TableHeader>
@@ -1473,16 +1527,17 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                               </TableCell>
                               <TableCell>
                                 <Select 
-                                  value={item.item_source_type || 'in_stock'}
-                                  onValueChange={(value: 'in_stock' | 'production' | 'out_of_stock') => updateItem(index, "item_source_type", value)}
+                                  value={item.item_status || 'in_stock'}
+                                  onValueChange={(value: 'in_stock' | 'awaiting_production' | 'purchase_required' | 'completed') => updateItem(index, "item_status", value)}
                                 >
                                   <SelectTrigger className="h-8 text-sm">
                                     <SelectValue />
                                   </SelectTrigger>
                                   <SelectContent>
-                                    <SelectItem value="in_stock">✅ Estoque</SelectItem>
-                                    <SelectItem value="production">🏭 Produção</SelectItem>
-                                    <SelectItem value="out_of_stock">⚠️ Sem Estoque</SelectItem>
+                                    <SelectItem value="in_stock">✅ Disponível em Estoque</SelectItem>
+                                    <SelectItem value="awaiting_production">🏭 Aguardando Produção</SelectItem>
+                                    <SelectItem value="purchase_required">🛒 Solicitar Compra</SelectItem>
+                                    <SelectItem value="completed">✓ Concluído</SelectItem>
                                   </SelectContent>
                                 </Select>
                               </TableCell>
@@ -1516,18 +1571,15 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                                 />
                               </TableCell>
                               <TableCell>
-                                {getReceiveStatusBadge(item.received_status, item.deliveredQuantity, item.requestedQuantity)}
-                              </TableCell>
-                              <TableCell>
                                 <div className="flex gap-1">
                                   <Button
                                     type="button"
                                     variant="outline"
                                     size="sm"
                                     onClick={() => handleMarkAsCompleted(item)}
-                                    disabled={!item.id || item.received_status === 'completed'}
+                                    disabled={!item.id || item.item_status === 'completed'}
                                     className="h-8 gap-1 text-green-700 border-green-300 hover:bg-green-50"
-                                    title="Marcar como totalmente recebido"
+                                    title="Marcar como totalmente recebido e concluído"
                                   >
                                     <CheckCircle className="h-3 w-3" />
                                     OK

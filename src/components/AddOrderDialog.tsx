@@ -21,6 +21,7 @@ export interface OrderItem {
   deliveredQuantity: number;
   received_status?: 'pending' | 'partial' | 'completed';
   item_source_type?: 'in_stock' | 'production' | 'out_of_stock';
+  item_status?: 'in_stock' | 'awaiting_production' | 'purchase_required' | 'completed';
   production_estimated_date?: string;
   userId?: string;
 }

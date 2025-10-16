@@ -10,13 +10,14 @@ interface ItemSourceMetricsProps {
 export const ItemSourceMetrics = ({ orders }: ItemSourceMetricsProps) => {
   const allItems = orders.flatMap(o => o.items || []);
   
-  const bySource = {
-    inStock: allItems.filter(i => i.item_source_type === 'in_stock' || !i.item_source_type).length,
-    production: allItems.filter(i => i.item_source_type === 'production').length,
-    outOfStock: allItems.filter(i => i.item_source_type === 'out_of_stock').length
+  const byStatus = {
+    inStock: allItems.filter(i => i.item_status === 'in_stock' || (!i.item_status && i.item_source_type === 'in_stock') || (!i.item_status && !i.item_source_type)).length,
+    awaitingProduction: allItems.filter(i => i.item_status === 'awaiting_production' || (!i.item_status && i.item_source_type === 'production')).length,
+    purchaseRequired: allItems.filter(i => i.item_status === 'purchase_required' || (!i.item_status && i.item_source_type === 'out_of_stock')).length,
+    completed: allItems.filter(i => i.item_status === 'completed').length
   };
   
-  const total = bySource.inStock + bySource.production + bySource.outOfStock;
+  const total = byStatus.inStock + byStatus.awaitingProduction + byStatus.purchaseRequired + byStatus.completed;
   
   if (total === 0) {
     return (
@@ -39,42 +40,53 @@ export const ItemSourceMetrics = ({ orders }: ItemSourceMetricsProps) => {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Package className="h-5 w-5" />
-          📦 Origem dos Itens
+          📦 Situação dos Itens
         </CardTitle>
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
-          {/* Estoque Disponível */}
+          {/* Disponível em Estoque */}
           <div>
             <div className="flex justify-between mb-2">
               <span className="text-sm font-medium">✅ Disponível em Estoque</span>
               <span className="text-sm font-bold text-green-600">
-                {bySource.inStock} ({Math.round((bySource.inStock / total) * 100)}%)
+                {byStatus.inStock} ({Math.round((byStatus.inStock / total) * 100)}%)
               </span>
             </div>
-            <Progress value={(bySource.inStock / total) * 100} className="h-2" />
+            <Progress value={(byStatus.inStock / total) * 100} className="h-2" />
           </div>
           
-          {/* Em Produção */}
+          {/* Aguardando Produção */}
           <div>
             <div className="flex justify-between mb-2">
               <span className="text-sm font-medium">🏭 Aguardando Produção</span>
               <span className="text-sm font-bold text-blue-600">
-                {bySource.production} ({Math.round((bySource.production / total) * 100)}%)
+                {byStatus.awaitingProduction} ({Math.round((byStatus.awaitingProduction / total) * 100)}%)
               </span>
             </div>
-            <Progress value={(bySource.production / total) * 100} className="h-2" />
+            <Progress value={(byStatus.awaitingProduction / total) * 100} className="h-2" />
           </div>
           
-          {/* Sem Estoque */}
+          {/* Solicitar Compra */}
           <div>
             <div className="flex justify-between mb-2">
-              <span className="text-sm font-medium">⚠️ Sem Controle / Fora de Estoque</span>
-              <span className="text-sm font-bold text-red-600">
-                {bySource.outOfStock} ({Math.round((bySource.outOfStock / total) * 100)}%)
+              <span className="text-sm font-medium">🛒 Solicitar Compra</span>
+              <span className="text-sm font-bold text-orange-600">
+                {byStatus.purchaseRequired} ({Math.round((byStatus.purchaseRequired / total) * 100)}%)
               </span>
             </div>
-            <Progress value={(bySource.outOfStock / total) * 100} className="h-2" />
+            <Progress value={(byStatus.purchaseRequired / total) * 100} className="h-2" />
+          </div>
+          
+          {/* Concluído */}
+          <div>
+            <div className="flex justify-between mb-2">
+              <span className="text-sm font-medium">✓ Concluído</span>
+              <span className="text-sm font-bold text-emerald-700">
+                {byStatus.completed} ({Math.round((byStatus.completed / total) * 100)}%)
+              </span>
+            </div>
+            <Progress value={(byStatus.completed / total) * 100} className="h-2" />
           </div>
           
           <div className="pt-2 border-t text-xs text-muted-foreground">
