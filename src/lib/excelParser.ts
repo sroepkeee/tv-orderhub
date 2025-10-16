@@ -1,4 +1,5 @@
 import * as XLSX from 'xlsx';
+import { addBusinessDays } from '@/lib/utils';
 
 export interface ParsedOrderData {
   orderInfo: {
@@ -76,14 +77,23 @@ function extractOrderInfo(data: any[][]): ParsedOrderData['orderInfo'] {
   // Pular cabeçalho (linha 0), dados começam na linha 1
   const row = data[1] || [];
   
+  const issueDate = String(row[5] || '').trim();
+  let deliveryDate = String(row[6] || '').trim();
+  
+  // Se não houver data de entrega, calcular 10 dias úteis
+  if (!deliveryDate && issueDate) {
+    deliveryDate = addBusinessDays(issueDate, 10);
+    console.log(`✅ Data de entrega calculada: ${deliveryDate} (10 dias úteis a partir de ${issueDate})`);
+  }
+  
   return {
     orderNumber: String(row[0] || '').trim(),
     customerName: String(row[1] || '').trim(),
     customerDocument: String(row[2] || '').trim(),
     deliveryAddress: String(row[3] || '').trim(),
     municipality: String(row[4] || '').trim(),
-    issueDate: String(row[5] || '').trim(),
-    deliveryDate: String(row[6] || '').trim(),
+    issueDate,
+    deliveryDate,
     shippingDate: String(row[7] || '').trim(),
     carrier: String(row[8] || '').trim(),
     freightType: String(row[9] || '').trim(),

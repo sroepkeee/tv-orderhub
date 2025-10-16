@@ -1,4 +1,5 @@
 import type { ParsedOrderData } from './excelParser';
+import { addBusinessDays } from './utils';
 
 // Lazy load pdfjs to avoid conflicts with React
 let pdfjsLib: any = null;
@@ -141,10 +142,11 @@ function extractOrderHeader(text: string): ParsedOrderData['orderInfo'] {
   const deliveryDateMatch = text.match(/(?:ENTREGA|PREVIS[ÃA]O|DATA\s+ENTREGA):?\s*(\d{2}\/\d{2}\/\d{4})/i);
   if (deliveryDateMatch) {
     orderInfo.deliveryDate = deliveryDateMatch[1];
-    console.log('✅ Data Entrega:', orderInfo.deliveryDate);
+    console.log('✅ Data Entrega (do PDF):', orderInfo.deliveryDate);
   } else if (orderInfo.issueDate) {
-    orderInfo.deliveryDate = orderInfo.issueDate;
-    console.log('⚠️ Usando data de emissão como entrega');
+    // Calcular 10 dias úteis a partir da emissão
+    orderInfo.deliveryDate = addBusinessDays(orderInfo.issueDate, 10);
+    console.log('✅ Data Entrega (calculada):', orderInfo.deliveryDate, '(10 dias úteis)');
   }
   
   // CLIENTE - Suporta múltiplos formatos: CLIENTE:, RAZÃO SOCIAL:, NOME/RAZÃO SOCIAL:
