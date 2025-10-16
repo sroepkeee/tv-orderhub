@@ -49,6 +49,7 @@ export interface Order {
   description: string;
   quantity: number;
   createdDate: string;
+  issueDate?: string;
   status: OrderStatus;
   client: string;
   deliveryDeadline: string;
@@ -322,6 +323,7 @@ export const Dashboard = () => {
             description: firstItem?.itemDescription || dbOrder.notes || "",
             quantity: totalRequested,
             createdDate: new Date(dbOrder.created_at).toISOString().split('T')[0],
+            issueDate: (dbOrder as any).issue_date || undefined,
             status: dbOrder.status as OrderStatus,
             client: dbOrder.customer_name,
             deliveryDeadline: dbOrder.delivery_date,

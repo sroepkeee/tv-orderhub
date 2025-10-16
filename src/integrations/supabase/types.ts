@@ -373,6 +373,7 @@ export type Database = {
           freight_type: string | null
           freight_value: number | null
           id: string
+          issue_date: string | null
           lab_completed_at: string | null
           lab_notes: string | null
           lab_requested_at: string | null
@@ -404,6 +405,7 @@ export type Database = {
           freight_type?: string | null
           freight_value?: number | null
           id?: string
+          issue_date?: string | null
           lab_completed_at?: string | null
           lab_notes?: string | null
           lab_requested_at?: string | null
@@ -435,6 +437,7 @@ export type Database = {
           freight_type?: string | null
           freight_value?: number | null
           id?: string
+          issue_date?: string | null
           lab_completed_at?: string | null
           lab_notes?: string | null
           lab_requested_at?: string | null

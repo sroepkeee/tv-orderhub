@@ -109,6 +109,7 @@ export const ImportOrderDialog = ({ open, onOpenChange, onImportSuccess }: Impor
           customer_document: parsedData.orderInfo.customerDocument || null,
           delivery_address: parsedData.orderInfo.deliveryAddress,
           municipality: parsedData.orderInfo.municipality || null,
+          issue_date: convertDate(parsedData.orderInfo.issueDate) || null,
           delivery_date: convertDate(parsedData.orderInfo.deliveryDate)!,
           shipping_date: convertDate(parsedData.orderInfo.shippingDate || '') || null,
           status: 'pending',

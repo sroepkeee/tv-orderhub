@@ -209,6 +209,12 @@ export const KanbanCard = ({ order, onEdit, onStatusChange }: KanbanCardProps) =
 
       {/* Deadline */}
       <div className="space-y-1">
+        {order.issueDate && (
+          <div className="flex items-center justify-between text-[10px] text-muted-foreground">
+            <span>Emissão:</span>
+            <span>{new Date(order.issueDate).toLocaleDateString("pt-BR")}</span>
+          </div>
+        )}
         <div className="flex items-center justify-between text-xs">
           <div className="flex items-center gap-1">
             <Clock className="h-3 w-3" />

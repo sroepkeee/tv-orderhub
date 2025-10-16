@@ -1376,9 +1376,31 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                       maxLength={50}
                     />
                   </div>
+                  {order.issueDate && (
+                    <div>
+                      <Label htmlFor="issueDate">Data de Emissão (TOTVS)</Label>
+                      <Input 
+                        type="date"
+                        value={order.issueDate ? format(new Date(order.issueDate), 'yyyy-MM-dd') : ''}
+                        disabled
+                        className="bg-muted cursor-not-allowed"
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Data original do pedido (não editável)
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 gap-4">
                   <div>
                     <Label htmlFor="deliveryDeadline">Prazo de Entrega</Label>
                     <Input {...register("deliveryDeadline", { required: true })} type="date" />
+                    {order.issueDate && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Prazo inicial: 10 dias úteis a partir de {format(new Date(order.issueDate), 'dd/MM/yyyy')}
+                      </p>
+                    )}
                   </div>
                 </div>
 
