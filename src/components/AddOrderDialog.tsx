@@ -121,9 +121,8 @@ export const AddOrderDialog = ({ onAddOrder }: AddOrderDialogProps) => {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button size="lg" className="gap-2">
-          <Plus className="h-5 w-5" />
-          Novo Lançamento
+        <Button data-add-order-trigger className="hidden">
+          Trigger
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-2xl">

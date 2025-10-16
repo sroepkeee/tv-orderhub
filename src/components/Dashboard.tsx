@@ -4,8 +4,14 @@ import { DateRange } from "react-day-picker";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Search, Calendar, BarChart3, FileSpreadsheet } from "lucide-react";
+import { Search, Calendar, BarChart3, FileSpreadsheet, Plus, ChevronDown } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useNavigate } from "react-router-dom";
 import { AddOrderDialog } from "./AddOrderDialog";
 import { EditOrderDialog } from "./EditOrderDialog";
@@ -1025,14 +1031,30 @@ export const Dashboard = () => {
             Indicadores
           </Button>
           <UserMenu />
-          <Button
-            variant="outline"
-            onClick={() => setShowImportDialog(true)}
-            className="gap-2"
-          >
-            <FileSpreadsheet className="h-4 w-4" />
-            Importar TOTVS
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button className="gap-2">
+                <Plus className="h-4 w-4" />
+                Novo Lançamento
+                <ChevronDown className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem
+                onClick={() => {
+                  const addButton = document.querySelector('[data-add-order-trigger]') as HTMLElement;
+                  addButton?.click();
+                }}
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Lançamento Manual
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setShowImportDialog(true)}>
+                <FileSpreadsheet className="h-4 w-4 mr-2" />
+                Importar do TOTVS
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           <AddOrderDialog onAddOrder={handleAddOrder} />
         </div>
       </div>
