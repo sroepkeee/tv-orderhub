@@ -229,7 +229,7 @@ export function OrdersTrackingTable({ orders, onOrderClick }: OrdersTrackingTabl
               </TableRow>
             ) : (
               filteredOrders.map((order) => {
-                const daysOpen = calculateDaysOpen(order.createdDate);
+                const daysOpen = calculateDaysOpen(order.createdDate, order.issueDate);
                 const daysUntil = calculateDaysUntilDeadline(order.deliveryDeadline);
                 const deliveryInfo = getPartialDeliveryInfo(order.items || []);
                 const deliveryPercentage = deliveryInfo.total > 0 
@@ -266,9 +266,14 @@ export function OrdersTrackingTable({ orders, onOrderClick }: OrdersTrackingTabl
                       </div>
                     </TableCell>
                     <TableCell className="text-center">
-                      <Badge variant="outline" className="text-xs">
+                      <Badge variant="outline" className="text-xs font-semibold">
                         {daysOpen}d
                       </Badge>
+                      {order.issueDate && (
+                        <div className="text-[10px] text-muted-foreground mt-0.5">
+                          desde emissão
+                        </div>
+                      )}
                     </TableCell>
                     <TableCell className="text-center">
                       {getDeadlineBadge(daysUntil)}

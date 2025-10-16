@@ -51,7 +51,8 @@ export const calculateAverageTimeInPhase = (
   if (phaseOrders.length === 0) return 0;
   
   const totalDays = phaseOrders.reduce((sum, order) => {
-    const start = parseISO(order.createdDate);
+    // Usar issueDate se disponível, senão usar createdDate
+    const start = order.issueDate ? parseISO(order.issueDate) : parseISO(order.createdDate);
     const end = new Date();
     return sum + differenceInDays(end, start);
   }, 0);
@@ -71,7 +72,8 @@ export const calculateOnTimeRate = (
   if (completedOrders.length === 0) return 100;
   
   const onTimeCount = completedOrders.filter(order => {
-    const start = parseISO(order.createdDate);
+    // Usar issueDate se disponível, senão usar createdDate
+    const start = order.issueDate ? parseISO(order.issueDate) : parseISO(order.createdDate);
     const end = parseISO(order.deliveryDeadline);
     const actualDays = differenceInDays(end, start);
     return actualDays <= targetDays;
@@ -139,7 +141,8 @@ export const calculateAverageProductionTime = (orders: Order[]): number => {
   if (productionOrders.length === 0) return 0;
   
   const totalDays = productionOrders.reduce((sum, order) => {
-    const start = parseISO(order.createdDate);
+    // Usar issueDate se disponível, senão usar createdDate
+    const start = order.issueDate ? parseISO(order.issueDate) : parseISO(order.createdDate);
     const end = order.status === 'completed' || order.status === 'delivered'
       ? parseISO(order.deliveryDeadline)
       : new Date();
@@ -167,11 +170,12 @@ export const getOrderCountByPhase = (orders: Order[], phase: string): number => 
   return orders.filter(o => isInPhase(o.status, phase)).length;
 };
 
-// Calcular dias desde criação do pedido
-export const calculateDaysOpen = (createdDate: string): number => {
-  const created = parseISO(createdDate);
+// Calcular dias desde criação/emissão do pedido
+export const calculateDaysOpen = (createdDate: string, issueDate?: string): number => {
+  // Usar issueDate se disponível, senão usar createdDate
+  const startDate = issueDate ? parseISO(issueDate) : parseISO(createdDate);
   const today = new Date();
-  return differenceInDays(today, created);
+  return differenceInDays(today, startDate);
 };
 
 // Calcular dias até o prazo de entrega
