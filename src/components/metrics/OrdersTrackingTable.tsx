@@ -17,7 +17,7 @@ interface OrderWithDetails extends Order {
   items?: OrderItem[];
   dateChangesCount?: number;
 }
-type SortField = 'orderNumber' | 'client' | 'itemsQuantity' | 'status' | 'issueDate' | 'deliveryDeadline' | 'daysOpen' | 'deadline' | 'dateChanges';
+type SortField = 'orderNumber' | 'client' | 'orderType' | 'itemsQuantity' | 'status' | 'issueDate' | 'deliveryDeadline' | 'daysOpen' | 'deadline' | 'dateChanges';
 type SortDirection = 'asc' | 'desc';
 
 export function OrdersTrackingTable({
@@ -110,6 +110,10 @@ export function OrdersTrackingTable({
           case 'client':
             aValue = a.client.toLowerCase();
             bValue = b.client.toLowerCase();
+            break;
+          case 'orderType':
+            aValue = a.type?.toLowerCase() || '';
+            bValue = b.type?.toLowerCase() || '';
             break;
           case 'itemsQuantity':
             aValue = (a.items || []).reduce((sum, item) => sum + item.requestedQuantity, 0);
@@ -252,6 +256,9 @@ export function OrdersTrackingTable({
               <TableHead className="min-w-[150px] cursor-pointer hover:bg-muted/50" onClick={() => handleSort('client')}>
                 Cliente{getSortIcon('client')}
               </TableHead>
+              <TableHead className="min-w-[100px] cursor-pointer hover:bg-muted/50" onClick={() => handleSort('orderType')}>
+                Tipo{getSortIcon('orderType')}
+              </TableHead>
               <TableHead className="min-w-[90px] text-center cursor-pointer hover:bg-muted/50" onClick={() => handleSort('itemsQuantity')}>
                 Qtd. Itens{getSortIcon('itemsQuantity')}
               </TableHead>
@@ -279,7 +286,7 @@ export function OrdersTrackingTable({
           </TableHeader>
           <TableBody>
             {filteredOrders.length === 0 ? <TableRow>
-                <TableCell colSpan={11} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={12} className="text-center py-8 text-muted-foreground">
                   Nenhum pedido encontrado com os filtros selecionados
                 </TableCell>
               </TableRow> : filteredOrders.map(order => {
@@ -294,6 +301,11 @@ export function OrdersTrackingTable({
             return <TableRow key={order.id} className={cn("cursor-pointer hover:bg-muted/50 transition-colors", isCritical && "animate-pulse-critical")} onClick={() => onOrderClick(order)}>
                     <TableCell className="font-medium">{order.orderNumber}</TableCell>
                     <TableCell>{order.client}</TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className="text-xs">
+                        {order.type === 'ecommerce' ? '🛒 E-commerce' : '📋 Manual'}
+                      </Badge>
+                    </TableCell>
                     <TableCell className="text-center">
                       <Badge variant="secondary" className="text-sm font-semibold">
                         <Package className="h-3 w-3 mr-1" />
