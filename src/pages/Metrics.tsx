@@ -56,10 +56,13 @@ export default function Metrics() {
   const loadData = async () => {
     setLoading(true);
     try {
-      // Carregar apenas pedidos ativos (excluindo finalizados e cancelados)
+      // Carregar pedidos com seus itens
       const { data: ordersData, error: ordersError } = await supabase
         .from('orders')
-        .select('*')
+        .select(`
+          *,
+          order_items (*)
+        `)
         .not('status', 'in', '(delivered,completed,cancelled)')
         .order('created_at', { ascending: false });
       
@@ -80,6 +83,32 @@ export default function Metrics() {
         client: dbOrder.customer_name,
         deliveryDeadline: dbOrder.delivery_date,
         deskTicket: dbOrder.order_number,
+        items: (dbOrder.order_items || []).map((item: any) => ({
+          id: item.id,
+          itemCode: item.item_code,
+          itemDescription: item.item_description,
+          requestedQuantity: item.requested_quantity,
+          deliveredQuantity: item.delivered_quantity,
+          unit: item.unit,
+          warehouse: item.warehouse,
+          deliveryDate: item.delivery_date,
+          userId: item.user_id,
+          item_source_type: item.item_source_type as 'in_stock' | 'production' | 'out_of_stock',
+          item_status: item.item_status as 'in_stock' | 'awaiting_production' | 'purchase_required' | 'completed',
+          sla_days: item.sla_days,
+          is_imported: item.is_imported,
+          import_lead_time_days: item.import_lead_time_days,
+          sla_deadline: item.sla_deadline,
+          current_phase: item.current_phase,
+          phase_started_at: item.phase_started_at,
+          production_estimated_date: item.production_estimated_date,
+          received_status: item.received_status,
+          unit_price: item.unit_price,
+          discount_percent: item.discount_percent,
+          total_value: item.total_value,
+          ipi_percent: item.ipi_percent,
+          icms_percent: item.icms_percent,
+        }))
       }));
       
       setOrders(transformedOrders);
