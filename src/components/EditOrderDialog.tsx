@@ -12,7 +12,7 @@ import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Calendar, User, FileText, CheckCircle, XCircle, Clock, History, Edit, Plus, Trash2, Loader2, MessageSquare, Download, Package, AlertCircle } from "lucide-react";
-import { useForm } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
 import { Order } from "./Dashboard";
 import { OrderItem } from "./AddOrderDialog";
 import { supabase } from "@/integrations/supabase/client";
@@ -59,7 +59,7 @@ interface EditOrderDialogProps {
 }
 
 export const EditOrderDialog = ({ order, open, onOpenChange, onSave, onDelete }: EditOrderDialogProps) => {
-  const { register, handleSubmit, setValue, reset, getValues } = useForm<Order>();
+  const { register, handleSubmit, setValue, reset, getValues, control } = useForm<Order>();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("edit");
   const [items, setItems] = useState<OrderItem[]>([]);
@@ -93,8 +93,6 @@ export const EditOrderDialog = ({ order, open, onOpenChange, onSave, onDelete }:
     newDate: string;
     itemIndex: number;
   } | null>(null);
-  const [selectedOrderType, setSelectedOrderType] = useState<string>("");
-
   useEffect(() => {
     if (!open) return;
     supabase.auth.getUser().then(({ data: { user } }) => {
@@ -453,8 +451,6 @@ export const EditOrderDialog = ({ order, open, onOpenChange, onSave, onDelete }:
         freightValue: (order as any).freight_value,
       };
       reset(orderData);
-      setSelectedOrderType(order.type || "");
-      setValue("type", order.type as any);
       
       // Carregar itens diretamente do banco para garantir dados atualizados
       const loadItems = async () => {
@@ -1233,14 +1229,11 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
 
   const onSubmit = (data: Order) => {
     console.log('💾 Salvando pedido com dados:', data);
-    console.log('📝 Tipo selecionado:', selectedOrderType);
     
-    // Garantir que o tipo selecionado seja incluído
     const updatedOrder = { 
       ...data, 
       id: order.id, 
-      items,
-      type: selectedOrderType as any
+      items
     };
     
     // Check if delivery date changed
@@ -1493,12 +1486,15 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <Label htmlFor="type">Tipo de Pedido</Label>
-                    <OrderTypeSelector 
-                      value={selectedOrderType} 
-                      onValueChange={(value) => {
-                        setSelectedOrderType(value);
-                        setValue("type", value as any);
-                      }} 
+                    <Controller
+                      name="type"
+                      control={control}
+                      render={({ field }) => (
+                        <OrderTypeSelector 
+                          value={field.value} 
+                          onValueChange={field.onChange} 
+                        />
+                      )}
                     />
                   </div>
                   <div>
