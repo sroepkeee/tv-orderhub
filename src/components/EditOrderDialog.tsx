@@ -451,7 +451,40 @@ export const EditOrderDialog = ({ order, open, onOpenChange, onSave, onDelete }:
         freightValue: (order as any).freight_value,
       };
       reset(orderData);
-      setItems(order.items || []);
+      
+      // Carregar itens diretamente do banco para garantir dados atualizados
+      const loadItems = async () => {
+        const { data: itemsData } = await supabase
+          .from('order_items')
+          .select('*')
+          .eq('order_id', order.id);
+        
+        const mappedItems = (itemsData || []).map(item => ({
+          id: item.id,
+          itemCode: item.item_code,
+          itemDescription: item.item_description,
+          unit: item.unit,
+          requestedQuantity: item.requested_quantity,
+          warehouse: item.warehouse,
+          deliveryDate: item.delivery_date,
+          deliveredQuantity: item.delivered_quantity,
+          item_source_type: item.item_source_type as 'in_stock' | 'production' | 'out_of_stock',
+          item_status: item.item_status as 'in_stock' | 'awaiting_production' | 'purchase_required' | 'completed',
+          received_status: item.received_status as 'pending' | 'partial' | 'completed',
+          production_estimated_date: item.production_estimated_date,
+          sla_days: item.sla_days,
+          is_imported: item.is_imported,
+          import_lead_time_days: item.import_lead_time_days,
+          sla_deadline: item.sla_deadline,
+          current_phase: item.current_phase,
+          phase_started_at: item.phase_started_at,
+          userId: item.user_id
+        }));
+        setItems(mappedItems);
+      };
+      
+      loadItems();
+      
       setActiveTab("edit");
       setShowCommentInput(false);
       setNewComment("");
@@ -604,71 +637,91 @@ export const EditOrderDialog = ({ order, open, onOpenChange, onSave, onDelete }:
     if (field === 'item_status' && oldItem.item_status !== value && oldItem.id) {
       console.log(`🔄 Situação mudou: ${oldItem.item_status} → ${value}`);
       
+      // Validação de permissão
+      if (oldItem.userId && oldItem.userId !== currentUserId) {
+        toast({
+          title: "Sem permissão",
+          description: "Você não tem permissão para alterar este item.",
+          variant: "destructive",
+        });
+        return;
+      }
+      
       // Salvar no banco
       const { error } = await supabase
         .from('order_items')
         .update({ item_status: value })
         .eq('id', oldItem.id);
       
-      if (!error) {
-        await recordItemChange(
-          oldItem.id, 
-          'item_status', 
-          oldItem.item_status || 'in_stock', 
-          value,
-          `Situação alterada`
-        );
-        
-        const statusLabels = {
-          in_stock: '✅ Disponível em Estoque',
-          awaiting_production: '🏭 Aguardando Produção',
-          purchase_required: '🛒 Solicitar Compra',
-          completed: '✓ Concluído'
-        };
-        
-        // Recarregar itens do banco para sincronizar UI
-        const { data: reloadedItems } = await supabase
-          .from('order_items')
-          .select('*')
-          .eq('order_id', order.id);
-        
-        if (reloadedItems) {
-          const mappedItems = reloadedItems.map(dbItem => ({
-            id: dbItem.id,
-            itemCode: dbItem.item_code,
-            itemDescription: dbItem.item_description,
-            unit: dbItem.unit,
-            requestedQuantity: dbItem.requested_quantity,
-            warehouse: dbItem.warehouse,
-            deliveryDate: dbItem.delivery_date,
-            deliveredQuantity: dbItem.delivered_quantity,
-            received_status: dbItem.received_status as 'pending' | 'partial' | 'completed',
-            item_status: dbItem.item_status as 'in_stock' | 'awaiting_production' | 'purchase_required' | 'completed',
-            item_source_type: dbItem.item_source_type as 'in_stock' | 'production' | 'out_of_stock',
-            production_estimated_date: dbItem.production_estimated_date,
-            unit_price: dbItem.unit_price,
-            discount_percent: dbItem.discount_percent,
-            ipi_percent: dbItem.ipi_percent,
-            icms_percent: dbItem.icms_percent,
-            total_value: dbItem.total_value,
-            sla_days: dbItem.sla_days,
-            is_imported: dbItem.is_imported,
-            import_lead_time_days: dbItem.import_lead_time_days,
-            sla_deadline: dbItem.sla_deadline,
-            current_phase: dbItem.current_phase,
-            phase_started_at: dbItem.phase_started_at
-          }));
-          setItems(mappedItems);
-        }
-        
+      if (error) {
+        console.error('Error updating item_status:', error);
         toast({
-          title: "✅ Situação atualizada",
-          description: `Item agora está: ${statusLabels[value as keyof typeof statusLabels]}`
+          title: "Erro ao atualizar situação",
+          description: error.message,
+          variant: "destructive",
         });
-        
-        // Recarregar histórico
-        loadHistory();
+        return;
       }
+      
+      await recordItemChange(
+        oldItem.id, 
+        'item_status', 
+        oldItem.item_status || 'in_stock', 
+        value,
+        `Situação alterada`
+      );
+      
+      const statusLabels = {
+        in_stock: '✅ Disponível em Estoque',
+        awaiting_production: '🏭 Aguardando Produção',
+        purchase_required: '🛒 Solicitar Compra',
+        completed: '✓ Concluído'
+      };
+      
+      toast({
+        title: "Situação atualizada",
+        description: `Item alterado para: ${statusLabels[value as keyof typeof statusLabels]}`,
+      });
+      
+      // Recarregar itens do banco para sincronizar UI
+      const { data: reloadedItems } = await supabase
+        .from('order_items')
+        .select('*')
+        .eq('order_id', order.id);
+      
+      if (reloadedItems) {
+        const mappedItems = reloadedItems.map(dbItem => ({
+          id: dbItem.id,
+          itemCode: dbItem.item_code,
+          itemDescription: dbItem.item_description,
+          unit: dbItem.unit,
+          requestedQuantity: dbItem.requested_quantity,
+          warehouse: dbItem.warehouse,
+          deliveryDate: dbItem.delivery_date,
+          deliveredQuantity: dbItem.delivered_quantity,
+          received_status: dbItem.received_status as 'pending' | 'partial' | 'completed',
+          item_status: dbItem.item_status as 'in_stock' | 'awaiting_production' | 'purchase_required' | 'completed',
+          item_source_type: dbItem.item_source_type as 'in_stock' | 'production' | 'out_of_stock',
+          production_estimated_date: dbItem.production_estimated_date,
+          unit_price: dbItem.unit_price,
+          discount_percent: dbItem.discount_percent,
+          ipi_percent: dbItem.ipi_percent,
+          icms_percent: dbItem.icms_percent,
+          total_value: dbItem.total_value,
+          sla_days: dbItem.sla_days,
+          is_imported: dbItem.is_imported,
+          import_lead_time_days: dbItem.import_lead_time_days,
+          sla_deadline: dbItem.sla_deadline,
+          current_phase: dbItem.current_phase,
+          phase_started_at: dbItem.phase_started_at,
+          userId: dbItem.user_id
+        }));
+        setItems(mappedItems);
+      }
+      
+      // Recarregar histórico
+      loadHistory();
+      return;
     }
     
     setItems(newItems);

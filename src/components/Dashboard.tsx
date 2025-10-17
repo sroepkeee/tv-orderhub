@@ -312,8 +312,15 @@ export const Dashboard = () => {
             deliveryDate: item.delivery_date,
             deliveredQuantity: item.delivered_quantity,
             item_source_type: item.item_source_type as 'in_stock' | 'production' | 'out_of_stock',
+            item_status: item.item_status as 'in_stock' | 'awaiting_production' | 'purchase_required' | 'completed',
             received_status: item.received_status as 'pending' | 'partial' | 'completed',
             production_estimated_date: item.production_estimated_date,
+            sla_days: item.sla_days,
+            is_imported: item.is_imported,
+            import_lead_time_days: item.import_lead_time_days,
+            sla_deadline: item.sla_deadline,
+            current_phase: item.current_phase,
+            phase_started_at: item.phase_started_at,
             userId: item.user_id
           }));
 
@@ -661,8 +668,12 @@ export const Dashboard = () => {
                 delivery_date: item.deliveryDate,
                 delivered_quantity: Math.max(0, Math.min(item.deliveredQuantity, item.requestedQuantity)),
                 item_source_type: item.item_source_type || 'in_stock',
+                item_status: item.item_status || 'in_stock',
                 received_status: statusToSave,
-                production_estimated_date: item.production_estimated_date || null
+                production_estimated_date: item.production_estimated_date || null,
+                sla_days: item.sla_days,
+                is_imported: item.is_imported,
+                import_lead_time_days: item.import_lead_time_days
               })
               .eq('id', item.id);
 
@@ -682,8 +693,12 @@ export const Dashboard = () => {
                 delivery_date: item.deliveryDate,
                 delivered_quantity: Math.max(0, Math.min(item.deliveredQuantity, item.requestedQuantity)),
                 item_source_type: item.item_source_type || 'in_stock',
+                item_status: item.item_status || 'in_stock',
                 received_status: statusToSave,
-                production_estimated_date: item.production_estimated_date || null
+                production_estimated_date: item.production_estimated_date || null,
+                sla_days: item.sla_days,
+                is_imported: item.is_imported,
+                import_lead_time_days: item.import_lead_time_days
               });
 
             if (insertError) throw insertError;
