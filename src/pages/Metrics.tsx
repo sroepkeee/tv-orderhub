@@ -30,6 +30,7 @@ import {
   countItemsBySource
 } from "@/lib/metrics";
 import { useNavigate } from "react-router-dom";
+import { toast } from "@/hooks/use-toast";
 
 export default function Metrics() {
   const { user } = useAuth();
@@ -303,9 +304,42 @@ export default function Metrics() {
           order={selectedOrder}
           open={showEditDialog}
           onOpenChange={setShowEditDialog}
-          onSave={(updatedOrder) => {
-            loadData();
-            setShowEditDialog(false);
+          onSave={async (updatedOrder) => {
+            try {
+              const { data: row, error } = await supabase
+                .from('orders')
+                .update({
+                  customer_name: updatedOrder.client,
+                  delivery_address: updatedOrder.client,
+                  delivery_date: updatedOrder.deliveryDeadline,
+                  status: updatedOrder.status,
+                  priority: updatedOrder.priority,
+                  order_type: updatedOrder.type,
+                  notes: updatedOrder.deskTicket,
+                  totvs_order_number: (updatedOrder as any).totvsOrderNumber || null,
+                })
+                .eq('id', updatedOrder.id)
+                .select('id')
+                .single();
+
+              if (error) throw error;
+              if (!row) throw new Error('Sem permissão para atualizar este pedido.');
+
+              toast({
+                title: 'Pedido atualizado',
+                description: `Tipo alterado para "${updatedOrder.type}" com sucesso.`,
+              });
+
+              await loadData();
+              setShowEditDialog(false);
+            } catch (err: any) {
+              console.error('Erro ao atualizar pedido na página de Métricas:', err);
+              toast({
+                title: 'Erro ao salvar',
+                description: err.message || 'Não foi possível salvar as alterações. Verifique suas permissões.',
+                variant: 'destructive',
+              });
+            }
           }}
         />
       )}
