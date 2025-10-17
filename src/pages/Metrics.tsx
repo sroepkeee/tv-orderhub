@@ -8,7 +8,8 @@ import { ProductionMetrics } from "@/components/metrics/ProductionMetrics";
 import { PhaseTimeMetrics } from "@/components/metrics/PhaseTimeMetrics";
 import { EnhancedDateChangeHistory } from "@/components/metrics/EnhancedDateChangeHistory";
 import { SLAAlert } from "@/components/metrics/SLAAlert";
-import { OrderTotvsMetrics } from "@/components/metrics/OrderTotvsMetrics";
+import { OrderTotvsMetrics } from '@/components/metrics/OrderTotvsMetrics';
+import { ItemSLATracking } from '@/components/metrics/ItemSLATracking';
 import { ItemSourceMetrics } from "@/components/metrics/ItemSourceMetrics";
 import { CriticalItemsAlert } from "@/components/metrics/CriticalItemsAlert";
 import { ProductionTimeBySource } from "@/components/metrics/ProductionTimeBySource";
@@ -260,6 +261,11 @@ export default function Metrics() {
       {/* Integração TOTVS */}
       <div className="mb-6">
         <OrderTotvsMetrics orders={orders} />
+      </div>
+
+      {/* Rastreamento de SLA por Item */}
+      <div className="mb-6">
+        <ItemSLATracking orders={orders} />
       </div>
 
       {/* Dialog de Edição */}

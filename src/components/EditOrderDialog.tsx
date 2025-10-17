@@ -1554,10 +1554,12 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                             <TableHead className="w-[80px]">UND</TableHead>
                             <TableHead className="w-[100px]">Qtd. Sol.</TableHead>
                             <TableHead className="w-[130px]">Armazém</TableHead>
-                            <TableHead className="w-[140px]">Data Entrega</TableHead>
-                            <TableHead className="w-[180px]">Situação</TableHead>
-                            <TableHead className="w-[120px]">Qtd. Recebida</TableHead>
-                            <TableHead className="w-[100px]">Ações</TableHead>
+                              <TableHead className="w-[140px]">Data Entrega</TableHead>
+                              <TableHead className="w-[180px]">Situação</TableHead>
+                              <TableHead className="w-[100px]">SLA (dias)</TableHead>
+                              <TableHead className="w-[120px]">Importação?</TableHead>
+                              <TableHead className="w-[120px]">Qtd. Recebida</TableHead>
+                              <TableHead className="w-[100px]">Ações</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -1628,6 +1630,49 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                                     <SelectItem value="completed">✓ Concluído</SelectItem>
                                   </SelectContent>
                                 </Select>
+                              </TableCell>
+                              <TableCell>
+                                <Input
+                                  type="number"
+                                  value={item.sla_days || ''}
+                                  onChange={(e) => updateItem(index, "sla_days", parseInt(e.target.value) || null)}
+                                  placeholder="Auto"
+                                  className="h-8 text-sm w-20"
+                                  title="SLA em dias úteis (vazio = automático)"
+                                />
+                              </TableCell>
+                              <TableCell>
+                                {item.item_source_type === 'out_of_stock' && (
+                                  <div className="flex flex-col gap-1">
+                                    <Select 
+                                      value={item.is_imported ? 'yes' : 'no'}
+                                      onValueChange={(value) => {
+                                        updateItem(index, "is_imported", value === 'yes');
+                                        if (value === 'no') {
+                                          updateItem(index, "import_lead_time_days", null);
+                                        }
+                                      }}
+                                    >
+                                      <SelectTrigger className="h-8 text-sm">
+                                        <SelectValue />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="no">Não</SelectItem>
+                                        <SelectItem value="yes">Sim</SelectItem>
+                                      </SelectContent>
+                                    </Select>
+                                    {item.is_imported && (
+                                      <Input
+                                        type="number"
+                                        value={item.import_lead_time_days || ''}
+                                        onChange={(e) => updateItem(index, "import_lead_time_days", parseInt(e.target.value) || null)}
+                                        placeholder="Prazo import."
+                                        className="h-8 text-sm"
+                                        title="Prazo de importação em dias"
+                                      />
+                                    )}
+                                  </div>
+                                )}
                               </TableCell>
                               <TableCell>
                                 <Input

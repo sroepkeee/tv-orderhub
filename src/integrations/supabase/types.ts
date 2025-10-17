@@ -283,20 +283,26 @@ export type Database = {
       order_items: {
         Row: {
           created_at: string
+          current_phase: string | null
           delivered_quantity: number
           delivery_date: string
           discount_percent: number | null
           icms_percent: number | null
           id: string
+          import_lead_time_days: number | null
           ipi_percent: number | null
+          is_imported: boolean | null
           item_code: string
           item_description: string
           item_source_type: string | null
           item_status: string | null
           order_id: string
+          phase_started_at: string | null
           production_estimated_date: string | null
           received_status: string | null
           requested_quantity: number
+          sla_days: number | null
+          sla_deadline: string | null
           total_value: number | null
           unit: string
           unit_price: number | null
@@ -306,20 +312,26 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          current_phase?: string | null
           delivered_quantity?: number
           delivery_date: string
           discount_percent?: number | null
           icms_percent?: number | null
           id?: string
+          import_lead_time_days?: number | null
           ipi_percent?: number | null
+          is_imported?: boolean | null
           item_code: string
           item_description: string
           item_source_type?: string | null
           item_status?: string | null
           order_id: string
+          phase_started_at?: string | null
           production_estimated_date?: string | null
           received_status?: string | null
           requested_quantity?: number
+          sla_days?: number | null
+          sla_deadline?: string | null
           total_value?: number | null
           unit?: string
           unit_price?: number | null
@@ -329,20 +341,26 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          current_phase?: string | null
           delivered_quantity?: number
           delivery_date?: string
           discount_percent?: number | null
           icms_percent?: number | null
           id?: string
+          import_lead_time_days?: number | null
           ipi_percent?: number | null
+          is_imported?: boolean | null
           item_code?: string
           item_description?: string
           item_source_type?: string | null
           item_status?: string | null
           order_id?: string
+          phase_started_at?: string | null
           production_estimated_date?: string | null
           received_status?: string | null
           requested_quantity?: number
+          sla_days?: number | null
+          sla_deadline?: string | null
           total_value?: number | null
           unit?: string
           unit_price?: number | null

@@ -24,6 +24,12 @@ export interface OrderItem {
   item_status?: 'in_stock' | 'awaiting_production' | 'purchase_required' | 'completed';
   production_estimated_date?: string;
   userId?: string;
+  sla_days?: number | null;
+  is_imported?: boolean;
+  import_lead_time_days?: number | null;
+  sla_deadline?: string;
+  current_phase?: string;
+  phase_started_at?: string;
 }
 
 interface OrderFormData {
