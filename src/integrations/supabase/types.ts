@@ -378,6 +378,63 @@ export type Database = {
           },
         ]
       }
+      order_type_config: {
+        Row: {
+          approval_required: boolean | null
+          category: string
+          cost_center: string | null
+          created_at: string | null
+          default_sla_days: number
+          default_status: string
+          default_warehouse: string | null
+          description: string | null
+          display_name: string
+          icon: string | null
+          id: string
+          operation_nature: string
+          order_type: string
+          responsible_department: string | null
+          stock_operation: string
+          updated_at: string | null
+        }
+        Insert: {
+          approval_required?: boolean | null
+          category?: string
+          cost_center?: string | null
+          created_at?: string | null
+          default_sla_days: number
+          default_status: string
+          default_warehouse?: string | null
+          description?: string | null
+          display_name: string
+          icon?: string | null
+          id?: string
+          operation_nature: string
+          order_type: string
+          responsible_department?: string | null
+          stock_operation: string
+          updated_at?: string | null
+        }
+        Update: {
+          approval_required?: boolean | null
+          category?: string
+          cost_center?: string | null
+          created_at?: string | null
+          default_sla_days?: number
+          default_status?: string
+          default_warehouse?: string | null
+          description?: string | null
+          display_name?: string
+          icon?: string | null
+          id?: string
+          operation_nature?: string
+          order_type?: string
+          responsible_department?: string | null
+          stock_operation?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       orders: {
         Row: {
           carrier_name: string | null
@@ -400,6 +457,7 @@ export type Database = {
           municipality: string | null
           notes: string | null
           operation_code: string | null
+          order_category: string | null
           order_number: string
           order_type: string
           priority: string
@@ -432,6 +490,7 @@ export type Database = {
           municipality?: string | null
           notes?: string | null
           operation_code?: string | null
+          order_category?: string | null
           order_number: string
           order_type: string
           priority: string
@@ -464,6 +523,7 @@ export type Database = {
           municipality?: string | null
           notes?: string | null
           operation_code?: string | null
+          order_category?: string | null
           order_number?: string
           order_type?: string
           priority?: string
@@ -500,6 +560,66 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      stock_movements: {
+        Row: {
+          created_at: string | null
+          id: string
+          item_code: string
+          movement_date: string | null
+          movement_type: string
+          notes: string | null
+          order_id: string
+          order_item_id: string | null
+          quantity: number
+          user_id: string
+          warehouse_from: string | null
+          warehouse_to: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          item_code: string
+          movement_date?: string | null
+          movement_type: string
+          notes?: string | null
+          order_id: string
+          order_item_id?: string | null
+          quantity: number
+          user_id: string
+          warehouse_from?: string | null
+          warehouse_to?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          item_code?: string
+          movement_date?: string | null
+          movement_type?: string
+          notes?: string | null
+          order_id?: string
+          order_item_id?: string | null
+          quantity?: number
+          user_id?: string
+          warehouse_from?: string | null
+          warehouse_to?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stock_movements_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_movements_order_item_id_fkey"
+            columns: ["order_item_id"]
+            isOneToOne: false
+            referencedRelation: "order_items"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {

@@ -9,6 +9,7 @@ import { useForm } from "react-hook-form";
 import { toast } from "@/hooks/use-toast";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { OrderTypeSelector } from "@/components/OrderTypeSelector";
 
 export interface OrderItem {
   id?: string;
@@ -139,17 +140,10 @@ export const AddOrderDialog = ({ onAddOrder }: AddOrderDialogProps) => {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label htmlFor="type">Tipo de Pedido</Label>
-              <Select onValueChange={(value) => setValue("type", value)} required>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione o tipo" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="production">Pedidos de Produção</SelectItem>
-                  <SelectItem value="sales">Pedidos de Venda</SelectItem>
-                  <SelectItem value="materials">Remessa de Materiais</SelectItem>
-                  <SelectItem value="ecommerce">E-commerce</SelectItem>
-                </SelectContent>
-              </Select>
+              <OrderTypeSelector 
+                value={orderType || ""} 
+                onValueChange={(value) => setValue("type", value)} 
+              />
             </div>
             <div>
               <Label htmlFor="priority">Prioridade</Label>

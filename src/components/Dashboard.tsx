@@ -62,6 +62,8 @@ export interface Order {
   deskTicket: string;
   totvsOrderNumber?: string;
   items?: import("./AddOrderDialog").OrderItem[];
+  order_category?: string;
+  daysOpen?: number;
 }
 
 // Mock data
@@ -342,7 +344,8 @@ export const Dashboard = () => {
             deliveryDeadline: dbOrder.delivery_date,
             deskTicket: dbOrder.notes || dbOrder.order_number,
             totvsOrderNumber: dbOrder.totvs_order_number || undefined,
-            items
+            items,
+            order_category: dbOrder.order_category,
           };
         })
       );

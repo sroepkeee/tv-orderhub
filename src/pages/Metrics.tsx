@@ -20,6 +20,7 @@ import { StatusDistribution } from "@/components/metrics/StatusDistribution";
 import { VolumeByType } from "@/components/metrics/VolumeByType";
 import { ActivityTimeline } from "@/components/metrics/ActivityTimeline";
 import { TrendCard } from "@/components/metrics/TrendCard";
+import { OrderTypeMetrics } from "@/components/metrics/OrderTypeMetrics";
 import type { Order } from "@/components/Dashboard";
 import { 
   calculateAverageProductionTime, 
@@ -70,21 +71,28 @@ export default function Metrics() {
       if (ordersError) throw ordersError;
       
       // Transformar dados
-      const transformedOrders: Order[] = (ordersData || []).map(dbOrder => ({
-        id: dbOrder.id,
-        type: dbOrder.order_type as any,
-        priority: dbOrder.priority as any,
-        orderNumber: dbOrder.order_number,
-        item: dbOrder.customer_name,
-        description: dbOrder.notes || "",
-        quantity: 0,
-        createdDate: new Date(dbOrder.created_at).toISOString().split('T')[0],
-        issueDate: dbOrder.issue_date ? new Date(dbOrder.issue_date).toISOString().split('T')[0] : undefined,
-        status: dbOrder.status as any,
-        client: dbOrder.customer_name,
-        deliveryDeadline: dbOrder.delivery_date,
-        deskTicket: dbOrder.order_number,
-        items: (dbOrder.order_items || []).map((item: any) => ({
+      const transformedOrders: Order[] = (ordersData || []).map(dbOrder => {
+        const createdDate = new Date(dbOrder.created_at);
+        const now = new Date();
+        const daysOpen = Math.floor((now.getTime() - createdDate.getTime()) / (1000 * 60 * 60 * 24));
+        
+        return {
+          id: dbOrder.id,
+          type: dbOrder.order_type as any,
+          priority: dbOrder.priority as any,
+          orderNumber: dbOrder.order_number,
+          item: dbOrder.customer_name,
+          description: dbOrder.notes || "",
+          quantity: 0,
+          createdDate: createdDate.toISOString().split('T')[0],
+          issueDate: dbOrder.issue_date ? new Date(dbOrder.issue_date).toISOString().split('T')[0] : undefined,
+          status: dbOrder.status as any,
+          client: dbOrder.customer_name,
+          deliveryDeadline: dbOrder.delivery_date,
+          deskTicket: dbOrder.order_number,
+          order_category: dbOrder.order_category,
+          daysOpen,
+          items: (dbOrder.order_items || []).map((item: any) => ({
           id: item.id,
           itemCode: item.item_code,
           itemDescription: item.item_description,
@@ -110,7 +118,8 @@ export default function Metrics() {
           ipi_percent: item.ipi_percent,
           icms_percent: item.icms_percent,
         }))
-      }));
+        };
+      });
       
       setOrders(transformedOrders);
       
@@ -267,6 +276,11 @@ export default function Metrics() {
       {/* Evolução e Comparativos */}
       <div className="mb-6">
         <ComparativeMetrics orders={orders} />
+      </div>
+
+      {/* Métricas por Tipo e Categoria */}
+      <div className="mb-6">
+        <OrderTypeMetrics orders={orders} />
       </div>
 
       {/* Distribuições e Atividades */}

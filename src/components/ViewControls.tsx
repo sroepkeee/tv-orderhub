@@ -11,19 +11,22 @@ import {
 import { ArrowUpDown, Filter, Layers, LayoutGrid, List } from "lucide-react";
 
 export type SortOption = "priority" | "deadline" | "created" | "status";
-export type GroupOption = "priority" | "phase" | "type" | "none";
+export type GroupOption = "priority" | "phase" | "type" | "category" | "none";
 export type PhaseFilter = "all" | "preparation" | "production" | "packaging" | "logistics" | "completion";
 export type ViewMode = "list" | "kanban";
+export type CategoryFilter = "all" | "reposicao" | "vendas" | "operacoes_especiais";
 
 interface ViewControlsProps {
   sortBy: SortOption;
   groupBy: GroupOption;
   phaseFilter: PhaseFilter;
   viewMode: ViewMode;
+  categoryFilter?: CategoryFilter;
   onSortChange: (sort: SortOption) => void;
   onGroupChange: (group: GroupOption) => void;
   onPhaseFilterChange: (phase: PhaseFilter) => void;
   onViewModeChange: (mode: ViewMode) => void;
+  onCategoryFilterChange?: (category: CategoryFilter) => void;
 }
 
 export const ViewControls = ({
@@ -31,10 +34,12 @@ export const ViewControls = ({
   groupBy,
   phaseFilter,
   viewMode,
+  categoryFilter = "all",
   onSortChange,
   onGroupChange,
   onPhaseFilterChange,
   onViewModeChange,
+  onCategoryFilterChange,
 }: ViewControlsProps) => {
   const sortOptions = [
     { value: "priority" as SortOption, label: "Prioridade" },
@@ -46,8 +51,16 @@ export const ViewControls = ({
   const groupOptions = [
     { value: "priority" as GroupOption, label: "Prioridade" },
     { value: "phase" as GroupOption, label: "Fase" },
+    { value: "category" as GroupOption, label: "Categoria" },
     { value: "type" as GroupOption, label: "Tipo de Pedido" },
     { value: "none" as GroupOption, label: "Sem Agrupamento" },
+  ];
+
+  const categoryFilters = [
+    { value: "all" as CategoryFilter, label: "Todas Categorias", icon: "📋" },
+    { value: "reposicao" as CategoryFilter, label: "Reposição", icon: "📦" },
+    { value: "vendas" as CategoryFilter, label: "Vendas", icon: "🏪" },
+    { value: "operacoes_especiais" as CategoryFilter, label: "Operações Especiais", icon: "🔄" },
   ];
 
   const phaseFilters = [
@@ -131,6 +144,33 @@ export const ViewControls = ({
           ))}
         </DropdownMenuContent>
       </DropdownMenu>
+      )}
+
+      {/* Category Filter */}
+      {onCategoryFilterChange && (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="sm" className="gap-2">
+              <Filter className="h-4 w-4" />
+              {categoryFilters.find(o => o.value === categoryFilter)?.icon}{' '}
+              {categoryFilters.find(o => o.value === categoryFilter)?.label}
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="w-56">
+            <DropdownMenuLabel>Filtrar por Categoria</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            {categoryFilters.map((option) => (
+              <DropdownMenuItem
+                key={option.value}
+                onClick={() => onCategoryFilterChange(option.value)}
+                className={categoryFilter === option.value ? "bg-accent" : ""}
+              >
+                <span className="mr-2">{option.icon}</span>
+                {option.label}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
       )}
 
       {/* Phase Filter */}
