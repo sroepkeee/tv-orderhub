@@ -1548,9 +1548,12 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                   <div>
                     <Label htmlFor="deliveryDeadline">Prazo de Entrega</Label>
                     <Input {...register("deliveryDeadline", { required: true })} type="date" />
-                    {order.issueDate && (
+                    {items.length > 0 && (
                       <p className="text-xs text-muted-foreground mt-0.5">
-                        Prazo inicial: 10 dias úteis a partir de {format(new Date(order.issueDate), 'dd/MM/yyyy')}
+                        SLAs acordados: {items
+                          .filter(item => item.sla_days)
+                          .map(item => `${item.sla_days} dias`)
+                          .join(', ') || 'Não definido'}
                       </p>
                     )}
                   </div>
