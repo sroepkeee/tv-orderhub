@@ -349,7 +349,7 @@ export function OrdersTrackingTable({
               <TableHead className="min-w-[150px] cursor-pointer hover:bg-muted/50" onClick={() => handleSort('client')}>
                 Cliente{getSortIcon('client')}
               </TableHead>
-              <TableHead className="min-w-[100px] cursor-pointer hover:bg-muted/50" onClick={() => handleSort('orderType')}>
+              <TableHead className="min-w-[180px] cursor-pointer hover:bg-muted/50" onClick={() => handleSort('orderType')}>
                 Tipo{getSortIcon('orderType')}
               </TableHead>
               <TableHead className="min-w-[90px] text-center cursor-pointer hover:bg-muted/50" onClick={() => handleSort('itemsQuantity')}>
