@@ -25,13 +25,27 @@ export function OrdersTrackingTable({
   onOrderClick
 }: OrdersTrackingTableProps) {
   const [filter, setFilter] = useState<'all' | 'critical' | 'warning' | 'good'>('all');
+  const [orderTypeFilter, setOrderTypeFilter] = useState<string>('all');
   const [ordersWithDetails, setOrdersWithDetails] = useState<OrderWithDetails[]>([]);
+  const [orderTypes, setOrderTypes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [sortField, setSortField] = useState<SortField | null>(null);
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   useEffect(() => {
     loadOrderDetails();
+    loadOrderTypes();
   }, [orders]);
+
+  const loadOrderTypes = async () => {
+    const { data } = await supabase
+      .from('order_type_config')
+      .select('*')
+      .order('display_name');
+    
+    if (data) {
+      setOrderTypes(data);
+    }
+  };
   const loadOrderDetails = async () => {
     setLoading(true);
     try {
@@ -88,13 +102,21 @@ export function OrdersTrackingTable({
   };
 
   const getFilteredOrders = () => {
-    let filtered = filter === 'all' 
-      ? [...ordersWithDetails]
-      : ordersWithDetails.filter(order => {
-          const daysUntil = calculateDaysUntilDeadline(order.deliveryDeadline);
-          const status = getDeadlineStatus(daysUntil);
-          return status === filter;
-        });
+    let filtered = ordersWithDetails;
+    
+    // Filtrar por prazo (crítico, atenção, em dia)
+    if (filter !== 'all') {
+      filtered = filtered.filter(order => {
+        const daysUntil = calculateDaysUntilDeadline(order.deliveryDeadline);
+        const status = getDeadlineStatus(daysUntil);
+        return status === filter;
+      });
+    }
+    
+    // Filtrar por tipo de pedido
+    if (orderTypeFilter !== 'all') {
+      filtered = filtered.filter(order => order.type === orderTypeFilter);
+    }
 
     // Aplicar ordenação
     if (sortField) {
@@ -156,42 +178,38 @@ export function OrdersTrackingTable({
     return filtered;
   };
   const getOrderTypeBadge = (type: string) => {
-    const typeMap: Record<string, { label: string; emoji: string; className: string }> = {
-      production: {
-        label: 'Produção',
-        emoji: '🏭',
-        className: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20'
-      },
-      sales: {
-        label: 'Vendas',
-        emoji: '💼',
-        className: 'bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20'
-      },
-      ecommerce: {
-        label: 'E-commerce',
-        emoji: '🛒',
-        className: 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20'
-      },
-      standard: {
-        label: 'Padrão',
-        emoji: '📋',
-        className: 'bg-gray-500/10 text-gray-600 dark:text-gray-400 border-gray-500/20'
-      },
-      materials: {
-        label: 'Materiais',
-        emoji: '📦',
-        className: 'bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/20'
-      }
-    };
-
-    const config = typeMap[type] || typeMap.standard;
+    // Buscar configuração do tipo
+    const typeConfig = orderTypes.find(t => t.order_type === type);
     
+    if (typeConfig) {
+      // Cores por categoria
+      const categoryColors: Record<string, string> = {
+        vendas: 'bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20',
+        estoque: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20',
+        producao: 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20',
+        logistica: 'bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/20',
+        outros: 'bg-gray-500/10 text-gray-600 dark:text-gray-400 border-gray-500/20'
+      };
+      
+      const colorClass = categoryColors[typeConfig.category] || categoryColors.outros;
+      
+      return (
+        <Badge 
+          variant="outline" 
+          className={cn("text-xs font-medium", colorClass)}
+        >
+          {typeConfig.icon} {typeConfig.display_name}
+        </Badge>
+      );
+    }
+    
+    // Fallback para tipos antigos
     return (
       <Badge 
         variant="outline" 
-        className={cn("text-xs font-medium", config.className)}
+        className="text-xs font-medium bg-gray-500/10 text-gray-600 dark:text-gray-400 border-gray-500/20"
       >
-        {config.emoji} {config.label}
+        📋 {type}
       </Badge>
     );
   };
@@ -270,20 +288,54 @@ export function OrdersTrackingTable({
           Visão completa do status e prazos de todos os pedidos - Clique em qualquer linha para ver detalhes
         </p>
 
-        {/* Filtros rápidos */}
-        <div className="flex gap-2 flex-wrap">
-          <Button variant={filter === 'all' ? 'default' : 'outline'} size="sm" onClick={() => setFilter('all')}>
-            Todos ({ordersWithDetails.length})
-          </Button>
-          <Button variant={filter === 'critical' ? 'destructive' : 'outline'} size="sm" onClick={() => setFilter('critical')}>
-            Críticos ({ordersWithDetails.filter(o => getDeadlineStatus(calculateDaysUntilDeadline(o.deliveryDeadline)) === 'critical').length})
-          </Button>
-          <Button variant={filter === 'warning' ? 'default' : 'outline'} size="sm" onClick={() => setFilter('warning')} className={filter === 'warning' ? 'bg-yellow-600 hover:bg-yellow-700' : ''}>
-            Atenção ({ordersWithDetails.filter(o => getDeadlineStatus(calculateDaysUntilDeadline(o.deliveryDeadline)) === 'warning').length})
-          </Button>
-          <Button variant={filter === 'good' ? 'default' : 'outline'} size="sm" onClick={() => setFilter('good')} className={filter === 'good' ? 'bg-green-600 hover:bg-green-700' : ''}>
-            Em dia ({ordersWithDetails.filter(o => getDeadlineStatus(calculateDaysUntilDeadline(o.deliveryDeadline)) === 'good').length})
-          </Button>
+        {/* Filtros por Prazo */}
+        <div className="space-y-3">
+          <div>
+            <h3 className="text-sm font-semibold mb-2 text-muted-foreground">Filtrar por Prazo</h3>
+            <div className="flex gap-2 flex-wrap">
+              <Button variant={filter === 'all' ? 'default' : 'outline'} size="sm" onClick={() => setFilter('all')}>
+                Todos ({ordersWithDetails.length})
+              </Button>
+              <Button variant={filter === 'critical' ? 'destructive' : 'outline'} size="sm" onClick={() => setFilter('critical')}>
+                Críticos ({ordersWithDetails.filter(o => getDeadlineStatus(calculateDaysUntilDeadline(o.deliveryDeadline)) === 'critical').length})
+              </Button>
+              <Button variant={filter === 'warning' ? 'default' : 'outline'} size="sm" onClick={() => setFilter('warning')} className={filter === 'warning' ? 'bg-yellow-600 hover:bg-yellow-700' : ''}>
+                Atenção ({ordersWithDetails.filter(o => getDeadlineStatus(calculateDaysUntilDeadline(o.deliveryDeadline)) === 'warning').length})
+              </Button>
+              <Button variant={filter === 'good' ? 'default' : 'outline'} size="sm" onClick={() => setFilter('good')} className={filter === 'good' ? 'bg-green-600 hover:bg-green-700' : ''}>
+                Em dia ({ordersWithDetails.filter(o => getDeadlineStatus(calculateDaysUntilDeadline(o.deliveryDeadline)) === 'good').length})
+              </Button>
+            </div>
+          </div>
+
+          {/* Filtros por Tipo de Pedido */}
+          <div>
+            <h3 className="text-sm font-semibold mb-2 text-muted-foreground">Filtrar por Tipo de Pedido</h3>
+            <div className="flex gap-2 flex-wrap">
+              <Button 
+                variant={orderTypeFilter === 'all' ? 'default' : 'outline'} 
+                size="sm" 
+                onClick={() => setOrderTypeFilter('all')}
+              >
+                Todos os Tipos ({ordersWithDetails.length})
+              </Button>
+              {orderTypes.map(typeConfig => {
+                const count = ordersWithDetails.filter(o => o.type === typeConfig.order_type).length;
+                if (count === 0) return null;
+                
+                return (
+                  <Button 
+                    key={typeConfig.order_type}
+                    variant={orderTypeFilter === typeConfig.order_type ? 'default' : 'outline'} 
+                    size="sm" 
+                    onClick={() => setOrderTypeFilter(typeConfig.order_type)}
+                  >
+                    {typeConfig.icon} {typeConfig.display_name} ({count})
+                  </Button>
+                );
+              })}
+            </div>
+          </div>
         </div>
       </div>
 
