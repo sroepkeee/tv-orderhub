@@ -22,6 +22,7 @@ import { CompleteOrderDialog } from "./CompleteOrderDialog";
 import { ExceptionCommentDialog } from "./ExceptionCommentDialog";
 import { PhaseButtons } from "./PhaseButtons";
 import { ConfirmationDialog } from "./ConfirmationDialog";
+import { OrderTypeSelector } from "@/components/OrderTypeSelector";
 
 interface HistoryEvent {
   id: string;
@@ -1480,18 +1481,11 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
               <form onSubmit={handleSubmit(onSubmit)} className="space-y-3">
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <Label htmlFor="type">Tipo</Label>
-                    <Select onValueChange={(value) => setValue("type", value as any)} defaultValue={order?.type}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="production">Produção</SelectItem>
-                        <SelectItem value="sales">Vendas</SelectItem>
-                        <SelectItem value="materials">Materiais</SelectItem>
-                        <SelectItem value="ecommerce">E-commerce</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <Label htmlFor="type">Tipo de Pedido</Label>
+                    <OrderTypeSelector 
+                      value={order?.type || ""} 
+                      onValueChange={(value) => setValue("type", value as any)} 
+                    />
                   </div>
                   <div>
                     <Label htmlFor="priority">Prioridade</Label>
