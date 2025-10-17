@@ -1656,7 +1656,6 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                             <TableHead className="w-[130px]">Armazém</TableHead>
                               <TableHead className="w-[140px]">Data Entrega</TableHead>
                               <TableHead className="w-[180px]">Situação</TableHead>
-                              <TableHead className="w-[100px]">SLA (dias)</TableHead>
                               <TableHead className="w-[120px]">Importação?</TableHead>
                               <TableHead className="w-[120px]">Qtd. Recebida</TableHead>
                               <TableHead className="w-[100px]">Ações</TableHead>
@@ -1730,16 +1729,6 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                                     <SelectItem value="completed">✓ Concluído</SelectItem>
                                   </SelectContent>
                                 </Select>
-                              </TableCell>
-                              <TableCell>
-                                <Input
-                                  type="number"
-                                  value={item.sla_days || ''}
-                                  onChange={(e) => updateItem(index, "sla_days", parseInt(e.target.value) || null)}
-                                  placeholder="Auto"
-                                  className="h-8 text-sm w-20"
-                                  title="SLA em dias úteis (vazio = automático)"
-                                />
                               </TableCell>
                               <TableCell>
                                 {item.item_source_type === 'out_of_stock' && (
