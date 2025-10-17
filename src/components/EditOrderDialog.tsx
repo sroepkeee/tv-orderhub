@@ -93,6 +93,7 @@ export const EditOrderDialog = ({ order, open, onOpenChange, onSave, onDelete }:
     newDate: string;
     itemIndex: number;
   } | null>(null);
+  const [selectedOrderType, setSelectedOrderType] = useState<string>("");
 
   useEffect(() => {
     if (!open) return;
@@ -452,6 +453,8 @@ export const EditOrderDialog = ({ order, open, onOpenChange, onSave, onDelete }:
         freightValue: (order as any).freight_value,
       };
       reset(orderData);
+      setSelectedOrderType(order.type || "");
+      setValue("type", order.type as any);
       
       // Carregar itens diretamente do banco para garantir dados atualizados
       const loadItems = async () => {
@@ -1230,7 +1233,15 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
 
   const onSubmit = (data: Order) => {
     console.log('💾 Salvando pedido com dados:', data);
-    const updatedOrder = { ...data, id: order.id, items };
+    console.log('📝 Tipo selecionado:', selectedOrderType);
+    
+    // Garantir que o tipo selecionado seja incluído
+    const updatedOrder = { 
+      ...data, 
+      id: order.id, 
+      items,
+      type: selectedOrderType as any
+    };
     
     // Check if delivery date changed
     if (order.deliveryDeadline !== data.deliveryDeadline) {
@@ -1483,8 +1494,11 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                   <div>
                     <Label htmlFor="type">Tipo de Pedido</Label>
                     <OrderTypeSelector 
-                      value={order?.type || ""} 
-                      onValueChange={(value) => setValue("type", value as any)} 
+                      value={selectedOrderType} 
+                      onValueChange={(value) => {
+                        setSelectedOrderType(value);
+                        setValue("type", value as any);
+                      }} 
                     />
                   </div>
                   <div>
