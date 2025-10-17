@@ -155,6 +155,47 @@ export function OrdersTrackingTable({
 
     return filtered;
   };
+  const getOrderTypeBadge = (type: string) => {
+    const typeMap: Record<string, { label: string; emoji: string; className: string }> = {
+      production: {
+        label: 'Produção',
+        emoji: '🏭',
+        className: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20'
+      },
+      sales: {
+        label: 'Vendas',
+        emoji: '💼',
+        className: 'bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20'
+      },
+      ecommerce: {
+        label: 'E-commerce',
+        emoji: '🛒',
+        className: 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20'
+      },
+      standard: {
+        label: 'Padrão',
+        emoji: '📋',
+        className: 'bg-gray-500/10 text-gray-600 dark:text-gray-400 border-gray-500/20'
+      },
+      materials: {
+        label: 'Materiais',
+        emoji: '📦',
+        className: 'bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/20'
+      }
+    };
+
+    const config = typeMap[type] || typeMap.standard;
+    
+    return (
+      <Badge 
+        variant="outline" 
+        className={cn("text-xs font-medium", config.className)}
+      >
+        {config.emoji} {config.label}
+      </Badge>
+    );
+  };
+
   const getStatusBadge = (status: string) => {
     const statusMap: Record<string, {
       label: string;
@@ -302,17 +343,7 @@ export function OrdersTrackingTable({
                     <TableCell className="font-medium">{order.orderNumber}</TableCell>
                     <TableCell>{order.client}</TableCell>
                     <TableCell>
-                      <Badge 
-                        variant="outline" 
-                        className={cn(
-                          "text-xs font-medium",
-                          order.type === 'ecommerce' 
-                            ? "bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20" 
-                            : "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20"
-                        )}
-                      >
-                        {order.type === 'ecommerce' ? '🛒 E-commerce' : '📋 Manual'}
-                      </Badge>
+                      {getOrderTypeBadge(order.type)}
                     </TableCell>
                     <TableCell className="text-center">
                       <Badge variant="secondary" className="text-sm font-semibold">
