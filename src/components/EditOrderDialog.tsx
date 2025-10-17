@@ -650,7 +650,13 @@ export const EditOrderDialog = ({ order, open, onOpenChange, onSave, onDelete }:
             discount_percent: dbItem.discount_percent,
             ipi_percent: dbItem.ipi_percent,
             icms_percent: dbItem.icms_percent,
-            total_value: dbItem.total_value
+            total_value: dbItem.total_value,
+            sla_days: dbItem.sla_days,
+            is_imported: dbItem.is_imported,
+            import_lead_time_days: dbItem.import_lead_time_days,
+            sla_deadline: dbItem.sla_deadline,
+            current_phase: dbItem.current_phase,
+            phase_started_at: dbItem.phase_started_at
           }));
           setItems(mappedItems);
         }
@@ -723,7 +729,13 @@ export const EditOrderDialog = ({ order, open, onOpenChange, onSave, onDelete }:
           item_source_type: (item.item_source_type as 'in_stock' | 'production' | 'out_of_stock') || 'in_stock',
           item_status: (item.item_status as 'in_stock' | 'awaiting_production' | 'purchase_required' | 'completed') || 'in_stock',
           production_estimated_date: item.production_estimated_date,
-          userId: item.user_id
+          userId: item.user_id,
+          sla_days: item.sla_days,
+          is_imported: item.is_imported,
+          import_lead_time_days: item.import_lead_time_days,
+          sla_deadline: item.sla_deadline,
+          current_phase: item.current_phase,
+          phase_started_at: item.phase_started_at
         })));
       }
       
@@ -785,7 +797,13 @@ export const EditOrderDialog = ({ order, open, onOpenChange, onSave, onDelete }:
           item_source_type: (item.item_source_type as 'in_stock' | 'production' | 'out_of_stock') || 'in_stock',
           item_status: (item.item_status as 'in_stock' | 'awaiting_production' | 'purchase_required' | 'completed') || 'in_stock',
           production_estimated_date: item.production_estimated_date,
-          userId: item.user_id
+          userId: item.user_id,
+          sla_days: item.sla_days,
+          is_imported: item.is_imported,
+          import_lead_time_days: item.import_lead_time_days,
+          sla_deadline: item.sla_deadline,
+          current_phase: item.current_phase,
+          phase_started_at: item.phase_started_at
         })));
       }
       
