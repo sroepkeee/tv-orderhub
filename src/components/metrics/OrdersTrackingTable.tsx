@@ -302,7 +302,15 @@ export function OrdersTrackingTable({
                     <TableCell className="font-medium">{order.orderNumber}</TableCell>
                     <TableCell>{order.client}</TableCell>
                     <TableCell>
-                      <Badge variant="outline" className="text-xs">
+                      <Badge 
+                        variant="outline" 
+                        className={cn(
+                          "text-xs font-medium",
+                          order.type === 'ecommerce' 
+                            ? "bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20" 
+                            : "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20"
+                        )}
+                      >
                         {order.type === 'ecommerce' ? '🛒 E-commerce' : '📋 Manual'}
                       </Badge>
                     </TableCell>
@@ -341,7 +349,9 @@ export function OrdersTrackingTable({
                         <Progress value={deliveryPercentage} className="h-2" />
                       </div>
                     </TableCell>
-                    
+                    <TableCell>
+                      {getItemSourceBadges(order.items || [])}
+                    </TableCell>
                     <TableCell className="text-center">
                       {order.dateChangesCount && order.dateChangesCount > 0 ? <Badge variant="outline" className="bg-orange-500/10 text-orange-600 border-orange-500/20">
                           🔄 {order.dateChangesCount}
