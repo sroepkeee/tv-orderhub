@@ -642,6 +642,10 @@ export type Database = {
         Args: { business_days: number; start_date: string }
         Returns: string
       }
+      user_can_modify_order: {
+        Args: { order_uuid: string }
+        Returns: boolean
+      }
     }
     Enums: {
       [_ in never]: never
