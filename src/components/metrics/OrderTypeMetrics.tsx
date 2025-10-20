@@ -77,6 +77,20 @@ export function OrderTypeMetrics({ orders }: OrderTypeMetricsProps) {
     color: categoryColors[category] || "#94a3b8"
   }));
 
+  // SLA por categoria (de acordo com os requisitos)
+  const categorySLA: Record<string, number> = {
+    operacoes_especiais: 7,
+    reposicao: 7,
+    vendas: 2,
+    outros: 7
+  };
+
+  const slaData = Object.entries(categorySLA).map(([category, sla]) => ({
+    name: categoryLabels[category] || category,
+    sla,
+    color: categoryColors[category] || "#94a3b8"
+  }));
+
   return (
     <div className="grid gap-6 md:grid-cols-2">
       {/* Volume por Categoria - Gráfico de Pizza */}
@@ -154,6 +168,41 @@ export function OrderTypeMetrics({ orders }: OrderTypeMetricsProps) {
             </Bar>
           </BarChart>
         </ResponsiveContainer>
+      </Card>
+
+      {/* SLA Padrão por Categoria */}
+      <Card className="p-6">
+        <h3 className="text-lg font-semibold mb-4">SLA Padrão por Categoria</h3>
+        <ResponsiveContainer width="100%" height={250}>
+          <BarChart data={slaData}>
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis dataKey="name" />
+            <YAxis label={{ value: 'Dias Úteis', angle: -90, position: 'insideLeft' }} />
+            <Tooltip />
+            <Bar dataKey="sla" fill="#8b5cf6">
+              {slaData.map((entry, index) => (
+                <Cell key={`cell-${index}`} fill={entry.color} />
+              ))}
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
+        <div className="mt-4 space-y-2">
+          <div className="text-xs text-muted-foreground">
+            <strong>SLA Configurado:</strong>
+          </div>
+          {slaData.map((cat) => (
+            <div key={cat.name} className="flex items-center justify-between text-sm">
+              <div className="flex items-center gap-2">
+                <div 
+                  className="w-3 h-3 rounded-full" 
+                  style={{ backgroundColor: cat.color }}
+                />
+                <span>{cat.name}</span>
+              </div>
+              <Badge variant="outline">{cat.sla} dias úteis</Badge>
+            </div>
+          ))}
+        </div>
       </Card>
 
       {/* Resumo Estatístico */}

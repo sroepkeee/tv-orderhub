@@ -13,12 +13,13 @@ interface ItemSLATrackingProps {
 }
 
 export const ItemSLATracking = ({ orders }: ItemSLATrackingProps) => {
-  // Flatten all items from all orders
+  // Flatten all items from all orders with category info
   const allItems = orders.flatMap(order => 
     (order.items || []).map(item => ({
       ...item,
       orderNumber: order.orderNumber,
-      orderId: order.id
+      orderId: order.id,
+      orderCategory: order.order_category || 'outros'
     }))
   );
 
@@ -86,14 +87,26 @@ export const ItemSLATracking = ({ orders }: ItemSLATrackingProps) => {
   const getSourceTypeBadge = (type: string | undefined) => {
     switch (type) {
       case 'in_stock':
-        return <Badge variant="outline" className="text-green-700 border-green-300">📦 Estoque (48h)</Badge>;
+        return <Badge variant="outline" className="text-green-700 border-green-300">📦 Estoque (2d)</Badge>;
       case 'production':
         return <Badge variant="outline" className="text-blue-700 border-blue-300">🏭 Produção (7d)</Badge>;
       case 'out_of_stock':
-        return <Badge variant="outline" className="text-orange-700 border-orange-300">🛒 Compra</Badge>;
+        return <Badge variant="outline" className="text-orange-700 border-orange-300">🛒 Compra (15d)</Badge>;
       default:
         return <Badge variant="outline">-</Badge>;
     }
+  };
+
+  const getCategoryBadge = (category: string) => {
+    const categoryLabels: Record<string, { label: string; color: string }> = {
+      operacoes_especiais: { label: "Op. Especiais (7d)", color: "bg-purple-100 text-purple-700 border-purple-300" },
+      reposicao: { label: "Reposição (7d)", color: "bg-blue-100 text-blue-700 border-blue-300" },
+      vendas: { label: "Vendas (2d)", color: "bg-green-100 text-green-700 border-green-300" },
+      outros: { label: "Outros (7d)", color: "bg-gray-100 text-gray-700 border-gray-300" }
+    };
+    
+    const config = categoryLabels[category] || categoryLabels.outros;
+    return <Badge variant="outline" className={config.color}>{config.label}</Badge>;
   };
 
   const getCurrentPhaseBadge = (phase: string | undefined) => {
@@ -182,6 +195,7 @@ export const ItemSLATracking = ({ orders }: ItemSLATrackingProps) => {
                   <TableHead className="w-[100px]">Pedido</TableHead>
                   <TableHead className="w-[120px]">Código</TableHead>
                   <TableHead className="min-w-[200px]">Descrição</TableHead>
+                  <TableHead className="w-[150px]">Categoria</TableHead>
                   <TableHead className="w-[130px]">Tipo/SLA</TableHead>
                   <TableHead className="w-[120px]">Fase Atual</TableHead>
                   <TableHead className="w-[120px]">Prazo SLA</TableHead>
@@ -192,7 +206,7 @@ export const ItemSLATracking = ({ orders }: ItemSLATrackingProps) => {
               <TableBody>
                 {itemsWithSLA.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                       Nenhum item encontrado
                     </TableCell>
                   </TableRow>
@@ -211,9 +225,12 @@ export const ItemSLATracking = ({ orders }: ItemSLATrackingProps) => {
                         <TableCell className="font-mono text-sm">{item.itemCode}</TableCell>
                         <TableCell className="text-sm">{item.itemDescription}</TableCell>
                         <TableCell>
+                          {getCategoryBadge((item as any).orderCategory)}
+                        </TableCell>
+                        <TableCell>
                           {getSourceTypeBadge(item.item_source_type)}
                           <div className="text-xs text-muted-foreground mt-1">
-                            SLA: {item.sla_days || 7} dias
+                            SLA Item: {item.sla_days || 7} dias
                           </div>
                         </TableCell>
                         <TableCell>{getCurrentPhaseBadge(item.current_phase)}</TableCell>

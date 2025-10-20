@@ -21,6 +21,7 @@ import { VolumeByType } from "@/components/metrics/VolumeByType";
 import { ActivityTimeline } from "@/components/metrics/ActivityTimeline";
 import { TrendCard } from "@/components/metrics/TrendCard";
 import { OrderTypeMetrics } from "@/components/metrics/OrderTypeMetrics";
+import { CategorySLAMetrics } from "@/components/metrics/CategorySLAMetrics";
 import type { Order } from "@/components/Dashboard";
 import { 
   calculateAverageProductionTime, 
@@ -276,6 +277,11 @@ export default function Metrics() {
       {/* Evolução e Comparativos */}
       <div className="mb-6">
         <ComparativeMetrics orders={orders} />
+      </div>
+
+      {/* Performance de SLA por Categoria */}
+      <div className="mb-6">
+        <CategorySLAMetrics orders={orders} />
       </div>
 
       {/* Métricas por Tipo e Categoria */}
