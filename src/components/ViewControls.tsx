@@ -8,6 +8,12 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { ArrowUpDown, Filter, Layers, LayoutGrid, List } from "lucide-react";
 
 export type SortOption = "priority" | "deadline" | "created" | "status";
@@ -73,128 +79,153 @@ export const ViewControls = ({
   ];
 
   return (
-    <div className="flex items-center gap-3 mb-6 flex-wrap">
-      {/* View Mode Toggle */}
-      <div className="flex items-center gap-1 border rounded-lg p-1">
-        <Button
-          variant={viewMode === "list" ? "default" : "ghost"}
-          size="sm"
-          className="gap-2"
-          onClick={() => onViewModeChange("list")}
-        >
-          <List className="h-4 w-4" />
-          Lista
-        </Button>
-        <Button
-          variant={viewMode === "kanban" ? "default" : "ghost"}
-          size="sm"
-          className="gap-2"
-          onClick={() => onViewModeChange("kanban")}
-        >
-          <LayoutGrid className="h-4 w-4" />
-          Kanban
-        </Button>
-      </div>
-
-      {/* Sort Control (hidden in Kanban view) */}
-      {viewMode === "list" && (
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="outline" size="sm" className="gap-2">
-            <ArrowUpDown className="h-4 w-4" />
-            Ordenar: {sortOptions.find(o => o.value === sortBy)?.label}
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="start" className="w-56">
-          <DropdownMenuLabel>Ordenar por</DropdownMenuLabel>
-          <DropdownMenuSeparator />
-          {sortOptions.map((option) => (
-            <DropdownMenuItem
-              key={option.value}
-              onClick={() => onSortChange(option.value)}
-              className={sortBy === option.value ? "bg-accent" : ""}
-            >
-              {option.label}
-            </DropdownMenuItem>
-          ))}
-        </DropdownMenuContent>
-      </DropdownMenu>
-      )}
-
-      {/* Group Control (hidden in Kanban view) */}
-      {viewMode === "list" && (
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="outline" size="sm" className="gap-2">
-            <Layers className="h-4 w-4" />
-            Agrupar: {groupOptions.find(o => o.value === groupBy)?.label}
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="start" className="w-56">
-          <DropdownMenuLabel>Agrupar por</DropdownMenuLabel>
-          <DropdownMenuSeparator />
-          {groupOptions.map((option) => (
-            <DropdownMenuItem
-              key={option.value}
-              onClick={() => onGroupChange(option.value)}
-              className={groupBy === option.value ? "bg-accent" : ""}
-            >
-              {option.label}
-            </DropdownMenuItem>
-          ))}
-        </DropdownMenuContent>
-      </DropdownMenu>
-      )}
-
-      {/* Category Filter */}
-      {onCategoryFilterChange && (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm" className="gap-2">
-              <Filter className="h-4 w-4" />
-              {categoryFilters.find(o => o.value === categoryFilter)?.icon}{' '}
-              {categoryFilters.find(o => o.value === categoryFilter)?.label}
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="w-56">
-            <DropdownMenuLabel>Filtrar por Categoria</DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            {categoryFilters.map((option) => (
-              <DropdownMenuItem
-                key={option.value}
-                onClick={() => onCategoryFilterChange(option.value)}
-                className={categoryFilter === option.value ? "bg-accent" : ""}
+    <TooltipProvider>
+      <div className="flex items-center gap-1.5 mb-4 flex-wrap">
+        {/* View Mode Toggle */}
+        <div className="flex items-center gap-0.5 border rounded-md p-0.5">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant={viewMode === "list" ? "default" : "ghost"}
+                size="icon"
+                className="h-7 w-7"
+                onClick={() => onViewModeChange("list")}
               >
-                <span className="mr-2">{option.icon}</span>
-                {option.label}
-              </DropdownMenuItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
-      )}
+                <List className="h-3.5 w-3.5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Lista</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant={viewMode === "kanban" ? "default" : "ghost"}
+                size="icon"
+                className="h-7 w-7"
+                onClick={() => onViewModeChange("kanban")}
+              >
+                <LayoutGrid className="h-3.5 w-3.5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Kanban</TooltipContent>
+          </Tooltip>
+        </div>
 
-      {/* Phase Filter */}
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="outline" size="sm" className="gap-2">
-            <Filter className="h-4 w-4" />
-            Fase: {phaseFilters.find(o => o.value === phaseFilter)?.label}
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="start" className="w-56">
-          <DropdownMenuLabel>Filtrar por Fase</DropdownMenuLabel>
-          <DropdownMenuSeparator />
-          {phaseFilters.map((option) => (
-            <DropdownMenuItem
-              key={option.value}
-              onClick={() => onPhaseFilterChange(option.value)}
-              className={phaseFilter === option.value ? "bg-accent" : ""}
-            >
-              {option.label}
-            </DropdownMenuItem>
-          ))}
-        </DropdownMenuContent>
-      </DropdownMenu>
-    </div>
+        {/* Sort Control (hidden in Kanban view) */}
+        {viewMode === "list" && (
+        <Tooltip>
+          <DropdownMenu>
+            <TooltipTrigger asChild>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="icon" className="h-7 w-7">
+                  <ArrowUpDown className="h-3.5 w-3.5" />
+                </Button>
+              </DropdownMenuTrigger>
+            </TooltipTrigger>
+            <DropdownMenuContent align="start" className="w-56">
+              <DropdownMenuLabel>Ordenar por</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {sortOptions.map((option) => (
+                <DropdownMenuItem
+                  key={option.value}
+                  onClick={() => onSortChange(option.value)}
+                  className={sortBy === option.value ? "bg-accent" : ""}
+                >
+                  {option.label}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <TooltipContent>Ordenar</TooltipContent>
+        </Tooltip>
+        )}
+
+        {/* Group Control (hidden in Kanban view) */}
+        {viewMode === "list" && (
+        <Tooltip>
+          <DropdownMenu>
+            <TooltipTrigger asChild>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="icon" className="h-7 w-7">
+                  <Layers className="h-3.5 w-3.5" />
+                </Button>
+              </DropdownMenuTrigger>
+            </TooltipTrigger>
+            <DropdownMenuContent align="start" className="w-56">
+              <DropdownMenuLabel>Agrupar por</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {groupOptions.map((option) => (
+                <DropdownMenuItem
+                  key={option.value}
+                  onClick={() => onGroupChange(option.value)}
+                  className={groupBy === option.value ? "bg-accent" : ""}
+                >
+                  {option.label}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <TooltipContent>Agrupar</TooltipContent>
+        </Tooltip>
+        )}
+
+        {/* Category Filter */}
+        {onCategoryFilterChange && (
+          <Tooltip>
+            <DropdownMenu>
+              <TooltipTrigger asChild>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="icon" className="h-7 w-7">
+                    <span className="text-sm">{categoryFilters.find(o => o.value === categoryFilter)?.icon}</span>
+                  </Button>
+                </DropdownMenuTrigger>
+              </TooltipTrigger>
+              <DropdownMenuContent align="start" className="w-56">
+                <DropdownMenuLabel>Filtrar por Categoria</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {categoryFilters.map((option) => (
+                  <DropdownMenuItem
+                    key={option.value}
+                    onClick={() => onCategoryFilterChange(option.value)}
+                    className={categoryFilter === option.value ? "bg-accent" : ""}
+                  >
+                    <span className="mr-2">{option.icon}</span>
+                    {option.label}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <TooltipContent>Filtrar por Categoria</TooltipContent>
+          </Tooltip>
+        )}
+
+        {/* Phase Filter */}
+        <Tooltip>
+          <DropdownMenu>
+            <TooltipTrigger asChild>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="icon" className="h-7 w-7">
+                  <Filter className="h-3.5 w-3.5" />
+                </Button>
+              </DropdownMenuTrigger>
+            </TooltipTrigger>
+            <DropdownMenuContent align="start" className="w-56">
+              <DropdownMenuLabel>Filtrar por Fase</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {phaseFilters.map((option) => (
+                <DropdownMenuItem
+                  key={option.value}
+                  onClick={() => onPhaseFilterChange(option.value)}
+                  className={phaseFilter === option.value ? "bg-accent" : ""}
+                >
+                  {option.label}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <TooltipContent>Filtrar por Fase</TooltipContent>
+        </Tooltip>
+      </div>
+    </TooltipProvider>
   );
 };
