@@ -9,6 +9,7 @@ import { validateOrder, validatePdfOrder, ValidationResult } from "@/lib/orderVa
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Upload, FileSpreadsheet, CheckCircle2, XCircle, AlertTriangle, Download } from "lucide-react";
+import { cleanItemDescription } from "@/lib/utils";
 interface ImportOrderDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -185,7 +186,7 @@ export const ImportOrderDialog = ({
         user_id: user.id,
         order_id: order.id,
         item_code: item.itemCode,
-        item_description: item.description,
+        item_description: cleanItemDescription(item.description),
         requested_quantity: item.quantity,
         delivered_quantity: 0,
         unit: item.unit,

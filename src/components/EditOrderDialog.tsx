@@ -23,6 +23,7 @@ import { ExceptionCommentDialog } from "./ExceptionCommentDialog";
 import { PhaseButtons } from "./PhaseButtons";
 import { ConfirmationDialog } from "./ConfirmationDialog";
 import { OrderTypeSelector } from "@/components/OrderTypeSelector";
+import { cleanItemDescription } from "@/lib/utils";
 
 interface HistoryEvent {
   id: string;
@@ -462,7 +463,7 @@ export const EditOrderDialog = ({ order, open, onOpenChange, onSave, onDelete }:
         const mappedItems = (itemsData || []).map(item => ({
           id: item.id,
           itemCode: item.item_code,
-          itemDescription: item.item_description,
+          itemDescription: cleanItemDescription(item.item_description),
           unit: item.unit,
           requestedQuantity: item.requested_quantity,
           warehouse: item.warehouse,
@@ -693,7 +694,7 @@ export const EditOrderDialog = ({ order, open, onOpenChange, onSave, onDelete }:
         const mappedItems = reloadedItems.map(dbItem => ({
           id: dbItem.id,
           itemCode: dbItem.item_code,
-          itemDescription: dbItem.item_description,
+          itemDescription: cleanItemDescription(dbItem.item_description),
           unit: dbItem.unit,
           requestedQuantity: dbItem.requested_quantity,
           warehouse: dbItem.warehouse,
@@ -772,7 +773,7 @@ export const EditOrderDialog = ({ order, open, onOpenChange, onSave, onDelete }:
         setItems(updatedItems.map(item => ({
           id: item.id,
           itemCode: item.item_code,
-          itemDescription: item.item_description,
+          itemDescription: cleanItemDescription(item.item_description),
           unit: item.unit,
           requestedQuantity: item.requested_quantity,
           warehouse: item.warehouse,
@@ -840,7 +841,7 @@ export const EditOrderDialog = ({ order, open, onOpenChange, onSave, onDelete }:
         setItems(updatedItems.map(item => ({
           id: item.id,
           itemCode: item.item_code,
-          itemDescription: item.item_description,
+          itemDescription: cleanItemDescription(item.item_description),
           unit: item.unit,
           requestedQuantity: item.requested_quantity,
           warehouse: item.warehouse,

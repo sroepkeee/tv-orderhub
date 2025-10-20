@@ -8,7 +8,7 @@ import type { Order } from "@/components/Dashboard";
 import type { OrderItem } from "@/components/AddOrderDialog";
 import { calculateDaysOpen, calculateDaysUntilDeadline, getDeadlineStatus, getPartialDeliveryInfo, countOrderDateChanges } from "@/lib/metrics";
 import { Calendar, TrendingUp, Package, AlertCircle, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, cleanItemDescription } from "@/lib/utils";
 interface OrdersTrackingTableProps {
   orders: Order[];
   onOrderClick: (order: Order) => void;
@@ -59,7 +59,7 @@ export function OrdersTrackingTable({
         const items: OrderItem[] = (itemsData || []).map(item => ({
           id: item.id,
           itemCode: item.item_code,
-          itemDescription: item.item_description,
+          itemDescription: cleanItemDescription(item.item_description),
           requestedQuantity: item.requested_quantity,
           deliveredQuantity: item.delivered_quantity,
           unit: item.unit,

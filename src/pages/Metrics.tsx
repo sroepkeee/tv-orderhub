@@ -23,6 +23,7 @@ import { TrendCard } from "@/components/metrics/TrendCard";
 import { OrderTypeMetrics } from "@/components/metrics/OrderTypeMetrics";
 import { CategorySLAMetrics } from "@/components/metrics/CategorySLAMetrics";
 import type { Order } from "@/components/Dashboard";
+import { cleanItemDescription } from "@/lib/utils";
 import { 
   calculateAverageProductionTime, 
   calculateOnTimeRate, 
@@ -96,7 +97,7 @@ export default function Metrics() {
           items: (dbOrder.order_items || []).map((item: any) => ({
           id: item.id,
           itemCode: item.item_code,
-          itemDescription: item.item_description,
+          itemDescription: cleanItemDescription(item.item_description),
           requestedQuantity: item.requested_quantity,
           deliveredQuantity: item.delivered_quantity,
           unit: item.unit,

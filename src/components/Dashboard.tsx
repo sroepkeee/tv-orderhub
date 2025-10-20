@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Search, Calendar, BarChart3, FileSpreadsheet, Plus, ChevronDown } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
+import { cleanItemDescription } from "@/lib/utils";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -307,7 +308,7 @@ export const Dashboard = () => {
           const items = (itemsData || []).map(item => ({
             id: item.id,
             itemCode: item.item_code,
-            itemDescription: item.item_description,
+            itemDescription: cleanItemDescription(item.item_description),
             unit: item.unit,
             requestedQuantity: item.requested_quantity,
             warehouse: item.warehouse,
