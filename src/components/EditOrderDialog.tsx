@@ -1553,32 +1553,6 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                   <div>
                     <Label htmlFor="deliveryDeadline">Prazo de Entrega</Label>
                     <Input {...register("deliveryDeadline", { required: true })} type="date" />
-                    {items.length > 0 && (() => {
-                      const stockItems = items.filter(i => i.item_source_type === 'in_stock');
-                      const productionItems = items.filter(i => i.item_source_type === 'production');
-                      const purchaseItems = items.filter(i => i.item_source_type === 'out_of_stock');
-                      
-                      const parts = [];
-                      if (stockItems.length > 0) {
-                        parts.push(`📦 Estoque (2d): ${stockItems.length} ${stockItems.length === 1 ? 'item' : 'itens'}`);
-                      }
-                      if (productionItems.length > 0) {
-                        parts.push(`🏭 Produção (7d): ${productionItems.length} ${productionItems.length === 1 ? 'item' : 'itens'}`);
-                      }
-                      if (purchaseItems.length > 0) {
-                        const customLeadTimes = purchaseItems
-                          .filter(i => i.sla_days && i.sla_days !== 15)
-                          .map(i => i.sla_days);
-                        const hasCustom = customLeadTimes.length > 0;
-                        parts.push(`🛒 Compra: ${purchaseItems.length} ${purchaseItems.length === 1 ? 'item' : 'itens'}${hasCustom ? ` (${[...new Set(customLeadTimes)].join(', ')}d)` : ' (15d)'}`);
-                      }
-                      
-                      return parts.length > 0 ? (
-                        <p className="text-xs text-muted-foreground mt-0.5">
-                          SLAs previstos: {parts.join(' | ')}
-                        </p>
-                      ) : null;
-                    })()}
                   </div>
                 </div>
 
