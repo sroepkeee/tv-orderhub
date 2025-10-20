@@ -7,8 +7,9 @@ import { supabase } from "@/integrations/supabase/client";
 import type { Order } from "@/components/Dashboard";
 import type { OrderItem } from "@/components/AddOrderDialog";
 import { calculateDaysOpen, calculateDaysUntilDeadline, getDeadlineStatus, getPartialDeliveryInfo, countOrderDateChanges } from "@/lib/metrics";
-import { Calendar, TrendingUp, Package, AlertCircle, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+import { Calendar, TrendingUp, Package, AlertCircle, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown } from "lucide-react";
 import { cn, cleanItemDescription } from "@/lib/utils";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 interface OrdersTrackingTableProps {
   orders: Order[];
   onOrderClick: (order: Order) => void;
@@ -31,6 +32,7 @@ export function OrdersTrackingTable({
   const [loading, setLoading] = useState(true);
   const [sortField, setSortField] = useState<SortField | null>(null);
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+  const [isDeadlineFilterOpen, setIsDeadlineFilterOpen] = useState(false);
   useEffect(() => {
     loadOrderDetails();
     loadOrderTypes();
@@ -290,23 +292,30 @@ export function OrdersTrackingTable({
 
         {/* Filtros por Prazo */}
         <div className="space-y-3">
-          <div>
-            <h3 className="text-sm font-semibold mb-2 text-muted-foreground">Filtrar por Prazo</h3>
-            <div className="flex gap-2 flex-wrap">
-              <Button variant={filter === 'all' ? 'default' : 'outline'} size="sm" onClick={() => setFilter('all')}>
-                Todos ({ordersWithDetails.length})
-              </Button>
-              <Button variant={filter === 'critical' ? 'destructive' : 'outline'} size="sm" onClick={() => setFilter('critical')}>
-                Críticos ({ordersWithDetails.filter(o => getDeadlineStatus(calculateDaysUntilDeadline(o.deliveryDeadline)) === 'critical').length})
-              </Button>
-              <Button variant={filter === 'warning' ? 'default' : 'outline'} size="sm" onClick={() => setFilter('warning')} className={filter === 'warning' ? 'bg-yellow-600 hover:bg-yellow-700' : ''}>
-                Atenção ({ordersWithDetails.filter(o => getDeadlineStatus(calculateDaysUntilDeadline(o.deliveryDeadline)) === 'warning').length})
-              </Button>
-              <Button variant={filter === 'good' ? 'default' : 'outline'} size="sm" onClick={() => setFilter('good')} className={filter === 'good' ? 'bg-green-600 hover:bg-green-700' : ''}>
-                Em dia ({ordersWithDetails.filter(o => getDeadlineStatus(calculateDaysUntilDeadline(o.deliveryDeadline)) === 'good').length})
-              </Button>
+          <Collapsible open={isDeadlineFilterOpen} onOpenChange={setIsDeadlineFilterOpen}>
+            <div>
+              <CollapsibleTrigger className="flex items-center gap-2 w-full hover:opacity-70 transition-opacity">
+                <h3 className="text-sm font-semibold mb-2 text-muted-foreground">Filtrar por Prazo</h3>
+                <ChevronDown className={cn("h-4 w-4 text-muted-foreground transition-transform mb-2", isDeadlineFilterOpen && "rotate-180")} />
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <div className="flex gap-2 flex-wrap">
+                  <Button variant={filter === 'all' ? 'default' : 'outline'} size="sm" onClick={() => setFilter('all')}>
+                    Todos ({ordersWithDetails.length})
+                  </Button>
+                  <Button variant={filter === 'critical' ? 'destructive' : 'outline'} size="sm" onClick={() => setFilter('critical')}>
+                    Críticos ({ordersWithDetails.filter(o => getDeadlineStatus(calculateDaysUntilDeadline(o.deliveryDeadline)) === 'critical').length})
+                  </Button>
+                  <Button variant={filter === 'warning' ? 'default' : 'outline'} size="sm" onClick={() => setFilter('warning')} className={filter === 'warning' ? 'bg-yellow-600 hover:bg-yellow-700' : ''}>
+                    Atenção ({ordersWithDetails.filter(o => getDeadlineStatus(calculateDaysUntilDeadline(o.deliveryDeadline)) === 'warning').length})
+                  </Button>
+                  <Button variant={filter === 'good' ? 'default' : 'outline'} size="sm" onClick={() => setFilter('good')} className={filter === 'good' ? 'bg-green-600 hover:bg-green-700' : ''}>
+                    Em dia ({ordersWithDetails.filter(o => getDeadlineStatus(calculateDaysUntilDeadline(o.deliveryDeadline)) === 'good').length})
+                  </Button>
+                </div>
+              </CollapsibleContent>
             </div>
-          </div>
+          </Collapsible>
 
           {/* Filtros por Tipo de Pedido */}
           <div>
