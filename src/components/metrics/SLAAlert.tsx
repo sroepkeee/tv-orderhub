@@ -1,9 +1,10 @@
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AlertTriangle, X } from "lucide-react";
+import { AlertTriangle, X, ChevronDown, ChevronUp } from "lucide-react";
 import { differenceInDays, parseISO } from "date-fns";
 import type { Order } from "@/components/Dashboard";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 interface SLAAlertProps {
   orders: Order[];
@@ -12,6 +13,7 @@ interface SLAAlertProps {
 
 export const SLAAlert = ({ orders, threshold = 2 }: SLAAlertProps) => {
   const [isVisible, setIsVisible] = useState(true);
+  const [isExpanded, setIsExpanded] = useState(true);
   
   const criticalOrders = orders.filter(o => {
     if (o.status === 'completed' || o.status === 'delivered' || o.status === 'cancelled') {
@@ -30,38 +32,53 @@ export const SLAAlert = ({ orders, threshold = 2 }: SLAAlertProps) => {
   if (criticalOrders.length === 0 || !isVisible) return null;
   
   return (
-    <Alert variant="destructive" className="mb-6 relative">
-      <AlertTriangle className="h-4 w-4" />
-      <Button
-        variant="ghost"
-        size="icon"
-        className="absolute top-2 right-2 h-6 w-6 hover:bg-destructive/20"
-        onClick={() => setIsVisible(false)}
-      >
-        <X className="h-4 w-4" />
-      </Button>
-      <AlertTitle className="font-bold">
-        ⚠️ {criticalOrders.length} {criticalOrders.length === 1 ? 'Pedido Crítico' : 'Pedidos Críticos'}
-      </AlertTitle>
-      <AlertDescription>
-        {criticalOrders.length === 1 
-          ? 'Há um pedido com prazo vencendo em menos de 2 dias!'
-          : `Há ${criticalOrders.length} pedidos com prazo vencendo em menos de 2 dias!`
-        }
-      </AlertDescription>
-      <div className="mt-3 space-y-1">
-        {criticalOrders.slice(0, 5).map(order => (
-          <div key={order.id} className="text-sm flex justify-between">
-            <span className="font-medium">{order.orderNumber}</span>
-            <span>{order.client}</span>
+    <Collapsible open={isExpanded} onOpenChange={setIsExpanded}>
+      <Alert variant="destructive" className="mb-6 relative">
+        <AlertTriangle className="h-4 w-4" />
+        <div className="absolute top-2 right-2 flex gap-1">
+          <CollapsibleTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6 hover:bg-destructive/20"
+            >
+              {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            </Button>
+          </CollapsibleTrigger>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6 hover:bg-destructive/20"
+            onClick={() => setIsVisible(false)}
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
+        <AlertTitle className="font-bold pr-16">
+          ⚠️ {criticalOrders.length} {criticalOrders.length === 1 ? 'Pedido Crítico' : 'Pedidos Críticos'}
+        </AlertTitle>
+        <CollapsibleContent>
+          <AlertDescription>
+            {criticalOrders.length === 1 
+              ? 'Há um pedido com prazo vencendo em menos de 2 dias!'
+              : `Há ${criticalOrders.length} pedidos com prazo vencendo em menos de 2 dias!`
+            }
+          </AlertDescription>
+          <div className="mt-3 space-y-1">
+            {criticalOrders.slice(0, 5).map(order => (
+              <div key={order.id} className="text-sm flex justify-between">
+                <span className="font-medium">{order.orderNumber}</span>
+                <span>{order.client}</span>
+              </div>
+            ))}
+            {criticalOrders.length > 5 && (
+              <div className="text-xs text-muted-foreground mt-2">
+                + {criticalOrders.length - 5} outros pedidos
+              </div>
+            )}
           </div>
-        ))}
-        {criticalOrders.length > 5 && (
-          <div className="text-xs text-muted-foreground mt-2">
-            + {criticalOrders.length - 5} outros pedidos
-          </div>
-        )}
-      </div>
-    </Alert>
+        </CollapsibleContent>
+      </Alert>
+    </Collapsible>
   );
 };
