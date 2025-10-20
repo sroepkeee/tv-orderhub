@@ -4,23 +4,12 @@ import { ArrowLeft, Clock, CheckCircle, AlertTriangle, Package, Truck, TrendingD
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { MetricCard } from "@/components/metrics/MetricCard";
-import { ProductionMetrics } from "@/components/metrics/ProductionMetrics";
-import { PhaseTimeMetrics } from "@/components/metrics/PhaseTimeMetrics";
 import { EnhancedDateChangeHistory } from "@/components/metrics/EnhancedDateChangeHistory";
 import { SLAAlert } from "@/components/metrics/SLAAlert";
-import { OrderTotvsMetrics } from '@/components/metrics/OrderTotvsMetrics';
-import { ItemSLATracking } from '@/components/metrics/ItemSLATracking';
-import { ItemSourceMetrics } from "@/components/metrics/ItemSourceMetrics";
-import { CriticalItemsAlert } from "@/components/metrics/CriticalItemsAlert";
-import { ProductionTimeBySource } from "@/components/metrics/ProductionTimeBySource";
 import { OrdersTrackingTable } from "@/components/metrics/OrdersTrackingTable";
 import { EditOrderDialog } from "@/components/EditOrderDialog";
 import { ComparativeMetrics } from "@/components/metrics/ComparativeMetrics";
-import { StatusDistribution } from "@/components/metrics/StatusDistribution";
-import { VolumeByType } from "@/components/metrics/VolumeByType";
-import { ActivityTimeline } from "@/components/metrics/ActivityTimeline";
 import { TrendCard } from "@/components/metrics/TrendCard";
-import { OrderTypeMetrics } from "@/components/metrics/OrderTypeMetrics";
 import { CategorySLAMetrics } from "@/components/metrics/CategorySLAMetrics";
 import type { Order } from "@/components/Dashboard";
 import { cleanItemDescription } from "@/lib/utils";
@@ -204,9 +193,6 @@ export default function Metrics() {
       {/* SLA Alerts */}
       <SLAAlert orders={orders} threshold={2} />
       
-      {/* Critical Items Alert */}
-      <CriticalItemsAlert orders={orders} />
-      
       {/* Grid de Cards Principais com Tendências */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-8">
         <TrendCard
@@ -270,9 +256,9 @@ export default function Metrics() {
         />
       </div>
 
-      {/* Histórico Expandido de Mudanças de Prazos */}
+      {/* Histórico de Mudanças de Prazos (Últimas 10) */}
       <div className="mb-6">
-        <EnhancedDateChangeHistory limit={20} orders={orders} />
+        <EnhancedDateChangeHistory limit={10} orders={orders} />
       </div>
 
       {/* Evolução e Comparativos */}
@@ -283,40 +269,6 @@ export default function Metrics() {
       {/* Performance de SLA por Categoria */}
       <div className="mb-6">
         <CategorySLAMetrics orders={orders} />
-      </div>
-
-      {/* Métricas por Tipo e Categoria */}
-      <div className="mb-6">
-        <OrderTypeMetrics orders={orders} />
-      </div>
-
-      {/* Distribuições e Atividades */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-        <StatusDistribution orders={orders} />
-        <VolumeByType orders={orders} />
-        <ActivityTimeline />
-      </div>
-      
-      {/* Seções de Indicadores Detalhados */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        <ProductionMetrics orders={orders} />
-        <PhaseTimeMetrics orders={orders} />
-      </div>
-      
-      {/* Indicadores de Origem dos Itens */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        <ItemSourceMetrics orders={orders} />
-        <ProductionTimeBySource orders={orders} />
-      </div>
-      
-      {/* Integração TOTVS */}
-      <div className="mb-6">
-        <OrderTotvsMetrics orders={orders} />
-      </div>
-
-      {/* Rastreamento de SLA por Item */}
-      <div className="mb-6">
-        <ItemSLATracking orders={orders} />
       </div>
 
       {/* Dialog de Edição */}

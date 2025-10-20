@@ -11,7 +11,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Calendar, User, FileText, CheckCircle, XCircle, Clock, History, Edit, Plus, Trash2, Loader2, MessageSquare, Download, Package, AlertCircle } from "lucide-react";
+import { Calendar, User, FileText, CheckCircle, XCircle, Clock, History, Edit, Plus, Trash2, Loader2, MessageSquare, Download, Package, AlertCircle, BarChart3 } from "lucide-react";
 import { useForm, Controller } from "react-hook-form";
 import { Order } from "./Dashboard";
 import { OrderItem } from "./AddOrderDialog";
@@ -24,6 +24,7 @@ import { PhaseButtons } from "./PhaseButtons";
 import { ConfirmationDialog } from "./ConfirmationDialog";
 import { OrderTypeSelector } from "@/components/OrderTypeSelector";
 import { cleanItemDescription } from "@/lib/utils";
+import { OrderMetricsTab } from "./metrics/OrderMetricsTab";
 
 interface HistoryEvent {
   id: string;
@@ -1455,10 +1456,14 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
           </DialogHeader>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-5 h-9">
+          <TabsList className="grid w-full grid-cols-6 h-9">
             <TabsTrigger value="edit" className="flex items-center gap-1.5 data-[state=active]:bg-blue-500 data-[state=active]:text-white text-xs">
               <Edit className="h-3.5 w-3.5" />
               Editar
+            </TabsTrigger>
+            <TabsTrigger value="indicators" className="flex items-center gap-1.5 data-[state=active]:bg-indigo-500 data-[state=active]:text-white text-xs">
+              <BarChart3 className="h-3.5 w-3.5" />
+              Indicadores
             </TabsTrigger>
             <TabsTrigger value="lab" className="flex items-center gap-1.5 data-[state=active]:bg-purple-500 data-[state=active]:text-white text-xs" disabled={!(order as any)?.lab_ticket_id}>
               <FileText className="h-3.5 w-3.5" />
@@ -1818,6 +1823,12 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                   </div>
                 </div>
               </form>
+            </ScrollArea>
+          </TabsContent>
+
+          <TabsContent value="indicators" className="mt-4">
+            <ScrollArea className="h-[calc(95vh-200px)] pr-4">
+              <OrderMetricsTab order={order} items={items} />
             </ScrollArea>
           </TabsContent>
 
