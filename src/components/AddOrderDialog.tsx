@@ -10,6 +10,8 @@ import { toast } from "@/hooks/use-toast";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { OrderTypeSelector } from "@/components/OrderTypeSelector";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Settings } from "lucide-react";
 
 export interface OrderItem {
   id?: string;
@@ -42,6 +44,10 @@ interface OrderFormData {
   totvsOrderNumber?: string;
   items: OrderItem[];
   pdfFile?: File;
+  requires_firmware?: boolean;
+  firmware_project_name?: string;
+  requires_image?: boolean;
+  image_project_name?: string;
 }
 
 interface AddOrderDialogProps {
@@ -52,6 +58,8 @@ export const AddOrderDialog = ({ onAddOrder }: AddOrderDialogProps) => {
   const [open, setOpen] = React.useState(false);
   const [items, setItems] = React.useState<OrderItem[]>([]);
   const [selectedPdfFile, setSelectedPdfFile] = React.useState<File | null>(null);
+  const [requiresFirmware, setRequiresFirmware] = React.useState(false);
+  const [requiresImage, setRequiresImage] = React.useState(false);
   const { register, handleSubmit, reset, setValue, watch } = useForm<OrderFormData>();
 
   const orderType = watch("type");
@@ -101,6 +109,25 @@ export const AddOrderDialog = ({ onAddOrder }: AddOrderDialogProps) => {
       return;
     }
 
+    // Validar firmware e imagem
+    if (requiresFirmware && !data.firmware_project_name?.trim()) {
+      toast({
+        title: "Campo obrigatório",
+        description: "Informe o nome do projeto/firmware",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    if (requiresImage && !data.image_project_name?.trim()) {
+      toast({
+        title: "Campo obrigatório",
+        description: "Informe o nome da imagem",
+        variant: "destructive"
+      });
+      return;
+    }
+
     const orderData = { ...data, items, pdfFile: selectedPdfFile || undefined };
     onAddOrder(orderData);
     
@@ -112,6 +139,8 @@ export const AddOrderDialog = ({ onAddOrder }: AddOrderDialogProps) => {
     reset();
     setItems([]);
     setSelectedPdfFile(null);
+    setRequiresFirmware(false);
+    setRequiresImage(false);
     setOpen(false);
   };
 
@@ -186,6 +215,78 @@ export const AddOrderDialog = ({ onAddOrder }: AddOrderDialogProps) => {
                 {...register("deliveryDeadline", { required: true })} 
                 type="date" 
               />
+            </div>
+          </div>
+
+          {/* Configurações de Firmware e Imagem */}
+          <div className="border-t pt-4 space-y-3">
+            <Label className="text-lg font-semibold flex items-center gap-2">
+              <Settings className="h-5 w-5" />
+              Configuração de Placas (Laboratório)
+            </Label>
+            
+            <div className="grid grid-cols-2 gap-4">
+              {/* Firmware */}
+              <Card className="p-4 space-y-3">
+                <div className="flex items-center space-x-2">
+                  <Checkbox 
+                    id="requires_firmware"
+                    checked={requiresFirmware}
+                    onCheckedChange={(checked) => {
+                      setRequiresFirmware(checked as boolean);
+                      setValue("requires_firmware", checked as boolean);
+                      if (!checked) {
+                        setValue("firmware_project_name", "");
+                      }
+                    }}
+                  />
+                  <Label htmlFor="requires_firmware" className="font-medium cursor-pointer">
+                    🔧 Requer Firmware Específico
+                  </Label>
+                </div>
+                
+                {requiresFirmware && (
+                  <div>
+                    <Label htmlFor="firmware_project_name">Nome do Projeto/Firmware</Label>
+                    <Input 
+                      {...register("firmware_project_name")}
+                      placeholder="Ex: FW_PLACA_V2.3.1"
+                      maxLength={200}
+                    />
+                  </div>
+                )}
+              </Card>
+
+              {/* Imagem */}
+              <Card className="p-4 space-y-3">
+                <div className="flex items-center space-x-2">
+                  <Checkbox 
+                    id="requires_image"
+                    checked={requiresImage}
+                    onCheckedChange={(checked) => {
+                      setRequiresImage(checked as boolean);
+                      setValue("requires_image", checked as boolean);
+                      if (!checked) {
+                        setValue("image_project_name", "");
+                      }
+                    }}
+                  />
+                  <Label htmlFor="requires_image" className="font-medium cursor-pointer">
+                    💾 Requer Imagem Específica
+                  </Label>
+                </div>
+                
+                {requiresImage && (
+                  <div>
+                    <Label htmlFor="image_project_name">Nome da Imagem</Label>
+                    <Input 
+                      {...register("image_project_name")}
+                      placeholder="Ex: IMG_LINUX_2024_Q1"
+                      maxLength={200}
+                    />
+                  </div>
+                )}
+              </Card>
             </div>
           </div>
 

@@ -16,6 +16,10 @@ interface NotifyLabRequest {
   }>;
   deliveryDate: string;
   priority: string;
+  requires_firmware?: boolean;
+  firmware_project_name?: string;
+  requires_image?: boolean;
+  image_project_name?: string;
 }
 
 serve(async (req) => {
@@ -29,7 +33,7 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const { orderId, orderNumber, items, deliveryDate, priority } = await req.json() as NotifyLabRequest;
+    const { orderId, orderNumber, items, deliveryDate, priority, requires_firmware, firmware_project_name, requires_image, image_project_name } = await req.json() as NotifyLabRequest;
 
     console.log('Notifying lab about order:', { orderId, orderNumber });
 
@@ -51,6 +55,12 @@ serve(async (req) => {
       deliveryDate,
       priority,
       timestamp: new Date().toISOString(),
+      special_requirements: {
+        requires_firmware: requires_firmware || false,
+        firmware_project_name: firmware_project_name || null,
+        requires_image: requires_image || false,
+        image_project_name: image_project_name || null,
+      }
     };
 
     const payloadString = JSON.stringify(payload);

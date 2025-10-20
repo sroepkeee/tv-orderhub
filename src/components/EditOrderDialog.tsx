@@ -11,7 +11,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Calendar, User, FileText, CheckCircle, XCircle, Clock, History, Edit, Plus, Trash2, Loader2, MessageSquare, Download, Package, AlertCircle, BarChart3 } from "lucide-react";
+import { Calendar, User, FileText, CheckCircle, XCircle, Clock, History, Edit, Plus, Trash2, Loader2, MessageSquare, Download, Package, AlertCircle, BarChart3, Settings } from "lucide-react";
 import { useForm, Controller } from "react-hook-form";
 import { Order } from "./Dashboard";
 import { OrderItem } from "./AddOrderDialog";
@@ -1561,6 +1561,92 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                   </div>
                 </div>
 
+                {/* Configurações de Firmware e Imagem */}
+                <div className="border-t pt-4 space-y-3">
+                  <Label className="text-lg font-semibold flex items-center gap-2">
+                    <Settings className="h-5 w-5" />
+                    Configuração de Placas (Laboratório)
+                  </Label>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    {/* Firmware Card */}
+                    <Card className="p-4 space-y-3 bg-blue-50 dark:bg-blue-950 border-blue-200">
+                      <div className="flex items-center space-x-2">
+                        <Controller
+                          name="requires_firmware"
+                          control={control}
+                          render={({ field }) => (
+                            <Checkbox 
+                              id="edit_requires_firmware"
+                              checked={field.value || false}
+                              onCheckedChange={field.onChange}
+                            />
+                          )}
+                        />
+                        <Label htmlFor="edit_requires_firmware" className="font-semibold cursor-pointer">
+                          🔧 Requer Firmware Específico
+                        </Label>
+                      </div>
+                      
+                      {getValues("requires_firmware") && (
+                        <div>
+                          <Label htmlFor="firmware_project_name">Nome do Projeto/Firmware</Label>
+                          <Input 
+                            {...register("firmware_project_name")}
+                            placeholder="Ex: FW_PLACA_V2.3.1"
+                            maxLength={200}
+                            className="bg-white dark:bg-gray-900"
+                          />
+                        </div>
+                      )}
+                      
+                      {getValues("requires_firmware") && getValues("firmware_project_name") && (
+                        <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-300">
+                          ✅ {getValues("firmware_project_name")}
+                        </Badge>
+                      )}
+                    </Card>
+
+                    {/* Imagem Card */}
+                    <Card className="p-4 space-y-3 bg-purple-50 dark:bg-purple-950 border-purple-200">
+                      <div className="flex items-center space-x-2">
+                        <Controller
+                          name="requires_image"
+                          control={control}
+                          render={({ field }) => (
+                            <Checkbox 
+                              id="edit_requires_image"
+                              checked={field.value || false}
+                              onCheckedChange={field.onChange}
+                            />
+                          )}
+                        />
+                        <Label htmlFor="edit_requires_image" className="font-semibold cursor-pointer">
+                          💾 Requer Imagem Específica
+                        </Label>
+                      </div>
+                      
+                      {getValues("requires_image") && (
+                        <div>
+                          <Label htmlFor="image_project_name">Nome da Imagem</Label>
+                          <Input 
+                            {...register("image_project_name")}
+                            placeholder="Ex: IMG_LINUX_2024_Q1"
+                            maxLength={200}
+                            className="bg-white dark:bg-gray-900"
+                          />
+                        </div>
+                      )}
+                      
+                      {getValues("requires_image") && getValues("image_project_name") && (
+                        <Badge variant="outline" className="bg-purple-100 text-purple-800 border-purple-300">
+                          ✅ {getValues("image_project_name")}
+                        </Badge>
+                      )}
+                    </Card>
+                  </div>
+                </div>
+
                 <div className="pt-3 border-t">
                   <Label className="text-sm font-medium mb-2 block">Status do Pedido</Label>
                   <PhaseButtons
@@ -1808,6 +1894,46 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                 </Card>
               ) : (
                 <div className="space-y-6">
+                  {/* Requisitos de Configuração */}
+                  {((order as any).requires_firmware || (order as any).requires_image) && (
+                    <Card className="p-6 border-2 border-amber-400 bg-amber-50 dark:bg-amber-950">
+                      <div className="flex items-start gap-3">
+                        <AlertCircle className="h-6 w-6 text-amber-600 mt-1 flex-shrink-0" />
+                        <div className="flex-1 space-y-3">
+                          <h3 className="font-bold text-lg text-amber-900 dark:text-amber-100">
+                            ⚠️ Atenção: Configurações Especiais Requeridas
+                          </h3>
+                          
+                          {(order as any).requires_firmware && (
+                            <div className="bg-white dark:bg-gray-900 p-4 rounded-lg border border-blue-300">
+                              <div className="flex items-center gap-2 mb-2">
+                                <Badge className="bg-blue-600">FIRMWARE</Badge>
+                                <span className="font-semibold">Firmware Específico Requerido</span>
+                              </div>
+                              <p className="text-sm text-muted-foreground">Projeto/Versão:</p>
+                              <p className="font-mono font-bold text-lg text-blue-700 dark:text-blue-400">
+                                {(order as any).firmware_project_name || "Não especificado"}
+                              </p>
+                            </div>
+                          )}
+                          
+                          {(order as any).requires_image && (
+                            <div className="bg-white dark:bg-gray-900 p-4 rounded-lg border border-purple-300">
+                              <div className="flex items-center gap-2 mb-2">
+                                <Badge className="bg-purple-600">IMAGEM</Badge>
+                                <span className="font-semibold">Imagem Específica Requerida</span>
+                              </div>
+                              <p className="text-sm text-muted-foreground">Nome da Imagem:</p>
+                              <p className="font-mono font-bold text-lg text-purple-700 dark:text-purple-400">
+                                {(order as any).image_project_name || "Não especificado"}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </Card>
+                  )}
+
                   {/* Lab Information Card */}
                   <Card className="p-6 space-y-4">
                     <h3 className="text-lg font-semibold flex items-center gap-2">

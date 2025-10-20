@@ -36,7 +36,11 @@ export const useSendToLab = () => {
           unit: item.unit
         })),
         deliveryDate: order.deliveryDeadline,
-        priority: order.priority
+        priority: order.priority,
+        requires_firmware: order.requires_firmware || false,
+        firmware_project_name: order.firmware_project_name || null,
+        requires_image: order.requires_image || false,
+        image_project_name: order.image_project_name || null,
       };
 
       // Call edge function

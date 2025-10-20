@@ -65,6 +65,10 @@ export interface Order {
   items?: import("./AddOrderDialog").OrderItem[];
   order_category?: string;
   daysOpen?: number;
+  requires_firmware?: boolean;
+  firmware_project_name?: string;
+  requires_image?: boolean;
+  image_project_name?: string;
 }
 
 // Mock data

@@ -445,9 +445,11 @@ export type Database = {
           delivery_date: string
           driver_name: string | null
           executive_name: string | null
+          firmware_project_name: string | null
           freight_type: string | null
           freight_value: number | null
           id: string
+          image_project_name: string | null
           issue_date: string | null
           lab_completed_at: string | null
           lab_notes: string | null
@@ -461,6 +463,8 @@ export type Database = {
           order_number: string
           order_type: string
           priority: string
+          requires_firmware: boolean | null
+          requires_image: boolean | null
           shipping_date: string | null
           status: string
           totvs_order_number: string | null
@@ -478,9 +482,11 @@ export type Database = {
           delivery_date: string
           driver_name?: string | null
           executive_name?: string | null
+          firmware_project_name?: string | null
           freight_type?: string | null
           freight_value?: number | null
           id?: string
+          image_project_name?: string | null
           issue_date?: string | null
           lab_completed_at?: string | null
           lab_notes?: string | null
@@ -494,6 +500,8 @@ export type Database = {
           order_number: string
           order_type: string
           priority: string
+          requires_firmware?: boolean | null
+          requires_image?: boolean | null
           shipping_date?: string | null
           status: string
           totvs_order_number?: string | null
@@ -511,9 +519,11 @@ export type Database = {
           delivery_date?: string
           driver_name?: string | null
           executive_name?: string | null
+          firmware_project_name?: string | null
           freight_type?: string | null
           freight_value?: number | null
           id?: string
+          image_project_name?: string | null
           issue_date?: string | null
           lab_completed_at?: string | null
           lab_notes?: string | null
@@ -527,6 +537,8 @@ export type Database = {
           order_number?: string
           order_type?: string
           priority?: string
+          requires_firmware?: boolean | null
+          requires_image?: boolean | null
           shipping_date?: string | null
           status?: string
           totvs_order_number?: string | null
