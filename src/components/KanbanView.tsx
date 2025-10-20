@@ -2,7 +2,6 @@ import React from "react";
 import { KanbanColumn } from "./KanbanColumn";
 import { Order } from "@/components/Dashboard";
 import {
-  ClipboardList,
   PackageCheck,
   Box,
   Truck,
@@ -10,6 +9,10 @@ import {
   Microscope,
   Calculator,
   FileText,
+  PackageSearch,
+  FileEdit,
+  Warehouse,
+  Receipt,
 } from "lucide-react";
 import {
   DndContext,
@@ -23,7 +26,7 @@ import {
 } from "@dnd-kit/core";
 import { KanbanCard } from "./KanbanCard";
 
-export type Phase = "preparation" | "production" | "laboratory" | "packaging" | "freight_quote" | "logistics" | "in_transit" | "invoicing" | "completion";
+export type Phase = "almox_ssm" | "order_generation" | "almox_general" | "production" | "balance_generation" | "laboratory" | "packaging" | "freight_quote" | "invoicing" | "logistics" | "in_transit" | "completion";
 
 interface KanbanViewProps {
   orders: Order[];
@@ -45,18 +48,28 @@ export const KanbanView = ({ orders, onEdit, onStatusChange }: KanbanViewProps) 
 
   const getPhaseFromStatus = (status: Order["status"]): Phase => {
     switch (status) {
-      case "pending":
-      case "in_analysis":
-      case "awaiting_approval":
-      case "planned":
-      case "on_hold":
-        return "preparation";
+      case "almox_ssm_received":
+      case "almox_ssm_in_review":
+      case "almox_ssm_approved":
+        return "almox_ssm";
+      case "order_generation_pending":
+      case "order_in_creation":
+      case "order_generated":
+        return "order_generation";
+      case "almox_general_received":
+      case "almox_general_separating":
+      case "almox_general_ready":
+        return "almox_general";
       case "separation_started":
       case "in_production":
       case "awaiting_material":
       case "separation_completed":
       case "production_completed":
         return "production";
+      case "balance_calculation":
+      case "balance_review":
+      case "balance_approved":
+        return "balance_generation";
       case "awaiting_lab":
       case "in_lab_analysis":
       case "lab_completed":
@@ -69,6 +82,10 @@ export const KanbanView = ({ orders, onEdit, onStatusChange }: KanbanViewProps) 
       case "freight_quote_received":
       case "freight_approved":
         return "freight_quote";
+      case "awaiting_invoice":
+      case "invoice_issued":
+      case "invoice_sent":
+        return "invoicing";
       case "released_for_shipping":
       case "in_expedition":
       case "pickup_scheduled":
@@ -77,31 +94,50 @@ export const KanbanView = ({ orders, onEdit, onStatusChange }: KanbanViewProps) 
       case "in_transit":
       case "collected":
         return "in_transit";
-      case "awaiting_invoice":
-      case "invoice_issued":
-      case "invoice_sent":
-        return "invoicing";
       case "delivered":
       case "completed":
       case "cancelled":
       case "delayed":
       case "returned":
+      case "pending":
+      case "in_analysis":
+      case "awaiting_approval":
+      case "planned":
+      case "on_hold":
         return "completion";
     }
   };
 
   const columns = [
     {
-      id: "preparation" as Phase,
-      title: "Preparação",
-      icon: ClipboardList,
+      id: "almox_ssm" as Phase,
+      title: "Almox SSM",
+      icon: PackageSearch,
       colorClass: "bg-blue-100 text-blue-900 dark:bg-blue-900/30 dark:text-blue-100",
+    },
+    {
+      id: "order_generation" as Phase,
+      title: "Gerar Ordem",
+      icon: FileEdit,
+      colorClass: "bg-indigo-100 text-indigo-900 dark:bg-indigo-900/30 dark:text-indigo-100",
+    },
+    {
+      id: "almox_general" as Phase,
+      title: "Almox Geral",
+      icon: Warehouse,
+      colorClass: "bg-violet-100 text-violet-900 dark:bg-violet-900/30 dark:text-violet-100",
     },
     {
       id: "production" as Phase,
       title: "Produção",
       icon: PackageCheck,
       colorClass: "bg-purple-100 text-purple-900 dark:bg-purple-900/30 dark:text-purple-100",
+    },
+    {
+      id: "balance_generation" as Phase,
+      title: "Gerar Saldo",
+      icon: Receipt,
+      colorClass: "bg-fuchsia-100 text-fuchsia-900 dark:bg-fuchsia-900/30 dark:text-fuchsia-100",
     },
     {
       id: "laboratory" as Phase,
@@ -137,7 +173,7 @@ export const KanbanView = ({ orders, onEdit, onStatusChange }: KanbanViewProps) 
       id: "in_transit" as Phase,
       title: "Em Trânsito",
       icon: Truck,
-      colorClass: "bg-indigo-100 text-indigo-900 dark:bg-indigo-900/30 dark:text-indigo-100",
+      colorClass: "bg-sky-100 text-sky-900 dark:bg-sky-900/30 dark:text-sky-100",
     },
     {
       id: "completion" as Phase,
@@ -153,22 +189,28 @@ export const KanbanView = ({ orders, onEdit, onStatusChange }: KanbanViewProps) 
 
   const getDefaultStatusForPhase = (phase: Phase): Order["status"] => {
     switch (phase) {
-      case "preparation":
-        return "pending";
+      case "almox_ssm":
+        return "almox_ssm_received";
+      case "order_generation":
+        return "order_generation_pending";
+      case "almox_general":
+        return "almox_general_received";
       case "production":
         return "in_production";
+      case "balance_generation":
+        return "balance_calculation";
       case "laboratory":
         return "in_lab_analysis";
       case "packaging":
         return "in_packaging";
       case "freight_quote":
         return "freight_quote_requested";
+      case "invoicing":
+        return "awaiting_invoice";
       case "logistics":
         return "in_expedition";
       case "in_transit":
         return "in_transit";
-      case "invoicing":
-        return "awaiting_invoice";
       case "completion":
         return "completed";
     }
