@@ -58,6 +58,7 @@ export function EnhancedDateChangeHistory({ limit = 20, orders }: EnhancedDateCh
   const [selectedChange, setSelectedChange] = useState<EnhancedDateChange | null>(null);
   const [actionType, setActionType] = useState<'followup' | 'stalling' | 'note' | null>(null);
   const [showOnlyActive, setShowOnlyActive] = useState(true);
+  const [insightsOpen, setInsightsOpen] = useState(false);
   const [expandedOrders, setExpandedOrders] = useState<Set<string>>(new Set());
 
   const loadDateChanges = async () => {
@@ -371,33 +372,40 @@ export function EnhancedDateChangeHistory({ limit = 20, orders }: EnhancedDateCh
             </Badge>
           </div>
 
-          {/* NOVO: Métricas Avançadas */}
+          {/* NOVO: Métricas Avançadas - Collapsible */}
           {advancedMetrics.topProblemCustomers.length > 0 && (
-            <div className="bg-muted/30 rounded-lg p-4 space-y-3">
-              <h4 className="font-semibold text-sm">📊 Insights de Mudanças</h4>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
-                <div>
-                  <div className="text-muted-foreground mb-1">Clientes com Mais Atrasos:</div>
-                  {advancedMetrics.topProblemCustomers.map((customer, i) => (
-                    <div key={i} className="text-xs">
-                      {i + 1}. {customer.name} ({customer.count}x, média {customer.avgDelay}d)
+            <Collapsible open={insightsOpen} onOpenChange={setInsightsOpen}>
+              <div className="bg-muted/30 rounded-lg p-4 space-y-3">
+                <CollapsibleTrigger className="flex items-center gap-2 w-full hover:opacity-70 transition-opacity">
+                  <h4 className="font-semibold text-sm">📊 Insights de Mudanças</h4>
+                  <ChevronDown className={`h-4 w-4 transition-transform ${insightsOpen ? '' : '-rotate-90'}`} />
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm pt-2">
+                    <div>
+                      <div className="text-muted-foreground mb-1">Clientes com Mais Atrasos:</div>
+                      {advancedMetrics.topProblemCustomers.map((customer, i) => (
+                        <div key={i} className="text-xs">
+                          {i + 1}. {customer.name} ({customer.count}x, média {customer.avgDelay}d)
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
-                <div>
-                  <div className="text-muted-foreground mb-1">Dia com Mais Mudanças:</div>
-                  <div className="font-semibold">{advancedMetrics.peakDay}</div>
-                </div>
-                <div>
-                  <div className="text-muted-foreground mb-1">Atraso Médio por Categoria:</div>
-                  {Object.entries(advancedMetrics.avgDelayByCategory).slice(0, 2).map(([cat, avg]) => (
-                    <div key={cat} className="text-xs">
-                      {getCategoryLabel(cat)}: {avg} dias
+                    <div>
+                      <div className="text-muted-foreground mb-1">Dia com Mais Mudanças:</div>
+                      <div className="font-semibold">{advancedMetrics.peakDay}</div>
                     </div>
-                  ))}
-                </div>
+                    <div>
+                      <div className="text-muted-foreground mb-1">Atraso Médio por Categoria:</div>
+                      {Object.entries(advancedMetrics.avgDelayByCategory).slice(0, 2).map(([cat, avg]) => (
+                        <div key={cat} className="text-xs">
+                          {getCategoryLabel(cat)}: {avg} dias
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </CollapsibleContent>
               </div>
-            </div>
+            </Collapsible>
           )}
 
           {/* Table */}
