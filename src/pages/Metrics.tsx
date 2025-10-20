@@ -297,10 +297,13 @@ export default function Metrics() {
                 })
                 .eq('id', updatedOrder.id)
                 .select('id')
-                .single();
+                .maybeSingle();
 
               if (error) throw error;
-              if (!row) throw new Error('Sem permissão para atualizar este pedido.');
+              
+              if (!row) {
+                throw new Error('Você não tem permissão para editar este pedido. Apenas o criador do pedido pode fazer alterações.');
+              }
 
               toast({
                 title: 'Pedido atualizado',
@@ -313,7 +316,7 @@ export default function Metrics() {
               console.error('Erro ao atualizar pedido na página de Métricas:', err);
               toast({
                 title: 'Erro ao salvar',
-                description: err.message || 'Não foi possível salvar as alterações. Verifique suas permissões.',
+                description: err.message || 'Não foi possível salvar as alterações.',
                 variant: 'destructive',
               });
             }
