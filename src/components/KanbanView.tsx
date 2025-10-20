@@ -8,6 +8,8 @@ import {
   Truck,
   CheckCircle2,
   Microscope,
+  Calculator,
+  FileText,
 } from "lucide-react";
 import {
   DndContext,
@@ -21,7 +23,7 @@ import {
 } from "@dnd-kit/core";
 import { KanbanCard } from "./KanbanCard";
 
-export type Phase = "preparation" | "production" | "laboratory" | "packaging" | "logistics" | "in_transit" | "completion";
+export type Phase = "preparation" | "production" | "laboratory" | "packaging" | "freight_quote" | "logistics" | "in_transit" | "invoicing" | "completion";
 
 interface KanbanViewProps {
   orders: Order[];
@@ -63,6 +65,10 @@ export const KanbanView = ({ orders, onEdit, onStatusChange }: KanbanViewProps) 
       case "in_packaging":
       case "ready_for_shipping":
         return "packaging";
+      case "freight_quote_requested":
+      case "freight_quote_received":
+      case "freight_approved":
+        return "freight_quote";
       case "released_for_shipping":
       case "in_expedition":
       case "pickup_scheduled":
@@ -71,6 +77,10 @@ export const KanbanView = ({ orders, onEdit, onStatusChange }: KanbanViewProps) 
       case "in_transit":
       case "collected":
         return "in_transit";
+      case "awaiting_invoice":
+      case "invoice_issued":
+      case "invoice_sent":
+        return "invoicing";
       case "delivered":
       case "completed":
       case "cancelled":
@@ -106,6 +116,12 @@ export const KanbanView = ({ orders, onEdit, onStatusChange }: KanbanViewProps) 
       colorClass: "bg-orange-100 text-orange-900 dark:bg-orange-900/30 dark:text-orange-100",
     },
     {
+      id: "freight_quote" as Phase,
+      title: "Cotação Frete",
+      icon: Calculator,
+      colorClass: "bg-amber-100 text-amber-900 dark:bg-amber-900/30 dark:text-amber-100",
+    },
+    {
       id: "logistics" as Phase,
       title: "Expedição",
       icon: Truck,
@@ -116,6 +132,12 @@ export const KanbanView = ({ orders, onEdit, onStatusChange }: KanbanViewProps) 
       title: "Em Trânsito",
       icon: Truck,
       colorClass: "bg-indigo-100 text-indigo-900 dark:bg-indigo-900/30 dark:text-indigo-100",
+    },
+    {
+      id: "invoicing" as Phase,
+      title: "Faturamento",
+      icon: FileText,
+      colorClass: "bg-emerald-100 text-emerald-900 dark:bg-emerald-900/30 dark:text-emerald-100",
     },
     {
       id: "completion" as Phase,
@@ -139,10 +161,14 @@ export const KanbanView = ({ orders, onEdit, onStatusChange }: KanbanViewProps) 
         return "in_lab_analysis";
       case "packaging":
         return "in_packaging";
+      case "freight_quote":
+        return "freight_quote_requested";
       case "logistics":
         return "in_expedition";
       case "in_transit":
         return "in_transit";
+      case "invoicing":
+        return "awaiting_invoice";
       case "completion":
         return "completed";
     }

@@ -10,7 +10,9 @@ import {
   Play,
   Pause,
   XCircle,
-  Check
+  Check,
+  Calculator,
+  FileText
 } from "lucide-react";
 import { Order } from "./Dashboard";
 import {
@@ -69,6 +71,17 @@ export const PhaseButtons = ({ order, onStatusChange }: PhaseButtonsProps) => {
       ]
     },
     {
+      id: "freight_quote",
+      label: "Cotação de Frete",
+      icon: Calculator,
+      color: "text-amber-600",
+      statuses: [
+        { value: "freight_quote_requested", label: "Cotação Solicitada" },
+        { value: "freight_quote_received", label: "Cotação Recebida" },
+        { value: "freight_approved", label: "Frete Aprovado" },
+      ]
+    },
+    {
       id: "logistics",
       label: "Expedição",
       icon: Truck,
@@ -80,6 +93,17 @@ export const PhaseButtons = ({ order, onStatusChange }: PhaseButtonsProps) => {
         { value: "pickup_scheduled", label: "Retirada Agendada" },
         { value: "awaiting_pickup", label: "Aguardando Retirada" },
         { value: "collected", label: "Coletado" },
+      ]
+    },
+    {
+      id: "invoicing",
+      label: "Faturamento",
+      icon: FileText,
+      color: "text-emerald-600",
+      statuses: [
+        { value: "awaiting_invoice", label: "Aguardando Faturamento" },
+        { value: "invoice_issued", label: "Nota Fiscal Emitida" },
+        { value: "invoice_sent", label: "NF Enviada ao Cliente" },
       ]
     },
     {

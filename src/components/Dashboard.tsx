@@ -39,8 +39,12 @@ type OrderStatus =
   | "awaiting_lab" | "in_lab_analysis" | "lab_completed"
   // Fase de Embalagem/Conferência
   | "in_quality_check" | "in_packaging" | "ready_for_shipping"
+  // Fase de Cotação de Frete
+  | "freight_quote_requested" | "freight_quote_received" | "freight_approved"
   // Fase de Expedição/Logística
   | "released_for_shipping" | "in_expedition" | "in_transit" | "pickup_scheduled" | "awaiting_pickup" | "collected"
+  // Fase de Faturamento
+  | "awaiting_invoice" | "invoice_issued" | "invoice_sent"
   // Fase de Conclusão
   | "delivered" | "completed"
   // Status de Exceção/Problemas
@@ -913,6 +917,10 @@ export const Dashboard = () => {
       "in_quality_check": "Em Conferência/Qualidade",
       "in_packaging": "Em Embalagem",
       "ready_for_shipping": "Pronto para Envio",
+      // Cotação de Frete
+      "freight_quote_requested": "Cotação Solicitada",
+      "freight_quote_received": "Cotação Recebida",
+      "freight_approved": "Frete Aprovado",
       // Expedição/Logística
       "released_for_shipping": "Liberado para Envio",
       "in_expedition": "Deixado na Expedição",
@@ -920,6 +928,10 @@ export const Dashboard = () => {
       "pickup_scheduled": "Retirada Agendada",
       "awaiting_pickup": "Aguardando Retirada",
       "collected": "Coletado",
+      // Faturamento
+      "awaiting_invoice": "Aguardando Faturamento",
+      "invoice_issued": "Nota Fiscal Emitida",
+      "invoice_sent": "NF Enviada ao Cliente",
       // Conclusão
       "delivered": "Entregue",
       "completed": "Finalizado",
