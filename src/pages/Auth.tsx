@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { Truck } from "lucide-react";
 import { ForgotPasswordDialog } from "@/components/ForgotPasswordDialog";
@@ -16,6 +17,7 @@ export default function Auth() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
+  const [department, setDepartment] = useState("");
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -42,6 +44,12 @@ export default function Auth() {
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!department) {
+      toast.error("Por favor, selecione sua área de trabalho");
+      return;
+    }
+    
     setLoading(true);
 
     try {
@@ -52,6 +60,7 @@ export default function Auth() {
           emailRedirectTo: `${window.location.origin}/`,
           data: {
             full_name: fullName,
+            department: department,
           },
         },
       });
@@ -59,6 +68,12 @@ export default function Auth() {
       if (error) throw error;
 
       if (data.user) {
+        // Update profile with department
+        await supabase
+          .from('profiles')
+          .update({ department })
+          .eq('id', data.user.id);
+        
         toast.success("Cadastro realizado! Verifique seu e-mail para confirmar.");
         navigate("/");
       }
@@ -156,6 +171,22 @@ export default function Auth() {
                     required
                     minLength={6}
                   />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="signup-department">Área de Trabalho</Label>
+                  <Select value={department} onValueChange={setDepartment} required>
+                    <SelectTrigger id="signup-department">
+                      <SelectValue placeholder="Selecione sua área" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Suporte">Suporte</SelectItem>
+                      <SelectItem value="Almox SSM">Almox SSM</SelectItem>
+                      <SelectItem value="Laboratório">Laboratório</SelectItem>
+                      <SelectItem value="Almox Geral">Almox Geral</SelectItem>
+                      <SelectItem value="Expedição">Expedição</SelectItem>
+                      <SelectItem value="Produção">Produção</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
                 <Button type="submit" className="w-full" disabled={loading}>
                   {loading ? "Criando conta..." : "Criar conta"}
