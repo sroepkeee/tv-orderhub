@@ -58,11 +58,11 @@ export const AddOrderDialog = ({ onAddOrder }: AddOrderDialogProps) => {
   const [open, setOpen] = React.useState(false);
   const [items, setItems] = React.useState<OrderItem[]>([]);
   const [selectedPdfFile, setSelectedPdfFile] = React.useState<File | null>(null);
-  const [requiresFirmware, setRequiresFirmware] = React.useState(false);
-  const [requiresImage, setRequiresImage] = React.useState(false);
   const { register, handleSubmit, reset, setValue, watch } = useForm<OrderFormData>();
 
   const orderType = watch("type");
+  const requiresFirmware = watch("requires_firmware");
+  const requiresImage = watch("requires_image");
 
   const addItem = () => {
     setItems([...items, {
@@ -139,8 +139,6 @@ export const AddOrderDialog = ({ onAddOrder }: AddOrderDialogProps) => {
     reset();
     setItems([]);
     setSelectedPdfFile(null);
-    setRequiresFirmware(false);
-    setRequiresImage(false);
     setOpen(false);
   };
 
@@ -231,9 +229,8 @@ export const AddOrderDialog = ({ onAddOrder }: AddOrderDialogProps) => {
                 <div className="flex items-center space-x-2">
                   <Checkbox 
                     id="requires_firmware"
-                    checked={requiresFirmware}
+                    checked={requiresFirmware || false}
                     onCheckedChange={(checked) => {
-                      setRequiresFirmware(checked as boolean);
                       setValue("requires_firmware", checked as boolean);
                       if (!checked) {
                         setValue("firmware_project_name", "");
@@ -262,9 +259,8 @@ export const AddOrderDialog = ({ onAddOrder }: AddOrderDialogProps) => {
                 <div className="flex items-center space-x-2">
                   <Checkbox 
                     id="requires_image"
-                    checked={requiresImage}
+                    checked={requiresImage || false}
                     onCheckedChange={(checked) => {
-                      setRequiresImage(checked as boolean);
                       setValue("requires_image", checked as boolean);
                       if (!checked) {
                         setValue("image_project_name", "");
