@@ -281,46 +281,89 @@ export default function Metrics() {
           order={selectedOrder}
           open={showEditDialog}
           onOpenChange={setShowEditDialog}
-          onSave={async (updatedOrder) => {
-            try {
-              const { data: row, error } = await supabase
-                .from('orders')
-                .update({
-                  customer_name: updatedOrder.client,
-                  delivery_address: updatedOrder.client,
-                  delivery_date: updatedOrder.deliveryDeadline,
-                  status: updatedOrder.status,
-                  priority: updatedOrder.priority,
-                  order_type: updatedOrder.type,
-                  notes: updatedOrder.deskTicket,
-                  totvs_order_number: (updatedOrder as any).totvsOrderNumber || null,
-                })
-                .eq('id', updatedOrder.id)
-                .select('id')
-                .maybeSingle();
+              onSave={async (updatedOrder) => {
+                try {
+                  // 1. Buscar pedido original para comparar
+                  const { data: originalOrder, error: fetchError } = await supabase
+                    .from('orders')
+                    .select('*')
+                    .eq('id', updatedOrder.id)
+                    .maybeSingle();
 
-              if (error) throw error;
-              
-              if (!row) {
-                throw new Error('Você não tem permissão para editar este pedido. Apenas o criador do pedido pode fazer alterações.');
-              }
+                  if (fetchError) throw fetchError;
+                  if (!originalOrder) throw new Error('Pedido não encontrado.');
 
-              toast({
-                title: 'Pedido atualizado',
-                description: `Tipo alterado para "${updatedOrder.type}" com sucesso.`,
-              });
+                  // 2. Detectar mudanças
+                  const changes = [];
+                  const fieldMap = {
+                    customer_name: { old: originalOrder.customer_name, new: updatedOrder.client },
+                    delivery_date: { old: originalOrder.delivery_date, new: updatedOrder.deliveryDeadline },
+                    status: { old: originalOrder.status, new: updatedOrder.status },
+                    priority: { old: originalOrder.priority, new: updatedOrder.priority },
+                    order_type: { old: originalOrder.order_type, new: updatedOrder.type },
+                    notes: { old: originalOrder.notes, new: updatedOrder.deskTicket },
+                  };
 
-              await loadData();
-              setShowEditDialog(false);
-            } catch (err: any) {
-              console.error('Erro ao atualizar pedido na página de Métricas:', err);
-              toast({
-                title: 'Erro ao salvar',
-                description: err.message || 'Não foi possível salvar as alterações.',
-                variant: 'destructive',
-              });
-            }
-          }}
+                  for (const [field, values] of Object.entries(fieldMap)) {
+                    if (values.old !== values.new) {
+                      changes.push({
+                        order_id: updatedOrder.id,
+                        changed_by: user!.id,
+                        field_name: field,
+                        old_value: String(values.old || ''),
+                        new_value: String(values.new || ''),
+                      });
+                    }
+                  }
+
+                  // 3. Atualizar pedido
+                  const { data: row, error: updateError } = await supabase
+                    .from('orders')
+                    .update({
+                      customer_name: updatedOrder.client,
+                      delivery_address: updatedOrder.client,
+                      delivery_date: updatedOrder.deliveryDeadline,
+                      status: updatedOrder.status,
+                      priority: updatedOrder.priority,
+                      order_type: updatedOrder.type,
+                      notes: updatedOrder.deskTicket,
+                      totvs_order_number: (updatedOrder as any).totvsOrderNumber || null,
+                    })
+                    .eq('id', updatedOrder.id)
+                    .select('id')
+                    .maybeSingle();
+
+                  if (updateError) throw updateError;
+                  if (!row) throw new Error('Falha ao salvar alterações.');
+
+                  // 4. Registrar auditoria (se houver mudanças)
+                  if (changes.length > 0) {
+                    const { error: auditError } = await supabase
+                      .from('order_changes')
+                      .insert(changes);
+
+                    if (auditError) {
+                      console.error('⚠️ Falha ao registrar auditoria:', auditError);
+                      // Não falhar a operação por falha na auditoria
+                    }
+                  }
+
+                  toast({
+                    title: 'Pedido atualizado',
+                    description: `${changes.length} alteração(ões) salva(s) com sucesso.`,
+                  });
+
+                  await loadData();
+                  setShowEditDialog(false);
+                } catch (err: any) {
+                  console.error('Erro ao atualizar pedido:', err);
+                  toast({
+                    title: 'Erro ao salvar',
+                    description: err.message || 'Não foi possível salvar as alterações.',
+                    variant: 'destructive',
+                  });
+                }
+              }}
         />
       )}
     </div>

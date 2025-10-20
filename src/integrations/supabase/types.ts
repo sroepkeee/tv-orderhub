@@ -124,6 +124,47 @@ export type Database = {
           },
         ]
       }
+      order_changes: {
+        Row: {
+          change_type: string
+          changed_at: string
+          changed_by: string
+          field_name: string
+          id: string
+          new_value: string | null
+          old_value: string | null
+          order_id: string
+        }
+        Insert: {
+          change_type?: string
+          changed_at?: string
+          changed_by: string
+          field_name: string
+          id?: string
+          new_value?: string | null
+          old_value?: string | null
+          order_id: string
+        }
+        Update: {
+          change_type?: string
+          changed_at?: string
+          changed_by?: string
+          field_name?: string
+          id?: string
+          new_value?: string | null
+          old_value?: string | null
+          order_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_changes_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       order_comments: {
         Row: {
           comment: string
