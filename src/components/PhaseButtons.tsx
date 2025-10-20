@@ -82,6 +82,17 @@ export const PhaseButtons = ({ order, onStatusChange }: PhaseButtonsProps) => {
       ]
     },
     {
+      id: "invoicing",
+      label: "Faturamento",
+      icon: FileText,
+      color: "text-emerald-600",
+      statuses: [
+        { value: "awaiting_invoice", label: "Aguardando Faturamento" },
+        { value: "invoice_issued", label: "Nota Fiscal Emitida" },
+        { value: "invoice_sent", label: "NF Enviada ao Cliente" },
+      ]
+    },
+    {
       id: "logistics",
       label: "Expedição",
       icon: Truck,
@@ -93,17 +104,6 @@ export const PhaseButtons = ({ order, onStatusChange }: PhaseButtonsProps) => {
         { value: "pickup_scheduled", label: "Retirada Agendada" },
         { value: "awaiting_pickup", label: "Aguardando Retirada" },
         { value: "collected", label: "Coletado" },
-      ]
-    },
-    {
-      id: "invoicing",
-      label: "Faturamento",
-      icon: FileText,
-      color: "text-emerald-600",
-      statuses: [
-        { value: "awaiting_invoice", label: "Aguardando Faturamento" },
-        { value: "invoice_issued", label: "Nota Fiscal Emitida" },
-        { value: "invoice_sent", label: "NF Enviada ao Cliente" },
       ]
     },
     {
