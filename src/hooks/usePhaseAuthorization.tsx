@@ -31,24 +31,7 @@ export const usePhaseAuthorization = () => {
   };
 
   const canEditPhase = (phase: string): boolean => {
-    if (userRoles.includes('admin')) return true;
-    
-    const phaseRoleMap: Record<string, string> = {
-      'almox_ssm': 'almox_ssm',
-      'order_generation': 'planejamento',
-      'almox_general': 'almox_geral',
-      'production': 'producao',
-      'balance_generation': 'faturamento',
-      'laboratory': 'laboratorio',
-      'packaging': 'logistica',
-      'freight_quote': 'comercial',
-      'invoicing': 'faturamento',
-      'logistics': 'logistica',
-      'completion': 'admin',
-      'exceptions': 'admin',
-    };
-
-    return userRoles.includes(phaseRoleMap[phase]);
+    return true; // Permite edição para todos os usuários
   };
 
   const hasRole = (role: string): boolean => {
