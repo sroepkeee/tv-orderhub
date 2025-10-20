@@ -549,6 +549,42 @@ export type Database = {
         }
         Relationships: []
       }
+      phase_config: {
+        Row: {
+          color: string | null
+          created_at: string | null
+          description: string | null
+          display_name: string
+          icon: string | null
+          id: string
+          order_index: number | null
+          phase_key: string
+          responsible_role: Database["public"]["Enums"]["app_role"]
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string | null
+          description?: string | null
+          display_name: string
+          icon?: string | null
+          id?: string
+          order_index?: number | null
+          phase_key: string
+          responsible_role: Database["public"]["Enums"]["app_role"]
+        }
+        Update: {
+          color?: string | null
+          created_at?: string | null
+          description?: string | null
+          display_name?: string
+          icon?: string | null
+          id?: string
+          order_index?: number | null
+          phase_key?: string
+          responsible_role?: Database["public"]["Enums"]["app_role"]
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string
@@ -633,11 +669,43 @@ export type Database = {
           },
         ]
       }
+      user_roles: {
+        Row: {
+          created_at: string | null
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
+      can_edit_phase: {
+        Args: { _phase: string; _user_id: string }
+        Returns: boolean
+      }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
       subtract_business_days: {
         Args: { business_days: number; start_date: string }
         Returns: string
@@ -648,7 +716,16 @@ export type Database = {
       }
     }
     Enums: {
-      [_ in never]: never
+      app_role:
+        | "admin"
+        | "almox_ssm"
+        | "planejamento"
+        | "almox_geral"
+        | "producao"
+        | "laboratorio"
+        | "logistica"
+        | "comercial"
+        | "faturamento"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -775,6 +852,18 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: [
+        "admin",
+        "almox_ssm",
+        "planejamento",
+        "almox_geral",
+        "producao",
+        "laboratorio",
+        "logistica",
+        "comercial",
+        "faturamento",
+      ],
+    },
   },
 } as const

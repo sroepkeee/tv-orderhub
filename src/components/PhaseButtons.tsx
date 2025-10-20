@@ -1,18 +1,19 @@
 import React from "react";
 import { Button } from "@/components/ui/button";
 import { 
-  ClipboardList, 
+  PackageSearch,
+  FileEdit,
+  Warehouse,
   PackageCheck, 
+  Receipt,
+  Microscope,
   Boxes, 
+  Calculator,
+  FileText,
   Truck, 
   CheckCircle2,
   AlertCircle,
-  Play,
-  Pause,
-  XCircle,
   Check,
-  Calculator,
-  FileText
 } from "lucide-react";
 import { Order } from "./Dashboard";
 import {
@@ -23,6 +24,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { usePhaseAuthorization } from "@/hooks/usePhaseAuthorization";
 
 interface PhaseButtonsProps {
   order: Order;
@@ -32,31 +34,75 @@ interface PhaseButtonsProps {
 export const PhaseButtons = ({ order, onStatusChange }: PhaseButtonsProps) => {
   const [optimisticStatus, setOptimisticStatus] = React.useState<string | null>(null);
   const currentStatus = optimisticStatus || order.status;
+  const { canEditPhase } = usePhaseAuthorization();
 
   const phases = [
     {
-      id: "preparation",
-      label: "Preparação",
-      icon: ClipboardList,
+      id: "almox_ssm",
+      label: "Almox SSM",
+      icon: PackageSearch,
       color: "text-blue-600",
       statuses: [
-        { value: "pending", label: "Pendente (Novo)" },
-        { value: "in_analysis", label: "Em Análise" },
-        { value: "awaiting_approval", label: "Aguardando Aprovação" },
-        { value: "planned", label: "Planejado" },
+        { value: "almox_ssm_received", label: "Recebido SSM" },
+        { value: "almox_ssm_in_review", label: "Em Análise SSM" },
+        { value: "almox_ssm_approved", label: "Aprovado SSM" },
+      ]
+    },
+    {
+      id: "order_generation",
+      label: "Gerar Ordem",
+      icon: FileEdit,
+      color: "text-indigo-600",
+      statuses: [
+        { value: "order_generation_pending", label: "Pendente Ordem" },
+        { value: "order_in_creation", label: "Criando Ordem" },
+        { value: "order_generated", label: "Ordem Gerada" },
+      ]
+    },
+    {
+      id: "almox_general",
+      label: "Almox Geral",
+      icon: Warehouse,
+      color: "text-violet-600",
+      statuses: [
+        { value: "almox_general_received", label: "Recebido Almox" },
+        { value: "almox_general_separating", label: "Separando" },
+        { value: "almox_general_ready", label: "Pronto Almox" },
       ]
     },
     {
       id: "production",
-      label: "Separação/Produção",
+      label: "Produção",
       icon: PackageCheck,
       color: "text-purple-600",
       statuses: [
-        { value: "separation_started", label: "Iniciado a Separação" },
+        { value: "separation_started", label: "Iniciado Separação" },
         { value: "in_production", label: "Em Produção" },
         { value: "awaiting_material", label: "Aguardando Material" },
-        { value: "separation_completed", label: "Concluído a Separação" },
-        { value: "production_completed", label: "Concluído a Produção" },
+        { value: "separation_completed", label: "Separação Concluída" },
+        { value: "production_completed", label: "Produção Concluída" },
+      ]
+    },
+    {
+      id: "balance_generation",
+      label: "Gerar Saldo",
+      icon: Receipt,
+      color: "text-fuchsia-600",
+      statuses: [
+        { value: "balance_calculation", label: "Calculando Saldo" },
+        { value: "balance_review", label: "Revisando Saldo" },
+        { value: "balance_approved", label: "Saldo Aprovado" },
+      ]
+    },
+    {
+      id: "laboratory",
+      label: "Laboratório",
+      icon: Microscope,
+      color: "text-pink-600",
+      statuses: [
+        { value: "awaiting_lab", label: "Aguardando Lab" },
+        { value: "in_lab_analysis", label: "Em Análise Lab" },
+        { value: "lab_completed", label: "Lab Concluído" },
       ]
     },
     {
@@ -131,10 +177,11 @@ export const PhaseButtons = ({ order, onStatusChange }: PhaseButtonsProps) => {
   ];
 
   return (
-    <div className="flex gap-2">
+    <div className="flex gap-2 flex-wrap">
       {phases.map((phase) => {
         const Icon = phase.icon;
         const isCurrentPhase = phase.statuses.some(s => s.value === currentStatus);
+        const canEdit = canEditPhase(phase.id);
         
         return (
           <DropdownMenu key={phase.id}>
@@ -143,6 +190,7 @@ export const PhaseButtons = ({ order, onStatusChange }: PhaseButtonsProps) => {
                 variant={isCurrentPhase ? "default" : "outline"}
                 size="sm"
                 className={`gap-2 ${isCurrentPhase ? '' : phase.color}`}
+                disabled={!canEdit}
               >
                 <Icon className="h-4 w-4" />
                 {phase.label}
@@ -160,6 +208,7 @@ export const PhaseButtons = ({ order, onStatusChange }: PhaseButtonsProps) => {
                     setTimeout(() => setOptimisticStatus(null), 2000);
                   }}
                   className={currentStatus === status.value ? "bg-accent" : ""}
+                  disabled={!canEdit}
                 >
                   {currentStatus === status.value && (
                     <Check className="h-4 w-4 mr-2 text-green-600 font-bold" />

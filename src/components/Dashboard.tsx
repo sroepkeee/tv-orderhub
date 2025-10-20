@@ -31,24 +31,32 @@ import { supabase } from "@/integrations/supabase/client";
 // Types
 type Priority = "high" | "medium" | "low";
 type OrderStatus = 
-  // Fase de Preparação/Planejamento
-  | "pending" | "in_analysis" | "awaiting_approval" | "planned"
-  // Fase de Separação/Produção
+  // Fase: Almox SSM
+  | "almox_ssm_received" | "almox_ssm_in_review" | "almox_ssm_approved"
+  // Fase: Gerar Ordem
+  | "order_generation_pending" | "order_in_creation" | "order_generated"
+  // Fase: Almox Geral
+  | "almox_general_received" | "almox_general_separating" | "almox_general_ready"
+  // Fase: Produção
   | "separation_started" | "in_production" | "awaiting_material" | "separation_completed" | "production_completed"
-  // Fase de Laboratório
+  // Fase: Gerar Saldo
+  | "balance_calculation" | "balance_review" | "balance_approved"
+  // Fase: Laboratório
   | "awaiting_lab" | "in_lab_analysis" | "lab_completed"
-  // Fase de Embalagem/Conferência
+  // Fase: Embalagem
   | "in_quality_check" | "in_packaging" | "ready_for_shipping"
-  // Fase de Cotação de Frete
+  // Fase: Cotação de Frete
   | "freight_quote_requested" | "freight_quote_received" | "freight_approved"
-  // Fase de Expedição/Logística
-  | "released_for_shipping" | "in_expedition" | "in_transit" | "pickup_scheduled" | "awaiting_pickup" | "collected"
-  // Fase de Faturamento
+  // Fase: Faturamento
   | "awaiting_invoice" | "invoice_issued" | "invoice_sent"
-  // Fase de Conclusão
+  // Fase: Expedição
+  | "released_for_shipping" | "in_expedition" | "in_transit" | "pickup_scheduled" | "awaiting_pickup" | "collected"
+  // Fase: Conclusão
   | "delivered" | "completed"
-  // Status de Exceção/Problemas
-  | "cancelled" | "on_hold" | "delayed" | "returned";
+  // Exceções
+  | "cancelled" | "on_hold" | "delayed" | "returned"
+  // Preparação (legacy)
+  | "pending" | "in_analysis" | "awaiting_approval" | "planned";
 type OrderType = "production" | "sales" | "materials" | "ecommerce";
 
 export interface Order {

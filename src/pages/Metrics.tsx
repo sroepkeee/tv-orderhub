@@ -21,6 +21,10 @@ import {
   findProblematicOrders,
   countItemsBySource
 } from "@/lib/metrics";
+import { PhasePerformanceMetrics } from "@/components/metrics/PhasePerformanceMetrics";
+import { DepartmentLeaderboard } from "@/components/metrics/DepartmentLeaderboard";
+import { BottleneckAnalysis } from "@/components/metrics/BottleneckAnalysis";
+import { ItemSourceAnalytics } from "@/components/metrics/ItemSourceAnalytics";
 import { useNavigate } from "react-router-dom";
 import { toast } from "@/hooks/use-toast";
 
