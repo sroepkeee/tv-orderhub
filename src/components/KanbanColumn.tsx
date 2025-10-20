@@ -34,7 +34,7 @@ export const KanbanColumn = ({
       {/* Column Header */}
       <div className={`${colorClass} rounded-t-lg p-4 sticky top-0 z-10 shadow-sm`}>
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 bg-slate-50">
             <Icon className="h-5 w-5" />
             <h3 className="font-semibold text-base">{title}</h3>
           </div>
