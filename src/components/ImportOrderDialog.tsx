@@ -203,8 +203,15 @@ export const ImportOrderDialog = ({
         error: itemsError
       } = await supabase.from('order_items').insert(itemsToInsert);
       if (itemsError) throw itemsError;
-      const pdfAttached = file?.name.endsWith('.pdf') ? '\n✅ PDF anexado automaticamente' : '';
-      toast.success(`Pedido ${parsedData.orderInfo.orderNumber} importado com sucesso na fase Preparação!${pdfAttached}`);
+      // Mensagem de sucesso diferenciada para importações com PDF
+      if (file?.name.endsWith('.pdf')) {
+        toast.success(
+          `✅ Pedido ${parsedData.orderInfo.orderNumber} importado com sucesso!\n\n📄 PDF salvo automaticamente na aba Anexos.`,
+          { duration: 5000 }
+        );
+      } else {
+        toast.success(`Pedido ${parsedData.orderInfo.orderNumber} importado com sucesso!`);
+      }
 
       // Forçar atualização da lista de pedidos
       window.dispatchEvent(new CustomEvent('ordersUpdated'));

@@ -1575,45 +1575,10 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                 <div className="space-y-3 pt-3">
                   <div className="flex items-center justify-between">
                     <Label className="text-lg font-semibold">Itens do Pedido</Label>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => document.getElementById('edit-attachment-upload')?.click()}
-                        disabled={uploadingAttachment}
-                        className="gap-2"
-                      >
-                        {uploadingAttachment ? (
-                          <>
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                            Enviando...
-                          </>
-                        ) : (
-                          <>
-                            <FileText className="h-4 w-4" />
-                            Anexar PDF
-                          </>
-                        )}
-                      </Button>
-                      <input
-                        id="edit-attachment-upload"
-                        type="file"
-                        accept=".pdf,application/pdf"
-                        className="hidden"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (file) {
-                            handleUploadAttachment(file);
-                            e.target.value = '';
-                          }
-                        }}
-                      />
-                      <Button type="button" onClick={addItem} size="sm" className="gap-2">
-                        <Plus className="h-4 w-4" />
-                        Adicionar Item
-                      </Button>
-                    </div>
+                    <Button type="button" onClick={addItem} size="sm" className="gap-2">
+                      <Plus className="h-4 w-4" />
+                      Adicionar Item
+                    </Button>
                   </div>
 
                   {items.length === 0 ? (
