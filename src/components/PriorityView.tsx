@@ -367,6 +367,7 @@ export const PriorityView = ({
         groupBy={groupBy}
         phaseFilter={phaseFilter}
         viewMode={viewMode}
+        orders={sortedOrders}
         onSortChange={setSortBy}
         onGroupChange={setGroupBy}
         onPhaseFilterChange={setPhaseFilter}

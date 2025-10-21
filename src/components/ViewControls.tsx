@@ -15,6 +15,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { ArrowUpDown, Filter, Layers, LayoutGrid, List } from "lucide-react";
+import { Order } from "./Dashboard";
 
 export type SortOption = "priority" | "deadline" | "created" | "status";
 export type GroupOption = "priority" | "phase" | "type" | "category" | "none";
@@ -28,6 +29,7 @@ interface ViewControlsProps {
   phaseFilter: PhaseFilter;
   viewMode: ViewMode;
   categoryFilter?: CategoryFilter;
+  orders?: Order[];
   onSortChange: (sort: SortOption) => void;
   onGroupChange: (group: GroupOption) => void;
   onPhaseFilterChange: (phase: PhaseFilter) => void;
@@ -41,6 +43,7 @@ export const ViewControls = ({
   phaseFilter,
   viewMode,
   categoryFilter = "all",
+  orders = [],
   onSortChange,
   onGroupChange,
   onPhaseFilterChange,
@@ -78,9 +81,73 @@ export const ViewControls = ({
     { value: "completion" as PhaseFilter, label: "Conclusão" },
   ];
 
+  // Calcular contagens por status
+  const statusCounts = React.useMemo(() => {
+    const counts = {
+      production: orders.filter(o => 
+        ["in_production", "awaiting_material", "production_completed"].includes(o.status)
+      ).length,
+      packaging: orders.filter(o => 
+        ["in_quality_check", "in_packaging", "ready_for_shipping"].includes(o.status)
+      ).length,
+      invoicing: orders.filter(o => 
+        ["awaiting_invoice", "invoice_requested", "invoice_issued", "invoice_sent"].includes(o.status)
+      ).length,
+      shipping: orders.filter(o => 
+        ["released_for_shipping", "in_expedition", "in_transit", "awaiting_pickup", "collected"].includes(o.status)
+      ).length,
+      completed: orders.filter(o => 
+        ["delivered", "completed"].includes(o.status)
+      ).length,
+      delayed: orders.filter(o => 
+        ["delayed", "on_hold"].includes(o.status)
+      ).length,
+    };
+    return counts;
+  }, [orders]);
+
   return (
     <TooltipProvider>
       <div className="flex items-center gap-1.5 mb-4 flex-wrap">
+        {/* Status Cards */}
+        {orders.length > 0 && (
+          <div className="flex items-center gap-1 mr-2 px-2 py-0.5 bg-muted/50 rounded-md border">
+            <div className="flex items-center gap-1 text-xs">
+              <span className="text-muted-foreground font-medium">Produção:</span>
+              <span className="font-bold text-primary">{statusCounts.production}</span>
+            </div>
+            <div className="h-3 w-px bg-border mx-1" />
+            <div className="flex items-center gap-1 text-xs">
+              <span className="text-muted-foreground font-medium">Embalagem:</span>
+              <span className="font-bold text-primary">{statusCounts.packaging}</span>
+            </div>
+            <div className="h-3 w-px bg-border mx-1" />
+            <div className="flex items-center gap-1 text-xs">
+              <span className="text-muted-foreground font-medium">Faturamento:</span>
+              <span className="font-bold text-primary">{statusCounts.invoicing}</span>
+            </div>
+            <div className="h-3 w-px bg-border mx-1" />
+            <div className="flex items-center gap-1 text-xs">
+              <span className="text-muted-foreground font-medium">Expedição:</span>
+              <span className="font-bold text-primary">{statusCounts.shipping}</span>
+            </div>
+            <div className="h-3 w-px bg-border mx-1" />
+            <div className="flex items-center gap-1 text-xs">
+              <span className="text-muted-foreground font-medium">Concluídos:</span>
+              <span className="font-bold text-[hsl(var(--progress-good))]">{statusCounts.completed}</span>
+            </div>
+            {statusCounts.delayed > 0 && (
+              <>
+                <div className="h-3 w-px bg-border mx-1" />
+                <div className="flex items-center gap-1 text-xs">
+                  <span className="text-muted-foreground font-medium">Atrasados:</span>
+                  <span className="font-bold text-[hsl(var(--progress-critical))]">{statusCounts.delayed}</span>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+        
         {/* View Mode Toggle */}
         <div className="flex items-center gap-0.5 border rounded-md p-0.5">
           <Tooltip>
