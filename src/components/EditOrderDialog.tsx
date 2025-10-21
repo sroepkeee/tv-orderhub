@@ -1955,15 +1955,18 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                     </div>
                     
                     <div>
-                      <Label>Dimensões (metros)</Label>
+                      <Label>Dimensões (centímetros)</Label>
                       <div className="grid grid-cols-3 gap-2">
                         <div>
                           <Input
                             type="number"
                             min="0"
-                            step="0.01"
+                            step="1"
                             placeholder="Altura"
-                            {...register("package_height_m")}
+                            {...register("package_height_m", {
+                              setValueAs: (v) => v ? Number(v) / 100 : undefined
+                            })}
+                            defaultValue={order?.package_height_m ? order.package_height_m * 100 : undefined}
                             className="bg-white dark:bg-gray-900"
                           />
                         </div>
@@ -1971,9 +1974,12 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                           <Input
                             type="number"
                             min="0"
-                            step="0.01"
+                            step="1"
                             placeholder="Largura"
-                            {...register("package_width_m")}
+                            {...register("package_width_m", {
+                              setValueAs: (v) => v ? Number(v) / 100 : undefined
+                            })}
+                            defaultValue={order?.package_width_m ? order.package_width_m * 100 : undefined}
                             className="bg-white dark:bg-gray-900"
                           />
                         </div>
@@ -1981,15 +1987,18 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                           <Input
                             type="number"
                             min="0"
-                            step="0.01"
+                            step="1"
                             placeholder="Comprimento"
-                            {...register("package_length_m")}
+                            {...register("package_length_m", {
+                              setValueAs: (v) => v ? Number(v) / 100 : undefined
+                            })}
+                            defaultValue={order?.package_length_m ? order.package_length_m * 100 : undefined}
                             className="bg-white dark:bg-gray-900"
                           />
                         </div>
                       </div>
                       <p className="text-xs text-muted-foreground mt-1">
-                        Altura x Largura x Comprimento (em metros)
+                        Altura x Largura x Comprimento (em centímetros)
                       </p>
                     </div>
                     
@@ -2013,7 +2022,7 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                               )}
                               {(getValues("package_height_m") || getValues("package_width_m") || getValues("package_length_m")) && (
                                 <div className="font-mono text-xs mt-1 bg-white dark:bg-gray-800 px-2 py-1 rounded inline-block">
-                                  {getValues("package_height_m") || 0} x {getValues("package_width_m") || 0} x {getValues("package_length_m") || 0} m
+                                  {getValues("package_height_m") || 0} x {getValues("package_width_m") || 0} x {getValues("package_length_m") || 0} cm
                                 </div>
                               )}
                             </div>
