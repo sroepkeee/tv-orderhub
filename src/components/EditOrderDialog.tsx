@@ -1357,37 +1357,36 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
       items
     };
     
-    // Track freight changes for history
+    // ✨ Track ALL field changes for complete history
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
-        const changes: Array<{field_name: string, old_value: string | null, new_value: string | null}> = [];
+        const fieldsToTrack = [
+          { key: 'freight_type', label: 'Tipo de Frete', category: 'shipping_info' },
+          { key: 'carrier_name', label: 'Transportadora', category: 'shipping_info' },
+          { key: 'tracking_code', label: 'Código de Rastreio', category: 'shipping_info' },
+          // ✨ Novos campos de dimensões
+          { key: 'package_volumes', label: 'Volumes', category: 'dimensions' },
+          { key: 'package_weight_kg', label: 'Peso (Kg)', category: 'dimensions' },
+          { key: 'package_height_m', label: 'Altura (m)', category: 'dimensions' },
+          { key: 'package_width_m', label: 'Largura (m)', category: 'dimensions' },
+          { key: 'package_length_m', label: 'Comprimento (m)', category: 'dimensions' },
+        ];
         
-        // Check freight_type change
-        if (order.freight_type !== data.freight_type) {
-          changes.push({
-            field_name: 'freight_type',
-            old_value: order.freight_type || null,
-            new_value: data.freight_type || null
-          });
-        }
+        const changes: Array<{field_name: string, old_value: string | null, new_value: string | null, category: string}> = [];
         
-        // Check carrier_name change
-        if (order.carrier_name !== data.carrier_name) {
-          changes.push({
-            field_name: 'carrier_name',
-            old_value: order.carrier_name || null,
-            new_value: data.carrier_name || null
-          });
-        }
-        
-        // Check tracking_code change
-        if (order.tracking_code !== data.tracking_code) {
-          changes.push({
-            field_name: 'tracking_code',
-            old_value: order.tracking_code || null,
-            new_value: data.tracking_code || null
-          });
+        for (const field of fieldsToTrack) {
+          const oldValue = (order as any)[field.key];
+          const newValue = (data as any)[field.key];
+          
+          if (oldValue != newValue) {
+            changes.push({
+              field_name: field.key,
+              old_value: oldValue != null ? String(oldValue) : null,
+              new_value: newValue != null ? String(newValue) : null,
+              category: field.category
+            });
+          }
         }
         
         // Insert changes into order_changes table
@@ -1399,13 +1398,15 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
               field_name: change.field_name,
               old_value: change.old_value,
               new_value: change.new_value,
-              change_type: 'update'
+              change_type: 'update',
+              change_category: change.category
             });
           }
+          console.log(`✅ ${changes.length} mudanças registradas no histórico`);
         }
       }
     } catch (error) {
-      console.error('Error logging freight changes:', error);
+      console.error('Error logging field changes:', error);
     }
     
     // Check if delivery date changed
@@ -1896,6 +1897,110 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                             </span>
                           </>
                         )}
+                      </div>
+                    </Card>
+                  )}
+                </div>
+
+                {/* ✨ Seção de Dimensões e Volumes */}
+                <div className="border-t pt-4 space-y-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Package className="h-5 w-5 text-primary" />
+                    <Label className="text-lg font-semibold">Dimensões e Volumes</Label>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="package_volumes">Volumes (Quantidade)</Label>
+                      <Input
+                        type="number"
+                        min="1"
+                        step="1"
+                        placeholder="1"
+                        {...register("package_volumes")}
+                        className="bg-white dark:bg-gray-900"
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">Número de volumes/pacotes</p>
+                    </div>
+                    
+                    <div>
+                      <Label htmlFor="package_weight_kg">Peso Total (Kg)</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        step="0.001"
+                        placeholder="0.000"
+                        {...register("package_weight_kg")}
+                        className="bg-white dark:bg-gray-900"
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">Peso em quilogramas</p>
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <Label>Dimensões (metros)</Label>
+                    <div className="grid grid-cols-3 gap-2">
+                      <div>
+                        <Input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          placeholder="Altura"
+                          {...register("package_height_m")}
+                          className="bg-white dark:bg-gray-900"
+                        />
+                      </div>
+                      <div>
+                        <Input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          placeholder="Largura"
+                          {...register("package_width_m")}
+                          className="bg-white dark:bg-gray-900"
+                        />
+                      </div>
+                      <div>
+                        <Input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          placeholder="Comprimento"
+                          {...register("package_length_m")}
+                          className="bg-white dark:bg-gray-900"
+                        />
+                      </div>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Altura x Largura x Comprimento (em metros)
+                    </p>
+                  </div>
+                  
+                  {/* Preview card */}
+                  {(getValues("package_volumes") || getValues("package_weight_kg") || 
+                    getValues("package_height_m") || getValues("package_width_m") || 
+                    getValues("package_length_m")) && (
+                    <Card className="p-3 bg-purple-50 dark:bg-purple-950 border-purple-200">
+                      <div className="flex items-start gap-3">
+                        <Package className="h-5 w-5 text-purple-600 mt-0.5" />
+                        <div className="space-y-1 flex-1">
+                          <p className="text-sm font-medium text-purple-900 dark:text-purple-100">
+                            Informações de Embalagem
+                          </p>
+                          <div className="text-sm text-purple-700 dark:text-purple-300">
+                            {getValues("package_volumes") && (
+                              <div><span className="font-medium">{getValues("package_volumes")}</span> volume(s)</div>
+                            )}
+                            {getValues("package_weight_kg") && (
+                              <div><span className="font-medium">{getValues("package_weight_kg")} Kg</span> de peso total</div>
+                            )}
+                            {(getValues("package_height_m") || getValues("package_width_m") || getValues("package_length_m")) && (
+                              <div className="font-mono text-xs mt-1 bg-white dark:bg-gray-800 px-2 py-1 rounded inline-block">
+                                {getValues("package_height_m") || 0} x {getValues("package_width_m") || 0} x {getValues("package_length_m") || 0} m
+                              </div>
+                            )}
+                          </div>
+                        </div>
                       </div>
                     </Card>
                   )}

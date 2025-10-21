@@ -84,6 +84,12 @@ export interface Order {
   freight_type?: string;
   carrier_name?: string;
   tracking_code?: string;
+  // ✨ Novos campos de dimensões e volumes
+  package_volumes?: number;
+  package_weight_kg?: number;
+  package_height_m?: number;
+  package_width_m?: number;
+  package_length_m?: number;
 }
 
 // Mock data
@@ -897,6 +903,24 @@ export const Dashboard = () => {
       // Save to history
       if (order && previousStatus) {
         await saveOrderHistory(orderId, previousStatus, newStatus, order.orderNumber);
+      }
+      
+      // ✨ Registrar mudança de status em order_changes para rastreamento completo
+      if (previousStatus !== newStatus) {
+        await supabase.from('order_changes').insert({
+          order_id: orderId,
+          field_name: 'status',
+          old_value: previousStatus,
+          new_value: newStatus,
+          changed_by: user.id,
+          change_category: 'status_change'
+        });
+        
+        console.log('✅ Mudança de status registrada em order_changes:', {
+          usuario: user.email,
+          de: previousStatus,
+          para: newStatus
+        });
       }
 
       await loadOrders();

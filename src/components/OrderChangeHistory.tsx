@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Clock } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Clock, TrendingUp, Truck, Package, Edit, ArrowRight } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -13,6 +14,7 @@ interface OrderChange {
   old_value: string | null;
   new_value: string | null;
   changed_by: string;
+  change_category?: string;
   profiles?: {
     full_name: string;
     email: string;
@@ -37,6 +39,7 @@ export function OrderChangeHistory({ orderId }: { orderId: string }) {
         old_value,
         new_value,
         changed_by,
+        change_category,
         profiles:changed_by (
           full_name,
           email
@@ -58,6 +61,42 @@ export function OrderChangeHistory({ orderId }: { orderId: string }) {
     priority: 'Prioridade',
     order_type: 'Tipo de Pedido',
     notes: 'Observações',
+    freight_type: 'Tipo de Frete',
+    carrier_name: 'Transportadora',
+    tracking_code: 'Código de Rastreio',
+    package_volumes: 'Volumes',
+    package_weight_kg: 'Peso (Kg)',
+    package_height_m: 'Altura (m)',
+    package_width_m: 'Largura (m)',
+    package_length_m: 'Comprimento (m)',
+  };
+  
+  // Helper: Obter ícone baseado na categoria
+  const getChangeIcon = (category?: string) => {
+    switch (category) {
+      case 'status_change': return <TrendingUp className="h-4 w-4 text-blue-600" />;
+      case 'shipping_info': return <Truck className="h-4 w-4 text-green-600" />;
+      case 'dimensions': return <Package className="h-4 w-4 text-purple-600" />;
+      default: return <Edit className="h-4 w-4 text-gray-600" />;
+    }
+  };
+  
+  // Helper: Obter badge de categoria
+  const getCategoryBadge = (category?: string) => {
+    const colors = {
+      'status_change': { bg: 'bg-blue-100 text-blue-700 border-blue-200', label: 'Status' },
+      'shipping_info': { bg: 'bg-green-100 text-green-700 border-green-200', label: 'Frete' },
+      'dimensions': { bg: 'bg-purple-100 text-purple-700 border-purple-200', label: 'Dimensões' },
+      'field_update': { bg: 'bg-gray-100 text-gray-700 border-gray-200', label: 'Campo' },
+    };
+    
+    const config = colors[category as keyof typeof colors] || colors.field_update;
+    
+    return (
+      <Badge variant="outline" className={`${config.bg} text-xs`}>
+        {config.label}
+      </Badge>
+    );
   };
 
   if (loading) return <div className="text-sm text-muted-foreground">Carregando histórico...</div>;
@@ -73,26 +112,45 @@ export function OrderChangeHistory({ orderId }: { orderId: string }) {
       </CardHeader>
       <CardContent className="space-y-4">
         {changes.map((change) => (
-          <div key={change.id} className="flex gap-3 pb-3 border-b last:border-0">
-            <Avatar className="h-8 w-8">
-              <AvatarFallback>
-                {change.profiles?.full_name?.[0] || change.profiles?.email?.[0] || '?'}
-              </AvatarFallback>
-            </Avatar>
-            <div className="flex-1">
-              <div className="text-sm">
-                <span className="font-medium">
+          <div key={change.id} className="flex gap-3 pb-4 border-b last:border-0">
+            <div className="flex-shrink-0 mt-1">
+              {getChangeIcon(change.change_category)}
+            </div>
+            
+            <div className="flex-1 space-y-2">
+              {/* Usuário e categoria */}
+              <div className="flex items-center gap-2 flex-wrap">
+                <Avatar className="h-6 w-6">
+                  <AvatarFallback className="text-xs">
+                    {change.profiles?.full_name?.[0] || change.profiles?.email?.[0] || '?'}
+                  </AvatarFallback>
+                </Avatar>
+                <span className="font-medium text-sm">
                   {change.profiles?.full_name || change.profiles?.email || 'Usuário'}
                 </span>
-                {' alterou '}
+                {getCategoryBadge(change.change_category)}
+              </div>
+              
+              {/* Campo alterado */}
+              <div className="text-sm">
+                <span className="text-muted-foreground">Alterou </span>
                 <span className="font-medium">{fieldLabels[change.field_name] || change.field_name}</span>
               </div>
-              <div className="text-xs text-muted-foreground mt-1">
-                <span className="line-through">{change.old_value || '(vazio)'}</span>
-                {' → '}
-                <span className="font-medium text-foreground">{change.new_value}</span>
+              
+              {/* Valores (antes → depois) */}
+              <div className="flex items-center gap-2 text-xs flex-wrap">
+                <span className="line-through text-muted-foreground bg-red-50 dark:bg-red-950 px-2 py-1 rounded border border-red-200">
+                  {change.old_value || '(vazio)'}
+                </span>
+                <ArrowRight className="h-3 w-3 text-muted-foreground" />
+                <span className="font-medium bg-green-50 dark:bg-green-950 px-2 py-1 rounded border border-green-200">
+                  {change.new_value}
+                </span>
               </div>
-              <div className="text-xs text-muted-foreground mt-1">
+              
+              {/* Data/hora */}
+              <div className="text-xs text-muted-foreground flex items-center gap-1">
+                <Clock className="h-3 w-3" />
                 {format(new Date(change.changed_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
               </div>
             </div>

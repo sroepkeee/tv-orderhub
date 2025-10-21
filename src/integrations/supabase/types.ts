@@ -126,6 +126,7 @@ export type Database = {
       }
       order_changes: {
         Row: {
+          change_category: string | null
           change_type: string
           changed_at: string
           changed_by: string
@@ -136,6 +137,7 @@ export type Database = {
           order_id: string
         }
         Insert: {
+          change_category?: string | null
           change_type?: string
           changed_at?: string
           changed_by: string
@@ -146,6 +148,7 @@ export type Database = {
           order_id: string
         }
         Update: {
+          change_category?: string | null
           change_type?: string
           changed_at?: string
           changed_by?: string
@@ -503,6 +506,11 @@ export type Database = {
           order_category: string | null
           order_number: string
           order_type: string
+          package_height_m: number | null
+          package_length_m: number | null
+          package_volumes: number | null
+          package_weight_kg: number | null
+          package_width_m: number | null
           priority: string
           requires_firmware: boolean | null
           requires_image: boolean | null
@@ -540,6 +548,11 @@ export type Database = {
           order_category?: string | null
           order_number: string
           order_type: string
+          package_height_m?: number | null
+          package_length_m?: number | null
+          package_volumes?: number | null
+          package_weight_kg?: number | null
+          package_width_m?: number | null
           priority: string
           requires_firmware?: boolean | null
           requires_image?: boolean | null
@@ -577,6 +590,11 @@ export type Database = {
           order_category?: string | null
           order_number?: string
           order_type?: string
+          package_height_m?: number | null
+          package_length_m?: number | null
+          package_volumes?: number | null
+          package_weight_kg?: number | null
+          package_width_m?: number | null
           priority?: string
           requires_firmware?: boolean | null
           requires_image?: boolean | null
