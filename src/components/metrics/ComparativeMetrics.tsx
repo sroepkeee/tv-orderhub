@@ -25,7 +25,8 @@ export function ComparativeMetrics({ orders }: ComparativeMetricsProps) {
     const dayEnd = endOfDay(day);
     
     const ordersInDay = orders.filter(order => {
-      const orderDate = new Date(order.createdDate);
+      if (!order.issueDate) return false;
+      const orderDate = new Date(order.issueDate);
       return isWithinInterval(orderDate, { start: dayStart, end: dayEnd });
     });
 
