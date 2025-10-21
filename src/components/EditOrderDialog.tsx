@@ -26,6 +26,7 @@ import { ConfirmationDialog } from "./ConfirmationDialog";
 import { OrderTypeSelector } from "@/components/OrderTypeSelector";
 import { cleanItemDescription } from "@/lib/utils";
 import { OrderMetricsTab } from "./metrics/OrderMetricsTab";
+import { EnhancedOrderTimeline } from "./EnhancedOrderTimeline";
 
 interface HistoryEvent {
   id: string;
@@ -2433,132 +2434,9 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
           </TabsContent>
 
           <TabsContent value="history" className="mt-4">
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4 p-4 bg-muted rounded-lg">
-                <div>
-                  <p className="text-sm font-medium">Cliente</p>
-                  <p className="text-sm text-muted-foreground">{order?.client}</p>
-                </div>
-                <div>
-                  <p className="text-sm font-medium">Chamado Desk</p>
-                  <p className="text-sm text-muted-foreground">{order?.deskTicket}</p>
-                </div>
-              </div>
-
-              {loadingHistory ? (
-                <div className="flex items-center justify-center h-[400px]">
-                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                </div>
-              ) : historyEvents.length === 0 ? (
-                <Card className="p-8 text-center">
-                  <History className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-                  <p className="text-muted-foreground">
-                    Nenhuma movimentação registrada ainda
-                  </p>
-                </Card>
-              ) : (
-                <ScrollArea className="h-[calc(95vh-300px)]">
-                  <div className="space-y-4">
-                    {historyEvents.map((event) => (
-                      <div key={event.id} className="flex gap-4 p-4 border rounded-lg">
-                        <div className="flex-shrink-0">
-                          {event.type === 'order' 
-                            ? getEventIcon(event.old_status, event.new_status)
-                            : <Package className="h-5 w-5 text-blue-600" />
-                          }
-                        </div>
-                         <div className="flex-1 space-y-2">
-                          {event.type === 'order' ? (
-                            <>
-                              <div className="flex items-center justify-between">
-                                <h4 className="font-medium">Mudança de Status</h4>
-                                <Badge variant={getEventBadgeVariant(event.new_status)} className="text-xs">
-                                  {getStatusLabel(event.new_status)}
-                                </Badge>
-                              </div>
-                              <p className="text-sm text-muted-foreground">
-                                De <span className="font-medium">{getStatusLabel(event.old_status)}</span> para{" "}
-                                <span className="font-medium">{getStatusLabel(event.new_status)}</span>
-                              </p>
-                            </>
-                          ) : event.type === 'change' ? (
-                            <>
-                              <div className="flex items-center justify-between">
-                                <h4 className="font-medium flex items-center gap-2">
-                                  <span className="text-sm">
-                                    {event.field_name === 'freight_type' && '🚚 Modo de Envio'}
-                                    {event.field_name === 'carrier_name' && '📦 Transportadora'}
-                                    {event.field_name === 'tracking_code' && '🔍 Código de Rastreamento'}
-                                  </span>
-                                </h4>
-                              </div>
-                              <p className="text-sm text-muted-foreground">
-                                {event.field_name === 'freight_type' && (
-                                  <>De <span className="font-medium">{event.old_value || '(não definido)'}</span> para <span className="font-medium">{event.new_value}</span></>
-                                )}
-                                {event.field_name === 'carrier_name' && (
-                                  <>De <span className="font-medium">{event.old_value || '(não definido)'}</span> para <span className="font-medium">{event.new_value}</span></>
-                                )}
-                                {event.field_name === 'tracking_code' && (
-                                  <>De <span className="font-medium font-mono text-xs">{event.old_value || '(não definido)'}</span> para <span className="font-medium font-mono text-xs">{event.new_value}</span></>
-                                )}
-                              </p>
-                            </>
-                          ) : (
-                            <>
-                              <div className="flex items-center justify-between">
-                                <h4 className="font-medium flex items-center gap-2">
-                                  <Badge variant="secondary" className="text-xs">
-                                    {event.order_items?.item_code}
-                                  </Badge>
-                                  <span className="text-sm text-muted-foreground">
-                                    {event.field_changed === 'received_status' && '📦 Status de recebimento'}
-                                    {event.field_changed === 'delivered_quantity' && '📊 Quantidade recebida'}
-                                    {event.field_changed === 'item_source_type' && '📍 Situação'}
-                                  </span>
-                                </h4>
-                              </div>
-                              <p className="text-sm text-muted-foreground">
-                                {event.field_changed === 'received_status' && (
-                                  <>De <span className="font-medium">{event.old_value === 'pending' ? 'Pendente' : event.old_value === 'partial' ? 'Parcial' : 'Completo'}</span> para <span className="font-medium">{event.new_value === 'pending' ? 'Pendente' : event.new_value === 'partial' ? 'Parcial' : 'Completo'}</span></>
-                                )}
-                                {event.field_changed === 'delivered_quantity' && (
-                                  <>De <span className="font-medium">{event.old_value}</span> para <span className="font-medium">{event.new_value}</span> unidades</>
-                                )}
-                                {event.field_changed === 'item_source_type' && (
-                                  <>De <span className="font-medium">{event.old_value === 'in_stock' ? 'Estoque' : event.old_value === 'production' ? 'Produção' : 'Sem Estoque'}</span> para <span className="font-medium">{event.new_value === 'in_stock' ? 'Estoque' : event.new_value === 'production' ? 'Produção' : 'Sem Estoque'}</span></>
-                                )}
-                              </p>
-                              {event.notes && (
-                                <p className="text-xs text-muted-foreground italic">
-                                  {event.notes}
-                                </p>
-                              )}
-                            </>
-                          )}
-                          <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                            <span className="flex items-center gap-1">
-                              <Calendar className="h-3 w-3" />
-                              {new Date(event.changed_at).toLocaleString('pt-BR', {
-                                day: '2-digit',
-                                month: '2-digit',
-                                year: 'numeric',
-                                hour: '2-digit',
-                                minute: '2-digit'
-                              })}
-                            </span>
-                            <span className="flex items-center gap-1">
-                              <User className="h-3 w-3" />
-                              {event.user_name || 'Sistema'}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </ScrollArea>
-              )}
-            </div>
+            <ScrollArea className="h-[calc(100vh-240px)]">
+              <EnhancedOrderTimeline orderId={order.id} />
+            </ScrollArea>
           </TabsContent>
 
           <TabsContent value="comments" className="mt-4">
