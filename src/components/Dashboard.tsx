@@ -81,6 +81,9 @@ export interface Order {
   firmware_project_name?: string;
   requires_image?: boolean;
   image_project_name?: string;
+  freight_type?: string;
+  carrier_name?: string;
+  tracking_code?: string;
 }
 
 // Mock data

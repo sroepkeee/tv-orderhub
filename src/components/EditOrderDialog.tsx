@@ -31,10 +31,11 @@ interface HistoryEvent {
   changed_at: string;
   old_status?: string;
   new_status?: string;
-  user_id: string;
+  user_id?: string;
   user_name?: string;
-  type?: 'order' | 'item';
+  type?: 'order' | 'item' | 'change';
   field_changed?: string;
+  field_name?: string;
   old_value?: string;
   new_value?: string;
   notes?: string;
@@ -102,7 +103,7 @@ export const EditOrderDialog = ({ order, open, onOpenChange, onSave, onDelete }:
     });
   }, [open]);
 
-  // Load history from database (order + items)
+  // Load history from database (order + items + freight changes)
   const loadHistory = async () => {
     if (!order?.id) return;
     
@@ -129,11 +130,21 @@ export const EditOrderDialog = ({ order, open, onOpenChange, onSave, onDelete }:
 
       if (itemError) console.error("Error loading item history:", itemError);
 
+      // NOVO: Histórico de mudanças gerais (frete, etc)
+      const { data: orderChanges, error: changesError } = await supabase
+        .from('order_changes')
+        .select('*')
+        .eq('order_id', order.id)
+        .order('changed_at', { ascending: false });
+
+      if (changesError) console.error("Error loading order changes:", changesError);
+
       // Load user profiles for all events
       const allUserIds = [
         ...(orderHistory?.filter(h => h.user_id && h.user_id !== '00000000-0000-0000-0000-000000000000')
           .map(h => h.user_id) || []),
-        ...(itemHistory?.map(h => h.user_id) || [])
+        ...(itemHistory?.map(h => h.user_id) || []),
+        ...(orderChanges?.map(h => h.changed_by) || [])
       ];
       const userIds = [...new Set(allUserIds)];
 
@@ -176,8 +187,19 @@ export const EditOrderDialog = ({ order, open, onOpenChange, onSave, onDelete }:
         };
       }) || [];
 
+      const orderChangesWithNames = orderChanges?.map(event => {
+        const profile = profiles.find(p => p.id === event.changed_by);
+        const userName = profile?.full_name || profile?.email || 'Usuário';
+        
+        return {
+          ...event,
+          user_name: userName,
+          type: 'change' as const
+        };
+      }) || [];
+
       // Combinar e ordenar por data
-      const combined = [...orderHistoryWithNames, ...itemHistoryWithNames]
+      const combined = [...orderHistoryWithNames, ...itemHistoryWithNames, ...orderChangesWithNames]
         .sort((a, b) => new Date(b.changed_at).getTime() - new Date(a.changed_at).getTime());
 
       setHistoryEvents(combined);
@@ -1288,7 +1310,7 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
     }
   };
 
-  const onSubmit = (data: Order) => {
+  const onSubmit = async (data: Order) => {
     console.log('💾 Salvando pedido com dados:', data);
     
     const updatedOrder = { 
@@ -1296,6 +1318,57 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
       id: order.id, 
       items
     };
+    
+    // Track freight changes for history
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const changes: Array<{field_name: string, old_value: string | null, new_value: string | null}> = [];
+        
+        // Check freight_type change
+        if (order.freight_type !== data.freight_type) {
+          changes.push({
+            field_name: 'freight_type',
+            old_value: order.freight_type || null,
+            new_value: data.freight_type || null
+          });
+        }
+        
+        // Check carrier_name change
+        if (order.carrier_name !== data.carrier_name) {
+          changes.push({
+            field_name: 'carrier_name',
+            old_value: order.carrier_name || null,
+            new_value: data.carrier_name || null
+          });
+        }
+        
+        // Check tracking_code change
+        if (order.tracking_code !== data.tracking_code) {
+          changes.push({
+            field_name: 'tracking_code',
+            old_value: order.tracking_code || null,
+            new_value: data.tracking_code || null
+          });
+        }
+        
+        // Insert changes into order_changes table
+        if (changes.length > 0) {
+          for (const change of changes) {
+            await supabase.from('order_changes').insert({
+              order_id: order.id,
+              changed_by: user.id,
+              field_name: change.field_name,
+              old_value: change.old_value,
+              new_value: change.new_value,
+              change_type: 'update'
+            });
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error logging freight changes:', error);
+    }
     
     // Check if delivery date changed
     if (order.deliveryDeadline !== data.deliveryDeadline) {
@@ -1704,6 +1777,90 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                       )}
                     </Card>
                   </div>
+                </div>
+
+                {/* Seção de Frete e Transporte */}
+                <div className="border-t pt-4 space-y-3">
+                  <Label className="text-lg font-semibold flex items-center gap-2">
+                    <Package className="h-5 w-5" />
+                    Informações de Frete e Transporte
+                  </Label>
+                  
+                  <div className="grid grid-cols-3 gap-3">
+                    <div>
+                      <Label htmlFor="freight_type">Modo de Envio</Label>
+                      <Controller
+                        name="freight_type"
+                        control={control}
+                        render={({ field }) => (
+                          <Select 
+                            onValueChange={field.onChange} 
+                            value={field.value || ""}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Selecione o modo" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="aereo">Aéreo</SelectItem>
+                              <SelectItem value="transportadora">Transportadora</SelectItem>
+                              <SelectItem value="correios">Correios</SelectItem>
+                              <SelectItem value="frota_propria">Frota Própria</SelectItem>
+                              <SelectItem value="retirada">Retirada no Local</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        )}
+                      />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="carrier_name">Nome da Transportadora/Empresa</Label>
+                      <Input 
+                        {...register("carrier_name")}
+                        placeholder="Ex: Azul Cargo, Correios, Jadlog"
+                        maxLength={100}
+                      />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="tracking_code">Código de Rastreamento</Label>
+                      <Input 
+                        {...register("tracking_code")}
+                        placeholder="Ex: BR123456789BR"
+                        maxLength={100}
+                      />
+                    </div>
+                  </div>
+
+                  {getValues("freight_type") && (
+                    <Card className="p-3 bg-green-50 dark:bg-green-950 border-green-200">
+                      <div className="flex items-center gap-2 text-sm">
+                        <CheckCircle className="h-4 w-4 text-green-600" />
+                        <span className="font-medium">
+                          Modo de envio: {
+                            getValues("freight_type") === "aereo" ? "Aéreo" :
+                            getValues("freight_type") === "transportadora" ? "Transportadora" :
+                            getValues("freight_type") === "correios" ? "Correios" :
+                            getValues("freight_type") === "frota_propria" ? "Frota Própria" :
+                            "Retirada no Local"
+                          }
+                        </span>
+                        {getValues("carrier_name") && (
+                          <>
+                            <span className="text-muted-foreground">•</span>
+                            <span>{getValues("carrier_name")}</span>
+                          </>
+                        )}
+                        {getValues("tracking_code") && (
+                          <>
+                            <span className="text-muted-foreground">•</span>
+                            <span className="font-mono text-xs bg-white dark:bg-gray-800 px-2 py-1 rounded">
+                              {getValues("tracking_code")}
+                            </span>
+                          </>
+                        )}
+                      </div>
+                    </Card>
+                  )}
                 </div>
 
                 <div className="pt-3 border-t">
@@ -2146,7 +2303,7 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                             : <Package className="h-5 w-5 text-blue-600" />
                           }
                         </div>
-                        <div className="flex-1 space-y-2">
+                         <div className="flex-1 space-y-2">
                           {event.type === 'order' ? (
                             <>
                               <div className="flex items-center justify-between">
@@ -2158,6 +2315,29 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                               <p className="text-sm text-muted-foreground">
                                 De <span className="font-medium">{getStatusLabel(event.old_status)}</span> para{" "}
                                 <span className="font-medium">{getStatusLabel(event.new_status)}</span>
+                              </p>
+                            </>
+                          ) : event.type === 'change' ? (
+                            <>
+                              <div className="flex items-center justify-between">
+                                <h4 className="font-medium flex items-center gap-2">
+                                  <span className="text-sm">
+                                    {event.field_name === 'freight_type' && '🚚 Modo de Envio'}
+                                    {event.field_name === 'carrier_name' && '📦 Transportadora'}
+                                    {event.field_name === 'tracking_code' && '🔍 Código de Rastreamento'}
+                                  </span>
+                                </h4>
+                              </div>
+                              <p className="text-sm text-muted-foreground">
+                                {event.field_name === 'freight_type' && (
+                                  <>De <span className="font-medium">{event.old_value || '(não definido)'}</span> para <span className="font-medium">{event.new_value}</span></>
+                                )}
+                                {event.field_name === 'carrier_name' && (
+                                  <>De <span className="font-medium">{event.old_value || '(não definido)'}</span> para <span className="font-medium">{event.new_value}</span></>
+                                )}
+                                {event.field_name === 'tracking_code' && (
+                                  <>De <span className="font-medium font-mono text-xs">{event.old_value || '(não definido)'}</span> para <span className="font-medium font-mono text-xs">{event.new_value}</span></>
+                                )}
                               </p>
                             </>
                           ) : (
