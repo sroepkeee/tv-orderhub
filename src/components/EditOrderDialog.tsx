@@ -297,6 +297,41 @@ export const EditOrderDialog = ({ order, open, onOpenChange, onSave, onDelete }:
     }
   };
 
+  // Delete attachment
+  const handleDeleteAttachment = async (attachmentId: string, filePath: string, fileName: string) => {
+    try {
+      // Delete from storage
+      const { error: storageError } = await supabase.storage
+        .from('order-attachments')
+        .remove([filePath]);
+
+      if (storageError) throw storageError;
+
+      // Delete from database
+      const { error: dbError } = await supabase
+        .from('order_attachments')
+        .delete()
+        .eq('id', attachmentId);
+
+      if (dbError) throw dbError;
+
+      toast({
+        title: "Anexo excluído",
+        description: `${fileName} foi removido com sucesso.`
+      });
+
+      // Reload attachments
+      loadAttachments();
+    } catch (error) {
+      console.error("Error deleting attachment:", error);
+      toast({
+        title: "Erro ao excluir",
+        description: "Não foi possível excluir o arquivo.",
+        variant: "destructive"
+      });
+    }
+  };
+
   // Upload new attachment (PDF, images, documents)
   const handleUploadAttachment = async (file: File) => {
     if (!order?.id) {
@@ -2387,15 +2422,26 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                               </div>
                             </div>
                             
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleDownloadPDF(attachment.file_path, attachment.file_name)}
-                              className="gap-2"
-                            >
-                              <Download className="h-4 w-4" />
-                              Baixar
-                            </Button>
+                            <div className="flex gap-2">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleDownloadPDF(attachment.file_path, attachment.file_name)}
+                                className="gap-2"
+                              >
+                                <Download className="h-4 w-4" />
+                                Baixar
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="destructive"
+                                onClick={() => handleDeleteAttachment(attachment.id, attachment.file_path, attachment.file_name)}
+                                className="gap-2"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                                Excluir
+                              </Button>
+                            </div>
                           </div>
                         </Card>
                       );
