@@ -1022,10 +1022,40 @@ export const EditOrderDialog = ({ order, open, onOpenChange, onSave, onDelete }:
 
       const oldStatus = order.status;
       
+      // Detectar mudança para fase "Gerar Ordem"
+      const orderGenerationStatuses = ['order_generation_pending', 'order_in_creation', 'order_generated'];
+      const isMovingToOrderGeneration = orderGenerationStatuses.includes(newStatus);
+      
+      let updateData: any = { status: newStatus };
+      
+      // Se está mudando para fase "Gerar Ordem", calcular novo prazo baseado no SLA
+      if (isMovingToOrderGeneration) {
+        // Buscar SLA padrão do tipo de pedido
+        const { data: orderTypeConfig } = await supabase
+          .from('order_type_config')
+          .select('default_sla_days')
+          .eq('order_type', order.type)
+          .single();
+        
+        if (orderTypeConfig?.default_sla_days) {
+          // Calcular nova data de entrega: hoje + SLA padrão
+          const today = new Date();
+          const newDeliveryDate = new Date(today);
+          newDeliveryDate.setDate(newDeliveryDate.getDate() + orderTypeConfig.default_sla_days);
+          
+          updateData.delivery_date = newDeliveryDate.toISOString().split('T')[0];
+          
+          // Também atualizar no formulário
+          setValue("deliveryDeadline", updateData.delivery_date);
+          
+          console.log(`📅 Calculando prazo: hoje + ${orderTypeConfig.default_sla_days} dias = ${updateData.delivery_date}`);
+        }
+      }
+      
       // Atualizar status no banco
       const { error: updateError } = await supabase
         .from('orders')
-        .update({ status: newStatus })
+        .update(updateData)
         .eq('id', order.id);
       
       if (updateError) throw updateError;
@@ -1046,11 +1076,19 @@ export const EditOrderDialog = ({ order, open, onOpenChange, onSave, onDelete }:
       setValue("status", newStatus as any, { shouldDirty: false, shouldTouch: false });
       
       // Atualizar o pedido no estado do componente pai
-      onSave({ ...order, status: newStatus as any });
+      const updatedOrder = { ...order, status: newStatus as any };
+      if (updateData.delivery_date) {
+        updatedOrder.deliveryDeadline = updateData.delivery_date;
+      }
+      onSave(updatedOrder);
+      
+      const description = isMovingToOrderGeneration && updateData.delivery_date
+        ? `Pedido agora está: ${getStatusLabel(newStatus)} - Prazo calculado automaticamente`
+        : `Pedido agora está: ${getStatusLabel(newStatus)}`;
       
       toast({
         title: "✅ Status atualizado",
-        description: `Pedido agora está: ${getStatusLabel(newStatus)}`
+        description
       });
       
       console.log('✅ Status salvo no banco:', newStatus);

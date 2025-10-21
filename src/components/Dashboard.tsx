@@ -860,9 +860,36 @@ export const Dashboard = () => {
     const previousStatus = order?.status;
     
     try {
+      // Detectar mudança para fase "Gerar Ordem"
+      const orderGenerationStatuses = ['order_generation_pending', 'order_in_creation', 'order_generated'];
+      const isMovingToOrderGeneration = orderGenerationStatuses.includes(newStatus);
+      
+      let updateData: any = { status: newStatus };
+      
+      // Se está mudando para fase "Gerar Ordem", calcular novo prazo baseado no SLA
+      if (isMovingToOrderGeneration && order) {
+        // Buscar SLA padrão do tipo de pedido
+        const { data: orderTypeConfig } = await supabase
+          .from('order_type_config')
+          .select('default_sla_days')
+          .eq('order_type', order.type)
+          .single();
+        
+        if (orderTypeConfig?.default_sla_days) {
+          // Calcular nova data de entrega: hoje + SLA padrão
+          const today = new Date();
+          const newDeliveryDate = new Date(today);
+          newDeliveryDate.setDate(newDeliveryDate.getDate() + orderTypeConfig.default_sla_days);
+          
+          updateData.delivery_date = newDeliveryDate.toISOString().split('T')[0];
+          
+          console.log(`📅 Calculando prazo: hoje + ${orderTypeConfig.default_sla_days} dias = ${updateData.delivery_date}`);
+        }
+      }
+      
       const { error } = await supabase
         .from('orders')
-        .update({ status: newStatus })
+        .update(updateData)
         .eq('id', orderId);
 
       if (error) throw error;
@@ -874,9 +901,13 @@ export const Dashboard = () => {
 
       await loadOrders();
       
+      const description = isMovingToOrderGeneration && updateData.delivery_date
+        ? `Pedido ${order?.orderNumber} movido para ${getStatusLabel(newStatus)} - Prazo calculado automaticamente`
+        : `Pedido ${order?.orderNumber} movido para ${getStatusLabel(newStatus)}`;
+      
       toast({
         title: "Status atualizado",
-        description: `Pedido ${order?.orderNumber} movido para ${getStatusLabel(newStatus)}`,
+        description,
       });
     } catch (error: any) {
       toast({
