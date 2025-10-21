@@ -1770,17 +1770,15 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                           </Label>
                         </div>
                         
-                        {getValues("requires_firmware") && (
-                          <div>
-                            <Label htmlFor="firmware_project_name">Nome do Projeto/Firmware</Label>
-                            <Input 
-                              {...register("firmware_project_name")}
-                              placeholder="Ex: FW_PLACA_V2.3.1"
-                              maxLength={200}
-                              className="bg-white dark:bg-gray-900"
-                            />
-                          </div>
-                        )}
+                        <div>
+                          <Label htmlFor="firmware_project_name">Nome do Projeto/Firmware</Label>
+                          <Input 
+                            {...register("firmware_project_name")}
+                            placeholder="Ex: FW_PLACA_V2.3.1"
+                            maxLength={200}
+                            className="bg-white dark:bg-gray-900"
+                          />
+                        </div>
                         
                         {getValues("requires_firmware") && getValues("firmware_project_name") && (
                           <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-300">
@@ -1808,17 +1806,15 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                           </Label>
                         </div>
                         
-                        {getValues("requires_image") && (
-                          <div>
-                            <Label htmlFor="image_project_name">Nome da Imagem</Label>
-                            <Input 
-                              {...register("image_project_name")}
-                              placeholder="Ex: IMG_LINUX_2024_Q1"
-                              maxLength={200}
-                              className="bg-white dark:bg-gray-900"
-                            />
-                          </div>
-                        )}
+                        <div>
+                          <Label htmlFor="image_project_name">Nome da Imagem</Label>
+                          <Input 
+                            {...register("image_project_name")}
+                            placeholder="Ex: IMG_LINUX_2024_Q1"
+                            maxLength={200}
+                            className="bg-white dark:bg-gray-900"
+                          />
+                        </div>
                         
                         {getValues("requires_image") && getValues("image_project_name") && (
                           <Badge variant="outline" className="bg-purple-100 text-purple-800 border-purple-300">
