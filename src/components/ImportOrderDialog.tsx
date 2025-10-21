@@ -123,12 +123,15 @@ export const ImportOrderDialog = ({
       }).select().single();
       if (orderError) throw orderError;
 
-      // Registrar no histórico como "Importação"
-      await supabase.from('order_history').insert({
+      // Registrar criação por importação no histórico
+      await supabase.from('order_changes').insert({
         order_id: order.id,
-        user_id: user.id,
-        old_status: 'imported',
-        new_status: 'pending'
+        field_name: 'created',
+        old_value: '',
+        new_value: 'imported',
+        changed_by: user.id,
+        change_category: 'order_creation',
+        change_type: 'create'
       });
 
       // Fazer upload do PDF para o storage (se for PDF)

@@ -517,14 +517,17 @@ export const Dashboard = () => {
 
       if (orderError) throw orderError;
 
-      // Register creation in history
+      // Register manual creation in history
       await supabase
-        .from('order_history')
+        .from('order_changes')
         .insert({
           order_id: orderRow.id,
-          user_id: user.id,
-          old_status: 'pending',
-          new_status: 'pending'
+          field_name: 'created',
+          old_value: '',
+          new_value: 'manual_creation',
+          changed_by: user.id,
+          change_category: 'order_creation',
+          change_type: 'create'
         });
 
       // Insert all items
