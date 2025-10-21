@@ -33,30 +33,30 @@ export const KanbanColumn = ({
   return (
     <div
       ref={setNodeRef}
-      className={`kanban-column flex-shrink-0 w-80 transition-all duration-300 flex flex-col ${isOver ? "drop-target" : ""}`}
+      className={`kanban-column transition-all duration-300 flex flex-col ${isOver ? "drop-target" : ""}`}
     >
       {/* Column Header */}
-      <div className={`${colorClass} rounded-t-lg p-4 sticky top-0 z-10 shadow-sm`}>
+      <div className={`${colorClass} rounded-t-lg p-2 lg:p-3 sticky top-0 z-10 shadow-sm`}>
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Icon className="h-5 w-5" />
-            <h3 className="font-semibold text-base">{title}</h3>
+          <div className="flex items-center gap-1.5">
+            <Icon className="h-4 w-4" />
+            <h3 className="font-semibold text-xs lg:text-sm">{title}</h3>
           </div>
-          <Badge variant="secondary" className="bg-white/90 text-foreground">
+          <Badge variant="secondary" className="bg-white/90 text-foreground text-xs">
             {orders.length}
           </Badge>
         </div>
         {highCount > 0 && (
-          <div className="flex gap-2 mt-2">
-            <Badge className="bg-priority-high text-white text-xs">
-              {highCount} alta prioridade
+          <div className="flex gap-2 mt-1.5">
+            <Badge className="bg-priority-high text-white text-[10px]">
+              {highCount} alta
             </Badge>
           </div>
         )}
       </div>
 
       {/* Cards Container */}
-      <div className="kanban-cards-container flex-1 bg-muted/30 rounded-b-lg p-3 overflow-y-auto space-y-3 animate-fade-in">
+      <div className="kanban-cards-container flex-1 bg-muted/30 rounded-b-lg p-2 overflow-y-auto space-y-2 animate-fade-in">
         {orders.length === 0 ? (
           <div className="text-center text-muted-foreground text-sm py-8">
             Nenhum pedido nesta fase

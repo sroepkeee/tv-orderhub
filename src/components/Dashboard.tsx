@@ -1101,23 +1101,23 @@ export const Dashboard = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background p-6">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-8">
-        <div className="flex items-center gap-4">
-          <img src={logo} alt="Imply Logo" className="h-24 w-auto" />
-          <h1 className="text-xl md:text-2xl lg:text-3xl font-bold text-dashboard-header tracking-tight">
-            Dashboard de Produção e Logística SSM
+    <div className="min-h-screen bg-background p-4 lg:p-6">
+      {/* Compact Header */}
+      <div className="flex items-center justify-between mb-4 lg:mb-6">
+        <div className="flex items-center gap-2 lg:gap-4">
+          <img src={logo} alt="Imply Logo" className="h-12 lg:h-16 w-auto" />
+          <h1 className="text-base md:text-lg lg:text-xl font-bold text-dashboard-header tracking-tight">
+            Dashboard SSM
           </h1>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="relative">
+        <div className="flex items-center gap-1.5 lg:gap-2">
+          <div className="relative hidden sm:block">
             <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 text-muted-foreground h-3.5 w-3.5" />
             <Input
               placeholder="Buscar..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-8 w-40 h-9 text-sm"
+              className="pl-8 w-32 lg:w-40 h-8 text-sm"
             />
           </div>
           <DateRangeFilter 
@@ -1131,18 +1131,19 @@ export const Dashboard = () => {
           <Button 
             variant="outline" 
             onClick={() => navigate('/metrics')}
-            className="gap-2"
+            className="gap-1.5 h-8 px-2 lg:px-3"
+            size="sm"
           >
-            <BarChart3 className="h-4 w-4" />
-            Indicadores
+            <BarChart3 className="h-3.5 w-3.5" />
+            <span className="hidden lg:inline">Indicadores</span>
           </Button>
           <UserMenu />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button className="gap-2">
-                <Plus className="h-4 w-4" />
-                Novo Lançamento
-                <ChevronDown className="h-4 w-4" />
+              <Button className="gap-1.5 h-8 px-2 lg:px-3" size="sm">
+                <Plus className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Novo</span>
+                <ChevronDown className="h-3.5 w-3.5" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
@@ -1166,13 +1167,13 @@ export const Dashboard = () => {
       </div>
 
       {/* Tab Navigation - Compacta */}
-      <div className="mb-4">
-        <div className="flex justify-center items-center gap-1 border-b border-border">
+      <div className="mb-3">
+        <div className="flex justify-center items-center gap-0.5 lg:gap-1 border-b border-border overflow-x-auto">
           {tabs.map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`px-4 py-2 text-sm font-medium transition-all relative ${
+              className={`px-2 py-1.5 lg:px-3 lg:py-2 text-xs lg:text-sm font-medium transition-all relative whitespace-nowrap ${
                 activeTab === tab.id
                   ? 'text-primary'
                   : 'text-muted-foreground hover:text-foreground'

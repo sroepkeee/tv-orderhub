@@ -127,52 +127,52 @@ export const KanbanCard = ({ order, onEdit, onStatusChange }: KanbanCardProps) =
         className={isDragging ? "dragging" : ""}
       >
         <Card
-          className={`relative kanban-card p-3 transition-all duration-200 ${getPriorityClass(
+          className={`relative kanban-card p-2 transition-all duration-200 ${getPriorityClass(
             order.priority
           )} ${
             isDragging 
               ? 'cursor-grabbing opacity-50 scale-105 shadow-2xl' 
-              : 'cursor-pointer hover:shadow-lg hover:scale-[1.02]'
+              : 'cursor-pointer hover:shadow-lg hover:scale-[1.01]'
           }`}
           onClick={handleCardClick}
           onMouseDown={() => setClickStart(Date.now())}
         >
-        {/* Drag handle - maior e mais visível */}
+        {/* Drag handle */}
         <div
-          className="absolute right-1 top-1 p-2 rounded-md hover:bg-primary/10 text-muted-foreground cursor-grab active:cursor-grabbing transition-colors"
+          className="absolute right-0.5 top-0.5 p-1 rounded hover:bg-primary/10 text-muted-foreground cursor-grab active:cursor-grabbing transition-colors"
           {...listeners}
           {...attributes}
           onMouseDown={(e) => {
             e.stopPropagation();
-            setClickStart(Date.now() + 500); // Evita click ao arrastar pelo handle
+            setClickStart(Date.now() + 500);
           }}
           onClick={(e) => e.stopPropagation()}
           aria-label="Arrastar pedido"
           title="Arraste para mover entre fases"
         >
-          <GripVertical className="h-5 w-5" />
+          <GripVertical className="h-4 w-4" />
         </div>
       {/* Header */}
-      <div className="flex items-start justify-between mb-1.5">
+      <div className="flex items-start justify-between mb-1 pr-5">
         <div className="flex flex-col gap-0.5">
-          <span className="font-bold text-sm">Pedido #{order.orderNumber}</span>
-          <Badge className={`${getTypeColor(order.type)} text-xs`}>
+          <span className="font-bold text-xs">#{order.orderNumber}</span>
+          <Badge className={`${getTypeColor(order.type)} text-[10px] px-1.5 py-0`}>
             {getTypeLabel(order.type)}
           </Badge>
         </div>
-        <Badge className={`${getPriorityBadgeClass(order.priority)} text-xs`}>
+        <Badge className={`${getPriorityBadgeClass(order.priority)} text-[10px] px-1.5 py-0`}>
           {getPriorityLabel(order.priority)}
         </Badge>
       </div>
 
       {/* Items Summary */}
-      <div className="mb-1.5">
-        <p className="text-sm font-medium">
+      <div className="mb-1">
+        <p className="text-xs font-medium">
           {order.items && order.items.length > 0 
             ? `${order.items.length} item(ns)`
             : order.item}
         </p>
-        <p className="text-xs text-muted-foreground line-clamp-2">
+        <p className="text-[10px] text-muted-foreground line-clamp-1">
           {order.items && order.items.length > 0 
             ? order.items.map(item => item.itemCode).join(", ")
             : order.description}
@@ -201,22 +201,16 @@ export const KanbanCard = ({ order, onEdit, onStatusChange }: KanbanCardProps) =
       </div>
 
       {/* Client */}
-      <div className="mb-1.5">
-        <p className="text-xs text-muted-foreground">
+      <div className="mb-1">
+        <p className="text-[10px] text-muted-foreground line-clamp-1">
           <span className="font-medium">Cliente:</span> {order.client}
         </p>
       </div>
 
       {/* Deadline */}
       <div className="space-y-0.5">
-        {order.issueDate && (
-          <div className="flex items-center justify-between text-[10px] text-muted-foreground">
-            <span>Emissão:</span>
-            <span>{new Date(order.issueDate).toLocaleDateString("pt-BR")}</span>
-          </div>
-        )}
-        <div className="flex items-center justify-between text-xs">
-          <div className="flex items-center gap-1">
+        <div className="flex items-center justify-between text-[10px]">
+          <div className="flex items-center gap-0.5">
             <Clock className="h-3 w-3" />
             <span>Prazo:</span>
           </div>
@@ -224,30 +218,30 @@ export const KanbanCard = ({ order, onEdit, onStatusChange }: KanbanCardProps) =
             {new Date(order.deliveryDeadline).toLocaleDateString("pt-BR")}
           </span>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="flex-1 h-1.5 bg-secondary rounded-full overflow-hidden">
+        <div className="flex items-center gap-1.5">
+          <div className="flex-1 h-1 bg-secondary rounded-full overflow-hidden">
             <div className={`h-full ${progressBarColor} transition-all`} style={{ width: "100%" }} />
           </div>
           {daysRemaining < 3 && (
             <AlertCircle className="h-3 w-3 text-progress-critical" />
           )}
         </div>
-        <p className="text-xs text-center">
+        <p className="text-[10px] text-center font-medium">
           {daysRemaining < 0
-            ? `${Math.abs(daysRemaining)} dias atrasado`
+            ? `${Math.abs(daysRemaining)}d atraso`
             : daysRemaining === 0
-            ? "Entrega hoje"
-            : `${daysRemaining} dias restantes`}
+            ? "Hoje"
+            : `${daysRemaining}d`}
         </p>
       </div>
 
       {/* Quantity */}
-      <div className="mt-1.5 pt-1.5 border-t">
-        <p className="text-xs text-muted-foreground">
-          <span className="font-medium">Qtd Total:</span> {order.quantity}
+      <div className="mt-1 pt-1 border-t">
+        <p className="text-[10px] text-muted-foreground">
+          <span className="font-medium">Qtd:</span> {order.quantity}
           {order.items && order.items.length > 0 && (
-            <span className="ml-2">
-              ({order.items.reduce((sum, item) => sum + item.deliveredQuantity, 0)} entregue)
+            <span className="ml-1">
+              ({order.items.reduce((sum, item) => sum + item.deliveredQuantity, 0)} ent.)
             </span>
           )}
         </p>

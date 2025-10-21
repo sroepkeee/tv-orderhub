@@ -405,8 +405,59 @@ All colors MUST be HSL.
     @apply bg-muted-foreground rounded;
   }
 
+  /* Responsive Kanban Columns */
   .kanban-column {
-    @apply min-w-80 max-w-80 transition-all duration-300;
+    /* Mobile: 1 column (full width) */
+    min-width: 280px;
+    width: 100%;
+    max-width: 100%;
+    transition: all 0.3s;
+  }
+
+  @media (min-width: 768px) {
+    /* Tablet: 2 columns */
+    .kanban-column {
+      min-width: 320px;
+      width: calc(50% - 0.5rem);
+      max-width: 400px;
+    }
+  }
+
+  @media (min-width: 1024px) {
+    /* Desktop small: 3 columns */
+    .kanban-column {
+      min-width: 300px;
+      width: calc(33.333% - 0.67rem);
+      max-width: 380px;
+    }
+  }
+
+  @media (min-width: 1440px) {
+    /* Desktop medium: 4-5 columns */
+    .kanban-column {
+      min-width: 280px;
+      width: calc(25% - 0.75rem);
+      max-width: 360px;
+    }
+  }
+
+  @media (min-width: 1920px) {
+    /* Desktop large: 6 columns */
+    .kanban-column {
+      min-width: 280px;
+      width: calc(16.666% - 0.84rem);
+      max-width: 340px;
+    }
+  }
+
+  @media (min-width: 2560px) {
+    /* Ultra-wide: flexible */
+    .kanban-column {
+      min-width: 300px;
+      width: auto;
+      flex: 1 1 320px;
+      max-width: 400px;
+    }
   }
 
   /* Coluna em estado de drop target */
@@ -417,7 +468,7 @@ All colors MUST be HSL.
   }
 
   .kanban-cards-container {
-    max-height: calc(100vh - 350px);
+    max-height: calc(100vh - 250px);
     scrollbar-width: thin;
     scrollbar-color: hsl(var(--muted-foreground)) transparent;
   }
