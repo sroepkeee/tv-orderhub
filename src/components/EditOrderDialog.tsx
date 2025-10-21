@@ -2098,7 +2098,7 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                             <TableHead className="min-w-[200px]">Descrição</TableHead>
                             <TableHead className="w-[80px]">UND</TableHead>
                             <TableHead className="w-[100px]">Qtd. Sol.</TableHead>
-                            <TableHead className="w-[130px]">Armazém</TableHead>
+                            <TableHead className="w-[100px]">Armazém</TableHead>
                               <TableHead className="w-[140px]">Data Entrega</TableHead>
                               <TableHead className="w-[180px]">Situação</TableHead>
                               <TableHead className="w-[120px]">Importação?</TableHead>
@@ -2157,7 +2157,7 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                                   className="h-8 text-sm"
                                 />
                               </TableCell>
-                              <TableCell>
+                              <TableCell className="p-1">
                                 <Input
                                   value={item.warehouse}
                                   onChange={(e) => updateItem(index, "warehouse", e.target.value)}
