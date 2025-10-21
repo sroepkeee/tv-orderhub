@@ -1106,7 +1106,9 @@ export const Dashboard = () => {
       <div className="flex items-center justify-between mb-8">
         <div className="flex items-center gap-4">
           <img src={logo} alt="Imply Logo" className="h-24 w-auto" />
-          <h1 className="text-3xl font-bold text-dashboard-header">Logística SSM</h1>
+          <h1 className="text-4xl font-bold text-dashboard-header tracking-tight">
+            Dashboard de Produção e Logística SSM
+          </h1>
         </div>
         <div className="flex items-center gap-4">
           <div className="relative">
