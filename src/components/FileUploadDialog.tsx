@@ -59,11 +59,12 @@ export const FileUploadDialog = ({ open, onOpenChange, onUpload, orderId }: File
               id="file-upload"
               type="file"
               multiple
+              accept=".pdf,.png,.jpg,.jpeg,.webp,.doc,.docx,.xls,.xlsx"
               onChange={handleFileSelect}
               className="cursor-pointer"
             />
             <p className="text-xs text-muted-foreground mt-1">
-              Formatos aceitos: PDF, DOC, DOCX, XLS, XLSX, JPG, PNG (max 10MB cada)
+              Formatos: PDF, Imagens (PNG, JPG, WEBP), Word, Excel (max 20MB cada)
             </p>
           </div>
 

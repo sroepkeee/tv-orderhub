@@ -11,7 +11,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Calendar, User, FileText, CheckCircle, XCircle, Clock, History, Edit, Plus, Trash2, Loader2, MessageSquare, Download, Package, AlertCircle, BarChart3, Settings } from "lucide-react";
+import { Calendar, User, FileText, CheckCircle, XCircle, Clock, History, Edit, Plus, Trash2, Loader2, MessageSquare, Download, Package, AlertCircle, BarChart3, Settings, Image as ImageIcon, File, FileSpreadsheet } from "lucide-react";
 import { useForm, Controller } from "react-hook-form";
 import { Order } from "./Dashboard";
 import { OrderItem } from "./AddOrderDialog";
@@ -297,7 +297,7 @@ export const EditOrderDialog = ({ order, open, onOpenChange, onSave, onDelete }:
     }
   };
 
-  // Upload new PDF attachment
+  // Upload new attachment (PDF, images, documents)
   const handleUploadAttachment = async (file: File) => {
     if (!order?.id) {
       console.error('❌ Upload cancelado: pedido não definido');
@@ -316,29 +316,43 @@ export const EditOrderDialog = ({ order, open, onOpenChange, onSave, onDelete }:
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Usuário não autenticado");
 
+      // Tipos aceitos
+      const ACCEPTED_TYPES = [
+        'application/pdf',
+        'image/png',
+        'image/jpeg',
+        'image/jpg',
+        'image/webp',
+        'application/msword',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'application/vnd.ms-excel',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      ];
+
       // Validate file
-      if (file.size > 10 * 1024 * 1024) {
+      if (file.size > 20 * 1024 * 1024) {
         console.error('❌ Arquivo muito grande:', file.size);
         toast({
           title: "Arquivo muito grande",
-          description: "O PDF deve ter no máximo 10MB.",
+          description: "O arquivo deve ter no máximo 20MB.",
           variant: "destructive"
         });
         return;
       }
 
-      if (file.type !== 'application/pdf') {
+      if (!ACCEPTED_TYPES.includes(file.type)) {
         console.error('❌ Tipo inválido:', file.type);
         toast({
           title: "Tipo inválido",
-          description: "Apenas arquivos PDF são aceitos.",
+          description: "Tipos aceitos: PDF, Imagens (PNG, JPG, WEBP), Word, Excel",
           variant: "destructive"
         });
         return;
       }
 
       // Upload to storage
-      const fileName = `${order.orderNumber}_${Date.now()}.pdf`;
+      const fileExtension = file.name.split('.').pop();
+      const fileName = `${order.orderNumber}_${Date.now()}.${fileExtension}`;
       const filePath = `${order.id}/${fileName}`;
 
       console.log('⏳ Fazendo upload para storage:', filePath);
@@ -419,6 +433,16 @@ export const EditOrderDialog = ({ order, open, onOpenChange, onSave, onDelete }:
         });
 
       if (error) throw error;
+
+      // Registrar auditoria do comentário
+      await supabase.from('order_changes').insert({
+        order_id: order.id,
+        changed_by: user.id,
+        field_name: 'comment',
+        old_value: null,
+        new_value: newComment.trim(),
+        change_type: 'create'
+      });
 
       setNewComment("");
       setShowCommentInput(false);
@@ -2281,14 +2305,14 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                     ) : (
                       <>
                         <Plus className="h-4 w-4" />
-                        Anexar PDF
+                        Anexar Arquivo
                       </>
                     )}
                   </Button>
                   <input
                     id="attachment-upload"
                     type="file"
-                    accept=".pdf,application/pdf"
+                    accept=".pdf,.png,.jpg,.jpeg,.webp,.doc,.docx,.xls,.xlsx"
                     className="hidden"
                     onChange={(e) => {
                       const file = e.target.files?.[0];
@@ -2313,36 +2337,69 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
               ) : (
                 <ScrollArea className="h-[400px]">
                   <div className="space-y-3">
-                    {attachments.map((attachment) => (
-                      <Card key={attachment.id} className="p-4">
-                        <div className="flex items-start justify-between">
-                          <div className="flex items-start gap-3 flex-1">
-                            <FileText className="h-10 w-10 text-red-600" />
-                            <div className="flex-1">
-                              <p className="font-medium">{attachment.file_name}</p>
-                              <div className="flex items-center gap-4 text-sm text-muted-foreground mt-1">
-                                <span>{(attachment.file_size / 1024 / 1024).toFixed(2)} MB</span>
-                                <span>•</span>
-                                <span>{format(new Date(attachment.uploaded_at), "dd/MM/yyyy 'às' HH:mm")}</span>
+                    {attachments.map((attachment) => {
+                      const isImage = attachment.file_type?.startsWith('image/');
+                      const isPDF = attachment.file_type === 'application/pdf';
+                      const isWord = attachment.file_type?.includes('word');
+                      const isExcel = attachment.file_type?.includes('excel') || attachment.file_type?.includes('spreadsheet');
+                      
+                      const getFileIcon = () => {
+                        if (isImage) return <ImageIcon className="h-10 w-10 text-blue-500" />;
+                        if (isPDF) return <FileText className="h-10 w-10 text-red-600" />;
+                        if (isWord) return <FileText className="h-10 w-10 text-blue-600" />;
+                        if (isExcel) return <FileSpreadsheet className="h-10 w-10 text-green-600" />;
+                        return <File className="h-10 w-10 text-gray-500" />;
+                      };
+
+                      const getImageUrl = (filePath: string) => {
+                        const { data } = supabase.storage
+                          .from('order-attachments')
+                          .getPublicUrl(filePath);
+                        return data.publicUrl;
+                      };
+
+                      return (
+                        <Card key={attachment.id} className="p-4">
+                          <div className="flex items-start justify-between">
+                            <div className="flex items-start gap-3 flex-1">
+                              {getFileIcon()}
+                              <div className="flex-1">
+                                <p className="font-medium">{attachment.file_name}</p>
+                                <div className="flex items-center gap-4 text-sm text-muted-foreground mt-1">
+                                  <span>{(attachment.file_size / 1024 / 1024).toFixed(2)} MB</span>
+                                  <span>•</span>
+                                  <span>{format(new Date(attachment.uploaded_at), "dd/MM/yyyy 'às' HH:mm")}</span>
+                                </div>
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  Enviado por: {attachment.profiles?.full_name || attachment.profiles?.email || 'Usuário'}
+                                </p>
+                                
+                                {/* Preview de imagem */}
+                                {isImage && (
+                                  <div className="mt-3">
+                                    <img 
+                                      src={getImageUrl(attachment.file_path)} 
+                                      alt={attachment.file_name}
+                                      className="max-w-full h-auto rounded border max-h-64 object-contain"
+                                    />
+                                  </div>
+                                )}
                               </div>
-                              <p className="text-xs text-muted-foreground mt-1">
-                                Enviado por: {attachment.profiles?.full_name || attachment.profiles?.email || 'Usuário'}
-                              </p>
                             </div>
+                            
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleDownloadPDF(attachment.file_path, attachment.file_name)}
+                              className="gap-2"
+                            >
+                              <Download className="h-4 w-4" />
+                              Baixar
+                            </Button>
                           </div>
-                          
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleDownloadPDF(attachment.file_path, attachment.file_name)}
-                            className="gap-2"
-                          >
-                            <Download className="h-4 w-4" />
-                            Baixar
-                          </Button>
-                        </div>
-                      </Card>
-                    ))}
+                        </Card>
+                      );
+                    })}
                   </div>
                 </ScrollArea>
               )}
