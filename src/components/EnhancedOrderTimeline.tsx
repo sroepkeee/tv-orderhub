@@ -126,32 +126,72 @@ export const EnhancedOrderTimeline: React.FC<EnhancedOrderTimelineProps> = ({ or
       // 1. Mudanças gerais do pedido (order_changes)
       const { data: orderChanges } = await supabase
         .from('order_changes')
-        .select('*, profiles:changed_by(full_name, email)')
+        .select('*')
         .eq('order_id', orderId)
         .order('changed_at', { ascending: false });
+
+      console.log('📊 Order Changes carregados:', orderChanges?.length || 0);
 
       // 2. Mudanças de status (order_history)
       const { data: statusHistory } = await supabase
         .from('order_history')
-        .select('*, profiles:user_id(full_name, email)')
+        .select('*')
         .eq('order_id', orderId)
         .order('changed_at', { ascending: false });
+
+      console.log('📈 Status History carregados:', statusHistory?.length || 0);
 
       // 3. Mudanças nos itens (order_item_history)
       const { data: itemHistory } = await supabase
         .from('order_item_history')
-        .select('*, profiles:user_id(full_name, email), order_items(item_code, item_description)')
+        .select('*, order_items(item_code, item_description)')
         .eq('order_id', orderId)
         .order('changed_at', { ascending: false });
 
+      console.log('📦 Item History carregados:', itemHistory?.length || 0);
+
+      // 4. Buscar perfis de usuários separadamente
+      const allUserIds = new Set<string>();
+      
+      orderChanges?.forEach(c => c.changed_by && allUserIds.add(c.changed_by));
+      statusHistory?.forEach(h => h.user_id && allUserIds.add(h.user_id));
+      itemHistory?.forEach(i => i.user_id && allUserIds.add(i.user_id));
+
+      const userIds = Array.from(allUserIds).filter(id => id !== '00000000-0000-0000-0000-000000000000');
+      
+      let profilesMap = new Map<string, string>();
+      
+      if (userIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('id, full_name, email')
+          .in('id', userIds);
+        
+        profiles?.forEach(p => {
+          profilesMap.set(p.id, p.full_name || p.email || 'Usuário');
+        });
+      }
+
+      console.log('👤 Perfis carregados:', profilesMap.size);
+
+      // Helper para obter nome do usuário
+      const getUserName = (userId: string): string => {
+        if (userId === '00000000-0000-0000-0000-000000000000') {
+          return 'Sistema Laboratório';
+        }
+        return profilesMap.get(userId) || 'Usuário';
+      };
+
       // Unificar e mapear para TimelineEvent[]
       const timelineEvents: TimelineEvent[] = [
-        ...(orderChanges || []).map(mapOrderChangeToEvent),
-        ...(statusHistory || []).map(mapStatusHistoryToEvent),
-        ...(itemHistory || []).map(mapItemHistoryToEvent),
+        ...(orderChanges || []).map(c => mapOrderChangeToEvent(c, getUserName)),
+        ...(statusHistory || []).map(h => mapStatusHistoryToEvent(h, getUserName)),
+        ...(itemHistory || []).map(i => mapItemHistoryToEvent(i, getUserName)),
       ].sort((a, b) => 
         new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
       );
+
+      console.log('✅ Total de eventos mapeados:', timelineEvents.length);
 
       // Calcular estatísticas
       const statusChanges = timelineEvents.filter(e => e.category === 'status_change').length;
@@ -173,15 +213,14 @@ export const EnhancedOrderTimeline: React.FC<EnhancedOrderTimelineProps> = ({ or
     }
   };
 
-  const mapOrderChangeToEvent = (change: any): TimelineEvent => {
+  const mapOrderChangeToEvent = (change: any, getUserName: (id: string) => string): TimelineEvent => {
     const isCreation = change.field_name === 'created';
-    const profile = change.profiles;
     
     return {
       id: change.id,
       timestamp: change.changed_at,
       user: {
-        name: profile?.full_name || profile?.email || 'Usuário',
+        name: getUserName(change.changed_by),
         id: change.changed_by,
       },
       category: (change.change_category as any) || 'field_update',
@@ -198,17 +237,12 @@ export const EnhancedOrderTimeline: React.FC<EnhancedOrderTimelineProps> = ({ or
     };
   };
 
-  const mapStatusHistoryToEvent = (history: any): TimelineEvent => {
-    const profile = history.profiles;
-    const userName = history.user_id === '00000000-0000-0000-0000-000000000000' 
-      ? 'Sistema Laboratório'
-      : (profile?.full_name || profile?.email || 'Usuário');
-
+  const mapStatusHistoryToEvent = (history: any, getUserName: (id: string) => string): TimelineEvent => {
     return {
       id: history.id,
       timestamp: history.changed_at,
       user: {
-        name: userName,
+        name: getUserName(history.user_id),
         id: history.user_id,
       },
       category: 'status_change',
@@ -220,14 +254,12 @@ export const EnhancedOrderTimeline: React.FC<EnhancedOrderTimelineProps> = ({ or
     };
   };
 
-  const mapItemHistoryToEvent = (item: any): TimelineEvent => {
-    const profile = item.profiles;
-    
+  const mapItemHistoryToEvent = (item: any, getUserName: (id: string) => string): TimelineEvent => {
     return {
       id: item.id,
       timestamp: item.changed_at,
       user: {
-        name: profile?.full_name || profile?.email || 'Usuário',
+        name: getUserName(item.user_id),
         id: item.user_id,
       },
       category: 'item_change',
