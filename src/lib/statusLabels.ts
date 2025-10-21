@@ -31,6 +31,7 @@ export const STATUS_LABELS: Record<string, string> = {
   "awaiting_pickup": "Aguardando Retirada",
   "collected": "Coletado",
   // Faturamento
+  "invoice_requested": "Solicitado Faturamento",
   "awaiting_invoice": "Aguardando Faturamento",
   "invoice_issued": "Nota Fiscal Emitida",
   "invoice_sent": "NF Enviada ao Cliente",
@@ -80,6 +81,7 @@ export function getStatusColor(status: string): string {
     "awaiting_approval": "bg-yellow-500",
     "awaiting_material": "bg-yellow-500",
     "awaiting_pickup": "bg-yellow-500",
+    "invoice_requested": "bg-yellow-500",
     "awaiting_invoice": "bg-yellow-500",
     "freight_quote_requested": "bg-yellow-500",
     // Laranja - Atenção

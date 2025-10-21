@@ -133,6 +133,7 @@ export const PhaseButtons = ({ order, onStatusChange }: PhaseButtonsProps) => {
       icon: FileText,
       color: "text-emerald-600",
       statuses: [
+        { value: "invoice_requested", label: "Solicitado Faturamento" },
         { value: "awaiting_invoice", label: "Aguardando Faturamento" },
         { value: "invoice_issued", label: "Nota Fiscal Emitida" },
         { value: "invoice_sent", label: "NF Enviada ao Cliente" },
