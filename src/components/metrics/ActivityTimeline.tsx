@@ -5,6 +5,7 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { getStatusLabel } from "@/lib/statusLabels";
 interface ActivityEvent {
   id: string;
   type: 'status_change' | 'date_change' | 'order_created';
@@ -48,7 +49,7 @@ export function ActivityTimeline() {
           id: change.id,
           type: 'status_change',
           order_number: change.orders.order_number,
-          description: `Status alterado de "${change.old_status}" para "${change.new_status}"`,
+          description: `Status alterado de "${getStatusLabel(change.old_status)}" para "${getStatusLabel(change.new_status)}"`,
           timestamp: change.changed_at
         });
       });

@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Clock, TrendingUp, Truck, Package, Edit, ArrowRight, Plus } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { getStatusLabel } from "@/lib/statusLabels";
 
 interface OrderChange {
   id: string;
@@ -158,11 +159,15 @@ export function OrderChangeHistory({ orderId }: { orderId: string }) {
                     {/* Valores (antes → depois) */}
                     <div className="flex items-center gap-2 text-xs flex-wrap">
                       <span className="line-through text-muted-foreground bg-red-50 dark:bg-red-950 px-2 py-1 rounded border border-red-200">
-                        {change.old_value || '(vazio)'}
+                        {change.field_name === 'status' 
+                          ? getStatusLabel(change.old_value) 
+                          : (change.old_value || '(vazio)')}
                       </span>
                       <ArrowRight className="h-3 w-3 text-muted-foreground" />
                       <span className="font-medium bg-green-50 dark:bg-green-950 px-2 py-1 rounded border border-green-200">
-                        {change.new_value}
+                        {change.field_name === 'status' 
+                          ? getStatusLabel(change.new_value) 
+                          : change.new_value}
                       </span>
                     </div>
                   </>

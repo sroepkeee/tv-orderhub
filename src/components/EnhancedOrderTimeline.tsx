@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card } from "@/components/ui/card";
 import { Loader2, Plus, TrendingUp, Truck, Package, Edit, FileText, Calendar } from "lucide-react";
+import { getStatusLabel } from "@/lib/statusLabels";
 
 interface TimelineEvent {
   id: string;
@@ -228,8 +229,12 @@ export const EnhancedOrderTimeline: React.FC<EnhancedOrderTimelineProps> = ({ or
         ? (change.new_value === 'imported' ? 'Importou este pedido do TOTVS' : 'Criou este pedido manualmente')
         : `Alterou ${fieldLabels[change.field_name] || change.field_name}`,
       changes: isCreation ? undefined : {
-        from: change.old_value || '(vazio)',
-        to: change.new_value || '(vazio)',
+        from: change.field_name === 'status' 
+          ? getStatusLabel(change.old_value) 
+          : (change.old_value || '(vazio)'),
+        to: change.field_name === 'status' 
+          ? getStatusLabel(change.new_value) 
+          : (change.new_value || '(vazio)'),
       },
       metadata: {
         fieldName: change.field_name,
@@ -248,8 +253,8 @@ export const EnhancedOrderTimeline: React.FC<EnhancedOrderTimelineProps> = ({ or
       category: 'status_change',
       title: 'Alterou Status',
       changes: {
-        from: history.old_status || '(vazio)',
-        to: history.new_status || '(vazio)',
+        from: getStatusLabel(history.old_status),
+        to: getStatusLabel(history.new_status),
       },
     };
   };

@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Search, Calendar, BarChart3, FileSpreadsheet, Plus, ChevronDown } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { cleanItemDescription } from "@/lib/utils";
+import { getStatusLabel } from "@/lib/statusLabels";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -969,49 +970,6 @@ export const Dashboard = () => {
     }
   };
 
-  const getStatusLabel = (status: string) => {
-    const labels: Record<string, string> = {
-      // Preparação/Planejamento
-      "pending": "Pendente (Novo)",
-      "in_analysis": "Em Análise",
-      "awaiting_approval": "Aguardando Aprovação",
-      "planned": "Planejado",
-      // Separação/Produção
-      "separation_started": "Iniciado a Separação",
-      "in_production": "Em Produção",
-      "awaiting_material": "Aguardando Material",
-      "separation_completed": "Concluído a Separação",
-      "production_completed": "Concluído a Produção",
-      // Embalagem/Conferência
-      "in_quality_check": "Em Conferência/Qualidade",
-      "in_packaging": "Em Embalagem",
-      "ready_for_shipping": "Pronto para Envio",
-      // Cotação de Frete
-      "freight_quote_requested": "Cotação Solicitada",
-      "freight_quote_received": "Cotação Recebida",
-      "freight_approved": "Frete Aprovado",
-      // Expedição/Logística
-      "released_for_shipping": "Liberado para Envio",
-      "in_expedition": "Deixado na Expedição",
-      "in_transit": "Em Trânsito",
-      "pickup_scheduled": "Retirada Agendada",
-      "awaiting_pickup": "Aguardando Retirada",
-      "collected": "Coletado",
-      // Faturamento
-      "awaiting_invoice": "Aguardando Faturamento",
-      "invoice_issued": "Nota Fiscal Emitida",
-      "invoice_sent": "NF Enviada ao Cliente",
-      // Conclusão
-      "delivered": "Entregue",
-      "completed": "Finalizado",
-      // Exceção/Problemas
-      "cancelled": "Cancelado",
-      "on_hold": "Em Espera",
-      "delayed": "Atrasado",
-      "returned": "Devolvido"
-    };
-    return labels[status] || status;
-  };
 
   const getStatusColor = (status: string) => {
     const colors: Record<string, string> = {
