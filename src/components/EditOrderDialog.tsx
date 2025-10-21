@@ -2076,7 +2076,21 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                         </TableHeader>
                         <TableBody>
                           {items.map((item, index) => (
-                            <TableRow key={index}>
+                            <TableRow 
+                              key={index}
+                              data-status={item.item_status}
+                              className={`
+                                transition-colors
+                                ${item.item_status === 'completed' 
+                                  ? 'bg-green-50 dark:bg-green-950/20 hover:bg-green-100 dark:hover:bg-green-900/30' 
+                                  : 'hover:bg-muted/50'
+                                }
+                                ${item.deliveredQuantity >= item.requestedQuantity && item.deliveredQuantity > 0
+                                  ? 'border-l-4 border-l-green-500'
+                                  : ''
+                                }
+                              `}
+                            >
                               <TableCell>
                                 <Input
                                   value={item.itemCode}

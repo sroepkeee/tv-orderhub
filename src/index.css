@@ -550,4 +550,56 @@ All colors MUST be HSL.
     writing-mode: vertical-rl;
     text-orientation: mixed;
   }
+
+  /* ========================================
+     Estilos para Itens Completos e Selecionados
+     ======================================== */
+  
+  /* Item completo - fundo verde suave */
+  tr[data-status="completed"],
+  .item-completed {
+    background-color: hsl(125 45% 96%);
+    border-left: 4px solid hsl(125 55% 45%);
+  }
+  
+  .dark tr[data-status="completed"],
+  .dark .item-completed {
+    background-color: hsl(125 45% 10%);
+    border-left-color: hsl(125 55% 45%);
+  }
+  
+  /* Item selecionado - destaque azul */
+  tr:focus-within,
+  tr[data-lov-selected="true"],
+  .item-selected {
+    background-color: hsl(220 60% 96%) !important;
+    outline: 2px solid hsl(220 60% 50%);
+    outline-offset: -2px;
+    box-shadow: 0 0 0 3px hsl(220 60% 90%);
+  }
+  
+  .dark tr:focus-within,
+  .dark tr[data-lov-selected="true"],
+  .dark .item-selected {
+    background-color: hsl(220 60% 15%) !important;
+    outline-color: hsl(220 60% 50%);
+    box-shadow: 0 0 0 3px hsl(220 60% 20%);
+  }
+  
+  /* Transição suave entre estados */
+  tr {
+    transition: background-color 0.2s ease, box-shadow 0.2s ease, outline 0.2s ease;
+  }
+  
+  /* Label em foco dentro de item selecionado */
+  tr:focus-within label,
+  tr[data-lov-selected="true"] label {
+    font-weight: 600;
+    color: hsl(220 60% 30%);
+  }
+  
+  .dark tr:focus-within label,
+  .dark tr[data-lov-selected="true"] label {
+    color: hsl(220 60% 80%);
+  }
 }
