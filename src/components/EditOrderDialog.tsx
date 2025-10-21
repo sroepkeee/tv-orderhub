@@ -11,7 +11,8 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Calendar, User, FileText, CheckCircle, XCircle, Clock, History, Edit, Plus, Trash2, Loader2, MessageSquare, Download, Package, AlertCircle, BarChart3, Settings, Image as ImageIcon, File, FileSpreadsheet } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Calendar, User, FileText, CheckCircle, XCircle, Clock, History, Edit, Plus, Trash2, Loader2, MessageSquare, Download, Package, AlertCircle, BarChart3, Settings, Image as ImageIcon, File, FileSpreadsheet, ChevronDown } from "lucide-react";
 import { useForm, Controller } from "react-hook-form";
 import { Order } from "./Dashboard";
 import { OrderItem } from "./AddOrderDialog";
@@ -96,6 +97,11 @@ export const EditOrderDialog = ({ order, open, onOpenChange, onSave, onDelete }:
     newDate: string;
     itemIndex: number;
   } | null>(null);
+  
+  // Estados para controlar seções colapsáveis
+  const [labConfigOpen, setLabConfigOpen] = useState(false);
+  const [freightInfoOpen, setFreightInfoOpen] = useState(false);
+  const [dimensionsOpen, setDimensionsOpen] = useState(false);
   useEffect(() => {
     if (!open) return;
     supabase.auth.getUser().then(({ data: { user } }) => {
@@ -1733,278 +1739,293 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                 </div>
 
                 {/* Configurações de Firmware e Imagem */}
-                <div className="border-t pt-4 space-y-3">
-                  <Label className="text-lg font-semibold flex items-center gap-2">
-                    <Settings className="h-5 w-5" />
-                    Configuração de Placas (Laboratório)
-                  </Label>
+                <Collapsible open={labConfigOpen} onOpenChange={setLabConfigOpen} className="border-t pt-4">
+                  <CollapsibleTrigger className="flex items-center justify-between w-full hover:bg-muted/50 p-2 rounded-lg transition-colors">
+                    <Label className="text-lg font-semibold flex items-center gap-2 cursor-pointer">
+                      <Settings className="h-5 w-5" />
+                      Configuração de Placas (Laboratório)
+                    </Label>
+                    <ChevronDown className={`h-5 w-5 transition-transform ${labConfigOpen ? 'rotate-180' : ''}`} />
+                  </CollapsibleTrigger>
                   
-                  <div className="grid grid-cols-2 gap-4">
-                    {/* Firmware Card */}
-                    <Card className="p-4 space-y-3 bg-blue-50 dark:bg-blue-950 border-blue-200">
-                      <div className="flex items-center space-x-2">
-                        <Controller
-                          name="requires_firmware"
-                          control={control}
-                          render={({ field }) => (
-                            <Checkbox 
-                              id="edit_requires_firmware"
-                              checked={field.value || false}
-                              onCheckedChange={field.onChange}
-                            />
-                          )}
-                        />
-                        <Label htmlFor="edit_requires_firmware" className="font-semibold cursor-pointer">
-                          🔧 Requer Firmware Específico
-                        </Label>
-                      </div>
-                      
-                      {getValues("requires_firmware") && (
-                        <div>
-                          <Label htmlFor="firmware_project_name">Nome do Projeto/Firmware</Label>
-                          <Input 
-                            {...register("firmware_project_name")}
-                            placeholder="Ex: FW_PLACA_V2.3.1"
-                            maxLength={200}
-                            className="bg-white dark:bg-gray-900"
+                  <CollapsibleContent className="space-y-3 mt-3">
+                    <div className="grid grid-cols-2 gap-4">
+                      {/* Firmware Card */}
+                      <Card className="p-4 space-y-3 bg-blue-50 dark:bg-blue-950 border-blue-200">
+                        <div className="flex items-center space-x-2">
+                          <Controller
+                            name="requires_firmware"
+                            control={control}
+                            render={({ field }) => (
+                              <Checkbox 
+                                id="edit_requires_firmware"
+                                checked={field.value || false}
+                                onCheckedChange={field.onChange}
+                              />
+                            )}
                           />
+                          <Label htmlFor="edit_requires_firmware" className="font-semibold cursor-pointer">
+                            🔧 Requer Firmware Específico
+                          </Label>
                         </div>
-                      )}
-                      
-                      {getValues("requires_firmware") && getValues("firmware_project_name") && (
-                        <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-300">
-                          ✅ {getValues("firmware_project_name")}
-                        </Badge>
-                      )}
-                    </Card>
+                        
+                        {getValues("requires_firmware") && (
+                          <div>
+                            <Label htmlFor="firmware_project_name">Nome do Projeto/Firmware</Label>
+                            <Input 
+                              {...register("firmware_project_name")}
+                              placeholder="Ex: FW_PLACA_V2.3.1"
+                              maxLength={200}
+                              className="bg-white dark:bg-gray-900"
+                            />
+                          </div>
+                        )}
+                        
+                        {getValues("requires_firmware") && getValues("firmware_project_name") && (
+                          <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-300">
+                            ✅ {getValues("firmware_project_name")}
+                          </Badge>
+                        )}
+                      </Card>
 
-                    {/* Imagem Card */}
-                    <Card className="p-4 space-y-3 bg-purple-50 dark:bg-purple-950 border-purple-200">
-                      <div className="flex items-center space-x-2">
-                        <Controller
-                          name="requires_image"
-                          control={control}
-                          render={({ field }) => (
-                            <Checkbox 
-                              id="edit_requires_image"
-                              checked={field.value || false}
-                              onCheckedChange={field.onChange}
-                            />
-                          )}
-                        />
-                        <Label htmlFor="edit_requires_image" className="font-semibold cursor-pointer">
-                          💾 Requer Imagem Específica
-                        </Label>
-                      </div>
-                      
-                      {getValues("requires_image") && (
-                        <div>
-                          <Label htmlFor="image_project_name">Nome da Imagem</Label>
-                          <Input 
-                            {...register("image_project_name")}
-                            placeholder="Ex: IMG_LINUX_2024_Q1"
-                            maxLength={200}
-                            className="bg-white dark:bg-gray-900"
+                      {/* Imagem Card */}
+                      <Card className="p-4 space-y-3 bg-purple-50 dark:bg-purple-950 border-purple-200">
+                        <div className="flex items-center space-x-2">
+                          <Controller
+                            name="requires_image"
+                            control={control}
+                            render={({ field }) => (
+                              <Checkbox 
+                                id="edit_requires_image"
+                                checked={field.value || false}
+                                onCheckedChange={field.onChange}
+                              />
+                            )}
                           />
+                          <Label htmlFor="edit_requires_image" className="font-semibold cursor-pointer">
+                            💾 Requer Imagem Específica
+                          </Label>
                         </div>
-                      )}
-                      
-                      {getValues("requires_image") && getValues("image_project_name") && (
-                        <Badge variant="outline" className="bg-purple-100 text-purple-800 border-purple-300">
-                          ✅ {getValues("image_project_name")}
-                        </Badge>
-                      )}
-                    </Card>
-                  </div>
-                </div>
+                        
+                        {getValues("requires_image") && (
+                          <div>
+                            <Label htmlFor="image_project_name">Nome da Imagem</Label>
+                            <Input 
+                              {...register("image_project_name")}
+                              placeholder="Ex: IMG_LINUX_2024_Q1"
+                              maxLength={200}
+                              className="bg-white dark:bg-gray-900"
+                            />
+                          </div>
+                        )}
+                        
+                        {getValues("requires_image") && getValues("image_project_name") && (
+                          <Badge variant="outline" className="bg-purple-100 text-purple-800 border-purple-300">
+                            ✅ {getValues("image_project_name")}
+                          </Badge>
+                        )}
+                      </Card>
+                    </div>
+                  </CollapsibleContent>
+                </Collapsible>
 
                 {/* Seção de Frete e Transporte */}
-                <div className="border-t pt-4 space-y-3">
-                  <Label className="text-lg font-semibold flex items-center gap-2">
-                    <Package className="h-5 w-5" />
-                    Informações de Frete e Transporte
-                  </Label>
+                <Collapsible open={freightInfoOpen} onOpenChange={setFreightInfoOpen} className="border-t pt-4">
+                  <CollapsibleTrigger className="flex items-center justify-between w-full hover:bg-muted/50 p-2 rounded-lg transition-colors">
+                    <Label className="text-lg font-semibold flex items-center gap-2 cursor-pointer">
+                      <Package className="h-5 w-5" />
+                      Informações de Frete e Transporte
+                    </Label>
+                    <ChevronDown className={`h-5 w-5 transition-transform ${freightInfoOpen ? 'rotate-180' : ''}`} />
+                  </CollapsibleTrigger>
                   
-                  <div className="grid grid-cols-3 gap-3">
-                    <div>
-                      <Label htmlFor="freight_type">Modo de Envio</Label>
-                      <Controller
-                        name="freight_type"
-                        control={control}
-                        render={({ field }) => (
-                          <Select 
-                            onValueChange={field.onChange} 
-                            value={field.value || ""}
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Selecione o modo" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="aereo">Aéreo</SelectItem>
-                              <SelectItem value="transportadora">Transportadora</SelectItem>
-                              <SelectItem value="correios">Correios</SelectItem>
-                              <SelectItem value="frota_propria">Frota Própria</SelectItem>
-                              <SelectItem value="retirada">Retirada no Local</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        )}
-                      />
-                    </div>
-
-                    <div>
-                      <Label htmlFor="carrier_name">Nome da Transportadora/Empresa</Label>
-                      <Input 
-                        {...register("carrier_name")}
-                        placeholder="Ex: Azul Cargo, Correios, Jadlog"
-                        maxLength={100}
-                      />
-                    </div>
-
-                    <div>
-                      <Label htmlFor="tracking_code">Código de Rastreamento</Label>
-                      <Input 
-                        {...register("tracking_code")}
-                        placeholder="Ex: BR123456789BR"
-                        maxLength={100}
-                      />
-                    </div>
-                  </div>
-
-                  {getValues("freight_type") && (
-                    <Card className="p-3 bg-green-50 dark:bg-green-950 border-green-200">
-                      <div className="flex items-center gap-2 text-sm">
-                        <CheckCircle className="h-4 w-4 text-green-600" />
-                        <span className="font-medium">
-                          Modo de envio: {
-                            getValues("freight_type") === "aereo" ? "Aéreo" :
-                            getValues("freight_type") === "transportadora" ? "Transportadora" :
-                            getValues("freight_type") === "correios" ? "Correios" :
-                            getValues("freight_type") === "frota_propria" ? "Frota Própria" :
-                            "Retirada no Local"
-                          }
-                        </span>
-                        {getValues("carrier_name") && (
-                          <>
-                            <span className="text-muted-foreground">•</span>
-                            <span>{getValues("carrier_name")}</span>
-                          </>
-                        )}
-                        {getValues("tracking_code") && (
-                          <>
-                            <span className="text-muted-foreground">•</span>
-                            <span className="font-mono text-xs bg-white dark:bg-gray-800 px-2 py-1 rounded">
-                              {getValues("tracking_code")}
-                            </span>
-                          </>
-                        )}
+                  <CollapsibleContent className="space-y-3 mt-3">
+                    <div className="grid grid-cols-3 gap-3">
+                      <div>
+                        <Label htmlFor="freight_type">Modo de Envio</Label>
+                        <Controller
+                          name="freight_type"
+                          control={control}
+                          render={({ field }) => (
+                            <Select 
+                              onValueChange={field.onChange} 
+                              value={field.value || ""}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Selecione o modo" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="aereo">Aéreo</SelectItem>
+                                <SelectItem value="transportadora">Transportadora</SelectItem>
+                                <SelectItem value="correios">Correios</SelectItem>
+                                <SelectItem value="frota_propria">Frota Própria</SelectItem>
+                                <SelectItem value="retirada">Retirada no Local</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          )}
+                        />
                       </div>
-                    </Card>
-                  )}
-                </div>
+
+                      <div>
+                        <Label htmlFor="carrier_name">Nome da Transportadora/Empresa</Label>
+                        <Input 
+                          {...register("carrier_name")}
+                          placeholder="Ex: Azul Cargo, Correios, Jadlog"
+                          maxLength={100}
+                        />
+                      </div>
+
+                      <div>
+                        <Label htmlFor="tracking_code">Código de Rastreamento</Label>
+                        <Input 
+                          {...register("tracking_code")}
+                          placeholder="Ex: BR123456789BR"
+                          maxLength={100}
+                        />
+                      </div>
+                    </div>
+
+                    {getValues("freight_type") && (
+                      <Card className="p-3 bg-green-50 dark:bg-green-950 border-green-200">
+                        <div className="flex items-center gap-2 text-sm">
+                          <CheckCircle className="h-4 w-4 text-green-600" />
+                          <span className="font-medium">
+                            Modo de envio: {
+                              getValues("freight_type") === "aereo" ? "Aéreo" :
+                              getValues("freight_type") === "transportadora" ? "Transportadora" :
+                              getValues("freight_type") === "correios" ? "Correios" :
+                              getValues("freight_type") === "frota_propria" ? "Frota Própria" :
+                              "Retirada no Local"
+                            }
+                          </span>
+                          {getValues("carrier_name") && (
+                            <>
+                              <span className="text-muted-foreground">•</span>
+                              <span>{getValues("carrier_name")}</span>
+                            </>
+                          )}
+                          {getValues("tracking_code") && (
+                            <>
+                              <span className="text-muted-foreground">•</span>
+                              <span className="font-mono text-xs bg-white dark:bg-gray-800 px-2 py-1 rounded">
+                                {getValues("tracking_code")}
+                              </span>
+                            </>
+                          )}
+                        </div>
+                      </Card>
+                    )}
+                  </CollapsibleContent>
+                </Collapsible>
 
                 {/* ✨ Seção de Dimensões e Volumes */}
-                <div className="border-t pt-4 space-y-4">
-                  <div className="flex items-center gap-2 mb-3">
-                    <Package className="h-5 w-5 text-primary" />
-                    <Label className="text-lg font-semibold">Dimensões e Volumes</Label>
-                  </div>
+                <Collapsible open={dimensionsOpen} onOpenChange={setDimensionsOpen} className="border-t pt-4">
+                  <CollapsibleTrigger className="flex items-center justify-between w-full hover:bg-muted/50 p-2 rounded-lg transition-colors">
+                    <Label className="text-lg font-semibold flex items-center gap-2 cursor-pointer">
+                      <Package className="h-5 w-5 text-primary" />
+                      Dimensões e Volumes
+                    </Label>
+                    <ChevronDown className={`h-5 w-5 transition-transform ${dimensionsOpen ? 'rotate-180' : ''}`} />
+                  </CollapsibleTrigger>
                   
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="package_volumes">Volumes (Quantidade)</Label>
-                      <Input
-                        type="number"
-                        min="1"
-                        step="1"
-                        placeholder="1"
-                        {...register("package_volumes")}
-                        className="bg-white dark:bg-gray-900"
-                      />
-                      <p className="text-xs text-muted-foreground mt-1">Número de volumes/pacotes</p>
+                  <CollapsibleContent className="space-y-4 mt-3">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="package_volumes">Volumes (Quantidade)</Label>
+                        <Input
+                          type="number"
+                          min="1"
+                          step="1"
+                          placeholder="1"
+                          {...register("package_volumes")}
+                          className="bg-white dark:bg-gray-900"
+                        />
+                        <p className="text-xs text-muted-foreground mt-1">Número de volumes/pacotes</p>
+                      </div>
+                      
+                      <div>
+                        <Label htmlFor="package_weight_kg">Peso Total (Kg)</Label>
+                        <Input
+                          type="number"
+                          min="0"
+                          step="0.001"
+                          placeholder="0.000"
+                          {...register("package_weight_kg")}
+                          className="bg-white dark:bg-gray-900"
+                        />
+                        <p className="text-xs text-muted-foreground mt-1">Peso em quilogramas</p>
+                      </div>
                     </div>
                     
                     <div>
-                      <Label htmlFor="package_weight_kg">Peso Total (Kg)</Label>
-                      <Input
-                        type="number"
-                        min="0"
-                        step="0.001"
-                        placeholder="0.000"
-                        {...register("package_weight_kg")}
-                        className="bg-white dark:bg-gray-900"
-                      />
-                      <p className="text-xs text-muted-foreground mt-1">Peso em quilogramas</p>
-                    </div>
-                  </div>
-                  
-                  <div>
-                    <Label>Dimensões (metros)</Label>
-                    <div className="grid grid-cols-3 gap-2">
-                      <div>
-                        <Input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          placeholder="Altura"
-                          {...register("package_height_m")}
-                          className="bg-white dark:bg-gray-900"
-                        />
-                      </div>
-                      <div>
-                        <Input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          placeholder="Largura"
-                          {...register("package_width_m")}
-                          className="bg-white dark:bg-gray-900"
-                        />
-                      </div>
-                      <div>
-                        <Input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          placeholder="Comprimento"
-                          {...register("package_length_m")}
-                          className="bg-white dark:bg-gray-900"
-                        />
-                      </div>
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Altura x Largura x Comprimento (em metros)
-                    </p>
-                  </div>
-                  
-                  {/* Preview card */}
-                  {(getValues("package_volumes") || getValues("package_weight_kg") || 
-                    getValues("package_height_m") || getValues("package_width_m") || 
-                    getValues("package_length_m")) && (
-                    <Card className="p-3 bg-purple-50 dark:bg-purple-950 border-purple-200">
-                      <div className="flex items-start gap-3">
-                        <Package className="h-5 w-5 text-purple-600 mt-0.5" />
-                        <div className="space-y-1 flex-1">
-                          <p className="text-sm font-medium text-purple-900 dark:text-purple-100">
-                            Informações de Embalagem
-                          </p>
-                          <div className="text-sm text-purple-700 dark:text-purple-300">
-                            {getValues("package_volumes") && (
-                              <div><span className="font-medium">{getValues("package_volumes")}</span> volume(s)</div>
-                            )}
-                            {getValues("package_weight_kg") && (
-                              <div><span className="font-medium">{getValues("package_weight_kg")} Kg</span> de peso total</div>
-                            )}
-                            {(getValues("package_height_m") || getValues("package_width_m") || getValues("package_length_m")) && (
-                              <div className="font-mono text-xs mt-1 bg-white dark:bg-gray-800 px-2 py-1 rounded inline-block">
-                                {getValues("package_height_m") || 0} x {getValues("package_width_m") || 0} x {getValues("package_length_m") || 0} m
-                              </div>
-                            )}
-                          </div>
+                      <Label>Dimensões (metros)</Label>
+                      <div className="grid grid-cols-3 gap-2">
+                        <div>
+                          <Input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            placeholder="Altura"
+                            {...register("package_height_m")}
+                            className="bg-white dark:bg-gray-900"
+                          />
+                        </div>
+                        <div>
+                          <Input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            placeholder="Largura"
+                            {...register("package_width_m")}
+                            className="bg-white dark:bg-gray-900"
+                          />
+                        </div>
+                        <div>
+                          <Input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            placeholder="Comprimento"
+                            {...register("package_length_m")}
+                            className="bg-white dark:bg-gray-900"
+                          />
                         </div>
                       </div>
-                    </Card>
-                  )}
-                </div>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Altura x Largura x Comprimento (em metros)
+                      </p>
+                    </div>
+                    
+                    {/* Preview card */}
+                    {(getValues("package_volumes") || getValues("package_weight_kg") || 
+                      getValues("package_height_m") || getValues("package_width_m") || 
+                      getValues("package_length_m")) && (
+                      <Card className="p-3 bg-purple-50 dark:bg-purple-950 border-purple-200">
+                        <div className="flex items-start gap-3">
+                          <Package className="h-5 w-5 text-purple-600 mt-0.5" />
+                          <div className="space-y-1 flex-1">
+                            <p className="text-sm font-medium text-purple-900 dark:text-purple-100">
+                              Informações de Embalagem
+                            </p>
+                            <div className="text-sm text-purple-700 dark:text-purple-300">
+                              {getValues("package_volumes") && (
+                                <div><span className="font-medium">{getValues("package_volumes")}</span> volume(s)</div>
+                              )}
+                              {getValues("package_weight_kg") && (
+                                <div><span className="font-medium">{getValues("package_weight_kg")} Kg</span> de peso total</div>
+                              )}
+                              {(getValues("package_height_m") || getValues("package_width_m") || getValues("package_length_m")) && (
+                                <div className="font-mono text-xs mt-1 bg-white dark:bg-gray-800 px-2 py-1 rounded inline-block">
+                                  {getValues("package_height_m") || 0} x {getValues("package_width_m") || 0} x {getValues("package_length_m") || 0} m
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </Card>
+                    )}
+                  </CollapsibleContent>
+                </Collapsible>
 
                 <div className="pt-3 border-t">
                   <Label className="text-sm font-medium mb-2 block">Status do Pedido</Label>
