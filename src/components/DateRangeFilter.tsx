@@ -23,24 +23,24 @@ export const DateRangeFilter = ({ dateRange, onDateRangeChange }: DateRangeFilte
       <PopoverTrigger asChild>
         <Button
           variant="outline"
-          size="lg"
+          size="sm"
           className={cn(
-            "justify-start text-left font-normal",
+            "justify-start text-left font-normal h-9 text-sm",
             !dateRange && "text-muted-foreground"
           )}
         >
-          <CalendarIcon className="mr-2 h-4 w-4" />
+          <CalendarIcon className="mr-2 h-3.5 w-3.5" />
           {dateRange?.from ? (
             dateRange.to ? (
               <>
-                {format(dateRange.from, "dd/MM/yyyy", { locale: ptBR })} -{" "}
-                {format(dateRange.to, "dd/MM/yyyy", { locale: ptBR })}
+                {format(dateRange.from, "dd/MM", { locale: ptBR })} -{" "}
+                {format(dateRange.to, "dd/MM", { locale: ptBR })}
               </>
             ) : (
-              format(dateRange.from, "dd/MM/yyyy", { locale: ptBR })
+              format(dateRange.from, "dd/MM", { locale: ptBR })
             )
           ) : (
-            <span>Filtrar Data</span>
+            <span>Data</span>
           )}
         </Button>
       </PopoverTrigger>

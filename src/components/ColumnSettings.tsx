@@ -62,9 +62,9 @@ export const ColumnSettings = ({ visibility, onVisibilityChange }: ColumnSetting
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="lg" className="gap-2">
-          <Settings className="h-4 w-4" />
-          Colunas ({visibleCount}/{columns.length})
+        <Button variant="outline" size="sm" className="gap-2 h-9 text-sm">
+          <Settings className="h-3.5 w-3.5" />
+          Colunas
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">

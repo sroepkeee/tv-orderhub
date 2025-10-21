@@ -1110,14 +1110,14 @@ export const Dashboard = () => {
             Dashboard de Produção e Logística SSM
           </h1>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+            <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 text-muted-foreground h-3.5 w-3.5" />
             <Input
-              placeholder="Buscar pedidos..."
+              placeholder="Buscar..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 w-80"
+              className="pl-8 w-40 h-9 text-sm"
             />
           </div>
           <DateRangeFilter 
