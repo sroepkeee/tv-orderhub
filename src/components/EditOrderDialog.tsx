@@ -1837,7 +1837,29 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                   </CollapsibleTrigger>
                   
                   <CollapsibleContent className="space-y-3 mt-3">
-                    <div className="grid grid-cols-3 gap-3">
+                    <div className="grid grid-cols-4 gap-3">
+                      <div>
+                        <Label htmlFor="freight_modality">Modalidade de Frete</Label>
+                        <Controller
+                          name="freight_modality"
+                          control={control}
+                          render={({ field }) => (
+                            <Select 
+                              onValueChange={field.onChange} 
+                              value={field.value || ""}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="FOB ou CIF" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="FOB">FOB - Free On Board</SelectItem>
+                                <SelectItem value="CIF">CIF - Cost, Insurance and Freight</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          )}
+                        />
+                      </div>
+
                       <div>
                         <Label htmlFor="freight_type">Modo de Envio</Label>
                         <Controller
@@ -1882,19 +1904,29 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                       </div>
                     </div>
 
-                    {getValues("freight_type") && (
+                    {(getValues("freight_type") || getValues("freight_modality")) && (
                       <Card className="p-3 bg-green-50 dark:bg-green-950 border-green-200">
-                        <div className="flex items-center gap-2 text-sm">
+                        <div className="flex items-center gap-2 text-sm flex-wrap">
                           <CheckCircle className="h-4 w-4 text-green-600" />
-                          <span className="font-medium">
-                            Modo de envio: {
-                              getValues("freight_type") === "aereo" ? "Aéreo" :
-                              getValues("freight_type") === "transportadora" ? "Transportadora" :
-                              getValues("freight_type") === "correios" ? "Correios" :
-                              getValues("freight_type") === "frota_propria" ? "Frota Própria" :
-                              "Retirada no Local"
-                            }
-                          </span>
+                          {getValues("freight_modality") && (
+                            <Badge variant="outline" className="bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 border-blue-300">
+                              {getValues("freight_modality")}
+                            </Badge>
+                          )}
+                          {getValues("freight_type") && (
+                            <>
+                              {getValues("freight_modality") && <span className="text-muted-foreground">•</span>}
+                              <span className="font-medium">
+                                Modo de envio: {
+                                  getValues("freight_type") === "aereo" ? "Aéreo" :
+                                  getValues("freight_type") === "transportadora" ? "Transportadora" :
+                                  getValues("freight_type") === "correios" ? "Correios" :
+                                  getValues("freight_type") === "frota_propria" ? "Frota Própria" :
+                                  "Retirada no Local"
+                                }
+                              </span>
+                            </>
+                          )}
                           {getValues("carrier_name") && (
                             <>
                               <span className="text-muted-foreground">•</span>

@@ -490,6 +490,7 @@ export type Database = {
           driver_name: string | null
           executive_name: string | null
           firmware_project_name: string | null
+          freight_modality: string | null
           freight_type: string | null
           freight_value: number | null
           id: string
@@ -532,6 +533,7 @@ export type Database = {
           driver_name?: string | null
           executive_name?: string | null
           firmware_project_name?: string | null
+          freight_modality?: string | null
           freight_type?: string | null
           freight_value?: number | null
           id?: string
@@ -574,6 +576,7 @@ export type Database = {
           driver_name?: string | null
           executive_name?: string | null
           firmware_project_name?: string | null
+          freight_modality?: string | null
           freight_type?: string | null
           freight_value?: number | null
           id?: string

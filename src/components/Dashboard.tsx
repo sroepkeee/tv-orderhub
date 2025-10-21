@@ -83,6 +83,7 @@ export interface Order {
   requires_image?: boolean;
   image_project_name?: string;
   freight_type?: string;
+  freight_modality?: string;
   carrier_name?: string;
   tracking_code?: string;
   // ✨ Novos campos de dimensões e volumes
