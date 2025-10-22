@@ -123,31 +123,34 @@ All colors MUST be HSL.
     --type-ecommerce: 200 80% 50%;
     --type-ecommerce-bg: 200 80% 96%;
 
-    /* Kanban Phase Colors - Simplified Neutral */
-    --phase-almox-ssm: 217 90% 60%;
-    --phase-almox-ssm-bg: 220 15% 97%;
-    --phase-order-gen: 239 85% 65%;
-    --phase-order-gen-bg: 220 15% 97%;
-    --phase-almox-general: 258 85% 65%;
-    --phase-almox-general-bg: 220 15% 97%;
-    --phase-production: 280 75% 60%;
-    --phase-production-bg: 220 15% 97%;
-    --phase-balance: 300 80% 65%;
-    --phase-balance-bg: 220 15% 97%;
-    --phase-laboratory: 330 85% 65%;
-    --phase-laboratory-bg: 220 15% 97%;
-    --phase-packaging: 25 95% 60%;
-    --phase-packaging-bg: 220 15% 97%;
-    --phase-freight: 40 95% 55%;
-    --phase-freight-bg: 220 15% 97%;
-    --phase-invoicing: 160 75% 45%;
-    --phase-invoicing-bg: 220 15% 97%;
-    --phase-logistics: 190 85% 50%;
-    --phase-logistics-bg: 220 15% 97%;
-    --phase-transit: 200 90% 55%;
-    --phase-transit-bg: 220 15% 97%;
-    --phase-completion: 142 75% 45%;
-    --phase-completion-bg: 142 30% 96%;
+    /* Kanban Phase Colors - Unified Neutral Design */
+    --phase-almox-ssm: 220 40% 35%;
+    --phase-almox-ssm-bg: 220 15% 94%;
+    --phase-order-gen: 220 40% 35%;
+    --phase-order-gen-bg: 220 15% 94%;
+    --phase-almox-general: 220 40% 35%;
+    --phase-almox-general-bg: 220 15% 94%;
+    --phase-production: 220 40% 35%;
+    --phase-production-bg: 220 15% 94%;
+    --phase-balance: 220 40% 35%;
+    --phase-balance-bg: 220 15% 94%;
+    --phase-laboratory: 220 40% 35%;
+    --phase-laboratory-bg: 220 15% 94%;
+    --phase-packaging: 220 40% 35%;
+    --phase-packaging-bg: 220 15% 94%;
+    --phase-freight: 220 40% 35%;
+    --phase-freight-bg: 220 15% 94%;
+    --phase-invoicing: 220 40% 35%;
+    --phase-invoicing-bg: 220 15% 94%;
+    --phase-logistics: 220 40% 35%;
+    --phase-logistics-bg: 220 15% 94%;
+    --phase-transit: 220 40% 35%;
+    --phase-transit-bg: 220 15% 94%;
+    --phase-completion: 220 40% 35%;
+    --phase-completion-bg: 220 15% 94%;
+    
+    /* Unified phase border accent */
+    --phase-border: 220 60% 50%;
 
     /* Dashboard specific */
     --dashboard-header: 220 25% 25%;
@@ -287,31 +290,34 @@ All colors MUST be HSL.
     --type-ecommerce: 200 80% 65%;
     --type-ecommerce-bg: 200 70% 12%;
 
-    /* Kanban Phase Colors - Dark Mode Simplified Neutral */
-    --phase-almox-ssm: 217 90% 75%;
-    --phase-almox-ssm-bg: 220 20% 14%;
-    --phase-order-gen: 239 85% 75%;
-    --phase-order-gen-bg: 220 20% 14%;
-    --phase-almox-general: 258 85% 75%;
-    --phase-almox-general-bg: 220 20% 14%;
-    --phase-production: 280 75% 70%;
-    --phase-production-bg: 220 20% 14%;
-    --phase-balance: 300 80% 75%;
-    --phase-balance-bg: 220 20% 14%;
-    --phase-laboratory: 330 85% 75%;
-    --phase-laboratory-bg: 220 20% 14%;
-    --phase-packaging: 25 95% 70%;
-    --phase-packaging-bg: 220 20% 14%;
-    --phase-freight: 40 95% 65%;
-    --phase-freight-bg: 220 20% 14%;
-    --phase-invoicing: 160 75% 60%;
-    --phase-invoicing-bg: 220 20% 14%;
-    --phase-logistics: 190 85% 60%;
-    --phase-logistics-bg: 220 20% 14%;
-    --phase-transit: 200 90% 65%;
-    --phase-transit-bg: 220 20% 14%;
-    --phase-completion: 142 75% 60%;
-    --phase-completion-bg: 142 20% 16%;
+    /* Kanban Phase Colors - Dark Mode Unified Neutral Design */
+    --phase-almox-ssm: 220 30% 85%;
+    --phase-almox-ssm-bg: 220 20% 16%;
+    --phase-order-gen: 220 30% 85%;
+    --phase-order-gen-bg: 220 20% 16%;
+    --phase-almox-general: 220 30% 85%;
+    --phase-almox-general-bg: 220 20% 16%;
+    --phase-production: 220 30% 85%;
+    --phase-production-bg: 220 20% 16%;
+    --phase-balance: 220 30% 85%;
+    --phase-balance-bg: 220 20% 16%;
+    --phase-laboratory: 220 30% 85%;
+    --phase-laboratory-bg: 220 20% 16%;
+    --phase-packaging: 220 30% 85%;
+    --phase-packaging-bg: 220 20% 16%;
+    --phase-freight: 220 30% 85%;
+    --phase-freight-bg: 220 20% 16%;
+    --phase-invoicing: 220 30% 85%;
+    --phase-invoicing-bg: 220 20% 16%;
+    --phase-logistics: 220 30% 85%;
+    --phase-logistics-bg: 220 20% 16%;
+    --phase-transit: 220 30% 85%;
+    --phase-transit-bg: 220 20% 16%;
+    --phase-completion: 220 30% 85%;
+    --phase-completion-bg: 220 20% 16%;
+    
+    /* Unified phase border accent */
+    --phase-border: 220 70% 65%;
 
     /* Dashboard specific - Dark Mode */
     --dashboard-header: 220 10% 92%;
