@@ -140,13 +140,25 @@ export const KanbanCard = ({
             {isEcommerce && <span className="text-base">🛒</span>}
             #{order.orderNumber}
           </span>
-          <Badge className={`${getTypeColor(order.type)} text-[10px] px-1.5 py-0 ${isEcommerce ? 'font-bold ring-2 ring-orderType-ecommerce' : ''}`}>
+          <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-muted-foreground/30 text-muted-foreground">
             {getTypeLabel(order.type)}
           </Badge>
         </div>
-        <Badge className={`${getPriorityBadgeClass(order.priority)} text-[10px] px-1.5 py-0`}>
-          {getPriorityLabel(order.priority)}
-        </Badge>
+        {order.priority === 'high' && (
+          <Badge className="bg-red-500 text-white text-[10px] px-1.5 py-0">
+            Alta
+          </Badge>
+        )}
+        {order.priority === 'medium' && (
+          <Badge variant="outline" className="border-orange-400 text-orange-600 dark:text-orange-400 text-[10px] px-1.5 py-0">
+            Média
+          </Badge>
+        )}
+        {order.priority === 'low' && (
+          <Badge variant="outline" className="border-green-400 text-green-600 dark:text-green-400 text-[10px] px-1.5 py-0">
+            Baixa
+          </Badge>
+        )}
       </div>
 
       {/* Items Summary */}
@@ -158,18 +170,20 @@ export const KanbanCard = ({
           {order.items && order.items.length > 0 ? order.items.map(item => item.itemCode).join(", ") : order.description}
         </p>
         
-        {/* Item Source Badges */}
-        {order.items && order.items.length > 0 && <div className="flex gap-1 mt-1 flex-wrap">
-            {countItemsBySource(order.items).inStock > 0 && <span className="text-[10px] px-1.5 py-0.5 rounded bg-green-100 text-green-700">
-                ✅ {countItemsBySource(order.items).inStock}
-              </span>}
-            {countItemsBySource(order.items).production > 0 && <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-700">
-                🏭 {countItemsBySource(order.items).production}
-              </span>}
-            {countItemsBySource(order.items).outOfStock > 0 && <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-100 text-red-700">
-                ⚠️ {countItemsBySource(order.items).outOfStock}
-              </span>}
-          </div>}
+        {/* Item Source Indicators - Monochromatic */}
+        {order.items && order.items.length > 0 && (
+          <div className="flex gap-2 mt-1 text-[10px] text-muted-foreground">
+            {countItemsBySource(order.items).inStock > 0 && (
+              <span>✓ {countItemsBySource(order.items).inStock} estoque</span>
+            )}
+            {countItemsBySource(order.items).production > 0 && (
+              <span>⚙ {countItemsBySource(order.items).production} produção</span>
+            )}
+            {countItemsBySource(order.items).outOfStock > 0 && (
+              <span className="text-red-500">⚠ {countItemsBySource(order.items).outOfStock} falta</span>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Client */}

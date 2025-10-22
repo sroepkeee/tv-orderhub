@@ -35,12 +35,12 @@ export const KanbanColumn = ({
       ref={setNodeRef}
       className={`kanban-column transition-all duration-300 flex flex-col ${isOver ? "drop-target" : ""}`}
     >
-      {/* Column Header */}
-      <div className={`${colorClass} rounded-t-lg p-2 lg:p-3 sticky top-0 z-10 shadow-sm`}>
+      {/* Column Header with colored left border */}
+      <div className="bg-card border-l-4 rounded-t-lg p-2 lg:p-3 sticky top-0 z-10 shadow-sm" style={{ borderLeftColor: `hsl(var(${colorClass.match(/--[\w-]+/)?.[0] || '--primary'}))` }}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1.5">
-            <Icon className="h-4 w-4" />
-            <h3 className="font-semibold text-xs lg:text-sm">{title}</h3>
+            <Icon className="h-4 w-4" style={{ color: `hsl(var(${colorClass.match(/--[\w-]+/)?.[0] || '--primary'}))` }} />
+            <h3 className="font-semibold text-xs lg:text-sm text-foreground">{title}</h3>
           </div>
           <Badge variant="secondary" className="bg-background text-foreground border border-border text-xs">
             {orders.length}
@@ -48,7 +48,7 @@ export const KanbanColumn = ({
         </div>
         {highCount > 0 && (
           <div className="flex gap-2 mt-1.5">
-            <Badge className="bg-priority-high text-white text-[10px]">
+            <Badge className="bg-red-500 text-white text-[10px]">
               {highCount} alta
             </Badge>
           </div>

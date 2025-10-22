@@ -205,12 +205,10 @@ export default {
         },
         "ecommerce-pulse": {
           "0%, 100%": {
-            boxShadow: "0 0 0 0 hsl(var(--type-ecommerce) / 0.1), 0 0 8px 0 hsl(var(--type-ecommerce) / 0.08)",
-            borderColor: "hsl(var(--type-ecommerce) / 0.3)",
+            borderColor: "hsl(var(--type-ecommerce) / 0.4)",
           },
           "50%": {
-            boxShadow: "0 0 8px 2px hsl(var(--type-ecommerce) / 0.2), 0 0 15px 2px hsl(var(--type-ecommerce) / 0.15)",
-            borderColor: "hsl(var(--type-ecommerce) / 0.5)",
+            borderColor: "hsl(var(--type-ecommerce) / 0.7)",
           },
         },
       },
