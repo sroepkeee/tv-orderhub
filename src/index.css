@@ -123,6 +123,32 @@ All colors MUST be HSL.
     --type-ecommerce: 200 80% 50%;
     --type-ecommerce-bg: 200 80% 96%;
 
+    /* Kanban Phase Colors - Vibrant */
+    --phase-almox-ssm: 217 90% 60%;
+    --phase-almox-ssm-bg: 217 95% 92%;
+    --phase-order-gen: 239 85% 65%;
+    --phase-order-gen-bg: 239 90% 93%;
+    --phase-almox-general: 258 85% 65%;
+    --phase-almox-general-bg: 258 90% 93%;
+    --phase-production: 280 75% 60%;
+    --phase-production-bg: 280 85% 92%;
+    --phase-balance: 300 80% 65%;
+    --phase-balance-bg: 300 90% 93%;
+    --phase-laboratory: 330 85% 65%;
+    --phase-laboratory-bg: 330 90% 93%;
+    --phase-packaging: 25 95% 60%;
+    --phase-packaging-bg: 25 100% 92%;
+    --phase-freight: 40 95% 55%;
+    --phase-freight-bg: 40 100% 92%;
+    --phase-invoicing: 160 75% 45%;
+    --phase-invoicing-bg: 160 85% 92%;
+    --phase-logistics: 190 85% 50%;
+    --phase-logistics-bg: 190 95% 92%;
+    --phase-transit: 200 90% 55%;
+    --phase-transit-bg: 200 95% 92%;
+    --phase-completion: 142 75% 45%;
+    --phase-completion-bg: 142 85% 92%;
+
     /* Dashboard specific */
     --dashboard-header: 220 25% 25%;
     --dashboard-nav: 220 20% 30%;
@@ -260,6 +286,32 @@ All colors MUST be HSL.
     --type-materials-bg: 160 40% 12%;
     --type-ecommerce: 200 80% 65%;
     --type-ecommerce-bg: 200 70% 12%;
+
+    /* Kanban Phase Colors - Dark Mode Vibrant */
+    --phase-almox-ssm: 217 90% 75%;
+    --phase-almox-ssm-bg: 217 60% 15%;
+    --phase-order-gen: 239 85% 75%;
+    --phase-order-gen-bg: 239 60% 15%;
+    --phase-almox-general: 258 85% 75%;
+    --phase-almox-general-bg: 258 60% 15%;
+    --phase-production: 280 75% 70%;
+    --phase-production-bg: 280 60% 15%;
+    --phase-balance: 300 80% 75%;
+    --phase-balance-bg: 300 60% 15%;
+    --phase-laboratory: 330 85% 75%;
+    --phase-laboratory-bg: 330 60% 15%;
+    --phase-packaging: 25 95% 70%;
+    --phase-packaging-bg: 25 70% 15%;
+    --phase-freight: 40 95% 65%;
+    --phase-freight-bg: 40 70% 15%;
+    --phase-invoicing: 160 75% 60%;
+    --phase-invoicing-bg: 160 60% 15%;
+    --phase-logistics: 190 85% 60%;
+    --phase-logistics-bg: 190 60% 15%;
+    --phase-transit: 200 90% 65%;
+    --phase-transit-bg: 200 60% 15%;
+    --phase-completion: 142 75% 60%;
+    --phase-completion-bg: 142 60% 15%;
 
     /* Dashboard specific - Dark Mode */
     --dashboard-header: 220 10% 92%;
