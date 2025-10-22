@@ -43,9 +43,7 @@ export const KanbanColumn = ({
           </Badge>
         </div>
         {highCount > 0 && <div className="flex gap-2 mt-1.5">
-            <Badge className="bg-priority-high text-white text-[10px] rounded-sm">
-              {highCount} alta
-            </Badge>
+            
           </div>}
       </div>
 
