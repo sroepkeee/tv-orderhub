@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -18,6 +18,17 @@ export default function Auth() {
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
   const [department, setDepartment] = useState("");
+
+  // Redirecionar se já estiver autenticado
+  useEffect(() => {
+    const checkAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        navigate("/");
+      }
+    };
+    checkAuth();
+  }, [navigate]);
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -68,14 +79,9 @@ export default function Auth() {
       if (error) throw error;
 
       if (data.user) {
-        // Update profile with department
-        await supabase
-          .from('profiles')
-          .update({ department })
-          .eq('id', data.user.id);
-        
+        // O trigger handle_new_user já cria o perfil com department
         toast.success("Cadastro realizado! Verifique seu e-mail para confirmar.");
-        navigate("/");
+        // Não redirecionar - usuário permanece na página até confirmar email
       }
     } catch (error: any) {
       toast.error(error.message || "Erro ao criar conta");
