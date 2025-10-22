@@ -4,7 +4,7 @@ import { Progress } from "@/components/ui/progress";
 import { Order } from "./Dashboard";
 import { ActionButtons } from "./ActionButtons";
 import { PhaseButtons } from "./PhaseButtons";
-import { ViewControls, SortOption, GroupOption, PhaseFilter, ViewMode } from "./ViewControls";
+import { ViewControls, SortOption, GroupOption, PhaseFilter, ViewMode, StatusFilter } from "./ViewControls";
 import { KanbanView } from "./KanbanView";
 import { ClipboardList, PackageCheck, Microscope, Boxes, Truck, CheckCircle2 } from "lucide-react";
 
@@ -30,6 +30,7 @@ export const PriorityView = ({
   const [sortBy, setSortBy] = React.useState<SortOption>("priority");
   const [groupBy, setGroupBy] = React.useState<GroupOption>("priority");
   const [phaseFilter, setPhaseFilter] = React.useState<PhaseFilter>("all");
+  const [statusFilter, setStatusFilter] = React.useState<StatusFilter>("all");
   const [viewMode, setViewMode] = React.useState<ViewMode>(() => {
     const saved = localStorage.getItem("viewMode");
     return (saved as ViewMode) || "kanban";
@@ -70,10 +71,72 @@ export const PriorityView = ({
     return phaseMap[status] || "other";
   };
 
+  // Filter by status first
+  const statusFilteredOrders = React.useMemo(() => {
+    if (statusFilter === "all") return orders;
+    
+    const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    
+    switch (statusFilter) {
+      case "high_priority":
+        return orders.filter(o => o.priority === "high");
+      case "medium_priority":
+        return orders.filter(o => o.priority === "medium");
+      case "low_priority":
+        return orders.filter(o => o.priority === "low");
+      case "critical_deadline":
+        return orders.filter(o => {
+          if (!o.deliveryDeadline || ["delivered", "completed", "cancelled"].includes(o.status)) return false;
+          const deadline = new Date(o.deliveryDeadline);
+          const daysUntil = Math.ceil((deadline.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+          return daysUntil <= 3 && daysUntil >= 0;
+        });
+      case "new_today":
+        return orders.filter(o => {
+          if (!o.createdDate) return false;
+          const created = new Date(o.createdDate);
+          return created >= todayStart;
+        });
+      case "on_hold":
+        return orders.filter(o => 
+          ["on_hold", "awaiting_material", "awaiting_approval"].includes(o.status)
+        );
+      case "delayed":
+        return orders.filter(o => ["delayed", "on_hold"].includes(o.status));
+      case "preparation":
+        return orders.filter(o => 
+          ["pending", "in_review", "approved", "materials_ordered"].includes(o.status)
+        );
+      case "production":
+        return orders.filter(o => 
+          ["in_production", "awaiting_material", "production_completed"].includes(o.status)
+        );
+      case "packaging":
+        return orders.filter(o => 
+          ["in_quality_check", "in_packaging", "ready_for_shipping"].includes(o.status)
+        );
+      case "invoicing":
+        return orders.filter(o => 
+          ["awaiting_invoice", "invoice_requested", "invoice_issued", "invoice_sent"].includes(o.status)
+        );
+      case "shipping":
+        return orders.filter(o => 
+          ["released_for_shipping", "in_expedition", "in_transit", "awaiting_pickup", "collected"].includes(o.status)
+        );
+      case "completed":
+        return orders.filter(o => ["delivered", "completed"].includes(o.status));
+      case "ecommerce":
+        return orders.filter(o => o.type === 'ecommerce');
+      default:
+        return orders;
+    }
+  }, [orders, statusFilter]);
+
   // Filter by phase
   const phaseFilteredOrders = phaseFilter === "all" 
-    ? orders 
-    : orders.filter(order => getPhaseFromStatus(order.status) === phaseFilter);
+    ? statusFilteredOrders 
+    : statusFilteredOrders.filter(order => getPhaseFromStatus(order.status) === phaseFilter);
 
   // Sort orders
   const sortedOrders = [...phaseFilteredOrders].sort((a, b) => {
@@ -366,11 +429,13 @@ export const PriorityView = ({
         sortBy={sortBy}
         groupBy={groupBy}
         phaseFilter={phaseFilter}
+        statusFilter={statusFilter}
         viewMode={viewMode}
         orders={sortedOrders}
         onSortChange={setSortBy}
         onGroupChange={setGroupBy}
         onPhaseFilterChange={setPhaseFilter}
+        onStatusFilterChange={setStatusFilter}
         onViewModeChange={handleViewModeChange}
       />
       

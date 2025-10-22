@@ -22,6 +22,7 @@ export type GroupOption = "priority" | "phase" | "type" | "category" | "none";
 export type PhaseFilter = "all" | "preparation" | "production" | "packaging" | "logistics" | "completion";
 export type ViewMode = "list" | "kanban";
 export type CategoryFilter = "all" | "reposicao" | "vendas" | "operacoes_especiais";
+export type StatusFilter = "all" | "high_priority" | "medium_priority" | "low_priority" | "critical_deadline" | "new_today" | "on_hold" | "delayed" | "preparation" | "production" | "packaging" | "invoicing" | "shipping" | "completed" | "ecommerce";
 
 interface ViewControlsProps {
   sortBy: SortOption;
@@ -29,12 +30,14 @@ interface ViewControlsProps {
   phaseFilter: PhaseFilter;
   viewMode: ViewMode;
   categoryFilter?: CategoryFilter;
+  statusFilter?: StatusFilter;
   orders?: Order[];
   onSortChange: (sort: SortOption) => void;
   onGroupChange: (group: GroupOption) => void;
   onPhaseFilterChange: (phase: PhaseFilter) => void;
   onViewModeChange: (mode: ViewMode) => void;
   onCategoryFilterChange?: (category: CategoryFilter) => void;
+  onStatusFilterChange?: (status: StatusFilter) => void;
 }
 
 export const ViewControls = ({
@@ -43,12 +46,14 @@ export const ViewControls = ({
   phaseFilter,
   viewMode,
   categoryFilter = "all",
+  statusFilter = "all",
   orders = [],
   onSortChange,
   onGroupChange,
   onPhaseFilterChange,
   onViewModeChange,
   onCategoryFilterChange,
+  onStatusFilterChange,
 }: ViewControlsProps) => {
   const sortOptions = [
     { value: "priority" as SortOption, label: "Prioridade" },
@@ -140,7 +145,14 @@ export const ViewControls = ({
         {/* Status Cards - Linha 1: Métricas Gerais */}
         {orders.length > 0 && (
           <>
-            <div className="flex items-center gap-1 mr-2 px-2 py-0.5 bg-muted/50 rounded-md border">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => onStatusFilterChange?.(statusFilter === "all" ? "all" : "all")}
+              className={`flex items-center gap-1 mr-2 px-2 py-0.5 h-auto rounded-md border transition-all hover:shadow-md ${
+                statusFilter === "all" ? "bg-primary/10 border-primary" : "bg-muted/50"
+              }`}
+            >
               <div className="flex items-center gap-1 text-xs">
                 <span className="text-muted-foreground font-medium">Total:</span>
                 <span className="font-bold text-foreground">{statusCounts.total}</span>
@@ -201,39 +213,81 @@ export const ViewControls = ({
                   </div>
                 </>
               )}
-            </div>
+            </Button>
 
             {/* Status Cards - Linha 2: Fases do Processo */}
-            <div className="flex items-center gap-1 mr-2 px-2 py-0.5 bg-muted/50 rounded-md border">
-              <div className="flex items-center gap-1 text-xs">
-                <span className="text-muted-foreground font-medium">Preparação:</span>
-                <span className="font-bold text-primary">{statusCounts.preparation}</span>
-              </div>
-              <div className="h-3 w-px bg-border mx-1" />
-              <div className="flex items-center gap-1 text-xs">
-                <span className="text-muted-foreground font-medium">Produção:</span>
-                <span className="font-bold text-primary">{statusCounts.production}</span>
-              </div>
-              <div className="h-3 w-px bg-border mx-1" />
-              <div className="flex items-center gap-1 text-xs">
-                <span className="text-muted-foreground font-medium">Embalagem:</span>
-                <span className="font-bold text-primary">{statusCounts.packaging}</span>
-              </div>
-              <div className="h-3 w-px bg-border mx-1" />
-              <div className="flex items-center gap-1 text-xs">
-                <span className="text-muted-foreground font-medium">Faturamento:</span>
-                <span className="font-bold text-primary">{statusCounts.invoicing}</span>
-              </div>
-              <div className="h-3 w-px bg-border mx-1" />
-              <div className="flex items-center gap-1 text-xs">
-                <span className="text-muted-foreground font-medium">Expedição:</span>
-                <span className="font-bold text-primary">{statusCounts.shipping}</span>
-              </div>
-              <div className="h-3 w-px bg-border mx-1" />
-              <div className="flex items-center gap-1 text-xs">
-                <span className="text-muted-foreground font-medium">✓ Concluídos:</span>
-                <span className="font-bold text-[hsl(var(--progress-good))]">{statusCounts.completed}</span>
-              </div>
+            <div className="flex items-center gap-1 mr-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => onStatusFilterChange?.(statusFilter === "preparation" ? "all" : "preparation")}
+                className={`flex items-center gap-1 px-2 py-0.5 h-auto rounded-md border transition-all hover:shadow-md ${
+                  statusFilter === "preparation" ? "bg-primary/10 border-primary" : "bg-muted/50"
+                }`}
+              >
+                <span className="text-xs text-muted-foreground font-medium">Preparação:</span>
+                <span className="text-xs font-bold text-primary">{statusCounts.preparation}</span>
+              </Button>
+              
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => onStatusFilterChange?.(statusFilter === "production" ? "all" : "production")}
+                className={`flex items-center gap-1 px-2 py-0.5 h-auto rounded-md border transition-all hover:shadow-md ${
+                  statusFilter === "production" ? "bg-primary/10 border-primary" : "bg-muted/50"
+                }`}
+              >
+                <span className="text-xs text-muted-foreground font-medium">Produção:</span>
+                <span className="text-xs font-bold text-primary">{statusCounts.production}</span>
+              </Button>
+              
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => onStatusFilterChange?.(statusFilter === "packaging" ? "all" : "packaging")}
+                className={`flex items-center gap-1 px-2 py-0.5 h-auto rounded-md border transition-all hover:shadow-md ${
+                  statusFilter === "packaging" ? "bg-primary/10 border-primary" : "bg-muted/50"
+                }`}
+              >
+                <span className="text-xs text-muted-foreground font-medium">Embalagem:</span>
+                <span className="text-xs font-bold text-primary">{statusCounts.packaging}</span>
+              </Button>
+              
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => onStatusFilterChange?.(statusFilter === "invoicing" ? "all" : "invoicing")}
+                className={`flex items-center gap-1 px-2 py-0.5 h-auto rounded-md border transition-all hover:shadow-md ${
+                  statusFilter === "invoicing" ? "bg-primary/10 border-primary" : "bg-muted/50"
+                }`}
+              >
+                <span className="text-xs text-muted-foreground font-medium">Faturamento:</span>
+                <span className="text-xs font-bold text-primary">{statusCounts.invoicing}</span>
+              </Button>
+              
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => onStatusFilterChange?.(statusFilter === "shipping" ? "all" : "shipping")}
+                className={`flex items-center gap-1 px-2 py-0.5 h-auto rounded-md border transition-all hover:shadow-md ${
+                  statusFilter === "shipping" ? "bg-primary/10 border-primary" : "bg-muted/50"
+                }`}
+              >
+                <span className="text-xs text-muted-foreground font-medium">Expedição:</span>
+                <span className="text-xs font-bold text-primary">{statusCounts.shipping}</span>
+              </Button>
+              
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => onStatusFilterChange?.(statusFilter === "completed" ? "all" : "completed")}
+                className={`flex items-center gap-1 px-2 py-0.5 h-auto rounded-md border transition-all hover:shadow-md ${
+                  statusFilter === "completed" ? "bg-primary/10 border-primary" : "bg-muted/50"
+                }`}
+              >
+                <span className="text-xs text-muted-foreground font-medium">✓ Concluídos:</span>
+                <span className="text-xs font-bold text-[hsl(var(--progress-good))]">{statusCounts.completed}</span>
+              </Button>
             </div>
 
             {/* E-commerce Insights Card */}
@@ -261,7 +315,16 @@ export const ViewControls = ({
               if (ecomTotal === 0) return null;
 
               return (
-                <div className="flex items-center gap-1 mr-2 px-2 py-0.5 bg-blue-50/50 dark:bg-blue-950/20 rounded-md border border-blue-200 dark:border-blue-800">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => onStatusFilterChange?.(statusFilter === "ecommerce" ? "all" : "ecommerce")}
+                  className={`flex items-center gap-1 mr-2 px-2 py-0.5 h-auto rounded-md border transition-all hover:shadow-md ${
+                    statusFilter === "ecommerce" 
+                      ? "bg-blue-100 dark:bg-blue-900/40 border-blue-400 dark:border-blue-600" 
+                      : "bg-blue-50/50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800"
+                  }`}
+                >
                   <div className="flex items-center gap-1 text-xs">
                     <span className="text-blue-700 dark:text-blue-300 font-medium">🛒 E-commerce:</span>
                     <span className="font-bold text-blue-900 dark:text-blue-100">{ecomTotal}</span>
@@ -298,7 +361,7 @@ export const ViewControls = ({
                     <span className="text-blue-700 dark:text-blue-300 font-medium">✓ Taxa:</span>
                     <span className="font-bold text-green-600 dark:text-green-400">{ecomCompletionRate}%</span>
                   </div>
-                </div>
+                </Button>
               );
             })()}
           </>
