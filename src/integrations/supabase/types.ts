@@ -83,6 +83,84 @@ export type Database = {
           },
         ]
       }
+      lab_item_work: {
+        Row: {
+          assigned_to: string | null
+          completed_at: string | null
+          created_at: string | null
+          firmware_notes: string | null
+          firmware_updated: boolean | null
+          firmware_version: string | null
+          general_notes: string | null
+          id: string
+          image_installed: boolean | null
+          image_notes: string | null
+          image_version: string | null
+          order_id: string
+          order_item_id: string
+          repair_parts: Json | null
+          started_at: string | null
+          tests_performed: Json | null
+          updated_at: string | null
+          work_status: string
+        }
+        Insert: {
+          assigned_to?: string | null
+          completed_at?: string | null
+          created_at?: string | null
+          firmware_notes?: string | null
+          firmware_updated?: boolean | null
+          firmware_version?: string | null
+          general_notes?: string | null
+          id?: string
+          image_installed?: boolean | null
+          image_notes?: string | null
+          image_version?: string | null
+          order_id: string
+          order_item_id: string
+          repair_parts?: Json | null
+          started_at?: string | null
+          tests_performed?: Json | null
+          updated_at?: string | null
+          work_status?: string
+        }
+        Update: {
+          assigned_to?: string | null
+          completed_at?: string | null
+          created_at?: string | null
+          firmware_notes?: string | null
+          firmware_updated?: boolean | null
+          firmware_version?: string | null
+          general_notes?: string | null
+          id?: string
+          image_installed?: boolean | null
+          image_notes?: string | null
+          image_version?: string | null
+          order_id?: string
+          order_item_id?: string
+          repair_parts?: Json | null
+          started_at?: string | null
+          tests_performed?: Json | null
+          updated_at?: string | null
+          work_status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lab_item_work_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lab_item_work_order_item_id_fkey"
+            columns: ["order_item_id"]
+            isOneToOne: true
+            referencedRelation: "order_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       order_attachments: {
         Row: {
           file_name: string
@@ -775,10 +853,7 @@ export type Database = {
         Args: { business_days: number; start_date: string }
         Returns: string
       }
-      user_can_modify_order: {
-        Args: { order_uuid: string }
-        Returns: boolean
-      }
+      user_can_modify_order: { Args: { order_uuid: string }; Returns: boolean }
     }
     Enums: {
       app_role:

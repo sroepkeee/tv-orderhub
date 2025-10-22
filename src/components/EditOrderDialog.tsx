@@ -27,6 +27,7 @@ import { OrderTypeSelector } from "@/components/OrderTypeSelector";
 import { cleanItemDescription } from "@/lib/utils";
 import { OrderMetricsTab } from "./metrics/OrderMetricsTab";
 import { EnhancedOrderTimeline } from "./EnhancedOrderTimeline";
+import { LabWorkView } from "./LabWorkView";
 
 interface HistoryEvent {
   id: string;
@@ -1643,7 +1644,7 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
               <BarChart3 className="h-3.5 w-3.5" />
               Indicadores
             </TabsTrigger>
-            <TabsTrigger value="lab" className="flex items-center gap-1.5 data-[state=active]:bg-purple-500 data-[state=active]:text-white text-xs" disabled={!(order as any)?.lab_ticket_id}>
+            <TabsTrigger value="lab" className="flex items-center gap-1.5 data-[state=active]:bg-purple-500 data-[state=active]:text-white text-xs">
               <FileText className="h-3.5 w-3.5" />
               Laboratório
             </TabsTrigger>
@@ -2298,172 +2299,14 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
           </TabsContent>
 
           <TabsContent value="lab" className="mt-4">
-            <ScrollArea className="h-[calc(95vh-200px)] pr-4">
-              {!(order as any)?.lab_ticket_id ? (
-                <Card className="p-8 text-center">
-                  <FileText className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-                  <p className="text-muted-foreground">
-                    Este pedido ainda não foi enviado ao laboratório
-                  </p>
-                </Card>
-              ) : (
-                <div className="space-y-6">
-                  {/* Requisitos de Configuração */}
-                  {((order as any).requires_firmware || (order as any).requires_image) && (
-                    <Card className="p-6 border-2 border-amber-400 bg-amber-50 dark:bg-amber-950">
-                      <div className="flex items-start gap-3">
-                        <AlertCircle className="h-6 w-6 text-amber-600 mt-1 flex-shrink-0" />
-                        <div className="flex-1 space-y-3">
-                          <h3 className="font-bold text-lg text-amber-900 dark:text-amber-100">
-                            ⚠️ Atenção: Configurações Especiais Requeridas
-                          </h3>
-                          
-                          {(order as any).requires_firmware && (
-                            <div className="bg-white dark:bg-gray-900 p-4 rounded-lg border border-blue-300">
-                              <div className="flex items-center gap-2 mb-2">
-                                <Badge className="bg-blue-600">FIRMWARE</Badge>
-                                <span className="font-semibold">Firmware Específico Requerido</span>
-                              </div>
-                              <p className="text-sm text-muted-foreground">Projeto/Versão:</p>
-                              <p className="font-mono font-bold text-lg text-blue-700 dark:text-blue-400">
-                                {(order as any).firmware_project_name || "Não especificado"}
-                              </p>
-                            </div>
-                          )}
-                          
-                          {(order as any).requires_image && (
-                            <div className="bg-white dark:bg-gray-900 p-4 rounded-lg border border-purple-300">
-                              <div className="flex items-center gap-2 mb-2">
-                                <Badge className="bg-purple-600">IMAGEM</Badge>
-                                <span className="font-semibold">Imagem Específica Requerida</span>
-                              </div>
-                              <p className="text-sm text-muted-foreground">Nome da Imagem:</p>
-                              <p className="font-mono font-bold text-lg text-purple-700 dark:text-purple-400">
-                                {(order as any).image_project_name || "Não especificado"}
-                              </p>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </Card>
-                  )}
-
-                  {/* Lab Information Card */}
-                  <Card className="p-6 space-y-4">
-                    <h3 className="text-lg font-semibold flex items-center gap-2">
-                      <FileText className="h-5 w-5 text-blue-600" />
-                      Informações do Laboratório
-                    </h3>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <p className="text-sm font-medium text-muted-foreground">Ticket ID</p>
-                        <p className="text-base font-mono">#{(order as any).lab_ticket_id}</p>
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-muted-foreground">Status Atual</p>
-                        <Badge className={(order as any).lab_status === "in_production" ? "bg-yellow-100 text-yellow-700" :
-                                        (order as any).lab_status === "quality_check" ? "bg-blue-100 text-blue-700" :
-                                        (order as any).lab_status === "ready" ? "bg-green-100 text-green-700" :
-                                        (order as any).lab_status === "error" ? "bg-red-100 text-red-700" :
-                                        "bg-gray-100 text-gray-700"}>
-                          {(order as any).lab_status === "in_production" ? "Em Produção" :
-                           (order as any).lab_status === "quality_check" ? "Controle de Qualidade" :
-                           (order as any).lab_status === "ready" ? "Pronto" :
-                           (order as any).lab_status === "error" ? "Erro de Produção" :
-                           "Desconhecido"}
-                        </Badge>
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-muted-foreground">Data de Envio</p>
-                        <p className="text-base flex items-center gap-1">
-                          <Clock className="h-4 w-4 text-muted-foreground" />
-                          {(order as any).lab_requested_at 
-                            ? format(new Date((order as any).lab_requested_at), "dd/MM/yyyy HH:mm")
-                            : "-"}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-muted-foreground">Data de Conclusão</p>
-                        <p className="text-base flex items-center gap-1">
-                          {(order as any).lab_completed_at ? (
-                            <>
-                              <CheckCircle className="h-4 w-4 text-green-600" />
-                              {format(new Date((order as any).lab_completed_at), "dd/MM/yyyy HH:mm")}
-                            </>
-                          ) : (
-                            <span className="text-muted-foreground">Em andamento...</span>
-                          )}
-                        </p>
-                      </div>
-                    </div>
-                  </Card>
-
-                  {/* Lab Notes */}
-                  {(order as any).lab_notes && (
-                    <Card className="p-6 space-y-3">
-                      <h3 className="text-lg font-semibold flex items-center gap-2">
-                        <MessageSquare className="h-5 w-5 text-blue-600" />
-                        Notas do Laboratório
-                      </h3>
-                      <div className="p-4 bg-muted rounded-lg">
-                        <p className="text-sm whitespace-pre-wrap">{(order as any).lab_notes}</p>
-                      </div>
-                    </Card>
-                  )}
-
-                  {/* Status Timeline */}
-                  <Card className="p-6 space-y-4">
-                    <h3 className="text-lg font-semibold flex items-center gap-2">
-                      <History className="h-5 w-5 text-blue-600" />
-                      Linha do Tempo
-                    </h3>
-                    <div className="space-y-3 pl-4 border-l-2 border-muted">
-                      <div className="relative pl-6">
-                        <div className="absolute -left-[9px] top-1 w-4 h-4 rounded-full bg-blue-600"></div>
-                        <p className="text-sm font-medium">Pedido enviado ao laboratório</p>
-                        <p className="text-xs text-muted-foreground">
-                          {(order as any).lab_requested_at 
-                            ? format(new Date((order as any).lab_requested_at), "dd/MM/yyyy HH:mm")
-                            : "-"}
-                        </p>
-                      </div>
-                      {(order as any).lab_status === "in_production" && (
-                        <div className="relative pl-6">
-                          <div className="absolute -left-[9px] top-1 w-4 h-4 rounded-full bg-yellow-600"></div>
-                          <p className="text-sm font-medium">Em produção</p>
-                          <p className="text-xs text-muted-foreground">Processando...</p>
-                        </div>
-                      )}
-                      {(order as any).lab_status === "quality_check" && (
-                        <div className="relative pl-6">
-                          <div className="absolute -left-[9px] top-1 w-4 h-4 rounded-full bg-blue-600"></div>
-                          <p className="text-sm font-medium">Controle de qualidade</p>
-                          <p className="text-xs text-muted-foreground">Em verificação...</p>
-                        </div>
-                      )}
-                      {(order as any).lab_status === "ready" && (
-                        <div className="relative pl-6">
-                          <div className="absolute -left-[9px] top-1 w-4 h-4 rounded-full bg-green-600"></div>
-                          <p className="text-sm font-medium">Concluído</p>
-                          <p className="text-xs text-muted-foreground">
-                            {(order as any).lab_completed_at 
-                              ? format(new Date((order as any).lab_completed_at), "dd/MM/yyyy HH:mm")
-                              : "-"}
-                          </p>
-                        </div>
-                      )}
-                      {(order as any).lab_status === "error" && (
-                        <div className="relative pl-6">
-                          <div className="absolute -left-[9px] top-1 w-4 h-4 rounded-full bg-red-600"></div>
-                          <p className="text-sm font-medium">Erro de produção</p>
-                          <p className="text-xs text-muted-foreground">Verifique as notas do laboratório</p>
-                        </div>
-                      )}
-                    </div>
-                  </Card>
-                </div>
-              )}
-            </ScrollArea>
+            <LabWorkView
+              orderId={order.id}
+              items={items}
+              requiresFirmware={order.requires_firmware}
+              firmwareProjectName={order.firmware_project_name}
+              requiresImage={order.requires_image}
+              imageProjectName={order.image_project_name}
+            />
           </TabsContent>
 
           <TabsContent value="history" className="mt-4">
