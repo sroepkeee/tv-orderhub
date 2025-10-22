@@ -125,16 +125,16 @@ export const KanbanView = ({ orders, onEdit, onStatusChange }: KanbanViewProps) 
       colorClass: "bg-phase-almox-ssm-bg text-phase-almox-ssm border-b-4 border-phase-almox-ssm",
     },
     {
-      id: "order_generation" as Phase,
-      title: "Gerar Ordem",
-      icon: FileEdit,
-      colorClass: "bg-phase-order-gen-bg text-phase-order-gen border-b-4 border-phase-order-gen",
-    },
-    {
       id: "almox_general" as Phase,
       title: "Almox Geral",
       icon: Warehouse,
       colorClass: "bg-phase-almox-general-bg text-phase-almox-general border-b-4 border-phase-almox-general",
+    },
+    {
+      id: "order_generation" as Phase,
+      title: "Gerar Ordem",
+      icon: FileEdit,
+      colorClass: "bg-phase-order-gen-bg text-phase-order-gen border-b-4 border-phase-order-gen",
     },
     {
       id: "production" as Phase,
