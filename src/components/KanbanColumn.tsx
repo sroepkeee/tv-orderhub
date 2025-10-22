@@ -32,19 +32,16 @@ export const KanbanColumn = ({
   });
   return <div ref={setNodeRef} className={`kanban-column transition-all duration-300 flex flex-col ${isOver ? "drop-target" : ""}`}>
       {/* Column Header */}
-      <div className={`${colorClass} rounded-t-lg p-2 lg:p-3 sticky top-0 z-10 shadow-sm`}>
-        <div className="flex items-center justify-between">
+      <div className={`${colorClass} rounded-t-lg p-2 sticky top-0 z-10 shadow-sm h-12 flex items-center`}>
+        <div className="flex items-center justify-between w-full">
           <div className="flex items-center gap-1.5">
             <Icon className="h-4 w-4" />
-            <h3 className="font-semibold text-xs lg:text-sm">{title}</h3>
+            <h3 className="font-semibold text-sm">{title}</h3>
           </div>
-          <Badge variant="secondary" className="bg-background text-foreground border border-border text-xs">
+          <Badge variant="secondary" className="bg-card/80 text-card-foreground border-border/50 text-xs h-5 px-2">
             {orders.length}
           </Badge>
         </div>
-        {highCount > 0 && <div className="flex gap-2 mt-1.5">
-            
-          </div>}
       </div>
 
       {/* Cards Container */}
