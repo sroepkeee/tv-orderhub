@@ -11,6 +11,7 @@ import { Calendar, TrendingUp, Package, AlertCircle, ArrowUpDown, ArrowUp, Arrow
 import { cn, cleanItemDescription } from "@/lib/utils";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { getStatusLabel, getStatusColor } from "@/lib/statusLabels";
+import { format } from "date-fns";
 interface OrdersTrackingTableProps {
   orders: Order[];
   onOrderClick: (order: Order) => void;
@@ -441,13 +442,13 @@ export function OrdersTrackingTable({
                     <TableCell className="text-sm">
                       <div className="flex items-center gap-1">
                         <Calendar className="h-3 w-3 text-muted-foreground" />
-                        {order.issueDate || '-'}
+                        {order.issueDate ? format(new Date(order.issueDate), 'dd-MM-yyyy') : '-'}
                       </div>
                     </TableCell>
                     <TableCell className="text-sm">
                       <div className="flex items-center gap-1">
                         <Calendar className="h-3 w-3 text-muted-foreground" />
-                        {order.deliveryDeadline}
+                        {format(new Date(order.deliveryDeadline), 'dd-MM-yyyy')}
                       </div>
                     </TableCell>
                     <TableCell className="text-center">
