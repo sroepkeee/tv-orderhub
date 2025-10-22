@@ -10,6 +10,7 @@ import { calculateDaysOpen, calculateDaysUntilDeadline, getDeadlineStatus, getPa
 import { Calendar, TrendingUp, Package, AlertCircle, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown } from "lucide-react";
 import { cn, cleanItemDescription } from "@/lib/utils";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { getStatusLabel, getStatusColor } from "@/lib/statusLabels";
 interface OrdersTrackingTableProps {
   orders: Order[];
   onOrderClick: (order: Order) => void;
@@ -217,36 +218,60 @@ export function OrdersTrackingTable({
   };
 
   const getStatusBadge = (status: string) => {
-    const statusMap: Record<string, {
-      label: string;
-      variant: 'default' | 'secondary' | 'destructive' | 'outline';
-    }> = {
-      pending: {
-        label: 'Pendente',
-        variant: 'outline'
-      },
-      in_analysis: {
-        label: 'Em Análise',
-        variant: 'secondary'
-      },
-      in_production: {
-        label: 'Em Produção',
-        variant: 'default'
-      },
-      completed: {
-        label: 'Concluído',
-        variant: 'default'
-      },
-      delivered: {
-        label: 'Entregue',
-        variant: 'default'
-      }
+    const label = getStatusLabel(status);
+    
+    // Mapeamento de cores por status (baseado no getStatusColor)
+    const statusColors: Record<string, string> = {
+      // Verde - Concluído/Sucesso
+      "completed": "bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20",
+      "delivered": "bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20",
+      "production_completed": "bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20",
+      "separation_completed": "bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20",
+      "invoice_issued": "bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20",
+      "collected": "bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20",
+      // Azul - Em andamento
+      "in_production": "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20",
+      "in_transit": "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20",
+      "in_packaging": "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20",
+      "in_quality_check": "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20",
+      "separation_started": "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20",
+      // Amarelo - Aguardando/Planejado
+      "pending": "bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 border-yellow-500/20",
+      "planned": "bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 border-yellow-500/20",
+      "awaiting_approval": "bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 border-yellow-500/20",
+      "awaiting_material": "bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 border-yellow-500/20",
+      "awaiting_pickup": "bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 border-yellow-500/20",
+      "invoice_requested": "bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 border-yellow-500/20",
+      "awaiting_invoice": "bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 border-yellow-500/20",
+      "freight_quote_requested": "bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 border-yellow-500/20",
+      // Laranja - Atenção
+      "on_hold": "bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/20",
+      "delayed": "bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/20",
+      "freight_quote_received": "bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/20",
+      // Roxo - Aprovado/Especial
+      "freight_approved": "bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20",
+      "ready_for_shipping": "bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20",
+      "released_for_shipping": "bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20",
+      "in_expedition": "bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20",
+      "pickup_scheduled": "bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20",
+      "invoice_sent": "bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20",
+      // Vermelho - Cancelado/Problema
+      "cancelled": "bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20",
+      "returned": "bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20",
+      // Cinza - Outros
+      "in_analysis": "bg-gray-500/10 text-gray-600 dark:text-gray-400 border-gray-500/20"
     };
-    const config = statusMap[status] || {
-      label: status,
-      variant: 'outline' as const
-    };
-    return <Badge variant={config.variant}>{config.label}</Badge>;
+    
+    const colorClass = statusColors[status] || "bg-gray-500/10 text-gray-600 dark:text-gray-400 border-gray-500/20";
+    
+    return (
+      <Badge 
+        variant="outline" 
+        className={cn("text-xs font-medium", colorClass)}
+      >
+        {label}
+      </Badge>
+    );
   };
   const getDeadlineBadge = (daysUntil: number) => {
     const status = getDeadlineStatus(daysUntil);
