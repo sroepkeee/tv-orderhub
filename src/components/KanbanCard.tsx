@@ -32,6 +32,9 @@ export const KanbanCard = ({ order, onEdit, onStatusChange }: KanbanCardProps) =
     }
   };
 
+  // Verifica se é e-commerce (vendas_ecommerce ou reposicao_ecommerce)
+  const isEcommerce = order.type?.toLowerCase().includes('ecommerce');
+
   const getPriorityClass = (priority: Order["priority"]) => {
     switch (priority) {
       case "high":
@@ -134,13 +137,19 @@ export const KanbanCard = ({ order, onEdit, onStatusChange }: KanbanCardProps) =
               ? 'cursor-grabbing opacity-50 scale-105 shadow-2xl' 
               : 'cursor-pointer hover:shadow-lg hover:scale-[1.01]'
           } ${
-            order.type === 'ecommerce' 
-              ? 'animate-ecommerce-pulse border-2' 
+            isEcommerce
+              ? 'animate-ecommerce-pulse border-2 border-orderType-ecommerce' 
               : ''
           }`}
           onClick={handleCardClick}
           onMouseDown={() => setClickStart(Date.now())}
         >
+        {/* Selo E-commerce no canto superior direito */}
+        {isEcommerce && (
+          <div className="absolute -top-2 -right-2 z-10 bg-orderType-ecommerce text-white rounded-full p-1.5 shadow-lg border-2 border-white animate-ecommerce-pulse">
+            <span className="text-sm font-bold">🛒</span>
+          </div>
+        )}
         {/* Drag handle */}
         <div
           className="absolute right-0.5 top-0.5 p-1 rounded hover:bg-primary/10 text-muted-foreground cursor-grab active:cursor-grabbing transition-colors"
@@ -159,8 +168,11 @@ export const KanbanCard = ({ order, onEdit, onStatusChange }: KanbanCardProps) =
       {/* Header */}
       <div className="flex items-start justify-between mb-1 pr-5">
         <div className="flex flex-col gap-0.5">
-          <span className="font-bold text-xs">#{order.orderNumber}</span>
-          <Badge className={`${getTypeColor(order.type)} text-[10px] px-1.5 py-0`}>
+          <span className="font-bold text-xs flex items-center gap-1">
+            {isEcommerce && <span className="text-base">🛒</span>}
+            #{order.orderNumber}
+          </span>
+          <Badge className={`${getTypeColor(order.type)} text-[10px] px-1.5 py-0 ${isEcommerce ? 'font-bold ring-2 ring-orderType-ecommerce' : ''}`}>
             {getTypeLabel(order.type)}
           </Badge>
         </div>
