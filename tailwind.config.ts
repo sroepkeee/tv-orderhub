@@ -205,12 +205,12 @@ export default {
         },
         "ecommerce-pulse": {
           "0%, 100%": {
-            borderColor: "hsl(200 80% 65% / 0.3)",
-            boxShadow: "0 0 0 0 hsl(200 80% 65% / 0)"
+            borderColor: "hsl(220 70% 55% / 0.12)",
+            boxShadow: "0 0 0 0 hsl(220 70% 55% / 0)"
           },
           "50%": {
-            borderColor: "hsl(220 70% 50% / 0.6)",
-            boxShadow: "0 0 6px 1px hsl(220 70% 50% / 0.2)"
+            borderColor: "hsl(220 70% 55% / 0.26)",
+            boxShadow: "0 0 4px 1px hsl(220 70% 55% / 0.12)"
           },
         },
       },
@@ -218,7 +218,7 @@ export default {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
         "pulse-critical": "pulse-critical 3s ease-in-out infinite",
-        "ecommerce-pulse": "ecommerce-pulse 8s cubic-bezier(0.4, 0, 0.2, 1) infinite",
+        "ecommerce-pulse": "ecommerce-pulse 12s cubic-bezier(0.4, 0, 0.2, 1) infinite",
       },
     },
   },
