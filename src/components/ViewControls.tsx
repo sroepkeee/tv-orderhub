@@ -83,6 +83,9 @@ export const ViewControls = ({
 
   // Calcular contagens por status e métricas
   const statusCounts = React.useMemo(() => {
+    const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    
     const counts = {
       total: orders.length,
       preparation: orders.filter(o => 
@@ -108,9 +111,25 @@ export const ViewControls = ({
       ).length,
       highPriority: orders.filter(o => o.priority === "high").length,
       mediumPriority: orders.filter(o => o.priority === "medium").length,
+      lowPriority: orders.filter(o => o.priority === "low").length,
       completionRate: orders.length > 0 
         ? Math.round((orders.filter(o => ["delivered", "completed"].includes(o.status)).length / orders.length) * 100)
         : 0,
+      // Novos indicadores
+      criticalDeadline: orders.filter(o => {
+        if (!o.deliveryDeadline || ["delivered", "completed", "cancelled"].includes(o.status)) return false;
+        const deadline = new Date(o.deliveryDeadline);
+        const daysUntil = Math.ceil((deadline.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+        return daysUntil <= 3 && daysUntil >= 0;
+      }).length,
+      newToday: orders.filter(o => {
+        if (!o.createdDate) return false;
+        const created = new Date(o.createdDate);
+        return created >= todayStart;
+      }).length,
+      onHold: orders.filter(o => 
+        ["on_hold", "awaiting_material", "awaiting_approval"].includes(o.status)
+      ).length,
     };
     return counts;
   }, [orders]);
@@ -138,9 +157,41 @@ export const ViewControls = ({
               </div>
               <div className="h-3 w-px bg-border mx-1" />
               <div className="flex items-center gap-1 text-xs">
+                <span className="text-muted-foreground font-medium">🟢 Baixa:</span>
+                <span className="font-bold text-[hsl(var(--priority-low))]">{statusCounts.lowPriority}</span>
+              </div>
+              <div className="h-3 w-px bg-border mx-1" />
+              <div className="flex items-center gap-1 text-xs">
                 <span className="text-muted-foreground font-medium">Taxa Conclusão:</span>
                 <span className="font-bold text-[hsl(var(--progress-good))]">{statusCounts.completionRate}%</span>
               </div>
+              {statusCounts.criticalDeadline > 0 && (
+                <>
+                  <div className="h-3 w-px bg-border mx-1" />
+                  <div className="flex items-center gap-1 text-xs">
+                    <span className="text-muted-foreground font-medium">🔥 Prazo Crítico:</span>
+                    <span className="font-bold text-orange-600 dark:text-orange-400 animate-pulse">{statusCounts.criticalDeadline}</span>
+                  </div>
+                </>
+              )}
+              {statusCounts.newToday > 0 && (
+                <>
+                  <div className="h-3 w-px bg-border mx-1" />
+                  <div className="flex items-center gap-1 text-xs">
+                    <span className="text-muted-foreground font-medium">📅 Novos Hoje:</span>
+                    <span className="font-bold text-blue-600 dark:text-blue-400">{statusCounts.newToday}</span>
+                  </div>
+                </>
+              )}
+              {statusCounts.onHold > 0 && (
+                <>
+                  <div className="h-3 w-px bg-border mx-1" />
+                  <div className="flex items-center gap-1 text-xs">
+                    <span className="text-muted-foreground font-medium">⏱️ Aguardando:</span>
+                    <span className="font-bold text-yellow-600 dark:text-yellow-400">{statusCounts.onHold}</span>
+                  </div>
+                </>
+              )}
               {statusCounts.delayed > 0 && (
                 <>
                   <div className="h-3 w-px bg-border mx-1" />
