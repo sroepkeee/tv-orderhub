@@ -6,26 +6,32 @@ import { Order } from "@/components/Dashboard";
 import { OrderItem } from "@/components/AddOrderDialog";
 import { useDraggable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
-
 interface KanbanCardProps {
   order: Order;
   onEdit: (order: Order) => void;
   onStatusChange: (orderId: string, newStatus: Order["status"]) => void;
 }
-
-export const KanbanCard = ({ order, onEdit, onStatusChange }: KanbanCardProps) => {
+export const KanbanCard = ({
+  order,
+  onEdit,
+  onStatusChange
+}: KanbanCardProps) => {
   const [clickStart, setClickStart] = useState<number>(0);
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
-    id: order.id,
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    isDragging
+  } = useDraggable({
+    id: order.id
   });
-
   const style = {
-    transform: CSS.Translate.toString(transform),
+    transform: CSS.Translate.toString(transform)
   };
-
   const handleCardClick = (e: React.MouseEvent) => {
     const clickDuration = Date.now() - clickStart;
-    
+
     // Se o click durou menos de 200ms, é um click real
     if (clickDuration < 200) {
       onEdit(order);
@@ -34,7 +40,6 @@ export const KanbanCard = ({ order, onEdit, onStatusChange }: KanbanCardProps) =
 
   // Verifica se é e-commerce (vendas_ecommerce ou reposicao_ecommerce)
   const isEcommerce = order.type?.toLowerCase().includes('ecommerce');
-
   const getPriorityClass = (priority: Order["priority"]) => {
     switch (priority) {
       case "high":
@@ -45,7 +50,6 @@ export const KanbanCard = ({ order, onEdit, onStatusChange }: KanbanCardProps) =
         return "border-l-4 border-l-priority-low";
     }
   };
-
   const getPriorityLabel = (priority: Order["priority"]) => {
     switch (priority) {
       case "high":
@@ -56,7 +60,6 @@ export const KanbanCard = ({ order, onEdit, onStatusChange }: KanbanCardProps) =
         return "Baixa";
     }
   };
-
   const getPriorityBadgeClass = (priority: Order["priority"]) => {
     switch (priority) {
       case "high":
@@ -67,7 +70,6 @@ export const KanbanCard = ({ order, onEdit, onStatusChange }: KanbanCardProps) =
         return "bg-priority-low text-white";
     }
   };
-
   const getTypeLabel = (type: Order["type"]) => {
     switch (type) {
       case "production":
@@ -80,7 +82,6 @@ export const KanbanCard = ({ order, onEdit, onStatusChange }: KanbanCardProps) =
         return "E-commerce";
     }
   };
-
   const getTypeColor = (type: Order["type"]) => {
     switch (type) {
       case "production":
@@ -93,17 +94,18 @@ export const KanbanCard = ({ order, onEdit, onStatusChange }: KanbanCardProps) =
         return "bg-orderType-ecommerce-bg text-orderType-ecommerce";
     }
   };
-
   const countItemsBySource = (items?: OrderItem[]) => {
-    if (!items || items.length === 0) return { inStock: 0, production: 0, outOfStock: 0 };
-    
+    if (!items || items.length === 0) return {
+      inStock: 0,
+      production: 0,
+      outOfStock: 0
+    };
     return {
       inStock: items.filter(i => i.item_source_type === 'in_stock' || !i.item_source_type).length,
       production: items.filter(i => i.item_source_type === 'production').length,
       outOfStock: items.filter(i => i.item_source_type === 'out_of_stock').length
     };
   };
-
   const calculateDaysRemaining = (deadline: string) => {
     const today = new Date();
     const deliveryDate = new Date(deadline);
@@ -111,7 +113,6 @@ export const KanbanCard = ({ order, onEdit, onStatusChange }: KanbanCardProps) =
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     return diffDays;
   };
-
   const getProgressBarColor = (daysRemaining: number) => {
     if (daysRemaining < 0) return "bg-progress-overdue";
     if (daysRemaining === 0) return "bg-progress-today";
@@ -119,50 +120,17 @@ export const KanbanCard = ({ order, onEdit, onStatusChange }: KanbanCardProps) =
     if (daysRemaining <= 5) return "bg-progress-warning";
     return "bg-progress-safe";
   };
-
   const daysRemaining = calculateDaysRemaining(order.deliveryDeadline);
   const progressBarColor = getProgressBarColor(daysRemaining);
-
-  return (
-      <div
-        ref={setNodeRef}
-        style={style}
-        className={isDragging ? "dragging" : ""}
-      >
-        <Card
-          className={`relative kanban-card p-2 transition-all duration-200 ${getPriorityClass(
-            order.priority
-          )} ${
-            isDragging 
-              ? 'cursor-grabbing opacity-50 scale-105 shadow-2xl' 
-              : 'cursor-pointer hover:shadow-lg hover:scale-[1.01]'
-          } ${
-            isEcommerce
-              ? 'animate-ecommerce-pulse border-2 border-orderType-ecommerce' 
-              : ''
-          }`}
-          onClick={handleCardClick}
-          onMouseDown={() => setClickStart(Date.now())}
-        >
+  return <div ref={setNodeRef} style={style} className={isDragging ? "dragging" : ""}>
+        <Card className={`relative kanban-card p-2 transition-all duration-200 ${getPriorityClass(order.priority)} ${isDragging ? 'cursor-grabbing opacity-50 scale-105 shadow-2xl' : 'cursor-pointer hover:shadow-lg hover:scale-[1.01]'} ${isEcommerce ? 'animate-ecommerce-pulse border-2 border-orderType-ecommerce' : ''}`} onClick={handleCardClick} onMouseDown={() => setClickStart(Date.now())}>
         {/* Selo E-commerce no canto superior direito */}
-        {isEcommerce && (
-          <div className="absolute -top-2 -right-2 z-10 bg-orderType-ecommerce text-white rounded-full p-1.5 shadow-lg border-2 border-white animate-ecommerce-pulse">
-            <span className="text-sm font-bold">🛒</span>
-          </div>
-        )}
+        {isEcommerce}
         {/* Drag handle */}
-        <div
-          className="absolute right-0.5 top-0.5 p-1 rounded hover:bg-primary/10 text-muted-foreground cursor-grab active:cursor-grabbing transition-colors"
-          {...listeners}
-          {...attributes}
-          onMouseDown={(e) => {
-            e.stopPropagation();
-            setClickStart(Date.now() + 500);
-          }}
-          onClick={(e) => e.stopPropagation()}
-          aria-label="Arrastar pedido"
-          title="Arraste para mover entre fases"
-        >
+        <div className="absolute right-0.5 top-0.5 p-1 rounded hover:bg-primary/10 text-muted-foreground cursor-grab active:cursor-grabbing transition-colors" {...listeners} {...attributes} onMouseDown={e => {
+        e.stopPropagation();
+        setClickStart(Date.now() + 500);
+      }} onClick={e => e.stopPropagation()} aria-label="Arrastar pedido" title="Arraste para mover entre fases">
           <GripVertical className="h-4 w-4" />
         </div>
       {/* Header */}
@@ -184,36 +152,24 @@ export const KanbanCard = ({ order, onEdit, onStatusChange }: KanbanCardProps) =
       {/* Items Summary */}
       <div className="mb-1">
         <p className="text-xs font-medium">
-          {order.items && order.items.length > 0 
-            ? `${order.items.length} item(ns)`
-            : order.item}
+          {order.items && order.items.length > 0 ? `${order.items.length} item(ns)` : order.item}
         </p>
         <p className="text-[10px] text-muted-foreground line-clamp-1">
-          {order.items && order.items.length > 0 
-            ? order.items.map(item => item.itemCode).join(", ")
-            : order.description}
+          {order.items && order.items.length > 0 ? order.items.map(item => item.itemCode).join(", ") : order.description}
         </p>
         
         {/* Item Source Badges */}
-        {order.items && order.items.length > 0 && (
-          <div className="flex gap-1 mt-1 flex-wrap">
-            {countItemsBySource(order.items).inStock > 0 && (
-              <span className="text-[10px] px-1.5 py-0.5 rounded bg-green-100 text-green-700">
+        {order.items && order.items.length > 0 && <div className="flex gap-1 mt-1 flex-wrap">
+            {countItemsBySource(order.items).inStock > 0 && <span className="text-[10px] px-1.5 py-0.5 rounded bg-green-100 text-green-700">
                 ✅ {countItemsBySource(order.items).inStock}
-              </span>
-            )}
-            {countItemsBySource(order.items).production > 0 && (
-              <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-700">
+              </span>}
+            {countItemsBySource(order.items).production > 0 && <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-700">
                 🏭 {countItemsBySource(order.items).production}
-              </span>
-            )}
-            {countItemsBySource(order.items).outOfStock > 0 && (
-              <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-100 text-red-700">
+              </span>}
+            {countItemsBySource(order.items).outOfStock > 0 && <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-100 text-red-700">
                 ⚠️ {countItemsBySource(order.items).outOfStock}
-              </span>
-            )}
-          </div>
-        )}
+              </span>}
+          </div>}
       </div>
 
       {/* Client */}
@@ -236,18 +192,14 @@ export const KanbanCard = ({ order, onEdit, onStatusChange }: KanbanCardProps) =
         </div>
         <div className="flex items-center gap-1.5">
           <div className="flex-1 h-1 bg-secondary rounded-full overflow-hidden">
-            <div className={`h-full ${progressBarColor} transition-all`} style={{ width: "100%" }} />
+            <div className={`h-full ${progressBarColor} transition-all`} style={{
+              width: "100%"
+            }} />
           </div>
-          {daysRemaining < 3 && (
-            <AlertCircle className="h-3 w-3 text-progress-critical" />
-          )}
+          {daysRemaining < 3 && <AlertCircle className="h-3 w-3 text-progress-critical" />}
         </div>
         <p className="text-[10px] text-center font-medium">
-          {daysRemaining < 0
-            ? `${Math.abs(daysRemaining)}d atraso`
-            : daysRemaining === 0
-            ? "Hoje"
-            : `${daysRemaining}d`}
+          {daysRemaining < 0 ? `${Math.abs(daysRemaining)}d atraso` : daysRemaining === 0 ? "Hoje" : `${daysRemaining}d`}
         </p>
       </div>
 
@@ -255,14 +207,11 @@ export const KanbanCard = ({ order, onEdit, onStatusChange }: KanbanCardProps) =
       <div className="mt-1 pt-1 border-t">
         <p className="text-[10px] text-muted-foreground">
           <span className="font-medium">Qtd:</span> {order.quantity}
-          {order.items && order.items.length > 0 && (
-            <span className="ml-1">
+          {order.items && order.items.length > 0 && <span className="ml-1">
               ({order.items.reduce((sum, item) => sum + item.deliveredQuantity, 0)} ent.)
-            </span>
-          )}
+            </span>}
         </p>
       </div>
       </Card>
-    </div>
-  );
+    </div>;
 };
