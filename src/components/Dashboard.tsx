@@ -470,11 +470,11 @@ export const Dashboard = () => {
     } else if (activeTab === "completed") {
       matchesTab = order.status === "delivered" || order.status === "completed";
     } else if (activeTab === "sales") {
+      // Todos os pedidos de vendas e e-commerce devem ser visíveis independente do status
       matchesTab = 
         order.type === "sales" || 
         order.type.includes("ecommerce") || 
-        order.type.includes("vendas") ||
-        (order.type === "ecommerce" && isEcommerceInSalesPhase(order.status));
+        order.type.includes("vendas");
     } else if (activeTab === "materials") {
       matchesTab = order.type === "materials";
     }

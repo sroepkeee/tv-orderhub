@@ -82,6 +82,12 @@ export const KanbanView = ({ orders, onEdit, onStatusChange }: KanbanViewProps) 
       case "freight_quote_received":
       case "freight_approved":
         return "freight_quote";
+      // Status de Faturamento (Invoicing Phase):
+      // - invoice_requested: Solicitação de geração de NF
+      // - awaiting_invoice: Aguardando emissão da NF
+      // - invoice_issued: NF emitida, aguardando envio
+      // - invoice_sent: NF enviada ao cliente
+      case "invoice_requested":
       case "awaiting_invoice":
       case "invoice_issued":
       case "invoice_sent":
@@ -104,6 +110,9 @@ export const KanbanView = ({ orders, onEdit, onStatusChange }: KanbanViewProps) 
       case "awaiting_approval":
       case "planned":
       case "on_hold":
+        return "completion";
+      default:
+        console.warn(`Status não mapeado no Kanban: ${status}, usando fase 'completion'`);
         return "completion";
     }
   };
