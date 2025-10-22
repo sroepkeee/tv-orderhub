@@ -205,12 +205,12 @@ export default {
         },
         "ecommerce-pulse": {
           "0%, 100%": {
-            boxShadow: "0 0 8px 2px hsl(var(--type-ecommerce) / 0.25)",
-            borderColor: "hsl(var(--type-ecommerce) / 0.7)",
+            boxShadow: "0 0 0 0 hsl(var(--type-ecommerce) / 0.3), 0 0 15px 0 hsl(var(--type-ecommerce) / 0.2)",
+            borderColor: "hsl(var(--type-ecommerce) / 0.4)",
           },
           "50%": {
-            boxShadow: "0 0 15px 4px hsl(var(--type-ecommerce) / 0.4)",
-            borderColor: "hsl(var(--type-ecommerce) / 0.85)",
+            boxShadow: "0 0 20px 5px hsl(var(--type-ecommerce) / 0.5), 0 0 30px 5px hsl(var(--type-ecommerce) / 0.3)",
+            borderColor: "hsl(var(--type-ecommerce) / 0.8)",
           },
         },
       },
@@ -218,7 +218,7 @@ export default {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
         "pulse-critical": "pulse-critical 3s ease-in-out infinite",
-        "ecommerce-pulse": "ecommerce-pulse 4s ease-in-out infinite",
+        "ecommerce-pulse": "ecommerce-pulse 2s ease-in-out infinite",
       },
     },
   },
