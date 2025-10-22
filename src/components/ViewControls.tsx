@@ -81,9 +81,13 @@ export const ViewControls = ({
     { value: "completion" as PhaseFilter, label: "Conclusão" },
   ];
 
-  // Calcular contagens por status
+  // Calcular contagens por status e métricas
   const statusCounts = React.useMemo(() => {
     const counts = {
+      total: orders.length,
+      preparation: orders.filter(o => 
+        ["pending", "in_review", "approved", "materials_ordered"].includes(o.status)
+      ).length,
       production: orders.filter(o => 
         ["in_production", "awaiting_material", "production_completed"].includes(o.status)
       ).length,
@@ -102,6 +106,11 @@ export const ViewControls = ({
       delayed: orders.filter(o => 
         ["delayed", "on_hold"].includes(o.status)
       ).length,
+      highPriority: orders.filter(o => o.priority === "high").length,
+      mediumPriority: orders.filter(o => o.priority === "medium").length,
+      completionRate: orders.length > 0 
+        ? Math.round((orders.filter(o => ["delivered", "completed"].includes(o.status)).length / orders.length) * 100)
+        : 0,
     };
     return counts;
   }, [orders]);
@@ -109,43 +118,73 @@ export const ViewControls = ({
   return (
     <TooltipProvider>
       <div className="flex items-center gap-1.5 mb-4 flex-wrap">
-        {/* Status Cards */}
+        {/* Status Cards - Linha 1: Métricas Gerais */}
         {orders.length > 0 && (
-          <div className="flex items-center gap-1 mr-2 px-2 py-0.5 bg-muted/50 rounded-md border">
-            <div className="flex items-center gap-1 text-xs">
-              <span className="text-muted-foreground font-medium">Produção:</span>
-              <span className="font-bold text-primary">{statusCounts.production}</span>
+          <>
+            <div className="flex items-center gap-1 mr-2 px-2 py-0.5 bg-muted/50 rounded-md border">
+              <div className="flex items-center gap-1 text-xs">
+                <span className="text-muted-foreground font-medium">Total:</span>
+                <span className="font-bold text-foreground">{statusCounts.total}</span>
+              </div>
+              <div className="h-3 w-px bg-border mx-1" />
+              <div className="flex items-center gap-1 text-xs">
+                <span className="text-muted-foreground font-medium">🔴 Alta:</span>
+                <span className="font-bold text-[hsl(var(--priority-high))]">{statusCounts.highPriority}</span>
+              </div>
+              <div className="h-3 w-px bg-border mx-1" />
+              <div className="flex items-center gap-1 text-xs">
+                <span className="text-muted-foreground font-medium">🟡 Média:</span>
+                <span className="font-bold text-[hsl(var(--priority-medium))]">{statusCounts.mediumPriority}</span>
+              </div>
+              <div className="h-3 w-px bg-border mx-1" />
+              <div className="flex items-center gap-1 text-xs">
+                <span className="text-muted-foreground font-medium">Taxa Conclusão:</span>
+                <span className="font-bold text-[hsl(var(--progress-good))]">{statusCounts.completionRate}%</span>
+              </div>
+              {statusCounts.delayed > 0 && (
+                <>
+                  <div className="h-3 w-px bg-border mx-1" />
+                  <div className="flex items-center gap-1 text-xs">
+                    <span className="text-muted-foreground font-medium">⚠️ Atrasados:</span>
+                    <span className="font-bold text-[hsl(var(--progress-critical))] animate-pulse">{statusCounts.delayed}</span>
+                  </div>
+                </>
+              )}
             </div>
-            <div className="h-3 w-px bg-border mx-1" />
-            <div className="flex items-center gap-1 text-xs">
-              <span className="text-muted-foreground font-medium">Embalagem:</span>
-              <span className="font-bold text-primary">{statusCounts.packaging}</span>
+
+            {/* Status Cards - Linha 2: Fases do Processo */}
+            <div className="flex items-center gap-1 mr-2 px-2 py-0.5 bg-muted/50 rounded-md border">
+              <div className="flex items-center gap-1 text-xs">
+                <span className="text-muted-foreground font-medium">Preparação:</span>
+                <span className="font-bold text-primary">{statusCounts.preparation}</span>
+              </div>
+              <div className="h-3 w-px bg-border mx-1" />
+              <div className="flex items-center gap-1 text-xs">
+                <span className="text-muted-foreground font-medium">Produção:</span>
+                <span className="font-bold text-primary">{statusCounts.production}</span>
+              </div>
+              <div className="h-3 w-px bg-border mx-1" />
+              <div className="flex items-center gap-1 text-xs">
+                <span className="text-muted-foreground font-medium">Embalagem:</span>
+                <span className="font-bold text-primary">{statusCounts.packaging}</span>
+              </div>
+              <div className="h-3 w-px bg-border mx-1" />
+              <div className="flex items-center gap-1 text-xs">
+                <span className="text-muted-foreground font-medium">Faturamento:</span>
+                <span className="font-bold text-primary">{statusCounts.invoicing}</span>
+              </div>
+              <div className="h-3 w-px bg-border mx-1" />
+              <div className="flex items-center gap-1 text-xs">
+                <span className="text-muted-foreground font-medium">Expedição:</span>
+                <span className="font-bold text-primary">{statusCounts.shipping}</span>
+              </div>
+              <div className="h-3 w-px bg-border mx-1" />
+              <div className="flex items-center gap-1 text-xs">
+                <span className="text-muted-foreground font-medium">✓ Concluídos:</span>
+                <span className="font-bold text-[hsl(var(--progress-good))]">{statusCounts.completed}</span>
+              </div>
             </div>
-            <div className="h-3 w-px bg-border mx-1" />
-            <div className="flex items-center gap-1 text-xs">
-              <span className="text-muted-foreground font-medium">Faturamento:</span>
-              <span className="font-bold text-primary">{statusCounts.invoicing}</span>
-            </div>
-            <div className="h-3 w-px bg-border mx-1" />
-            <div className="flex items-center gap-1 text-xs">
-              <span className="text-muted-foreground font-medium">Expedição:</span>
-              <span className="font-bold text-primary">{statusCounts.shipping}</span>
-            </div>
-            <div className="h-3 w-px bg-border mx-1" />
-            <div className="flex items-center gap-1 text-xs">
-              <span className="text-muted-foreground font-medium">Concluídos:</span>
-              <span className="font-bold text-[hsl(var(--progress-good))]">{statusCounts.completed}</span>
-            </div>
-            {statusCounts.delayed > 0 && (
-              <>
-                <div className="h-3 w-px bg-border mx-1" />
-                <div className="flex items-center gap-1 text-xs">
-                  <span className="text-muted-foreground font-medium">Atrasados:</span>
-                  <span className="font-bold text-[hsl(var(--progress-critical))]">{statusCounts.delayed}</span>
-                </div>
-              </>
-            )}
-          </div>
+          </>
         )}
         
         {/* View Mode Toggle */}
