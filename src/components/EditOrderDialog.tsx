@@ -1988,47 +1988,29 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                     
                     <div>
                       <Label>Dimensões (centímetros)</Label>
-                      <div className="grid grid-cols-3 gap-2">
-                        <div>
-                          <Input
-                            type="number"
-                            min="0"
-                            step="1"
-                            placeholder="Altura"
-                            {...register("package_height_m", {
-                              setValueAs: (v) => v ? Number(v) / 100 : undefined
-                            })}
-                            defaultValue={order?.package_height_m ? order.package_height_m * 100 : undefined}
-                            className="bg-white dark:bg-gray-900"
-                          />
-                        </div>
-                        <div>
-                          <Input
-                            type="number"
-                            min="0"
-                            step="1"
-                            placeholder="Largura"
-                            {...register("package_width_m", {
-                              setValueAs: (v) => v ? Number(v) / 100 : undefined
-                            })}
-                            defaultValue={order?.package_width_m ? order.package_width_m * 100 : undefined}
-                            className="bg-white dark:bg-gray-900"
-                          />
-                        </div>
-                        <div>
-                          <Input
-                            type="number"
-                            min="0"
-                            step="1"
-                            placeholder="Comprimento"
-                            {...register("package_length_m", {
-                              setValueAs: (v) => v ? Number(v) / 100 : undefined
-                            })}
-                            defaultValue={order?.package_length_m ? order.package_length_m * 100 : undefined}
-                            className="bg-white dark:bg-gray-900"
-                          />
-                        </div>
-                      </div>
+                      <Input
+                        type="text"
+                        placeholder="Ex: 30 x 40 x 50"
+                        defaultValue={
+                          order?.package_height_m && order?.package_width_m && order?.package_length_m
+                            ? `${Math.round(order.package_height_m * 100)} x ${Math.round(order.package_width_m * 100)} x ${Math.round(order.package_length_m * 100)}`
+                            : ''
+                        }
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          // Parse formato "30 x 40 x 50" ou "30x40x50" ou "30 40 50"
+                          const match = value.match(/(\d+)\s*[x×]\s*(\d+)\s*[x×]\s*(\d+)/i) || 
+                                       value.match(/(\d+)\s+(\d+)\s+(\d+)/);
+                          
+                          if (match) {
+                            const [_, height, width, length] = match;
+                            setValue("package_height_m", Number(height) / 100);
+                            setValue("package_width_m", Number(width) / 100);
+                            setValue("package_length_m", Number(length) / 100);
+                          }
+                        }}
+                        className="bg-white dark:bg-gray-900"
+                      />
                       <p className="text-xs text-muted-foreground mt-1">
                         Altura x Largura x Comprimento (em centímetros)
                       </p>
