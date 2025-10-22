@@ -37,12 +37,16 @@ export const STATUS_LABELS: Record<string, string> = {
   "invoice_sent": "NF Enviada ao Cliente",
   // Conclusão
   "delivered": "Entregue",
-  "completed": "Finalizado",
+  "completed": "Concluído",
   // Exceção/Problemas
   "cancelled": "Cancelado",
   "on_hold": "Em Espera",
   "delayed": "Atrasado",
-  "returned": "Devolvido"
+  "returned": "Devolvido",
+  // Itens/Estoque/Almoxarifado
+  "in_stock": "Em estoque",
+  "almox_ssm_received": "Recebido no Almox (SSM)",
+  "almox_general_received": "Recebido no Almox (Geral)"
 };
 
 /**

@@ -271,8 +271,12 @@ export const EnhancedOrderTimeline: React.FC<EnhancedOrderTimelineProps> = ({ or
       title: `Alterou ${fieldLabels[item.field_changed] || item.field_changed} do item`,
       description: item.order_items?.item_description,
       changes: {
-        from: item.old_value || '(vazio)',
-        to: item.new_value || '(vazio)',
+        from: ['item_status', 'received_status', 'status'].includes(item.field_changed)
+          ? getStatusLabel(item.old_value)
+          : (item.old_value || '(vazio)'),
+        to: ['item_status', 'received_status', 'status'].includes(item.field_changed)
+          ? getStatusLabel(item.new_value)
+          : (item.new_value || '(vazio)'),
       },
       metadata: {
         itemCode: item.order_items?.item_code,
