@@ -113,19 +113,19 @@ export function OrderTypeSelector({ value, onValueChange, disabled }: OrderTypeS
 
       {/* Informações do tipo selecionado */}
       {selectedType && (
-        <div className="rounded-lg border bg-muted/50 p-3 space-y-2 text-sm">
+        <div className="rounded-md border bg-muted/50 p-1.5 space-y-1 text-xs">
           <div className="flex items-center justify-between">
-            <span className="text-muted-foreground">SLA Padrão:</span>
-            <Badge variant="outline">{selectedType.default_sla_days} dias úteis</Badge>
+            <span className="text-muted-foreground">SLA:</span>
+            <Badge variant="outline" className="text-xs py-0 h-5">{selectedType.default_sla_days}d</Badge>
           </div>
           <div className="flex items-center justify-between">
-            <span className="text-muted-foreground">Responsável:</span>
+            <span className="text-muted-foreground">Resp.:</span>
             <span className="font-medium">{selectedType.responsible_department}</span>
           </div>
           {selectedType.approval_required && (
-            <div className="flex items-center gap-2 text-amber-600">
-              <span className="text-lg">⚠️</span>
-              <span className="text-xs">Requer aprovação antes do envio</span>
+            <div className="flex items-center gap-1.5 text-amber-600">
+              <span className="text-sm">⚠️</span>
+              <span>Requer aprovação</span>
             </div>
           )}
         </div>
