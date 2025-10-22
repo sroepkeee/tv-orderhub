@@ -49,7 +49,7 @@ type OrderStatus =
   // Fase: Cotação de Frete
   | "freight_quote_requested" | "freight_quote_received" | "freight_approved"
   // Fase: Faturamento
-  | "awaiting_invoice" | "invoice_issued" | "invoice_sent"
+  | "invoice_requested" | "awaiting_invoice" | "invoice_issued" | "invoice_sent"
   // Fase: Expedição
   | "released_for_shipping" | "in_expedition" | "in_transit" | "pickup_scheduled" | "awaiting_pickup" | "collected"
   // Fase: Conclusão
@@ -442,6 +442,8 @@ export const Dashboard = () => {
     const salesPhaseStatuses: OrderStatus[] = [
       // Preparação
       "pending", "in_analysis", "awaiting_approval", "planned",
+      // Faturamento
+      "invoice_requested", "awaiting_invoice", "invoice_issued", "invoice_sent",
       // Produção
       "separation_started", "in_production", "awaiting_material", 
       "separation_completed", "production_completed",
@@ -470,6 +472,8 @@ export const Dashboard = () => {
     } else if (activeTab === "sales") {
       matchesTab = 
         order.type === "sales" || 
+        order.type.includes("ecommerce") || 
+        order.type.includes("vendas") ||
         (order.type === "ecommerce" && isEcommerceInSalesPhase(order.status));
     } else if (activeTab === "materials") {
       matchesTab = order.type === "materials";
@@ -985,6 +989,11 @@ export const Dashboard = () => {
       "awaiting_material": "bg-status-material-bg text-status-material",
       "separation_completed": "bg-status-sep-complete-bg text-status-sep-complete",
       "production_completed": "bg-status-prod-complete-bg text-status-prod-complete",
+      // Faturamento
+      "invoice_requested": "bg-blue-100 text-blue-700",
+      "awaiting_invoice": "bg-blue-100 text-blue-700",
+      "invoice_issued": "bg-blue-200 text-blue-800",
+      "invoice_sent": "bg-blue-300 text-blue-900",
       // Embalagem/Conferência
       "in_quality_check": "bg-status-quality-bg text-status-quality",
       "in_packaging": "bg-status-packaging-bg text-status-packaging",
