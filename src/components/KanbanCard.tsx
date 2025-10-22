@@ -137,7 +137,7 @@ export const KanbanCard = ({
       <div className="flex items-start justify-between mb-1 pr-5">
         <div className="flex flex-col gap-0.5">
           <span className="font-bold text-xs flex items-center gap-1">
-            {isEcommerce && <span className="text-base">🛒</span>}
+            {isEcommerce && <span className="text-base animate-pulse">🛒</span>}
             #{order.orderNumber}
           </span>
           <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-muted-foreground/30 text-muted-foreground">
