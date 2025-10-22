@@ -235,6 +235,72 @@ export const ViewControls = ({
                 <span className="font-bold text-[hsl(var(--progress-good))]">{statusCounts.completed}</span>
               </div>
             </div>
+
+            {/* E-commerce Insights Card */}
+            {(() => {
+              const ecommerceOrders = orders.filter(o => 
+                o.type === 'ecommerce'
+              );
+              const ecomTotal = ecommerceOrders.length;
+              const ecomHigh = ecommerceOrders.filter(o => o.priority === 'high').length;
+              const ecomInProgress = ecommerceOrders.filter(o => 
+                !["delivered", "completed", "cancelled"].includes(o.status)
+              ).length;
+              const ecomCritical = ecommerceOrders.filter(o => {
+                if (!o.deliveryDeadline || ["delivered", "completed", "cancelled"].includes(o.status)) return false;
+                const deadline = new Date(o.deliveryDeadline);
+                const now = new Date();
+                const daysUntil = Math.ceil((deadline.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+                return daysUntil <= 2 && daysUntil >= 0;
+              }).length;
+              const ecomCompleted = ecommerceOrders.filter(o => 
+                ["delivered", "completed"].includes(o.status)
+              ).length;
+              const ecomCompletionRate = ecomTotal > 0 ? Math.round((ecomCompleted / ecomTotal) * 100) : 0;
+
+              if (ecomTotal === 0) return null;
+
+              return (
+                <div className="flex items-center gap-1 mr-2 px-2 py-0.5 bg-blue-50/50 dark:bg-blue-950/20 rounded-md border border-blue-200 dark:border-blue-800">
+                  <div className="flex items-center gap-1 text-xs">
+                    <span className="text-blue-700 dark:text-blue-300 font-medium">🛒 E-commerce:</span>
+                    <span className="font-bold text-blue-900 dark:text-blue-100">{ecomTotal}</span>
+                  </div>
+                  {ecomHigh > 0 && (
+                    <>
+                      <div className="h-3 w-px bg-blue-300 dark:bg-blue-700 mx-1" />
+                      <div className="flex items-center gap-1 text-xs">
+                        <span className="text-blue-700 dark:text-blue-300 font-medium">🔴 Prioritários:</span>
+                        <span className="font-bold text-red-600 dark:text-red-400">{ecomHigh}</span>
+                      </div>
+                    </>
+                  )}
+                  {ecomInProgress > 0 && (
+                    <>
+                      <div className="h-3 w-px bg-blue-300 dark:bg-blue-700 mx-1" />
+                      <div className="flex items-center gap-1 text-xs">
+                        <span className="text-blue-700 dark:text-blue-300 font-medium">⚙️ Em Andamento:</span>
+                        <span className="font-bold text-blue-900 dark:text-blue-100">{ecomInProgress}</span>
+                      </div>
+                    </>
+                  )}
+                  {ecomCritical > 0 && (
+                    <>
+                      <div className="h-3 w-px bg-blue-300 dark:bg-blue-700 mx-1" />
+                      <div className="flex items-center gap-1 text-xs">
+                        <span className="text-blue-700 dark:text-blue-300 font-medium">⏰ Prazo Urgente:</span>
+                        <span className="font-bold text-orange-600 dark:text-orange-400 animate-pulse">{ecomCritical}</span>
+                      </div>
+                    </>
+                  )}
+                  <div className="h-3 w-px bg-blue-300 dark:bg-blue-700 mx-1" />
+                  <div className="flex items-center gap-1 text-xs">
+                    <span className="text-blue-700 dark:text-blue-300 font-medium">✓ Taxa:</span>
+                    <span className="font-bold text-green-600 dark:text-green-400">{ecomCompletionRate}%</span>
+                  </div>
+                </div>
+              );
+            })()}
           </>
         )}
         
