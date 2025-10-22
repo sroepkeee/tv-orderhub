@@ -123,7 +123,7 @@ export const KanbanCard = ({
   const daysRemaining = calculateDaysRemaining(order.deliveryDeadline);
   const progressBarColor = getProgressBarColor(daysRemaining);
   return <div ref={setNodeRef} style={style} className={isDragging ? "dragging" : ""}>
-        <Card className={`relative kanban-card p-2 transition-all duration-200 ${getPriorityClass(order.priority)} ${isDragging ? 'cursor-grabbing opacity-50 scale-105 shadow-2xl' : 'cursor-pointer hover:shadow-lg hover:scale-[1.01]'} ${isEcommerce ? 'animate-ecommerce-pulse border-2 border-orderType-ecommerce' : ''}`} onClick={handleCardClick} onMouseDown={() => setClickStart(Date.now())}>
+        <Card className={`relative kanban-card p-2 transition-all duration-200 ${getPriorityClass(order.priority)} ${isDragging ? 'cursor-grabbing opacity-50 scale-105 shadow-2xl' : 'cursor-pointer hover:shadow-lg hover:scale-[1.01]'} ${isEcommerce ? 'animate-ecommerce-pulse border-2' : ''}`} onClick={handleCardClick} onMouseDown={() => setClickStart(Date.now())}>
         {/* Selo E-commerce no canto superior direito */}
         {isEcommerce}
         {/* Drag handle */}
