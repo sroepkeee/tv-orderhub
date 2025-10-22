@@ -42,7 +42,7 @@ export const KanbanColumn = ({
             <Icon className="h-4 w-4" />
             <h3 className="font-semibold text-xs lg:text-sm">{title}</h3>
           </div>
-          <Badge variant="secondary" className="bg-white/90 text-foreground text-xs">
+          <Badge variant="secondary" className="bg-background text-foreground border border-border text-xs">
             {orders.length}
           </Badge>
         </div>
