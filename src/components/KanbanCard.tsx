@@ -133,6 +133,10 @@ export const KanbanCard = ({ order, onEdit, onStatusChange }: KanbanCardProps) =
             isDragging 
               ? 'cursor-grabbing opacity-50 scale-105 shadow-2xl' 
               : 'cursor-pointer hover:shadow-lg hover:scale-[1.01]'
+          } ${
+            order.type === 'ecommerce' 
+              ? 'animate-ecommerce-pulse border-2' 
+              : ''
           }`}
           onClick={handleCardClick}
           onMouseDown={() => setClickStart(Date.now())}

@@ -128,6 +128,8 @@ export default {
           "sales-bg": "hsl(var(--type-sales-bg))",
           materials: "hsl(var(--type-materials))",
           "materials-bg": "hsl(var(--type-materials-bg))",
+          ecommerce: "hsl(var(--type-ecommerce))",
+          "ecommerce-bg": "hsl(var(--type-ecommerce-bg))",
         },
         phase: {
           "almox-ssm": "hsl(var(--phase-almox-ssm))",
@@ -201,11 +203,22 @@ export default {
             boxShadow: "0 0 0 4px hsl(var(--progress-critical) / 0.1)"
           },
         },
+        "ecommerce-pulse": {
+          "0%, 100%": {
+            boxShadow: "0 0 0 0 hsl(var(--type-ecommerce) / 0.3), 0 0 15px 0 hsl(var(--type-ecommerce) / 0.2)",
+            borderColor: "hsl(var(--type-ecommerce) / 0.4)",
+          },
+          "50%": {
+            boxShadow: "0 0 20px 5px hsl(var(--type-ecommerce) / 0.5), 0 0 30px 5px hsl(var(--type-ecommerce) / 0.3)",
+            borderColor: "hsl(var(--type-ecommerce) / 0.8)",
+          },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
         "pulse-critical": "pulse-critical 3s ease-in-out infinite",
+        "ecommerce-pulse": "ecommerce-pulse 2s ease-in-out infinite",
       },
     },
   },
