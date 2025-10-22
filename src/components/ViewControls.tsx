@@ -145,33 +145,52 @@ export const ViewControls = ({
         {/* Status Cards - Linha 1: Métricas Gerais */}
         {orders.length > 0 && (
           <>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => onStatusFilterChange?.(statusFilter === "all" ? "all" : "all")}
-              className={`flex items-center gap-1 mr-2 px-2 py-0.5 h-auto rounded-md border transition-all hover:shadow-md ${
-                statusFilter === "all" ? "bg-primary/10 border-primary" : "bg-muted/50"
-              }`}
-            >
+            <div className="flex items-center gap-1 mr-2 px-2 py-0.5 bg-muted/50 rounded-md border">
               <div className="flex items-center gap-1 text-xs">
                 <span className="text-muted-foreground font-medium">Total:</span>
                 <span className="font-bold text-foreground">{statusCounts.total}</span>
               </div>
               <div className="h-3 w-px bg-border mx-1" />
-              <div className="flex items-center gap-1 text-xs">
-                <span className="text-muted-foreground font-medium">🔴 Alta:</span>
-                <span className="font-bold text-[hsl(var(--priority-high))]">{statusCounts.highPriority}</span>
-              </div>
+              
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => onStatusFilterChange?.(statusFilter === "high_priority" ? "all" : "high_priority")}
+                className={`flex items-center gap-1 px-1.5 py-0.5 h-auto rounded transition-all hover:bg-red-100 dark:hover:bg-red-900/30 ${
+                  statusFilter === "high_priority" ? "bg-red-100 dark:bg-red-900/40" : ""
+                }`}
+              >
+                <span className="text-[10px] text-muted-foreground font-medium">🔴 Alta:</span>
+                <span className="text-[10px] font-bold text-[hsl(var(--priority-high))]">{statusCounts.highPriority}</span>
+              </Button>
+              
               <div className="h-3 w-px bg-border mx-1" />
-              <div className="flex items-center gap-1 text-xs">
-                <span className="text-muted-foreground font-medium">🟡 Média:</span>
-                <span className="font-bold text-[hsl(var(--priority-medium))]">{statusCounts.mediumPriority}</span>
-              </div>
+              
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => onStatusFilterChange?.(statusFilter === "medium_priority" ? "all" : "medium_priority")}
+                className={`flex items-center gap-1 px-1.5 py-0.5 h-auto rounded transition-all hover:bg-orange-100 dark:hover:bg-orange-900/30 ${
+                  statusFilter === "medium_priority" ? "bg-orange-100 dark:bg-orange-900/40" : ""
+                }`}
+              >
+                <span className="text-[10px] text-muted-foreground font-medium">🟡 Média:</span>
+                <span className="text-[10px] font-bold text-[hsl(var(--priority-medium))]">{statusCounts.mediumPriority}</span>
+              </Button>
+              
               <div className="h-3 w-px bg-border mx-1" />
-              <div className="flex items-center gap-1 text-xs">
-                <span className="text-muted-foreground font-medium">🟢 Baixa:</span>
-                <span className="font-bold text-[hsl(var(--priority-low))]">{statusCounts.lowPriority}</span>
-              </div>
+              
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => onStatusFilterChange?.(statusFilter === "low_priority" ? "all" : "low_priority")}
+                className={`flex items-center gap-1 px-1.5 py-0.5 h-auto rounded transition-all hover:bg-green-100 dark:hover:bg-green-900/30 ${
+                  statusFilter === "low_priority" ? "bg-green-100 dark:bg-green-900/40" : ""
+                }`}
+              >
+                <span className="text-[10px] text-muted-foreground font-medium">🟢 Baixa:</span>
+                <span className="text-[10px] font-bold text-[hsl(var(--priority-low))]">{statusCounts.lowPriority}</span>
+              </Button>
               <div className="h-3 w-px bg-border mx-1" />
               <div className="flex items-center gap-1 text-xs">
                 <span className="text-muted-foreground font-medium">Taxa Conclusão:</span>
@@ -213,7 +232,7 @@ export const ViewControls = ({
                   </div>
                 </>
               )}
-            </Button>
+            </div>
 
             {/* Status Cards - Linha 2: Fases do Processo */}
             <div className="flex items-center gap-1 mr-2">
