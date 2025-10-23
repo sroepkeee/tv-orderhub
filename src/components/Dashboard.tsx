@@ -374,6 +374,33 @@ export const Dashboard = () => {
             totvsOrderNumber: dbOrder.totvs_order_number || undefined,
             items,
             order_category: dbOrder.order_category,
+            
+            // Campos de frete e transporte
+            freight_modality: dbOrder.freight_modality || null,
+            carrier_name: dbOrder.carrier_name || null,
+            freight_type: dbOrder.freight_type || null,
+            freight_value: dbOrder.freight_value || null,
+            tracking_code: dbOrder.tracking_code || null,
+            
+            // Campos de embalagem
+            package_volumes: dbOrder.package_volumes || null,
+            package_weight_kg: dbOrder.package_weight_kg || null,
+            package_length_m: dbOrder.package_length_m || null,
+            package_width_m: dbOrder.package_width_m || null,
+            package_height_m: dbOrder.package_height_m || null,
+            
+            // Campos adicionais
+            customer_document: dbOrder.customer_document || null,
+            municipality: dbOrder.municipality || null,
+            operation_code: dbOrder.operation_code || null,
+            executive_name: dbOrder.executive_name || null,
+            firmware_project_name: dbOrder.firmware_project_name || null,
+            image_project_name: dbOrder.image_project_name || null,
+            requires_firmware: dbOrder.requires_firmware || false,
+            requires_image: dbOrder.requires_image || false,
+            shipping_date: dbOrder.shipping_date || null,
+            vehicle_plate: dbOrder.vehicle_plate || null,
+            driver_name: dbOrder.driver_name || null,
           };
         })
       );
