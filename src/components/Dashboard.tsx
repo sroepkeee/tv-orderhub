@@ -1099,9 +1099,9 @@ export const Dashboard = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background p-4 lg:p-6">
+    <div className="h-screen overflow-hidden bg-background p-4 lg:p-6 flex flex-col">
       {/* Compact Header */}
-      <div className="flex items-center justify-between mb-4 lg:mb-6">
+      <div className="flex items-center justify-between mb-4 lg:mb-6 flex-shrink-0">
         <div className="flex items-center gap-2 lg:gap-4">
           <img src={logo} alt="Imply Logo" className="h-12 lg:h-16 w-auto" />
           <h1 className="text-base md:text-lg lg:text-xl font-bold text-dashboard-header tracking-tight">
@@ -1165,7 +1165,7 @@ export const Dashboard = () => {
       </div>
 
       {/* Tab Navigation - Compacta */}
-      <div className="mb-3">
+      <div className="mb-3 flex-shrink-0">
         <div className="flex justify-center items-center gap-0.5 lg:gap-1 border-b border-border overflow-x-auto">
           {tabs.map((tab) => (
             <button
@@ -1187,8 +1187,9 @@ export const Dashboard = () => {
       </div>
 
       {/* Content */}
-      {loading ? (
-        <div className="flex items-center justify-center py-20">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden">
+        {loading ? (
+          <div className="flex items-center justify-center py-20">
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
             <p className="text-muted-foreground">Carregando pedidos...</p>
@@ -1316,7 +1317,8 @@ export const Dashboard = () => {
             </div>
           )}
         </div>
-      )}
+        )}
+      </div>
 
       {/* Edit Dialog with integrated History */}
       {selectedOrder && (
