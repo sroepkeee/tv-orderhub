@@ -86,55 +86,63 @@ export const ViewControls = ({
     { value: "completion" as PhaseFilter, label: "Conclusão" },
   ];
 
-  // Calcular contagens por status e métricas
+  // Calcular contagens por status e métricas (EXCLUINDO CONCLUÍDOS dos indicadores principais)
   const statusCounts = React.useMemo(() => {
     const now = new Date();
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     
+    // Pedidos ativos (excluindo concluídos)
+    const activeOrders = orders.filter(o => !["delivered", "completed"].includes(o.status));
+    const completedOrders = orders.filter(o => ["delivered", "completed"].includes(o.status));
+    
     const counts = {
-      total: orders.length,
-      preparation: orders.filter(o => 
+      // INDICADORES ATIVOS (sem concluídos)
+      total: activeOrders.length,
+      preparation: activeOrders.filter(o => 
         ["pending", "in_review", "approved", "materials_ordered"].includes(o.status)
       ).length,
-      production: orders.filter(o => 
+      production: activeOrders.filter(o => 
         ["in_production", "awaiting_material", "production_completed"].includes(o.status)
       ).length,
-      packaging: orders.filter(o => 
+      packaging: activeOrders.filter(o => 
         ["in_quality_check", "in_packaging", "ready_for_shipping"].includes(o.status)
       ).length,
-      invoicing: orders.filter(o => 
+      invoicing: activeOrders.filter(o => 
         ["awaiting_invoice", "invoice_requested", "invoice_issued", "invoice_sent"].includes(o.status)
       ).length,
-      shipping: orders.filter(o => 
+      shipping: activeOrders.filter(o => 
         ["released_for_shipping", "in_expedition", "in_transit", "awaiting_pickup", "collected"].includes(o.status)
       ).length,
-      completed: orders.filter(o => 
-        ["delivered", "completed"].includes(o.status)
-      ).length,
-      delayed: orders.filter(o => 
+      delayed: activeOrders.filter(o => 
         ["delayed", "on_hold"].includes(o.status)
       ).length,
-      highPriority: orders.filter(o => o.priority === "high").length,
-      mediumPriority: orders.filter(o => o.priority === "medium").length,
-      lowPriority: orders.filter(o => o.priority === "low").length,
-      completionRate: orders.length > 0 
-        ? Math.round((orders.filter(o => ["delivered", "completed"].includes(o.status)).length / orders.length) * 100)
-        : 0,
-      // Novos indicadores
-      criticalDeadline: orders.filter(o => {
-        if (!o.deliveryDeadline || ["delivered", "completed", "cancelled"].includes(o.status)) return false;
+      highPriority: activeOrders.filter(o => o.priority === "high").length,
+      mediumPriority: activeOrders.filter(o => o.priority === "medium").length,
+      lowPriority: activeOrders.filter(o => o.priority === "low").length,
+      criticalDeadline: activeOrders.filter(o => {
+        if (!o.deliveryDeadline) return false;
         const deadline = new Date(o.deliveryDeadline);
         const daysUntil = Math.ceil((deadline.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
         return daysUntil <= 3 && daysUntil >= 0;
       }).length,
-      newToday: orders.filter(o => {
+      newToday: activeOrders.filter(o => {
         if (!o.createdDate) return false;
         const created = new Date(o.createdDate);
         return created >= todayStart;
       }).length,
-      onHold: orders.filter(o => 
+      onHold: activeOrders.filter(o => 
         ["on_hold", "awaiting_material", "awaiting_approval"].includes(o.status)
       ).length,
+      
+      // INDICADORES DE CONCLUÍDOS (seção separada)
+      completed: completedOrders.length,
+      completionRate: orders.length > 0 
+        ? Math.round((completedOrders.length / orders.length) * 100)
+        : 0,
+      totalWithCompleted: orders.length, // Total incluindo concluídos para cálculo de %
+      // Estatísticas de valor de concluídos (se disponível)
+      completedValue: completedOrders.reduce((sum, o) => sum + (o.quantity || 0), 0),
+      activeValue: activeOrders.reduce((sum, o) => sum + (o.quantity || 0), 0),
     };
     return counts;
   }, [orders]);
@@ -147,8 +155,11 @@ export const ViewControls = ({
           <>
             <div className="flex items-center gap-1 mr-2 px-2 py-0.5 bg-muted/50 rounded-md border">
               <div className="flex items-center gap-1 text-xs">
-                <span className="text-muted-foreground font-medium">Total:</span>
+                <span className="text-muted-foreground font-medium">Ativos:</span>
                 <span className="font-bold text-foreground">{statusCounts.total}</span>
+                <span className="text-[10px] text-muted-foreground ml-0.5">
+                  ({statusCounts.totalWithCompleted} total)
+                </span>
               </div>
               <div className="h-3 w-px bg-border mx-1" />
               
@@ -191,11 +202,6 @@ export const ViewControls = ({
                 <span className="text-[10px] text-muted-foreground font-medium">🟢 Baixa:</span>
                 <span className="text-[10px] font-bold text-[hsl(var(--priority-low))]">{statusCounts.lowPriority}</span>
               </Button>
-              <div className="h-3 w-px bg-border mx-1" />
-              <div className="flex items-center gap-1 text-xs">
-                <span className="text-muted-foreground font-medium">Taxa Conclusão:</span>
-                <span className="font-bold text-[hsl(var(--progress-good))]">{statusCounts.completionRate}%</span>
-              </div>
               {statusCounts.criticalDeadline > 0 && (
                 <>
                   <div className="h-3 w-px bg-border mx-1" />
@@ -296,17 +302,42 @@ export const ViewControls = ({
                 <span className="text-xs font-bold text-primary">{statusCounts.shipping}</span>
               </Button>
               
+            </div>
+
+            {/* Seção de Indicadores de Concluídos */}
+            <div className="flex items-center gap-1 mr-2 px-2 py-1 bg-green-50/50 dark:bg-green-950/20 rounded-md border border-green-200 dark:border-green-800">
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => onStatusFilterChange?.(statusFilter === "completed" ? "all" : "completed")}
-                className={`flex items-center gap-1 px-2 py-0.5 h-auto rounded-md border transition-all hover:shadow-md ${
-                  statusFilter === "completed" ? "bg-primary/10 border-primary" : "bg-muted/50"
+                className={`flex items-center gap-1 px-2 py-0.5 h-auto rounded transition-all hover:bg-green-100 dark:hover:bg-green-900/30 ${
+                  statusFilter === "completed" ? "bg-green-100 dark:bg-green-900/40" : ""
                 }`}
               >
-                <span className="text-xs text-muted-foreground font-medium">✓ Concluídos:</span>
+                <span className="text-xs text-green-700 dark:text-green-300 font-medium">✓ Concluídos:</span>
                 <span className="text-xs font-bold text-[hsl(var(--progress-good))]">{statusCounts.completed}</span>
               </Button>
+              
+              <div className="h-3 w-px bg-green-300 dark:bg-green-700 mx-1" />
+              
+              <div className="flex items-center gap-1 text-xs">
+                <span className="text-green-700 dark:text-green-300 font-medium">% Total:</span>
+                <span className="font-bold text-[hsl(var(--progress-good))]">{statusCounts.completionRate}%</span>
+              </div>
+              
+              <div className="h-3 w-px bg-green-300 dark:bg-green-700 mx-1" />
+              
+              <div className="flex items-center gap-1 text-xs">
+                <span className="text-green-700 dark:text-green-300 font-medium">Qtd Total:</span>
+                <span className="font-bold text-green-600 dark:text-green-400">{statusCounts.completedValue}</span>
+              </div>
+              
+              <div className="h-3 w-px bg-green-300 dark:bg-green-700 mx-1" />
+              
+              <div className="flex items-center gap-1 text-xs">
+                <span className="text-green-700 dark:text-green-300 font-medium">Ativos (Qtd):</span>
+                <span className="font-bold text-blue-600 dark:text-blue-400">{statusCounts.activeValue}</span>
+              </div>
             </div>
 
             {/* E-commerce Insights Card */}
