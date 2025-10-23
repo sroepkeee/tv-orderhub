@@ -1889,15 +1889,6 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                             <Select 
                               onValueChange={field.onChange} 
                               value={field.value || ""}
-                              onOpenChange={(open) => {
-                                if (!open) {
-                                  const event = window.event;
-                                  if (event) {
-                                    event.preventDefault();
-                                    event.stopPropagation();
-                                  }
-                                }
-                              }}
                             >
                               <SelectTrigger>
                                 <SelectValue placeholder="FOB ou CIF" />
@@ -1920,15 +1911,6 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                             <Select 
                               onValueChange={field.onChange} 
                               value={field.value || ""}
-                              onOpenChange={(open) => {
-                                if (!open) {
-                                  const event = window.event;
-                                  if (event) {
-                                    event.preventDefault();
-                                    event.stopPropagation();
-                                  }
-                                }
-                              }}
                             >
                               <SelectTrigger>
                                 <SelectValue placeholder="Selecione o modo" />
