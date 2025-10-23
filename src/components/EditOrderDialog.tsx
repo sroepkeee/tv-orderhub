@@ -298,30 +298,46 @@ export const EditOrderDialog = ({ order, open, onOpenChange, onSave, onDelete }:
   // Download PDF attachment
   const handleDownloadPDF = async (filePath: string, fileName: string) => {
     try {
+      console.log('📥 Iniciando download:', { filePath, fileName });
+      
       const { data, error } = await supabase.storage
         .from('order-attachments')
         .download(filePath);
 
-      if (error) throw error;
+      if (error) {
+        console.error('❌ Erro ao baixar do storage:', error);
+        throw error;
+      }
 
+      console.log('✅ Arquivo baixado do storage, criando blob URL...');
+      
       const url = window.URL.createObjectURL(data);
       const a = document.createElement('a');
       a.href = url;
       a.download = fileName;
+      a.style.display = 'none';
+      
       document.body.appendChild(a);
+      
+      console.log('🖱️ Disparando click para download...');
       a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
+      
+      setTimeout(() => {
+        console.log('🧹 Limpando recursos do download...');
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+      }, 100);
 
       toast({
         title: "Download iniciado",
         description: `Baixando ${fileName}...`
       });
-    } catch (error) {
-      console.error("Error downloading PDF:", error);
+      
+    } catch (error: any) {
+      console.error("❌ Error downloading PDF:", error);
       toast({
         title: "Erro no download",
-        description: "Não foi possível baixar o arquivo.",
+        description: error?.message || "Não foi possível baixar o arquivo.",
         variant: "destructive"
       });
     }
