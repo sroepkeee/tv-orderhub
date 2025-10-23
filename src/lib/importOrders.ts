@@ -167,9 +167,9 @@ export async function importOrders(userId: string) {
             order_number: orderData.orderNumber,
             customer_name: orderData.customerName,
             delivery_address: orderData.customerName,
-            status: orderData.status,
+            status: 'almox_ssm', // Status inicial: Aguardando Almox SSM
             priority: orderData.priority,
-            order_type: 'standard',
+            order_type: 'reposicao_estoque', // Tipo padrão para pedidos importados
             delivery_date: orderData.deliveryDate,
             notes: orderData.notes,
             totvs_order_number: orderData.orderNumber,
