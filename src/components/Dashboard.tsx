@@ -650,9 +650,12 @@ export const Dashboard = () => {
           municipality: (updatedOrder as any).municipality || null,
           operation_code: (updatedOrder as any).operationCode || null,
           executive_name: (updatedOrder as any).executiveName || null,
-          carrier_name: (updatedOrder as any).carrierName || null,
-          freight_type: (updatedOrder as any).freightType || null,
-          freight_value: (updatedOrder as any).freightValue || null,
+          // Campos de frete (usando snake_case correto)
+          freight_modality: (updatedOrder as any).freight_modality || null,
+          carrier_name: (updatedOrder as any).carrier_name || null,
+          freight_type: (updatedOrder as any).freight_type || null,
+          freight_value: (updatedOrder as any).freight_value || null,
+          tracking_code: (updatedOrder as any).tracking_code || null,
         })
         .eq('id', updatedOrder.id)
         .select('id')
