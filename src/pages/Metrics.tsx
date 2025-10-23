@@ -98,7 +98,7 @@ export default function Metrics() {
           deliveryDate: item.delivery_date,
           userId: item.user_id,
           item_source_type: item.item_source_type as 'in_stock' | 'production' | 'out_of_stock',
-          item_status: item.item_status as 'in_stock' | 'awaiting_production' | 'purchase_required' | 'completed',
+          item_status: item.item_status as 'pending' | 'in_stock' | 'awaiting_production' | 'purchase_required' | 'completed',
           sla_days: item.sla_days,
           is_imported: item.is_imported,
           import_lead_time_days: item.import_lead_time_days,

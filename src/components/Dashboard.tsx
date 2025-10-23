@@ -342,7 +342,7 @@ export const Dashboard = () => {
             deliveryDate: item.delivery_date,
             deliveredQuantity: item.delivered_quantity,
             item_source_type: item.item_source_type as 'in_stock' | 'production' | 'out_of_stock',
-            item_status: item.item_status as 'in_stock' | 'awaiting_production' | 'purchase_required' | 'completed',
+            item_status: item.item_status as 'pending' | 'in_stock' | 'awaiting_production' | 'purchase_required' | 'completed',
             received_status: item.received_status as 'pending' | 'partial' | 'completed',
             production_estimated_date: item.production_estimated_date,
             sla_days: item.sla_days,

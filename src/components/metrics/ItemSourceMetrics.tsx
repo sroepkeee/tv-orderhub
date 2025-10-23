@@ -11,13 +11,14 @@ export const ItemSourceMetrics = ({ orders }: ItemSourceMetricsProps) => {
   const allItems = orders.flatMap(o => o.items || []);
   
   const byStatus = {
+    pending: allItems.filter(i => i.item_status === 'pending').length,
     inStock: allItems.filter(i => i.item_status === 'in_stock' || (!i.item_status && i.item_source_type === 'in_stock') || (!i.item_status && !i.item_source_type)).length,
     awaitingProduction: allItems.filter(i => i.item_status === 'awaiting_production' || (!i.item_status && i.item_source_type === 'production')).length,
     purchaseRequired: allItems.filter(i => i.item_status === 'purchase_required' || (!i.item_status && i.item_source_type === 'out_of_stock')).length,
     completed: allItems.filter(i => i.item_status === 'completed').length
   };
   
-  const total = byStatus.inStock + byStatus.awaitingProduction + byStatus.purchaseRequired + byStatus.completed;
+  const total = byStatus.pending + byStatus.inStock + byStatus.awaitingProduction + byStatus.purchaseRequired + byStatus.completed;
   
   if (total === 0) {
     return (
@@ -45,6 +46,17 @@ export const ItemSourceMetrics = ({ orders }: ItemSourceMetricsProps) => {
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
+          {/* Pendente */}
+          <div>
+            <div className="flex justify-between mb-2">
+              <span className="text-sm font-medium">⏳ Pendente</span>
+              <span className="text-sm font-bold text-yellow-600">
+                {byStatus.pending} ({Math.round((byStatus.pending / total) * 100)}%)
+              </span>
+            </div>
+            <Progress value={(byStatus.pending / total) * 100} className="h-2" />
+          </div>
+          
           {/* Disponível em Estoque */}
           <div>
             <div className="flex justify-between mb-2">
