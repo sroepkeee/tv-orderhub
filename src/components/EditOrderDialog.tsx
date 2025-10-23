@@ -2348,6 +2348,7 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
               <div className="border rounded-lg p-4 space-y-3">
                 {!showCommentInput ? (
                   <Button 
+                    type="button"
                     onClick={() => setShowCommentInput(true)}
                     className="w-full gap-2 bg-blue-600 hover:bg-blue-700"
                   >
@@ -2378,6 +2379,7 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                         Cancelar
                       </Button>
                       <Button
+                        type="button"
                         onClick={handleSaveComment}
                         disabled={!newComment.trim() || savingComment}
                         className="gap-2"
