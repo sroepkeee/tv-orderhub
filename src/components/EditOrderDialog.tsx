@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -65,7 +65,7 @@ interface EditOrderDialogProps {
 }
 
 export const EditOrderDialog = ({ order, open, onOpenChange, onSave, onDelete }: EditOrderDialogProps) => {
-  const { register, handleSubmit, setValue, reset, getValues, control } = useForm<Order>();
+  const { register, handleSubmit, setValue, reset, getValues, control, watch } = useForm<Order>();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("edit");
   const [items, setItems] = useState<OrderItem[]>([]);
@@ -100,11 +100,23 @@ export const EditOrderDialog = ({ order, open, onOpenChange, onSave, onDelete }:
     itemIndex: number;
   } | null>(null);
   const [isChangingStatus, setIsChangingStatus] = useState(false);
+  const [isSavingShipping, setIsSavingShipping] = useState(false);
   
   // Estados para controlar seções colapsáveis
   const [labConfigOpen, setLabConfigOpen] = useState(false);
   const [freightInfoOpen, setFreightInfoOpen] = useState(false);
   const [dimensionsOpen, setDimensionsOpen] = useState(false);
+  
+  // Ref para rastrear últimos valores dos campos de frete
+  const lastShippingRef = useRef({
+    freight_modality: null as string | null,
+    freight_type: null as string | null,
+    carrier_name: null as string | null,
+    tracking_code: null as string | null,
+  });
+  
+  // Ref para timeouts de debounce
+  const saveTimers = useRef<Record<string, any>>({});
   useEffect(() => {
     if (!open) return;
     supabase.auth.getUser().then(({ data: { user } }) => {
@@ -554,11 +566,21 @@ export const EditOrderDialog = ({ order, open, onOpenChange, onSave, onDelete }:
         municipality: (order as any).municipality,
         operationCode: (order as any).operation_code,
         executiveName: (order as any).executive_name,
-        carrierName: (order as any).carrier_name,
-        freightType: (order as any).freight_type,
-        freightValue: (order as any).freight_value,
+        freight_modality: (order as any).freight_modality,
+        carrier_name: (order as any).carrier_name,
+        freight_type: (order as any).freight_type,
+        freight_value: (order as any).freight_value,
+        tracking_code: (order as any).tracking_code,
       };
       reset(orderData);
+      
+      // Inicializar ref com valores atuais
+      lastShippingRef.current = {
+        freight_modality: (order as any).freight_modality ?? null,
+        freight_type: (order as any).freight_type ?? null,
+        carrier_name: (order as any).carrier_name ?? null,
+        tracking_code: (order as any).tracking_code ?? null,
+      };
       
       // Carregar itens diretamente do banco para garantir dados atualizados
       const loadItems = async () => {
@@ -601,6 +623,95 @@ export const EditOrderDialog = ({ order, open, onOpenChange, onSave, onDelete }:
       loadAttachments();
     }
   }, [open, order, reset]);
+  
+  // Auto-save para campos de frete com debounce
+  useEffect(() => {
+    if (!open || !order?.id) return;
+    
+    const saveShippingField = async (
+      key: 'freight_modality' | 'freight_type' | 'carrier_name' | 'tracking_code',
+      value: string | null
+    ) => {
+      if (!order?.id) return;
+      
+      const trimmedValue = typeof value === 'string' ? value.trim() : value;
+      
+      // Evitar saves redundantes
+      if (lastShippingRef.current[key] === trimmedValue) return;
+      
+      setIsSavingShipping(true);
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error('Usuário não autenticado');
+        
+        // Validar tamanho para strings
+        if (typeof trimmedValue === 'string' && trimmedValue.length > 100) {
+          toast({
+            title: 'Valor muito longo',
+            description: 'O campo deve ter no máximo 100 caracteres.',
+            variant: 'destructive'
+          });
+          return;
+        }
+        
+        // Persistir na tabela orders
+        const { error: updErr } = await supabase
+          .from('orders')
+          .update({ [key]: trimmedValue })
+          .eq('id', order.id);
+        
+        if (updErr) throw updErr;
+        
+        // Registrar histórico
+        const { error: histErr } = await supabase.from('order_changes').insert({
+          order_id: order.id,
+          changed_by: user.id,
+          field_name: key,
+          old_value: lastShippingRef.current[key],
+          new_value: trimmedValue,
+          change_type: 'update',
+          change_category: 'shipping_info',
+        });
+        
+        if (histErr) throw histErr;
+        
+        lastShippingRef.current[key] = trimmedValue;
+        
+        console.log(`✅ Auto-save: ${key} atualizado`);
+      } catch (e: any) {
+        console.error('Erro ao salvar info de frete:', e);
+        toast({
+          title: 'Erro ao salvar frete',
+          description: e?.message || 'Tente novamente.',
+          variant: 'destructive'
+        });
+      } finally {
+        setIsSavingShipping(false);
+      }
+    };
+    
+    const subscription = watch((values, { name }) => {
+      if (!name) return;
+      
+      if (['freight_modality', 'freight_type', 'carrier_name', 'tracking_code'].includes(name)) {
+        const val = (values as any)[name] ?? null;
+        
+        // Limpar timeout anterior
+        clearTimeout(saveTimers.current[name]);
+        
+        // Agendar novo save com debounce de 300ms
+        saveTimers.current[name] = setTimeout(() => {
+          saveShippingField(name as any, val);
+        }, 300);
+      }
+    });
+    
+    return () => {
+      subscription.unsubscribe();
+      // Limpar timeouts pendentes
+      Object.values(saveTimers.current).forEach(clearTimeout);
+    };
+  }, [open, order?.id, watch]);
 
   // Real-time subscription for history and comments updates
   useEffect(() => {
@@ -1399,6 +1510,7 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
         const fieldsToTrack = [
+          { key: 'freight_modality', label: 'Modalidade de Frete', category: 'shipping_info' },
           { key: 'freight_type', label: 'Tipo de Frete', category: 'shipping_info' },
           { key: 'carrier_name', label: 'Transportadora', category: 'shipping_info' },
           { key: 'tracking_code', label: 'Código de Rastreio', category: 'shipping_info' },
@@ -1874,6 +1986,12 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                     <Label className="text-lg font-semibold flex items-center gap-2 cursor-pointer">
                       <Package className="h-5 w-5" />
                       Informações de Frete e Transporte
+                      {isSavingShipping && (
+                        <span className="text-xs text-muted-foreground flex items-center gap-1">
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                          Salvando...
+                        </span>
+                      )}
                     </Label>
                     <ChevronDown className={`h-5 w-5 transition-transform ${freightInfoOpen ? 'rotate-180' : ''}`} />
                   </CollapsibleTrigger>

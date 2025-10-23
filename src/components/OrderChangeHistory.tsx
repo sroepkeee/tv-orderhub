@@ -62,6 +62,7 @@ export function OrderChangeHistory({ orderId }: { orderId: string }) {
     priority: 'Prioridade',
     order_type: 'Tipo de Pedido',
     notes: 'Observações',
+    freight_modality: 'Modalidade de Frete',
     freight_type: 'Tipo de Frete',
     carrier_name: 'Transportadora',
     tracking_code: 'Código de Rastreio',
