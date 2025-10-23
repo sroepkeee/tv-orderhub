@@ -795,15 +795,6 @@ export const EditOrderDialog = ({ order, open, onOpenChange, onSave, onDelete }:
   };
 
   const removeItem = (index: number) => {
-    const target = items[index];
-    if (target?.id && target?.userId && target.userId !== currentUserId) {
-      toast({
-        title: "Sem permissão para excluir",
-        description: "Este item foi criado por outro usuário e não pode ser removido.",
-        variant: "destructive",
-      });
-      return;
-    }
     setItems(items.filter((_, i) => i !== index));
   };
 
@@ -855,16 +846,6 @@ export const EditOrderDialog = ({ order, open, onOpenChange, onSave, onDelete }:
     // NOVO: Registrar mudança de situação (item_status)
     if (field === 'item_status' && oldItem.item_status !== value && oldItem.id) {
       console.log(`🔄 Situação mudou: ${oldItem.item_status} → ${value}`);
-      
-      // Validação de permissão
-      if (oldItem.userId && oldItem.userId !== currentUserId) {
-        toast({
-          title: "Sem permissão",
-          description: "Você não tem permissão para alterar este item.",
-          variant: "destructive",
-        });
-        return;
-      }
       
       // Salvar no banco
       const { error } = await supabase
@@ -1012,10 +993,10 @@ export const EditOrderDialog = ({ order, open, onOpenChange, onSave, onDelete }:
       }
       
       toast({
-        title: "✅ Quantidade atualizada",
+        title: newItemStatus === 'completed' ? "✅ Item concluído" : "⚠️ Recebimento parcial",
         description: newItemStatus === 'completed' 
           ? `Item concluído: ${receivedQty} de ${requestedQty} recebidos` 
-          : `${receivedQty} de ${requestedQty} recebidos`
+          : `Recebimento parcial: ${receivedQty} de ${requestedQty} recebidos (faltam ${requestedQty - receivedQty})`
       });
       
       // Recarregar histórico
@@ -2267,13 +2248,17 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                               data-status={item.item_status}
                               className={`
                                 transition-colors
-                                ${item.item_status === 'completed' 
-                                  ? 'bg-green-50 dark:bg-green-950/20 hover:bg-green-100 dark:hover:bg-green-900/30' 
+                                ${
+                                  item.item_status === 'completed' 
+                                    ? 'bg-green-50 dark:bg-green-950/20 hover:bg-green-100 dark:hover:bg-green-900/30' 
+                                  : item.deliveredQuantity > 0 && item.deliveredQuantity < item.requestedQuantity
+                                    ? 'bg-yellow-50 dark:bg-yellow-950/20 hover:bg-yellow-100 dark:hover:bg-yellow-900/30 border-l-4 border-l-yellow-500'
                                   : 'hover:bg-muted/50'
                                 }
-                                ${item.deliveredQuantity >= item.requestedQuantity && item.deliveredQuantity > 0
-                                  ? 'border-l-4 border-l-green-500'
-                                  : ''
+                                ${
+                                  item.deliveredQuantity >= item.requestedQuantity && item.deliveredQuantity > 0
+                                    ? 'border-l-4 border-l-green-500'
+                                    : ''
                                 }
                               `}
                             >
@@ -2377,34 +2362,41 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                                 )}
                               </TableCell>
                               <TableCell>
-                                <Input
-                                  type="number"
-                                  step="0.01"
-                                  value={item.deliveredQuantity}
-                                  onChange={(e) => {
-                                    const newQty = parseFloat(e.target.value) || 0;
-                                    
-                                    // Se o item já foi salvo, atualizar no banco
-                                    if (item.id) {
-                                      handleUpdateReceivedQuantity(item.id, newQty, item.requestedQuantity);
-                                    } else {
-                                      // Se ainda não foi salvo, apenas atualiza localmente
-                                      const validQty = Math.max(0, Math.min(newQty, item.requestedQuantity));
-                                      updateItem(index, "deliveredQuantity", validQty);
-                                    }
-                                  }}
-                                  onBlur={(e) => {
-                                    // Validar ao sair do campo
-                                    if (!item.id) {
-                                      const newQty = Math.max(0, Math.min(parseFloat(e.target.value) || 0, item.requestedQuantity));
-                                      updateItem(index, "deliveredQuantity", newQty);
-                                    }
-                                  }}
-                                  min="0"
-                                  max={item.requestedQuantity}
-                                  className="h-8 text-sm"
-                                  placeholder="0"
-                                />
+                                <div className="flex items-center gap-1">
+                                  <Input
+                                    type="number"
+                                    step="0.01"
+                                    value={item.deliveredQuantity}
+                                    onChange={(e) => {
+                                      const newQty = parseFloat(e.target.value) || 0;
+                                      
+                                      // Se o item já foi salvo, atualizar no banco
+                                      if (item.id) {
+                                        handleUpdateReceivedQuantity(item.id, newQty, item.requestedQuantity);
+                                      } else {
+                                        // Se ainda não foi salvo, apenas atualiza localmente
+                                        const validQty = Math.max(0, Math.min(newQty, item.requestedQuantity));
+                                        updateItem(index, "deliveredQuantity", validQty);
+                                      }
+                                    }}
+                                    onBlur={(e) => {
+                                      // Validar ao sair do campo
+                                      if (!item.id) {
+                                        const newQty = Math.max(0, Math.min(parseFloat(e.target.value) || 0, item.requestedQuantity));
+                                        updateItem(index, "deliveredQuantity", newQty);
+                                      }
+                                    }}
+                                    min="0"
+                                    max={item.requestedQuantity}
+                                    className="h-8 text-sm"
+                                    placeholder="0"
+                                  />
+                                  {item.deliveredQuantity > 0 && item.deliveredQuantity < item.requestedQuantity && (
+                                    <Badge variant="outline" className="bg-yellow-100 text-yellow-800 dark:bg-yellow-950 dark:text-yellow-200 text-xs whitespace-nowrap">
+                                      ⚠️ Parcial
+                                    </Badge>
+                                  )}
+                                </div>
                               </TableCell>
                               <TableCell>
                                 <div className="flex gap-1">
