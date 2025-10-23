@@ -188,6 +188,7 @@ export const PhaseButtons = ({ order, onStatusChange }: PhaseButtonsProps) => {
           <DropdownMenu key={phase.id}>
             <DropdownMenuTrigger asChild>
               <Button
+                type="button"
                 variant={isCurrentPhase ? "default" : "outline"}
                 size="sm"
                 className={`gap-2 ${isCurrentPhase ? '' : phase.color}`}

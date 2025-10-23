@@ -99,6 +99,7 @@ export const EditOrderDialog = ({ order, open, onOpenChange, onSave, onDelete }:
     newDate: string;
     itemIndex: number;
   } | null>(null);
+  const [isChangingStatus, setIsChangingStatus] = useState(false);
   
   // Estados para controlar seções colapsáveis
   const [labConfigOpen, setLabConfigOpen] = useState(false);
@@ -1016,15 +1017,23 @@ export const EditOrderDialog = ({ order, open, onOpenChange, onSave, onDelete }:
 
   // Handle status change with validation and immediate save
   const handleStatusChange = async (newStatus: string) => {
+    // Prevenir chamadas simultâneas
+    if (isChangingStatus) {
+      console.warn('⚠️ Já existe uma mudança de status em andamento');
+      return;
+    }
+    
+    setIsChangingStatus(true);
     console.log('🔄 Mudando status para:', newStatus);
     
     // Check if it's exception status
     if (newStatus === 'exception') {
       setPendingExceptionStatus(newStatus);
       setShowExceptionDialog(true);
+      setIsChangingStatus(false);
       return;
     }
-    
+  
     if (newStatus === 'completed') {
       // Check for pending items
       const pending = items.filter(item => 
@@ -1035,10 +1044,11 @@ export const EditOrderDialog = ({ order, open, onOpenChange, onSave, onDelete }:
       if (pending.length > 0) {
         setPendingCompletionStatus(newStatus);
         setShowCompleteDialog(true);
+        setIsChangingStatus(false);
         return;
       }
     }
-    
+  
     // Salvar imediatamente no banco de dados
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -1119,13 +1129,15 @@ export const EditOrderDialog = ({ order, open, onOpenChange, onSave, onDelete }:
       
       // Recarregar histórico
       loadHistory();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Erro ao salvar status:", error);
       toast({
         title: "Erro",
-        description: "Não foi possível salvar o status.",
-        variant: "destructive"
+        description: error.message || "Não foi possível salvar o status.",
+        variant: "destructive",
       });
+    } finally {
+      setIsChangingStatus(false);
     }
   };
 
@@ -1373,18 +1385,19 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
   };
 
   const onSubmit = async (data: Order) => {
-    console.log('💾 Salvando pedido com dados:', data);
+    console.log('💾 [INICIO] Salvando pedido com dados:', data);
     
-    const updatedOrder = { 
-      ...data, 
-      id: order.id, 
-      items
-    };
-    
-    // ✨ Track ALL field changes for complete history
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
+      const updatedOrder = { 
+        ...data, 
+        id: order.id, 
+        items
+      };
+      
+      // ✨ Track ALL field changes for complete history
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
         const fieldsToTrack = [
           { key: 'freight_type', label: 'Tipo de Frete', category: 'shipping_info' },
           { key: 'carrier_name', label: 'Transportadora', category: 'shipping_info' },
@@ -1430,7 +1443,8 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
         }
       }
     } catch (error) {
-      console.error('Error logging field changes:', error);
+      console.error('❌ [ERRO] Error logging field changes:', error);
+      // Não bloquear o save se o tracking falhar
     }
     
     // Check if delivery date changed
@@ -1455,6 +1469,17 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
     
     onSave(updatedOrder);
     onOpenChange(false);
+    console.log('✅ [SUCESSO] Pedido salvo com sucesso');
+    } catch (error: any) {
+      console.error('❌ [ERRO CRÍTICO] Falha ao salvar pedido:', error);
+      toast({
+        title: "Erro ao salvar",
+        description: "Por favor, tente novamente. Se o problema persistir, recarregue a página.",
+        variant: "destructive"
+      });
+    } finally {
+      console.log('🏁 [FIM] Processo de salvamento concluído');
+    }
   };
   
   const handleDateChangeSubmit = async () => {
@@ -1864,6 +1889,15 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                             <Select 
                               onValueChange={field.onChange} 
                               value={field.value || ""}
+                              onOpenChange={(open) => {
+                                if (!open) {
+                                  const event = window.event;
+                                  if (event) {
+                                    event.preventDefault();
+                                    event.stopPropagation();
+                                  }
+                                }
+                              }}
                             >
                               <SelectTrigger>
                                 <SelectValue placeholder="FOB ou CIF" />
@@ -1886,6 +1920,15 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                             <Select 
                               onValueChange={field.onChange} 
                               value={field.value || ""}
+                              onOpenChange={(open) => {
+                                if (!open) {
+                                  const event = window.event;
+                                  if (event) {
+                                    event.preventDefault();
+                                    event.stopPropagation();
+                                  }
+                                }
+                              }}
                             >
                               <SelectTrigger>
                                 <SelectValue placeholder="Selecione o modo" />
@@ -1908,6 +1951,12 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                           {...register("carrier_name")}
                           placeholder="Ex: Azul Cargo, Correios, Jadlog"
                           maxLength={100}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              e.stopPropagation();
+                            }
+                          }}
                         />
                       </div>
 
@@ -1917,6 +1966,12 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                           {...register("tracking_code")}
                           placeholder="Ex: BR123456789BR"
                           maxLength={100}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              e.stopPropagation();
+                            }
+                          }}
                         />
                       </div>
                     </div>
