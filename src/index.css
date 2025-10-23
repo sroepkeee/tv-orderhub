@@ -526,7 +526,7 @@ All colors MUST be HSL.
   }
 
   .kanban-cards-container {
-    max-height: calc(100% - 48px);
+    max-height: calc(100vh - 250px);
     scrollbar-width: thin;
     scrollbar-color: hsl(var(--muted-foreground)) transparent;
   }
@@ -659,16 +659,5 @@ All colors MUST be HSL.
   .dark tr:focus-within label,
   .dark tr[data-lov-selected="true"] label {
     color: hsl(220 60% 80%);
-  }
-
-  /* Prevenir scroll da página, permitir apenas scroll interno */
-  html, body {
-    overflow: hidden;
-    height: 100%;
-  }
-
-  #root {
-    height: 100%;
-    overflow: hidden;
   }
 }
