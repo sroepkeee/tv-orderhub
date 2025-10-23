@@ -196,6 +196,7 @@ export const ImportOrderDialog = ({
         warehouse: item.warehouse,
         delivery_date: convertDate(item.deliveryDate || parsedData.orderInfo.deliveryDate)!,
         item_source_type: item.sourceType || 'in_stock',
+        item_status: 'pending',
         unit_price: item.unitPrice || null,
         discount_percent: item.discount || null,
         total_value: item.totalValue || null,

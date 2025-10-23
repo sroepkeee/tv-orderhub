@@ -196,6 +196,7 @@ export async function importOrders(userId: string) {
           warehouse: item.warehouse,
           delivery_date: orderData.deliveryDate,
           item_source_type: item.sourceType,
+          item_status: 'pending',
           production_estimated_date: (item as any).productionDate || null,
           created_at: orderData.createdAt
         }));
