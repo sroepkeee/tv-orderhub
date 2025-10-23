@@ -139,10 +139,23 @@ export const ViewControls = ({
       completionRate: orders.length > 0 
         ? Math.round((completedOrders.length / orders.length) * 100)
         : 0,
-      totalWithCompleted: orders.length, // Total incluindo concluídos para cálculo de %
-      // Estatísticas de valor de concluídos (se disponível)
-      completedValue: completedOrders.reduce((sum, o) => sum + (o.quantity || 0), 0),
-      activeValue: activeOrders.reduce((sum, o) => sum + (o.quantity || 0), 0),
+      totalWithCompleted: orders.length,
+      // Pedidos concluídos no prazo
+      completedOnTime: completedOrders.filter(o => {
+        if (!o.deliveryDeadline || !o.createdDate) return false;
+        const deadline = new Date(o.deliveryDeadline);
+        const created = new Date(o.createdDate);
+        const actualDays = Math.ceil((deadline.getTime() - created.getTime()) / (1000 * 60 * 60 * 24));
+        return actualDays >= 0; // Entregue antes ou no prazo
+      }).length,
+      onTimeRate: completedOrders.length > 0
+        ? Math.round((completedOrders.filter(o => {
+            if (!o.deliveryDeadline || !o.createdDate) return false;
+            const deadline = new Date(o.deliveryDeadline);
+            const created = new Date(o.createdDate);
+            return Math.ceil((deadline.getTime() - created.getTime()) / (1000 * 60 * 60 * 24)) >= 0;
+          }).length / completedOrders.length) * 100)
+        : 0,
     };
     return counts;
   }, [orders]);
@@ -328,15 +341,23 @@ export const ViewControls = ({
               <div className="h-3 w-px bg-green-300 dark:bg-green-700 mx-1" />
               
               <div className="flex items-center gap-1 text-xs">
-                <span className="text-green-700 dark:text-green-300 font-medium">Qtd Total:</span>
-                <span className="font-bold text-green-600 dark:text-green-400">{statusCounts.completedValue}</span>
+                <span className="text-green-700 dark:text-green-300 font-medium">✓ No Prazo:</span>
+                <span className="font-bold text-emerald-600 dark:text-emerald-400">{statusCounts.completedOnTime}</span>
               </div>
               
               <div className="h-3 w-px bg-green-300 dark:bg-green-700 mx-1" />
               
               <div className="flex items-center gap-1 text-xs">
-                <span className="text-green-700 dark:text-green-300 font-medium">Ativos (Qtd):</span>
-                <span className="font-bold text-blue-600 dark:text-blue-400">{statusCounts.activeValue}</span>
+                <span className="text-green-700 dark:text-green-300 font-medium">Taxa Prazo:</span>
+                <span className={`font-bold ${
+                  statusCounts.onTimeRate >= 90 
+                    ? 'text-emerald-600 dark:text-emerald-400' 
+                    : statusCounts.onTimeRate >= 70 
+                    ? 'text-yellow-600 dark:text-yellow-400' 
+                    : 'text-orange-600 dark:text-orange-400'
+                }`}>
+                  {statusCounts.onTimeRate}%
+                </span>
               </div>
             </div>
 
