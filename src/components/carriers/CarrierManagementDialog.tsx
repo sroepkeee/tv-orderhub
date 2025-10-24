@@ -88,13 +88,19 @@ export const CarrierManagementDialog = ({
 
     setSaving(true);
     try {
+      console.log('Salvando transportadora:', formData);
+      
       if (carrier?.id) {
         await updateCarrier(carrier.id, formData);
       } else {
         await createCarrier(formData as Omit<Carrier, 'id' | 'created_at' | 'updated_at'>);
       }
+      
+      console.log('Transportadora salva com sucesso');
       onCarrierUpdated?.();
       onOpenChange(false);
+    } catch (error) {
+      console.error('Erro ao salvar:', error);
     } finally {
       setSaving(false);
     }

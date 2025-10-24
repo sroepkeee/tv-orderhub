@@ -65,12 +65,21 @@ export const useCarriers = () => {
 
   const updateCarrier = async (id: string, updates: Partial<Carrier>) => {
     try {
-      const { error } = await supabase
+      console.log('Atualizando transportadora:', id, updates);
+      
+      const { data, error } = await supabase
         .from('carriers')
         .update(updates as any)
-        .eq('id', id);
+        .eq('id', id)
+        .select()
+        .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Erro ao atualizar:', error);
+        throw error;
+      }
+
+      console.log('Transportadora atualizada:', data);
 
       toast({
         title: 'Transportadora atualizada',
@@ -78,12 +87,15 @@ export const useCarriers = () => {
       });
 
       await loadCarriers();
+      return data;
     } catch (error: any) {
+      console.error('Erro detalhado:', error);
       toast({
         title: 'Erro ao atualizar',
         description: error.message,
         variant: 'destructive',
       });
+      throw error;
     }
   };
 
