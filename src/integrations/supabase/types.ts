@@ -14,6 +14,139 @@ export type Database = {
   }
   public: {
     Tables: {
+      carrier_conversations: {
+        Row: {
+          carrier_id: string
+          conversation_type: string
+          created_at: string | null
+          created_by: string | null
+          delivered_at: string | null
+          id: string
+          message_content: string
+          message_direction: string
+          message_metadata: Json | null
+          n8n_message_id: string | null
+          order_id: string
+          quote_id: string | null
+          read_at: string | null
+          sent_at: string | null
+        }
+        Insert: {
+          carrier_id: string
+          conversation_type: string
+          created_at?: string | null
+          created_by?: string | null
+          delivered_at?: string | null
+          id?: string
+          message_content: string
+          message_direction: string
+          message_metadata?: Json | null
+          n8n_message_id?: string | null
+          order_id: string
+          quote_id?: string | null
+          read_at?: string | null
+          sent_at?: string | null
+        }
+        Update: {
+          carrier_id?: string
+          conversation_type?: string
+          created_at?: string | null
+          created_by?: string | null
+          delivered_at?: string | null
+          id?: string
+          message_content?: string
+          message_direction?: string
+          message_metadata?: Json | null
+          n8n_message_id?: string | null
+          order_id?: string
+          quote_id?: string | null
+          read_at?: string | null
+          sent_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "carrier_conversations_carrier_id_fkey"
+            columns: ["carrier_id"]
+            isOneToOne: false
+            referencedRelation: "carriers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "carrier_conversations_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "carrier_conversations_quote_id_fkey"
+            columns: ["quote_id"]
+            isOneToOne: false
+            referencedRelation: "freight_quotes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      carriers: {
+        Row: {
+          additional_contacts: Json | null
+          cnpj: string | null
+          collection_email: string | null
+          contact_person: string
+          contact_position: string | null
+          coverage_notes: string | null
+          created_at: string | null
+          email: string
+          id: string
+          is_active: boolean | null
+          name: string
+          notes: string | null
+          phone: string | null
+          quote_email: string | null
+          service_states: string[] | null
+          updated_at: string | null
+          whatsapp: string | null
+        }
+        Insert: {
+          additional_contacts?: Json | null
+          cnpj?: string | null
+          collection_email?: string | null
+          contact_person: string
+          contact_position?: string | null
+          coverage_notes?: string | null
+          created_at?: string | null
+          email: string
+          id?: string
+          is_active?: boolean | null
+          name: string
+          notes?: string | null
+          phone?: string | null
+          quote_email?: string | null
+          service_states?: string[] | null
+          updated_at?: string | null
+          whatsapp?: string | null
+        }
+        Update: {
+          additional_contacts?: Json | null
+          cnpj?: string | null
+          collection_email?: string | null
+          contact_person?: string
+          contact_position?: string | null
+          coverage_notes?: string | null
+          created_at?: string | null
+          email?: string
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          notes?: string | null
+          phone?: string | null
+          quote_email?: string | null
+          service_states?: string[] | null
+          updated_at?: string | null
+          whatsapp?: string | null
+        }
+        Relationships: []
+      }
       delivery_date_changes: {
         Row: {
           change_category: string | null
@@ -79,6 +212,116 @@ export type Database = {
             columns: ["order_item_id"]
             isOneToOne: false
             referencedRelation: "order_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      freight_quote_responses: {
+        Row: {
+          additional_info: Json | null
+          created_at: string | null
+          delivery_time_days: number | null
+          freight_value: number | null
+          id: string
+          is_selected: boolean | null
+          quote_id: string
+          received_at: string | null
+          responded_by: string | null
+          response_text: string
+        }
+        Insert: {
+          additional_info?: Json | null
+          created_at?: string | null
+          delivery_time_days?: number | null
+          freight_value?: number | null
+          id?: string
+          is_selected?: boolean | null
+          quote_id: string
+          received_at?: string | null
+          responded_by?: string | null
+          response_text: string
+        }
+        Update: {
+          additional_info?: Json | null
+          created_at?: string | null
+          delivery_time_days?: number | null
+          freight_value?: number | null
+          id?: string
+          is_selected?: boolean | null
+          quote_id?: string
+          received_at?: string | null
+          responded_by?: string | null
+          response_text?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "freight_quote_responses_quote_id_fkey"
+            columns: ["quote_id"]
+            isOneToOne: false
+            referencedRelation: "freight_quotes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      freight_quotes: {
+        Row: {
+          carrier_id: string
+          created_at: string | null
+          created_by: string | null
+          expires_at: string | null
+          id: string
+          n8n_conversation_id: string | null
+          order_id: string
+          quote_request_data: Json
+          requested_at: string | null
+          response_received_at: string | null
+          sent_at: string | null
+          status: string
+          updated_at: string | null
+        }
+        Insert: {
+          carrier_id: string
+          created_at?: string | null
+          created_by?: string | null
+          expires_at?: string | null
+          id?: string
+          n8n_conversation_id?: string | null
+          order_id: string
+          quote_request_data: Json
+          requested_at?: string | null
+          response_received_at?: string | null
+          sent_at?: string | null
+          status?: string
+          updated_at?: string | null
+        }
+        Update: {
+          carrier_id?: string
+          created_at?: string | null
+          created_by?: string | null
+          expires_at?: string | null
+          id?: string
+          n8n_conversation_id?: string | null
+          order_id?: string
+          quote_request_data?: Json
+          requested_at?: string | null
+          response_received_at?: string | null
+          sent_at?: string | null
+          status?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "freight_quotes_carrier_id_fkey"
+            columns: ["carrier_id"]
+            isOneToOne: false
+            referencedRelation: "carriers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "freight_quotes_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
             referencedColumns: ["id"]
           },
         ]
