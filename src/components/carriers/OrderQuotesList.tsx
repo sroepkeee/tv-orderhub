@@ -121,6 +121,9 @@ export function OrderQuotesList({
           const status = getQuoteStatus(order.conversations);
           const quoteData = extractQuoteData(order.lastMessage.message_content);
           const isSelected = selectedOrderId === order.orderId;
+          const carrierName = order.conversations.find(c => c.carrier?.name)?.carrier?.name 
+            ?? order.lastMessage.message_metadata?.carrier_name 
+            ?? order.lastMessage.message_metadata?.carrier?.name;
 
           return (
             <button
@@ -144,11 +147,11 @@ export function OrderQuotesList({
                     </Badge>
                   </div>
 
-                  {order.lastMessage.carrier?.name && (
+                  {carrierName && (
                     <div className="flex items-center gap-1 text-xs text-muted-foreground">
                       <Truck className="h-3 w-3" />
                       <span className="font-medium">
-                        {order.lastMessage.carrier.name}
+                        {carrierName}
                       </span>
                     </div>
                   )}
