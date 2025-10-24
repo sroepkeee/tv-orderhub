@@ -7,6 +7,7 @@ import { Loader2, Plus, BarChart3 } from 'lucide-react';
 import { FreightQuoteDialog } from './FreightQuoteDialog';
 import { FreightQuoteCard } from './FreightQuoteCard';
 import { QuoteComparisonTable } from './QuoteComparisonTable';
+import { QuoteSummaryTable } from './QuoteSummaryTable';
 import { useFreightQuotes } from '@/hooks/useFreightQuotes';
 import { Order } from '@/components/Dashboard';
 
@@ -52,6 +53,15 @@ export function CarriersTabContent({ order }: CarriersTabContentProps) {
           </Card>
         ) : (
           <>
+            {/* Quote Summary Table */}
+            {respondedQuotes.length > 0 && (
+              <QuoteSummaryTable 
+                quotes={quotes}
+                responses={responses}
+                onSelectQuote={selectQuote}
+              />
+            )}
+
             {/* Status Summary */}
             <Card className="p-4 bg-muted/50">
               <div className="flex items-center justify-between">
@@ -79,7 +89,7 @@ export function CarriersTabContent({ order }: CarriersTabContentProps) {
                     className="gap-2"
                   >
                     <BarChart3 className="h-4 w-4" />
-                    {showComparison ? 'Ocultar' : 'Ver'} Comparação
+                    {showComparison ? 'Ocultar' : 'Ver'} Comparação Detalhada
                   </Button>
                 )}
               </div>

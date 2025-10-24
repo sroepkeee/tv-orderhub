@@ -27,10 +27,17 @@ export const FreightQuoteCard = ({
   console.log('FreightQuoteCard - carrier:', quote.carrier);
   
   const getStatusBadge = () => {
+    if (selectedResponse) {
+      return <Badge className="bg-green-600 hover:bg-green-700 animate-pulse">✓ Selecionada</Badge>;
+    }
+    
+    if (quote.status === 'responded' || responses.length > 0) {
+      return <Badge className="bg-blue-600 hover:bg-blue-700">✅ Respondida</Badge>;
+    }
+
     const variants = {
       pending: 'secondary',
-      sent: 'default',
-      responded: 'default',
+      sent: 'secondary',
       accepted: 'default',
       rejected: 'destructive',
       expired: 'secondary',
@@ -39,8 +46,7 @@ export const FreightQuoteCard = ({
     return (
       <Badge variant={variants[quote.status] as any}>
         {quote.status === 'pending' && '⏳ Pendente'}
-        {quote.status === 'sent' && '📤 Enviado'}
-        {quote.status === 'responded' && '✅ Respondido'}
+        {quote.status === 'sent' && '⏳ Aguardando'}
         {quote.status === 'accepted' && '✓ Aceito'}
         {quote.status === 'rejected' && '✗ Rejeitado'}
         {quote.status === 'expired' && '⏰ Expirado'}
@@ -49,7 +55,11 @@ export const FreightQuoteCard = ({
   };
 
   const selectedResponse = responses.find(r => r.is_selected);
-  const bestResponse = responses.length > 0 ? responses[0] : null;
+  const bestResponse = responses.sort((a, b) => {
+    if (!a.freight_value) return 1;
+    if (!b.freight_value) return -1;
+    return a.freight_value - b.freight_value;
+  })[0];
 
   return (
     <>
@@ -81,28 +91,51 @@ export const FreightQuoteCard = ({
           </div>
 
           {bestResponse && (
-            <div className="border-t pt-3 space-y-2">
+            <div className="border-t pt-3 space-y-2 bg-primary/5 -mx-6 px-6 pb-3">
+              <p className="text-xs font-semibold text-primary uppercase">Resposta Recebida</p>
               {bestResponse.freight_value && (
-                <p className="font-semibold">💰 Valor: R$ {bestResponse.freight_value.toFixed(2)}</p>
+                <p className="font-bold text-lg flex items-center gap-2">
+                  💰 {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(bestResponse.freight_value)}
+                  {selectedResponse && (
+                    <Badge variant="outline" className="text-xs bg-green-100 text-green-700 border-green-300">
+                      ✓ Selecionada
+                    </Badge>
+                  )}
+                </p>
               )}
               {bestResponse.delivery_time_days && (
-                <p>⏱️ Prazo: {bestResponse.delivery_time_days} dias úteis</p>
+                <p className="flex items-center gap-2">
+                  ⏱️ <span className="font-semibold">{bestResponse.delivery_time_days} dias úteis</span>
+                </p>
               )}
               {bestResponse.response_text && (
                 <p className="text-sm text-muted-foreground">📝 {bestResponse.response_text}</p>
               )}
+              <p className="text-xs text-muted-foreground">
+                Recebido: {format(new Date(bestResponse.received_at), 'dd/MM/yyyy HH:mm')}
+              </p>
             </div>
           )}
 
           <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={() => setShowConversation(true)}>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => setShowConversation(true)}
+              className="flex-1"
+            >
               <MessageSquare className="h-4 w-4 mr-2" />
-              Ver Conversa
+              💬 Abrir Chat
             </Button>
             {bestResponse && !selectedResponse && (
-              <Button variant="default" size="sm" onClick={() => onSelectQuote(quote.id, bestResponse.id)}>
+              <Button 
+                variant="default" 
+                size="sm" 
+                onClick={() => onSelectQuote(quote.id, bestResponse.id)}
+                className="flex-1 bg-green-600 hover:bg-green-700"
+              >
                 <CheckCircle className="h-4 w-4 mr-2" />
-                Selecionar
+                Selecionar Cotação
               </Button>
             )}
           </div>

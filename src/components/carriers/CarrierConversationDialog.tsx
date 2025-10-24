@@ -81,8 +81,9 @@ export function CarrierConversationDialog({
 
         <Tabs defaultValue="quotes" className="flex-1 flex flex-col overflow-hidden">
           <TabsList className="mx-6 w-fit">
-            <TabsTrigger value="quotes">Cotações Recebidas</TabsTrigger>
-            <TabsTrigger value="conversation">Conversa</TabsTrigger>
+            <TabsTrigger value="quotes">📊 Cotações Recebidas</TabsTrigger>
+            <TabsTrigger value="conversation">💬 Conversa</TabsTrigger>
+            <TabsTrigger value="history">📜 Histórico</TabsTrigger>
           </TabsList>
 
           <TabsContent value="quotes" className="flex-1 overflow-auto px-6 pb-6">
@@ -95,6 +96,38 @@ export function CarrierConversationDialog({
               onSendMessage={handleSendMessage}
               loading={loading || sending}
             />
+          </TabsContent>
+
+          <TabsContent value="history" className="flex-1 overflow-auto px-6 pb-6">
+            <div className="space-y-2">
+              <h4 className="font-semibold text-sm text-muted-foreground">
+                Histórico de Cotações
+              </h4>
+              <div className="text-sm text-muted-foreground">
+                {filteredConversations.length > 0 ? (
+                  <div className="space-y-2">
+                    {filteredConversations.map((conv, idx) => (
+                      <div 
+                        key={conv.id} 
+                        className="p-3 border rounded-lg hover:bg-accent/50 transition-colors"
+                      >
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-xs font-medium">
+                            {conv.message_direction === 'outbound' ? '📤 Enviado' : '📥 Recebido'}
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            {new Date(conv.sent_at).toLocaleString('pt-BR')}
+                          </span>
+                        </div>
+                        <p className="text-sm">{conv.message_content}</p>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p>Nenhum histórico disponível para esta transportadora neste pedido.</p>
+                )}
+              </div>
+            </div>
           </TabsContent>
         </Tabs>
       </DialogContent>
