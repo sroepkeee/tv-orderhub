@@ -28,7 +28,8 @@ serve(async (req) => {
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const n8nWebhookUrl = Deno.env.get('N8N_WEBHOOK_URL')!;
+    const n8nWebhookUrl = Deno.env.get('N8N_WEBHOOK_URL') || 
+      'https://fructos-n8n-start.jtgui9.easypanel.host/webhook-test/bc019a4c-eba6-4ca4-81e6-7d11e5230fb2';
     const n8nApiKey = Deno.env.get('N8N_API_KEY');
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
@@ -88,6 +89,31 @@ serve(async (req) => {
         continue;
       }
 
+      // Registrar conversa IMEDIATAMENTE (antes de tentar N8N)
+      const { data: conversation, error: convError } = await supabase
+        .from('carrier_conversations')
+        .insert({
+          order_id: orderId,
+          carrier_id: carrierId,
+          quote_id: quote.id,
+          conversation_type: 'quote_request',
+          message_direction: 'outbound',
+          message_content: JSON.stringify(quoteData, null, 2),
+          message_metadata: {
+            channel: carrier.whatsapp ? 'whatsapp' : 'email',
+            recipient: carrier.quote_email || carrier.email,
+            sent_via_n8n: false,
+            n8n_attempted: false
+          },
+          created_by: userId
+        })
+        .select()
+        .single();
+
+      if (convError) {
+        console.error('Error creating conversation:', convError);
+      }
+
       // Preparar payload para N8N
       const n8nPayload = {
         quote_id: quote.id,
@@ -102,8 +128,13 @@ serve(async (req) => {
         quote_data: quoteData
       };
 
+      // Tentar enviar via N8N (mas não reverter se falhar)
+      let n8nSuccess = false;
+      let n8nData: any = null;
+
       try {
-        // Enviar para N8N
+        console.log(`Attempting to send to N8N webhook for carrier ${carrier.name}`);
+        
         const n8nHeaders: Record<string, string> = {
           'Content-Type': 'application/json'
         };
@@ -118,63 +149,77 @@ serve(async (req) => {
           body: JSON.stringify(n8nPayload)
         });
 
-        if (!n8nResponse.ok) {
+        if (n8nResponse.ok) {
+          n8nData = await n8nResponse.json();
+          n8nSuccess = true;
+          console.log('N8N response success:', n8nData);
+          
+          // Atualizar cotação como enviada
+          await supabase
+            .from('freight_quotes')
+            .update({ 
+              status: 'sent', 
+              sent_at: new Date().toISOString(),
+              n8n_conversation_id: n8nData.conversation_id || n8nData.id
+            })
+            .eq('id', quote.id);
+          
+          // Atualizar conversa com dados do N8N
+          if (conversation) {
+            await supabase
+              .from('carrier_conversations')
+              .update({
+                n8n_message_id: n8nData.message_id || n8nData.id,
+                message_metadata: {
+                  channel: carrier.whatsapp ? 'whatsapp' : 'email',
+                  recipient: carrier.quote_email || carrier.email,
+                  sent_via_n8n: true,
+                  n8n_attempted: true,
+                  n8n_response: n8nData
+                }
+              })
+              .eq('id', conversation.id);
+          }
+        } else {
           throw new Error(`N8N returned status ${n8nResponse.status}`);
         }
-
-        const n8nData = await n8nResponse.json();
-        console.log('N8N response:', n8nData);
-
-        // Atualizar status da cotação
+      } catch (n8nError) {
+        console.warn(`N8N integration failed for carrier ${carrier.name}, but conversation saved:`, n8nError);
+        
+        // NÃO reverter - apenas marcar como enviado localmente
         await supabase
           .from('freight_quotes')
           .update({ 
-            status: 'sent', 
-            sent_at: new Date().toISOString(),
-            n8n_conversation_id: n8nData.conversation_id || n8nData.id
+            status: 'sent_locally',
+            sent_at: new Date().toISOString()
           })
           .eq('id', quote.id);
-
-        // Registrar conversa
-        await supabase
-          .from('carrier_conversations')
-          .insert({
-            order_id: orderId,
-            carrier_id: carrierId,
-            quote_id: quote.id,
-            conversation_type: 'quote_request',
-            message_direction: 'outbound',
-            message_content: JSON.stringify(quoteData, null, 2),
-            message_metadata: {
-              channel: carrier.whatsapp ? 'whatsapp' : 'email',
-              recipient: carrier.quote_email || carrier.email
-            },
-            n8n_message_id: n8nData.message_id,
-            created_by: userId
-          });
-
-        results.push({ 
-          quote_id: quote.id,
-          carrier_id: carrierId,
-          carrier_name: carrier.name,
-          status: 'sent'
-        });
-      } catch (n8nError) {
-        console.error(`Error sending to N8N for carrier ${carrierId}:`, n8nError);
         
-        // Reverter status para pending
-        await supabase
-          .from('freight_quotes')
-          .update({ status: 'pending' })
-          .eq('id', quote.id);
-
-        results.push({ 
-          carrier_id: carrierId,
-          carrier_name: carrier.name,
-          status: 'error', 
-          error: 'Failed to send via N8N' 
-        });
+        // Atualizar conversa com informação de falha
+        if (conversation) {
+          await supabase
+            .from('carrier_conversations')
+            .update({
+              message_metadata: {
+                channel: carrier.whatsapp ? 'whatsapp' : 'email',
+                recipient: carrier.quote_email || carrier.email,
+                sent_via_n8n: false,
+                n8n_attempted: true,
+                n8n_error: n8nError instanceof Error ? n8nError.message : 'Unknown error'
+              }
+            })
+            .eq('id', conversation.id);
+        }
       }
+
+      // Adicionar ao resultado
+      results.push({ 
+        quote_id: quote.id,
+        carrier_id: carrierId,
+        carrier_name: carrier.name,
+        status: n8nSuccess ? 'sent' : 'sent_locally',
+        n8n_success: n8nSuccess
+      });
     }
 
     console.log('send-freight-quote: Completed. Results:', results);
