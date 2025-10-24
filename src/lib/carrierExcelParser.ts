@@ -231,11 +231,14 @@ export async function parseCarrierExcel(file: File): Promise<ParsedCarrierWithVa
         const carriers: ParsedCarrierWithValidation[] = jsonData.map((row, index) => {
           const states = parseStates(String(row.estados_atendidos || ''));
           
+          const emailPrincipal = row.email_principal ? String(row.email_principal).trim().toLowerCase() : undefined;
+          const emailCotacao = row.email_cotacao ? String(row.email_cotacao).trim().toLowerCase() : undefined;
+          
           const parsedData: ParsedCarrierData = {
             name: String(row.nome_transportadora || '').trim(),
             cnpj: row.cnpj ? normalizeCNPJ(String(row.cnpj)) : undefined,
-            email: row.email_principal ? String(row.email_principal).trim().toLowerCase() : undefined,
-            quote_email: row.email_cotacao ? String(row.email_cotacao).trim().toLowerCase() : undefined,
+            email: emailPrincipal || emailCotacao, // Usa email_cotacao como fallback se email_principal estiver vazio
+            quote_email: emailCotacao,
             collection_email: row.email_coleta ? String(row.email_coleta).trim().toLowerCase() : undefined,
             whatsapp: row.whatsapp ? normalizePhone(String(row.whatsapp)) : undefined,
             phone: row.telefone ? normalizePhone(String(row.telefone)) : undefined,
