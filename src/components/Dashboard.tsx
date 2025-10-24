@@ -4,7 +4,7 @@ import { DateRange } from "react-day-picker";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Search, Calendar, BarChart3, FileSpreadsheet, Plus, ChevronDown } from "lucide-react";
+import { Search, Calendar, BarChart3, FileSpreadsheet, Plus, ChevronDown, MessageSquare, Truck } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { cleanItemDescription } from "@/lib/utils";
 import { getStatusLabel } from "@/lib/statusLabels";

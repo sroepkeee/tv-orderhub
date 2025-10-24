@@ -7,6 +7,7 @@ import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 import Metrics from "./pages/Metrics";
+import CarriersChat from "./pages/CarriersChat";
 import { useAuth } from "./hooks/useAuth";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -48,6 +49,11 @@ const App = () => (
           <Route path="/metrics" element={
             <ProtectedRoute>
               <Metrics />
+            </ProtectedRoute>
+          } />
+          <Route path="/carriers-chat" element={
+            <ProtectedRoute>
+              <CarriersChat />
             </ProtectedRoute>
           } />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
