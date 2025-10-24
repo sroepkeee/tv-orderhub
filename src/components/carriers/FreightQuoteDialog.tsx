@@ -516,10 +516,17 @@ export const FreightQuoteDialog = ({
                         checked={selectedCarriers.includes(carrier.id)}
                         onCheckedChange={() => toggleCarrier(carrier.id)}
                       />
-                      <div>
-                        <p className="font-medium">{carrier.name}</p>
+                       <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium">{carrier.name}</p>
+                          {quoteData.recipient_state && carrier.service_states?.includes(quoteData.recipient_state) && (
+                            <Badge variant="default" className="bg-green-500 hover:bg-green-600 text-xs">
+                              ✓ Atende {quoteData.recipient_state}
+                            </Badge>
+                          )}
+                        </div>
                         <p className="text-sm text-muted-foreground">
-                          {carrier.service_states?.join(', ')}
+                          Estados: {carrier.service_states?.join(', ')}
                         </p>
                       </div>
                     </div>
