@@ -30,7 +30,9 @@ export function CarrierConversationDialog({
 
   useEffect(() => {
     if (open && orderId) {
-      loadConversationsByOrder(orderId);
+      (async () => {
+        await loadConversationsByOrder(orderId);
+      })();
     }
   }, [open, orderId]);
 

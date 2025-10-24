@@ -4,6 +4,7 @@ import { MessageBubble } from './MessageBubble';
 import { ConversationHeader } from './ConversationHeader';
 import { MessageInput } from './MessageInput';
 import { CarrierConversation } from '@/types/carriers';
+import { Loader2 } from 'lucide-react';
 
 interface ConversationThreadProps {
   conversations: CarrierConversation[];
@@ -25,12 +26,23 @@ export function ConversationThread({
     }
   }, [conversations]);
 
+  if (loading) {
+    return (
+      <div className="flex-1 flex items-center justify-center bg-muted/20">
+        <div className="text-center text-muted-foreground">
+          <Loader2 className="animate-spin h-8 w-8 mx-auto mb-2" />
+          <p className="text-sm">Carregando conversas...</p>
+        </div>
+      </div>
+    );
+  }
+
   if (conversations.length === 0) {
     return (
       <div className="flex-1 flex items-center justify-center bg-muted/20">
         <div className="text-center text-muted-foreground">
-          <p className="text-lg mb-2">Nenhuma conversa selecionada</p>
-          <p className="text-sm">Selecione uma conversa na lista lateral</p>
+          <p className="text-lg mb-2">Nenhuma mensagem ainda</p>
+          <p className="text-sm">As conversas aparecerão aqui quando enviadas</p>
         </div>
       </div>
     );

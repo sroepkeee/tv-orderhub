@@ -51,7 +51,12 @@ export const useCarrierConversations = () => {
           *,
           carriers (
             id,
-            name
+            name,
+            email,
+            quote_email,
+            whatsapp,
+            phone,
+            contact_person
           ),
           orders (
             order_number,
@@ -62,6 +67,8 @@ export const useCarrierConversations = () => {
         .order('sent_at', { ascending: true });
 
       if (error) throw error;
+      
+      setConversations((data || []) as unknown as CarrierConversation[]);
       return data || [];
     } catch (error: any) {
       toast({
@@ -84,16 +91,24 @@ export const useCarrierConversations = () => {
           *,
           carriers (
             id,
-            name
+            name,
+            email,
+            quote_email,
+            whatsapp,
+            phone,
+            contact_person
           ),
           orders (
-            order_number
+            order_number,
+            customer_name
           )
         `)
         .eq('order_id', orderId)
         .order('sent_at', { ascending: true });
 
       if (error) throw error;
+      
+      setConversations((data || []) as unknown as CarrierConversation[]);
       return data || [];
     } catch (error: any) {
       toast({
