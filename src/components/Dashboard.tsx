@@ -198,6 +198,7 @@ export const Dashboard = () => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [showEditDialog, setShowEditDialog] = useState(false);
+  const [unreadConversationsCount, setUnreadConversationsCount] = useState(0);
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
   const [loading, setLoading] = useState(true);
@@ -235,8 +236,23 @@ export const Dashboard = () => {
   useEffect(() => {
     if (user) {
       loadOrders();
+      loadUnreadCount();
     }
   }, [user]);
+
+  const loadUnreadCount = async () => {
+    try {
+      const { count } = await supabase
+        .from('carrier_conversations')
+        .select('*', { count: 'exact', head: true })
+        .eq('message_direction', 'inbound')
+        .is('read_at', null);
+      
+      setUnreadConversationsCount(count || 0);
+    } catch (error) {
+      console.error('Erro ao carregar contador de conversas:', error);
+    }
+  };
 
   // Limpar dialog se o pedido selecionado não existir mais
   useEffect(() => {
@@ -1018,6 +1034,21 @@ export const Dashboard = () => {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+          
+          <Button 
+            onClick={() => navigate('/carriers-chat')} 
+            variant="outline"
+            className="gap-1.5 h-8 px-2 lg:px-3 relative"
+            size="sm"
+          >
+            <MessageSquare className="h-3.5 w-3.5" />
+            <span className="hidden lg:inline">Conversas</span>
+            {unreadConversationsCount > 0 && (
+              <span className="absolute -top-1 -right-1 h-5 w-5 bg-destructive text-destructive-foreground text-xs rounded-full flex items-center justify-center">
+                {unreadConversationsCount}
+              </span>
+            )}
+          </Button>
           <AddOrderDialog onAddOrder={handleAddOrder} />
         </div>
       </div>

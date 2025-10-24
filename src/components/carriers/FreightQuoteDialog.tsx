@@ -29,12 +29,14 @@ interface FreightQuoteDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   order: Order;
+  onQuoteRequested?: () => void;
 }
 
 export const FreightQuoteDialog = ({
   open,
   onOpenChange,
   order,
+  onQuoteRequested,
 }: FreightQuoteDialogProps) => {
   const { carriers, loading: loadingCarriers } = useCarriers();
   const { sendQuoteRequest } = useFreightQuotes();

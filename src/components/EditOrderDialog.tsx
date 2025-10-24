@@ -12,7 +12,7 @@ import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Calendar, User, FileText, CheckCircle, XCircle, Clock, History, Edit, Plus, Trash2, Loader2, MessageSquare, Download, Package, AlertCircle, BarChart3, Settings, Image as ImageIcon, File, FileSpreadsheet, ChevronDown } from "lucide-react";
+import { Calendar, User, FileText, CheckCircle, XCircle, Clock, History, Edit, Plus, Trash2, Loader2, MessageSquare, Download, Package, AlertCircle, BarChart3, Settings, Image as ImageIcon, File, FileSpreadsheet, ChevronDown, Send, Truck } from "lucide-react";
 import { useForm, Controller } from "react-hook-form";
 import { Order } from "./Dashboard";
 import { OrderItem } from "./AddOrderDialog";
@@ -28,6 +28,7 @@ import { cleanItemDescription } from "@/lib/utils";
 import { OrderMetricsTab } from "./metrics/OrderMetricsTab";
 import { EnhancedOrderTimeline } from "./EnhancedOrderTimeline";
 import { LabWorkView } from "./LabWorkView";
+import { CarriersTabContent } from "./carriers/CarriersTabContent";
 interface HistoryEvent {
   id: string;
   changed_at: string;
@@ -1651,7 +1652,7 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
           </DialogHeader>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-6 h-9">
+          <TabsList className="grid w-full grid-cols-7 h-9">
             <TabsTrigger value="edit" className="flex items-center gap-1.5 data-[state=active]:bg-blue-500 data-[state=active]:text-white text-xs">
               <Edit className="h-3.5 w-3.5" />
               Editar
@@ -1663,6 +1664,10 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
             <TabsTrigger value="lab" className="flex items-center gap-1.5 data-[state=active]:bg-purple-500 data-[state=active]:text-white text-xs">
               <FileText className="h-3.5 w-3.5" />
               Laboratório
+            </TabsTrigger>
+            <TabsTrigger value="carriers" className="flex items-center gap-1.5 data-[state=active]:bg-teal-500 data-[state=active]:text-white text-xs">
+              <Send className="h-3.5 w-3.5" />
+              Transportadoras
             </TabsTrigger>
             <TabsTrigger value="history" className="flex items-center gap-1.5 data-[state=active]:bg-green-500 data-[state=active]:text-white text-xs">
               <History className="h-3.5 w-3.5" />
@@ -2121,6 +2126,12 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
 
           <TabsContent value="lab" className="mt-4">
             <LabWorkView orderId={order.id} items={items} requiresFirmware={order.requires_firmware} firmwareProjectName={order.firmware_project_name} requiresImage={order.requires_image} imageProjectName={order.image_project_name} />
+          </TabsContent>
+
+          <TabsContent value="carriers" className="mt-4">
+            <ScrollArea className="h-[calc(95vh-200px)] pr-4">
+              <CarriersTabContent order={order} />
+            </ScrollArea>
           </TabsContent>
 
           <TabsContent value="history" className="mt-4">
