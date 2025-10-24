@@ -58,25 +58,32 @@ export const CarrierManagementDialog = ({
   const [newContact, setNewContact] = useState({ name: '', phone: '', role: '' });
 
   useEffect(() => {
-    if (carrier) {
-      setFormData(carrier);
-    } else {
-      setFormData({
-        name: '',
-        cnpj: '',
-        email: '',
-        quote_email: '',
-        collection_email: '',
-        phone: '',
-        whatsapp: '',
-        contact_person: '',
-        contact_position: '',
-        service_states: [],
-        coverage_notes: '',
-        notes: '',
-        is_active: true,
-        additional_contacts: [],
-      });
+    // Apenas atualizar quando o dialog abrir
+    if (open) {
+      if (carrier) {
+        // Modo edição: carregar dados da transportadora
+        console.log('Carregando dados da transportadora:', carrier);
+        setFormData(carrier);
+        console.log('Dados carregados no form:', carrier);
+      } else {
+        // Modo criação: resetar para campos vazios
+        setFormData({
+          name: '',
+          cnpj: '',
+          email: '',
+          quote_email: '',
+          collection_email: '',
+          phone: '',
+          whatsapp: '',
+          contact_person: '',
+          contact_position: '',
+          service_states: [],
+          coverage_notes: '',
+          notes: '',
+          is_active: true,
+          additional_contacts: [],
+        });
+      }
     }
   }, [carrier, open]);
 
