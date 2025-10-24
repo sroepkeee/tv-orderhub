@@ -39,26 +39,29 @@ export const useCarrierImport = () => {
         }
       }
 
-      // Check by name + email
+      // Check by name
       const nameDuplicate = existingCarriers.find(
         existing => existing.name.toLowerCase() === carrier.name.toLowerCase()
       );
       if (nameDuplicate) {
         duplicates.push({
           carrier,
-          reason: `Nome já cadastrado (${nameDuplicate.email})`
+          reason: `Nome já cadastrado (${nameDuplicate.email || 'sem email'})`
         });
         return;
       }
 
-      const emailDuplicate = existingCarriers.find(
-        existing => existing.email.toLowerCase() === carrier.email.toLowerCase()
-      );
-      if (emailDuplicate) {
-        duplicates.push({
-          carrier,
-          reason: `Email já cadastrado (${emailDuplicate.name})`
-        });
+      // Check by email (apenas se ambos tiverem email)
+      if (carrier.email) {
+        const emailDuplicate = existingCarriers.find(
+          existing => existing.email?.toLowerCase() === carrier.email?.toLowerCase()
+        );
+        if (emailDuplicate) {
+          duplicates.push({
+            carrier,
+            reason: `Email já cadastrado (${emailDuplicate.name})`
+          });
+        }
       }
     });
 
@@ -100,15 +103,15 @@ export const useCarrierImport = () => {
             .insert([{
               name: carrier.name,
               cnpj: carrier.cnpj || null,
-              email: carrier.email,
+              email: carrier.email || null,
               quote_email: carrier.quote_email || null,
               collection_email: carrier.collection_email || null,
               whatsapp: carrier.whatsapp || null,
               phone: carrier.phone || null,
-              contact_person: carrier.contact_person,
+              contact_person: carrier.contact_person || null,
               contact_position: carrier.contact_position || null,
               additional_contacts: carrier.additional_contacts as any,
-              service_states: carrier.service_states,
+              service_states: carrier.service_states || [],
               coverage_notes: carrier.coverage_notes || null,
               notes: carrier.notes || null,
               is_active: true

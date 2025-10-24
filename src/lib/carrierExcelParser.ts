@@ -4,12 +4,12 @@ import type { CarrierContact } from '@/types/carriers';
 export interface ParsedCarrierData {
   name: string;
   cnpj?: string;
-  email: string;
+  email?: string;
   quote_email?: string;
   collection_email?: string;
   whatsapp?: string;
   phone?: string;
-  contact_person: string;
+  contact_person?: string;
   contact_position?: string;
   additional_contacts: CarrierContact[];
   service_states: string[];
@@ -35,7 +35,8 @@ const BRAZILIAN_STATES = [
   'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO'
 ];
 
-const EXPECTED_HEADERS = [
+// Suggested headers - não obrigatórios, apenas recomendados
+const SUGGESTED_HEADERS = [
   'nome_transportadora',
   'email_principal',
   'contato_principal',
@@ -105,7 +106,7 @@ function extractAdditionalContacts(row: any): CarrierContact[] {
 function validateCarrierData(data: ParsedCarrierData, rowIndex: number): ValidationIssue[] {
   const issues: ValidationIssue[] = [];
   
-  // Required fields
+  // ÚNICO CAMPO OBRIGATÓRIO: nome da transportadora
   if (!data.name || data.name.length < 3) {
     issues.push({
       field: 'nome_transportadora',
@@ -114,36 +115,42 @@ function validateCarrierData(data: ParsedCarrierData, rowIndex: number): Validat
     });
   }
   
+  // AVISOS (não bloqueiam importação) para campos recomendados vazios
   if (!data.email) {
     issues.push({
       field: 'email_principal',
-      message: 'Email principal é obrigatório',
-      severity: 'error'
+      message: 'Email principal não informado - recomendado completar após importação',
+      severity: 'warning'
     });
   } else if (!validateEmail(data.email)) {
     issues.push({
       field: 'email_principal',
       message: 'Email principal inválido',
-      severity: 'error'
+      severity: 'warning'
     });
   }
   
   if (!data.contact_person || data.contact_person.length < 3) {
     issues.push({
       field: 'contato_principal',
-      message: 'Nome do contato principal é obrigatório',
-      severity: 'error'
+      message: 'Nome do contato não informado - recomendado completar após importação',
+      severity: 'warning'
     });
   }
   
   if (!data.service_states || data.service_states.length === 0) {
     issues.push({
       field: 'estados_atendidos',
-      message: 'Pelo menos um estado deve ser informado',
-      severity: 'error'
+      message: 'Nenhum estado informado - recomendado completar após importação',
+      severity: 'warning'
     });
   } else {
-    issues.push(...validateStates(data.service_states));
+    // Validar estados apenas se foram informados
+    const stateIssues = validateStates(data.service_states);
+    // Converter erros de estados inválidos para warnings
+    stateIssues.forEach(issue => {
+      issues.push({ ...issue, severity: 'warning' });
+    });
   }
   
   // Optional email validations
@@ -211,13 +218,13 @@ export async function parseCarrierExcel(file: File): Promise<ParsedCarrierWithVa
           throw new Error('A planilha está vazia ou não contém dados válidos');
         }
         
-        // Validate headers
+        // Check for suggested headers (não bloqueia, apenas avisa)
         const firstRow = jsonData[0];
         const headers = Object.keys(firstRow).map(h => h.toLowerCase().trim());
-        const missingHeaders = EXPECTED_HEADERS.filter(h => !headers.includes(h));
+        const missingHeaders = SUGGESTED_HEADERS.filter(h => !headers.includes(h));
         
         if (missingHeaders.length > 0) {
-          throw new Error(`Colunas obrigatórias não encontradas: ${missingHeaders.join(', ')}`);
+          console.warn(`Colunas sugeridas não encontradas: ${missingHeaders.join(', ')}`);
         }
         
         // Parse each row
@@ -227,12 +234,12 @@ export async function parseCarrierExcel(file: File): Promise<ParsedCarrierWithVa
           const parsedData: ParsedCarrierData = {
             name: String(row.nome_transportadora || '').trim(),
             cnpj: row.cnpj ? normalizeCNPJ(String(row.cnpj)) : undefined,
-            email: String(row.email_principal || '').trim().toLowerCase(),
+            email: row.email_principal ? String(row.email_principal).trim().toLowerCase() : undefined,
             quote_email: row.email_cotacao ? String(row.email_cotacao).trim().toLowerCase() : undefined,
             collection_email: row.email_coleta ? String(row.email_coleta).trim().toLowerCase() : undefined,
             whatsapp: row.whatsapp ? normalizePhone(String(row.whatsapp)) : undefined,
             phone: row.telefone ? normalizePhone(String(row.telefone)) : undefined,
-            contact_person: String(row.contato_principal || '').trim(),
+            contact_person: row.contato_principal ? String(row.contato_principal).trim() : undefined,
             contact_position: row.cargo_contato ? String(row.cargo_contato).trim() : undefined,
             additional_contacts: extractAdditionalContacts(row),
             service_states: states.filter(s => BRAZILIAN_STATES.includes(s)),

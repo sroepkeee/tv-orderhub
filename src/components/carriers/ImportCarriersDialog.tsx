@@ -46,14 +46,9 @@ export function ImportCarriersDialog({ open, onOpenChange, onImportSuccess }: Im
       const parsed = await parseCarrierExcel(file);
       setCarriers(parsed);
       
-      // Select all valid carriers by default
-      const validIndices = new Set(
-        parsed
-          .map((c, i) => ({ carrier: c, index: i }))
-          .filter(({ carrier }) => carrier.isValid)
-          .map(({ index }) => index)
-      );
-      setSelectedCarriers(validIndices);
+      // Selecionar TODAS as transportadoras por padrão (inclusive com avisos)
+      const allIndices = new Set(parsed.map((_, i) => i));
+      setSelectedCarriers(allIndices);
       
       setStage('preview');
       toast.success(`${parsed.length} transportadora(s) encontrada(s) no arquivo`);
@@ -68,11 +63,8 @@ export function ImportCarriersDialog({ open, onOpenChange, onImportSuccess }: Im
   };
 
   const handleSelectAll = () => {
-    const validIndices = carriers
-      .map((c, i) => ({ carrier: c, index: i }))
-      .filter(({ carrier }) => carrier.isValid)
-      .map(({ index }) => index);
-    setSelectedCarriers(new Set(validIndices));
+    const allIndices = carriers.map((_, i) => i);
+    setSelectedCarriers(new Set(allIndices));
   };
 
   const handleDeselectAll = () => {
@@ -210,6 +202,11 @@ export function ImportCarriersDialog({ open, onOpenChange, onImportSuccess }: Im
               </div>
               <p className="text-sm text-muted-foreground">
                 {selectedCarriers.size} de {carriers.length} selecionada(s)
+                {carriers.filter(c => c.validationIssues.some(i => i.severity === 'warning')).length > 0 && (
+                  <span className="text-yellow-600 ml-2">
+                    ({carriers.filter((c, i) => selectedCarriers.has(i) && c.validationIssues.some(v => v.severity === 'warning')).length} com avisos)
+                  </span>
+                )}
               </p>
             </div>
 
@@ -226,7 +223,6 @@ export function ImportCarriersDialog({ open, onOpenChange, onImportSuccess }: Im
                       <Checkbox
                         checked={selectedCarriers.has(index)}
                         onCheckedChange={() => handleToggleCarrier(index)}
-                        disabled={!carrier.isValid}
                         className="mt-1"
                       />
                       <div className="flex-1 space-y-2">
