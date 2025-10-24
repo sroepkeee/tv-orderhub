@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Truck, Plus, Upload, TrendingUp, CheckCircle } from 'lucide-react';
+import { Truck, Plus, Upload, TrendingUp, CheckCircle, ArrowLeft } from 'lucide-react';
 import { useCarriers } from '@/hooks/useCarriers';
 import { CarriersList } from '@/components/carriers/CarriersList';
 import { CarrierManagementDialog } from '@/components/carriers/CarrierManagementDialog';
@@ -69,14 +70,26 @@ export default function Carriers() {
       <div className="container mx-auto p-6 space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold flex items-center gap-3">
-              <Truck className="h-8 w-8 text-primary" />
-              Gestão de Transportadoras
-            </h1>
-            <p className="text-muted-foreground mt-1">
-              Gerencie o cadastro de transportadoras e suas áreas de cobertura
-            </p>
+          <div className="flex items-start gap-4">
+            <Button
+              variant="ghost"
+              size="icon"
+              asChild
+              className="mt-1"
+            >
+              <Link to="/">
+                <ArrowLeft className="h-5 w-5" />
+              </Link>
+            </Button>
+            <div>
+              <h1 className="text-3xl font-bold flex items-center gap-3">
+                <Truck className="h-8 w-8 text-primary" />
+                Gestão de Transportadoras
+              </h1>
+              <p className="text-muted-foreground mt-1">
+                Gerencie o cadastro de transportadoras e suas áreas de cobertura
+              </p>
+            </div>
           </div>
           <div className="flex gap-2">
             <Button onClick={handleNewCarrier} className="gap-2">
