@@ -17,14 +17,14 @@ const BRAZILIAN_STATES = [
 
 export default function Carriers() {
   const { carriers, loading, loadCarriers } = useCarriers();
-  const [filteredState, setFilteredState] = useState<string>('');
+  const [filteredState, setFilteredState] = useState<string>('all');
   const [filteredCarriers, setFilteredCarriers] = useState<Carrier[]>([]);
   const [isManagementDialogOpen, setIsManagementDialogOpen] = useState(false);
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
   const [carrierToEdit, setCarrierToEdit] = useState<Carrier | undefined>();
 
   useEffect(() => {
-    if (filteredState) {
+    if (filteredState && filteredState !== 'all') {
       const filtered = carriers.filter(c => c.service_states.includes(filteredState));
       setFilteredCarriers(filtered);
     } else {
@@ -49,7 +49,7 @@ export default function Carriers() {
   };
 
   const activeCarriers = carriers.filter(c => c.is_active);
-  const coverageCount = filteredState 
+  const coverageCount = filteredState && filteredState !== 'all'
     ? activeCarriers.filter(c => c.service_states.includes(filteredState)).length
     : 0;
 
@@ -127,10 +127,10 @@ export default function Carriers() {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">
-                  {filteredState ? `Cobertura ${filteredState}` : 'Cobertura Total'}
+                  {filteredState !== 'all' ? `Cobertura ${filteredState}` : 'Cobertura Total'}
                 </p>
                 <p className="text-2xl font-bold">
-                  {filteredState ? coverageCount : activeCarriers.length}
+                  {filteredState !== 'all' ? coverageCount : activeCarriers.length}
                 </p>
               </div>
             </div>
@@ -148,7 +148,7 @@ export default function Carriers() {
                 <SelectValue placeholder="Todos os estados" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Todos os estados</SelectItem>
+                <SelectItem value="all">Todos os estados</SelectItem>
                 {BRAZILIAN_STATES.map(state => (
                   <SelectItem key={state} value={state}>
                     {state}
@@ -156,11 +156,11 @@ export default function Carriers() {
                 ))}
               </SelectContent>
             </Select>
-            {filteredState && (
+            {filteredState !== 'all' && (
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => setFilteredState('')}
+                onClick={() => setFilteredState('all')}
               >
                 Limpar filtro
               </Button>
@@ -175,7 +175,7 @@ export default function Carriers() {
         <Card className="p-6">
           <CarriersList
             carriers={filteredCarriers}
-            filteredState={filteredState}
+            filteredState={filteredState !== 'all' ? filteredState : ''}
             onEdit={handleEditCarrier}
             onCarriersChanged={handleCarriersChanged}
           />
