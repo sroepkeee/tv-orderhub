@@ -8,6 +8,35 @@ interface MessageBubbleProps {
   message: CarrierConversation;
 }
 
+// Função helper para processar formatação de texto
+const formatText = (text: string) => {
+  return text.split('\n').map((line, idx) => {
+    // Detectar linhas divisórias
+    if (line.includes('━━━')) {
+      return <div key={idx} className="border-t border-current opacity-30 my-2" />;
+    }
+    
+    // Processar negrito (*texto*)
+    const parts = line.split(/(\*[^*]+\*)/g);
+    const processedLine = parts.map((part, i) => {
+      if (part.startsWith('*') && part.endsWith('*')) {
+        return <strong key={i}>{part.slice(1, -1)}</strong>;
+      }
+      return part;
+    });
+    
+    // Aplicar indentação para linhas que começam com espaços
+    const indent = line.match(/^(\s+)/)?.[1]?.length || 0;
+    const paddingLeft = indent > 0 ? `${indent * 0.5}rem` : '0';
+    
+    return (
+      <div key={idx} style={{ paddingLeft }} className={indent > 0 ? 'text-xs opacity-90' : ''}>
+        {processedLine}
+      </div>
+    );
+  });
+};
+
 export function MessageBubble({ message }: MessageBubbleProps) {
   const isOutbound = message.message_direction === 'outbound';
   const isDelivered = !!message.delivered_at;
@@ -26,11 +55,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
       >
         {isQuote ? (
           <div className="text-sm whitespace-pre-wrap break-words font-medium">
-            {formatted.split('\n').map((line, idx) => (
-              <div key={idx} className={line.startsWith('  ') ? 'ml-2 text-xs opacity-90' : ''}>
-                {line}
-              </div>
-            ))}
+            {formatText(formatted)}
           </div>
         ) : (
           <p className="text-sm whitespace-pre-wrap break-words">
