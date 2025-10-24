@@ -1014,6 +1014,10 @@ export const Dashboard = () => {
             <BarChart3 className="h-3.5 w-3.5" />
             <span className="hidden lg:inline">Indicadores</span>
           </Button>
+          <Button variant="outline" onClick={() => navigate('/transportadoras')} className="gap-1.5 h-8 px-2 lg:px-3" size="sm">
+            <Truck className="h-3.5 w-3.5" />
+            <span className="hidden lg:inline">Transportadoras</span>
+          </Button>
           <UserMenu />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
