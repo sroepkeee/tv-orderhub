@@ -66,6 +66,7 @@ export interface Order {
   status: OrderStatus;
   client: string;
   deliveryDeadline: string;
+  delivery_address?: string;
   deskTicket: string;
   totvsOrderNumber?: string;
   items?: import("./AddOrderDialog").OrderItem[];
@@ -76,6 +77,7 @@ export interface Order {
   requires_image?: boolean;
   image_project_name?: string;
   freight_type?: string;
+  freight_value?: number;
   freight_modality?: string;
   carrier_name?: string;
   tracking_code?: string;
@@ -361,6 +363,7 @@ export const Dashboard = () => {
           status: dbOrder.status as OrderStatus,
           client: dbOrder.customer_name,
           deliveryDeadline: dbOrder.delivery_date,
+          delivery_address: dbOrder.delivery_address || dbOrder.customer_name,
           deskTicket: dbOrder.notes || dbOrder.order_number,
           totvsOrderNumber: dbOrder.totvs_order_number || undefined,
           items,

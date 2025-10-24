@@ -20,9 +20,11 @@ import {
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Package } from 'lucide-react';
 import { useCarriers } from '@/hooks/useCarriers';
 import { useFreightQuotes } from '@/hooks/useFreightQuotes';
+import { useOrderTotalValue } from '@/hooks/useOrderTotalValue';
+import { extractCity, extractState } from '@/lib/addressParser';
 import type { Order } from '@/components/Dashboard';
 
 interface FreightQuoteDialogProps {
@@ -40,24 +42,25 @@ export const FreightQuoteDialog = ({
 }: FreightQuoteDialogProps) => {
   const { carriers, loading: loadingCarriers } = useCarriers();
   const { sendQuoteRequest } = useFreightQuotes();
+  const { totalValue, loading: loadingTotal } = useOrderTotalValue(order.id);
   const [sending, setSending] = useState(false);
   const [selectedCarriers, setSelectedCarriers] = useState<string[]>([]);
 
   const [quoteData, setQuoteData] = useState({
-    // Remetente
-    sender_cnpj: '',
-    sender_company: 'SSM EQUIPAMENTOS',
-    sender_phone: '',
-    sender_address: '',
+    // Remetente (dados da Imply)
+    sender_cnpj: '05.681.400/0001-23',
+    sender_company: 'IMPLY TECNOLOGIA ELETRONICA LTDA',
+    sender_phone: '(51) 2106-8000',
+    sender_address: 'ROD RST 287 KM 105, SANTA CRUZ DO SUL/RS',
     
     // Destinatário (auto-preenchido do pedido)
-    recipient_name: order.client,
-    recipient_city: '',
-    recipient_state: '',
-    recipient_address: order.deliveryDeadline || '',
+    recipient_name: order.client || '',
+    recipient_city: extractCity(order.delivery_address),
+    recipient_state: extractState(order.delivery_address),
+    recipient_address: order.delivery_address || '',
     
     // Carga
-    product_description: order.description || '',
+    product_description: order.description || order.item || '',
     package_type: 'Caixa de madeira',
     volumes: order.package_volumes || 1,
     weight_kg: order.package_weight_kg || 0,
@@ -66,21 +69,35 @@ export const FreightQuoteDialog = ({
     height_m: order.package_height_m || 0,
     
     // Operacional
-    freight_payer: 'CIF',
-    freight_type: 'CIF',
+    freight_payer: order.freight_type === 'FOB' ? 'FOB' : 'CIF',
+    freight_type: order.freight_type || 'CIF',
     declared_value: 0,
     requires_insurance: false,
-    observations: '',
+    observations: order.deskTicket || '',
   });
 
+  // Atualizar valor declarado quando totalValue carregar
   useEffect(() => {
-    if (order && open) {
-      // Carregar transportadoras que atendem o estado
-      if (quoteData.recipient_state) {
-        // Filtrar automaticamente
+    if (totalValue > 0 && open) {
+      setQuoteData(prev => ({
+        ...prev,
+        declared_value: totalValue,
+        requires_insurance: totalValue > 1000,
+      }));
+    }
+  }, [totalValue, open]);
+
+  // Pré-selecionar transportadora se já cadastrada no pedido
+  useEffect(() => {
+    if (order.carrier_name && carriers.length > 0 && open) {
+      const matchingCarrier = carriers.find(c => 
+        c.name.toLowerCase().includes(order.carrier_name!.toLowerCase())
+      );
+      if (matchingCarrier && !selectedCarriers.includes(matchingCarrier.id)) {
+        setSelectedCarriers([matchingCarrier.id]);
       }
     }
-  }, [order, open, quoteData.recipient_state]);
+  }, [order.carrier_name, carriers, open]);
 
   const toggleCarrier = (carrierId: string) => {
     if (selectedCarriers.includes(carrierId)) {
@@ -120,9 +137,52 @@ export const FreightQuoteDialog = ({
           </p>
         </DialogHeader>
 
+        {/* Resumo do Pedido */}
+        {(totalValue > 0 || order.package_volumes) && (
+          <Card className="p-4 bg-muted/50 border-primary/20">
+            <div className="space-y-2">
+              {loadingTotal ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  Calculando valor total...
+                </div>
+              ) : totalValue > 0 ? (
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Valor Total do Pedido:</span>
+                  <span className="font-bold text-lg text-primary">
+                    R$ {totalValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  </span>
+                </div>
+              ) : null}
+              
+              {order.package_volumes && (
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground flex items-center gap-1">
+                    <Package className="h-3 w-3" />
+                    Volumes:
+                  </span>
+                  <span className="font-semibold">{order.package_volumes}</span>
+                </div>
+              )}
+              
+              {order.package_weight_kg && (
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Peso Total:</span>
+                  <span className="font-semibold">{order.package_weight_kg} kg</span>
+                </div>
+              )}
+            </div>
+          </Card>
+        )}
+
         <Accordion type="multiple" defaultValue={['sender', 'recipient', 'cargo', 'operational']}>
           <AccordionItem value="sender">
-            <AccordionTrigger>1. Dados do Remetente</AccordionTrigger>
+            <AccordionTrigger>
+              1. Dados do Remetente
+              <Badge variant="secondary" className="ml-2 text-xs">
+                ✨ Auto-preenchido
+              </Badge>
+            </AccordionTrigger>
             <AccordionContent className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2">
@@ -160,7 +220,14 @@ export const FreightQuoteDialog = ({
           </AccordionItem>
 
           <AccordionItem value="recipient">
-            <AccordionTrigger>2. Dados do Destinatário</AccordionTrigger>
+            <AccordionTrigger>
+              2. Dados do Destinatário
+              {order.delivery_address && (
+                <Badge variant="secondary" className="ml-2 text-xs">
+                  ✨ Auto-preenchido
+                </Badge>
+              )}
+            </AccordionTrigger>
             <AccordionContent className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2">
@@ -205,7 +272,14 @@ export const FreightQuoteDialog = ({
           </AccordionItem>
 
           <AccordionItem value="cargo">
-            <AccordionTrigger>3. Dados da Carga</AccordionTrigger>
+            <AccordionTrigger>
+              3. Dados da Carga
+              {(order.package_volumes || order.package_weight_kg) && (
+                <Badge variant="secondary" className="ml-2 text-xs">
+                  ✨ Auto-preenchido
+                </Badge>
+              )}
+            </AccordionTrigger>
             <AccordionContent className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2 col-span-2">
@@ -281,7 +355,14 @@ export const FreightQuoteDialog = ({
           </AccordionItem>
 
           <AccordionItem value="operational">
-            <AccordionTrigger>4. Informações Operacionais</AccordionTrigger>
+            <AccordionTrigger>
+              4. Informações Operacionais
+              {(totalValue > 0 || order.freight_type) && (
+                <Badge variant="secondary" className="ml-2 text-xs">
+                  ✨ Auto-preenchido
+                </Badge>
+              )}
+            </AccordionTrigger>
             <AccordionContent className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2">
