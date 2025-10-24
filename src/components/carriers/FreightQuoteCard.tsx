@@ -52,7 +52,16 @@ export const FreightQuoteCard = ({
       <Card>
         <CardHeader>
           <div className="flex items-start justify-between">
-            <CardTitle className="text-base">{(quote as any).carrier?.name || 'Transportadora'}</CardTitle>
+            <div>
+              <CardTitle className="text-base">
+                {(quote as any).carrier?.name || 'Transportadora'}
+              </CardTitle>
+              <p className="text-sm text-muted-foreground mt-1">
+                Solicitação de Cotação de Frete • 
+                {quote.quote_request_data?.recipient?.city && ` ${quote.quote_request_data.recipient.city}`}
+                {quote.quote_request_data?.recipient?.state && `/${quote.quote_request_data.recipient.state}`}
+              </p>
+            </div>
             {getStatusBadge()}
           </div>
         </CardHeader>
