@@ -1,7 +1,7 @@
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Package, MapPin, Calendar, DollarSign } from 'lucide-react';
+import { Package, MapPin, Calendar, DollarSign, Truck } from 'lucide-react';
 import { CarrierConversation } from '@/types/carriers';
 import { format } from 'date-fns';
 import { formatCarrierMessage } from '@/lib/utils';
@@ -143,6 +143,15 @@ export function OrderQuotesList({
                       {status.label}
                     </Badge>
                   </div>
+
+                  {order.lastMessage.carrier?.name && (
+                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                      <Truck className="h-3 w-3" />
+                      <span className="font-medium">
+                        {order.lastMessage.carrier.name}
+                      </span>
+                    </div>
+                  )}
 
                   {quoteData && (
                     <div className="space-y-1 text-xs text-muted-foreground">
