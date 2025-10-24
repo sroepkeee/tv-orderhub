@@ -19,6 +19,7 @@ export default function CarriersChat() {
     subscribeToNewMessages 
   } = useCarrierConversations();
   const [selectedWhatsApp, setSelectedWhatsApp] = useState<string | null>(null);
+  const [selectedCarrierId, setSelectedCarrierId] = useState<string | null>(null);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
 
@@ -32,6 +33,7 @@ export default function CarriersChat() {
 
   const handleSelectContact = (contact: { whatsapp: string; carrierId: string }) => {
     setSelectedWhatsApp(contact.whatsapp);
+    setSelectedCarrierId(contact.carrierId);
     setSelectedOrderId(null);
   };
 
@@ -42,9 +44,9 @@ export default function CarriersChat() {
   const handleSendMessage = async (message: string) => {
     if (!selectedOrderId || !selectedWhatsApp) return;
 
+    const keyFor = (c: any) => c.carrier?.whatsapp || `sem-whatsapp:${c.carrier_id}`;
     const conv = conversations.find(c => {
-      const conversationWhatsApp = c.carrier?.whatsapp || 'sem-whatsapp';
-      return c.order_id === selectedOrderId && conversationWhatsApp === selectedWhatsApp;
+      return c.order_id === selectedOrderId && keyFor(c) === selectedWhatsApp;
     });
     
     if (!conv) return;
@@ -75,11 +77,9 @@ export default function CarriersChat() {
     }
   };
 
+  const keyFor = (c: any) => c.carrier?.whatsapp || `sem-whatsapp:${c.carrier_id}`;
   const contactConversations = selectedWhatsApp
-    ? conversations.filter(c => {
-        const conversationWhatsApp = c.carrier?.whatsapp || 'sem-whatsapp';
-        return conversationWhatsApp === selectedWhatsApp;
-      })
+    ? conversations.filter(c => keyFor(c) === selectedWhatsApp)
     : [];
 
   const threadConversations = selectedOrderId

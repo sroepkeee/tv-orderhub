@@ -31,18 +31,18 @@ export function WhatsAppContactList({
 }: WhatsAppContactListProps) {
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Agrupar por WhatsApp
+  // Agrupar por chave única (WhatsApp ou carrier_id para casos sem WhatsApp)
   const groupedByWhatsApp = conversations.reduce((acc, conv) => {
-    const whatsapp = conv.carrier?.whatsapp || 'sem-whatsapp';
-    if (!acc[whatsapp]) {
-      acc[whatsapp] = [];
+    const key = conv.carrier?.whatsapp || `sem-whatsapp:${conv.carrier_id}`;
+    if (!acc[key]) {
+      acc[key] = [];
     }
-    acc[whatsapp].push(conv);
+    acc[key].push(conv);
     return acc;
   }, {} as Record<string, CarrierConversation[]>);
 
   // Criar lista de contatos
-  const contacts: WhatsAppContact[] = Object.entries(groupedByWhatsApp).map(([whatsapp, convs]) => {
+  const contacts: WhatsAppContact[] = Object.entries(groupedByWhatsApp).map(([key, convs]) => {
     const sortedConvs = convs.sort((a, b) => 
       new Date(b.sent_at).getTime() - new Date(a.sent_at).getTime()
     );
@@ -56,7 +56,7 @@ export function WhatsAppContactList({
     const uniqueOrders = new Set(convs.map(c => c.order_id));
 
     return {
-      whatsapp,
+      whatsapp: key,
       carrierName: lastMessage.carrier?.name || 'Transportadora',
       carrierId: lastMessage.carrier_id,
       orderCount: uniqueOrders.size,
@@ -79,7 +79,7 @@ export function WhatsAppContactList({
   });
 
   const formatWhatsApp = (whatsapp: string) => {
-    if (whatsapp === 'sem-whatsapp' || !whatsapp) return 'Sem WhatsApp';
+    if (!whatsapp || whatsapp.startsWith('sem-whatsapp')) return 'Sem WhatsApp';
     
     const cleaned = whatsapp.replace(/\D/g, '');
     
@@ -131,10 +131,10 @@ export function WhatsAppContactList({
                   <span className="font-semibold text-sm block mb-1">
                     {contact.carrierName}
                   </span>
-              <span className="text-xs text-muted-foreground flex items-center gap-1">
+               <span className="text-xs text-muted-foreground flex items-center gap-1">
                 <Phone className="h-3 w-3" />
                 {formatWhatsApp(contact.whatsapp)}
-                {contact.whatsapp === 'sem-whatsapp' && (
+                {contact.whatsapp.startsWith('sem-whatsapp') && (
                   <Badge variant="outline" className="text-xs ml-1">⚠️ Sem contato</Badge>
                 )}
               </span>
