@@ -25,100 +25,192 @@ function formatCompleteOrderMessage(order: any, items: any[], userMessage: strin
     lines.push('');
   }
   
-  // Dados do Pedido
-  lines.push('📋 *DADOS DO PEDIDO*');
-  lines.push(`Pedido: ${order.order_number || 'N/A'}`);
+  // Cabeçalho do Pedido
+  lines.push('🔔 *SOLICITAÇÃO DE COTAÇÃO DE FRETE*');
+  lines.push(`📦 Pedido: #${order.order_number || 'N/A'}`);
   if (order.totvs_order_number) {
-    lines.push(`Pedido TOTVS: ${order.totvs_order_number}`);
-  }
-  if (order.issue_date) {
-    lines.push(`Data Emissão: ${new Date(order.issue_date).toLocaleDateString('pt-BR')}`);
-  }
-  if (order.delivery_date) {
-    lines.push(`Data Entrega: ${new Date(order.delivery_date).toLocaleDateString('pt-BR')}`);
+    lines.push(`📋 Pedido TOTVS: ${order.totvs_order_number}`);
   }
   lines.push('');
   
-  // Dados do Destinatário
-  lines.push('👤 *DESTINATÁRIO*');
-  lines.push(`Nome: ${order.customer_name || 'N/A'}`);
-  if (order.customer_document) {
-    lines.push(`Documento: ${order.customer_document}`);
-  }
-  if (order.delivery_address) {
-    lines.push(`Endereço: ${order.delivery_address}`);
-  }
-  if (order.municipality) {
-    lines.push(`Município: ${order.municipality}`);
-  }
-  lines.push('');
-  
-  // Dados da Carga
+  // Calcular valor total do pedido
+  let totalValue = 0;
   if (items && items.length > 0) {
-    lines.push('📦 *ITENS DO PEDIDO*');
-    let totalWeight = 0;
-    let totalValue = 0;
+    items.forEach(item => {
+      if (item.total_value) {
+        totalValue += parseFloat(item.total_value);
+      }
+    });
+  }
+  
+  // Informações Principais
+  lines.push('💰 *Valor Total do Pedido:* R$ ' + totalValue.toFixed(2));
+  lines.push(`📦 *Volumes:* ${order.package_volumes || 1}`);
+  lines.push('');
+  lines.push('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  lines.push('');
+  
+  // 1. DADOS DO REMETENTE (sempre fixo - empresa IMPLY)
+  lines.push('📤 *1. DADOS DO REMETENTE*');
+  lines.push('');
+  lines.push('*Razão Social:* IMPLY TECNOLOGIA ELETRÔNICA LTDA.');
+  lines.push('*CNPJ:* 05.681.400/0001-23');
+  lines.push('*Telefone:* (51) 2106-8000');
+  lines.push('*Endereço:* Rodovia Imply Tecnologia, 1111 (RST 287 KM 105)');
+  lines.push('*Bairro:* Renascença');
+  lines.push('*Cidade/UF:* Santa Cruz do Sul/RS');
+  lines.push('*CEP:* 96815-710');
+  lines.push('');
+  lines.push('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  lines.push('');
+  
+  // 2. DADOS DO DESTINATÁRIO
+  lines.push('📥 *2. DADOS DO DESTINATÁRIO*');
+  lines.push('');
+  lines.push(`*Nome:* ${order.customer_name || 'N/A'}`);
+  
+  if (order.customer_document) {
+    const docLabel = order.customer_document.length > 14 ? 'CNPJ' : 'CPF';
+    lines.push(`*${docLabel}:* ${order.customer_document}`);
+  }
+  
+  // Extrair cidade e estado do delivery_address ou municipality
+  let city = '';
+  let state = '';
+  
+  if (order.municipality) {
+    const parts = order.municipality.split('/');
+    if (parts.length === 2) {
+      city = parts[0].trim();
+      state = parts[1].trim();
+    } else {
+      city = order.municipality;
+    }
+  }
+  
+  if (city) {
+    lines.push(`*Cidade:* ${city}`);
+  }
+  if (state) {
+    lines.push(`*Estado:* ${state}`);
+  }
+  
+  if (order.delivery_address) {
+    lines.push(`*Endereço Completo:* ${order.delivery_address}`);
+  }
+  lines.push('');
+  lines.push('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  lines.push('');
+  
+  // 3. DADOS DA CARGA
+  lines.push('📦 *3. DADOS DA CARGA*');
+  lines.push('');
+  
+  if (items && items.length > 0) {
+    // Concatenar descrições dos produtos
+    const productDescriptions = items.map(item => item.item_description).join(', ');
+    lines.push(`*Produto:* ${productDescriptions}`);
+    lines.push('');
     
+    // Detalhamento dos itens
+    lines.push('*Itens do Pedido:*');
     items.forEach((item, index) => {
       lines.push(`${index + 1}. ${item.item_description || 'Item'}`);
-      lines.push(`   Código: ${item.item_code || 'N/A'}`);
-      lines.push(`   Quantidade: ${item.requested_quantity || 0} ${item.unit || 'UND'}`);
+      lines.push(`   • Código: ${item.item_code || 'N/A'}`);
+      lines.push(`   • Quantidade: ${item.requested_quantity || 0} ${item.unit || 'UND'}`);
       if (item.unit_price) {
-        lines.push(`   Valor Unit.: R$ ${parseFloat(item.unit_price).toFixed(2)}`);
+        lines.push(`   • Valor Unitário: R$ ${parseFloat(item.unit_price).toFixed(2)}`);
       }
       if (item.total_value) {
-        const itemTotal = parseFloat(item.total_value);
-        lines.push(`   Valor Total: R$ ${itemTotal.toFixed(2)}`);
-        totalValue += itemTotal;
+        lines.push(`   • Valor Total: R$ ${parseFloat(item.total_value).toFixed(2)}`);
       }
-      lines.push('');
     });
-    
-    lines.push(`Total de Itens: ${items.length}`);
-    if (totalValue > 0) {
-      lines.push(`Valor Total da Carga: R$ ${totalValue.toFixed(2)}`);
-    }
     lines.push('');
   }
   
-  // Dados do Frete
-  lines.push('🚚 *INFORMAÇÕES DE FRETE*');
+  // Embalagem
+  lines.push('*Embalagem:* Caixa de madeira');
+  lines.push('');
+  
+  // Valor Declarado
+  lines.push(`💰 *Valor Declarado:* R$ ${totalValue.toFixed(2)}`);
+  lines.push('');
+  lines.push('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  lines.push('');
+  
+  // 4. INFORMAÇÕES DE FRETE
+  lines.push('🚚 *4. INFORMAÇÕES DE FRETE*');
+  lines.push('');
+  
   if (order.freight_type) {
-    lines.push(`Tipo de Frete: ${order.freight_type}`);
+    lines.push(`*Tipo de Frete:* ${order.freight_type}`);
   }
+  
   if (order.freight_modality) {
-    lines.push(`Modalidade: ${order.freight_modality}`);
+    lines.push(`*Modalidade:* ${order.freight_modality}`);
   }
-  if (order.carrier_name) {
-    lines.push(`Transportadora: ${order.carrier_name}`);
+  
+  // Quem paga o frete
+  const freightPayer = order.freight_type === 'CIF' ? 'Remetente (CIF)' : 'Destinatário (FOB)';
+  lines.push(`*Pagador do Frete:* ${freightPayer}`);
+  lines.push('');
+  
+  // 5. DIMENSÕES E PESO
+  lines.push('📏 *5. DIMENSÕES E PESO*');
+  lines.push('');
+  
+  if (order.package_weight_kg) {
+    lines.push(`*Peso Total:* ${order.package_weight_kg} kg`);
+  }
+  
+  if (order.package_volumes) {
+    lines.push(`*Quantidade de Volumes:* ${order.package_volumes}`);
+  }
+  
+  if (order.package_length_m || order.package_width_m || order.package_height_m) {
+    const length = order.package_length_m || 0;
+    const width = order.package_width_m || 0;
+    const height = order.package_height_m || 0;
+    lines.push(`*Dimensões por Volume:* ${length}m (C) x ${width}m (L) x ${height}m (A)`);
+    
+    // Calcular cubagem
+    if (length && width && height) {
+      const cubicMeters = length * width * height;
+      lines.push(`*Cubagem:* ${cubicMeters.toFixed(3)} m³`);
+    }
   }
   lines.push('');
   
-  // Dimensões e Peso
-  lines.push('📏 *DIMENSÕES E PESO*');
-  if (order.package_weight_kg) {
-    lines.push(`Peso: ${order.package_weight_kg} kg`);
+  // 6. PRAZO E DATAS
+  lines.push('📅 *6. PRAZOS*');
+  lines.push('');
+  
+  if (order.issue_date) {
+    lines.push(`*Data de Emissão:* ${new Date(order.issue_date).toLocaleDateString('pt-BR')}`);
   }
-  if (order.package_volumes) {
-    lines.push(`Volumes: ${order.package_volumes}`);
+  
+  if (order.delivery_date) {
+    lines.push(`*Data de Entrega Prevista:* ${new Date(order.delivery_date).toLocaleDateString('pt-BR')}`);
   }
-  if (order.package_length_m || order.package_width_m || order.package_height_m) {
-    const dims = [
-      order.package_length_m ? `${order.package_length_m}m` : null,
-      order.package_width_m ? `${order.package_width_m}m` : null,
-      order.package_height_m ? `${order.package_height_m}m` : null
-    ].filter(Boolean).join(' x ');
-    if (dims) {
-      lines.push(`Dimensões: ${dims}`);
-    }
+  
+  if (order.shipping_date) {
+    lines.push(`*Data de Embarque:* ${new Date(order.shipping_date).toLocaleDateString('pt-BR')}`);
   }
   
   // Observações
   if (order.notes) {
     lines.push('');
-    lines.push('📝 *OBSERVAÇÕES*');
+    lines.push('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    lines.push('');
+    lines.push('📝 *OBSERVAÇÕES ADICIONAIS*');
+    lines.push('');
     lines.push(order.notes);
   }
+  
+  lines.push('');
+  lines.push('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  lines.push('');
+  lines.push('✅ *Aguardamos sua cotação!*');
   
   return lines.join('\n');
 }
