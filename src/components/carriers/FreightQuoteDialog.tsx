@@ -27,6 +27,34 @@ import { useOrderTotalValue } from '@/hooks/useOrderTotalValue';
 import { extractCity, extractState } from '@/lib/addressParser';
 import type { Order } from '@/components/Dashboard';
 
+// Dados dos remetentes disponíveis
+const SENDER_OPTIONS = [
+  {
+    id: 'imply_tech',
+    name: 'IMPLY TECNOLOGIA ELETRÔNICA LTDA.',
+    cnpj: '05.681.400/0001-23',
+    address: 'Rodovia Imply Tecnologia, 1111 (RST 287 KM 105), Bairro Renascença, Santa Cruz do Sul/RS',
+    phone: '(51) 2106-8000',
+    email: 'imply@imply.com',
+  },
+  {
+    id: 'imply_sp',
+    name: 'IMPLY SÃO PAULO',
+    cnpj: '05.681.400/0001-23', // Mesmo CNPJ, filial
+    address: 'Av. Vereador Abel Ferreira, 1844 - Sala 1103, Edifício Anália Business Center, São Paulo/SP, CEP 03340-000',
+    phone: '(51) 2106-8000',
+    email: 'imply@imply.com',
+  },
+  {
+    id: 'imply_rental',
+    name: 'IMPLY RENTAL LOCAÇÃO DE EQUIPAMENTOS E SERVIÇOS LTDA',
+    cnpj: '14.928.256/0001-78',
+    address: 'Rodovia Imply Tecnologia, 1111 (RST 287 KM 105), Bairro Renascença, Santa Cruz do Sul/RS',
+    phone: '(51) 2106-8000',
+    email: 'nfe@imply.com',
+  },
+];
+
 interface FreightQuoteDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -45,13 +73,14 @@ export const FreightQuoteDialog = ({
   const { totalValue, loading: loadingTotal } = useOrderTotalValue(order.id);
   const [sending, setSending] = useState(false);
   const [selectedCarriers, setSelectedCarriers] = useState<string[]>([]);
+  const [selectedSender, setSelectedSender] = useState('imply_tech');
 
   const [quoteData, setQuoteData] = useState({
-    // Remetente (dados da Imply)
-    sender_cnpj: '05.681.400/0001-23',
-    sender_company: 'IMPLY TECNOLOGIA ELETRONICA LTDA',
-    sender_phone: '(51) 2106-8000',
-    sender_address: 'ROD RST 287 KM 105, SANTA CRUZ DO SUL/RS',
+    // Remetente (dados da Imply - padrão)
+    sender_cnpj: SENDER_OPTIONS[0].cnpj,
+    sender_company: SENDER_OPTIONS[0].name,
+    sender_phone: SENDER_OPTIONS[0].phone,
+    sender_address: SENDER_OPTIONS[0].address,
     
     // Destinatário (auto-preenchido do pedido)
     recipient_name: order.client || '',
@@ -98,6 +127,21 @@ export const FreightQuoteDialog = ({
       }
     }
   }, [order.carrier_name, carriers, open]);
+
+  // Atualizar dados do remetente quando selecionado
+  const handleSenderChange = (senderId: string) => {
+    const sender = SENDER_OPTIONS.find(s => s.id === senderId);
+    if (sender) {
+      setSelectedSender(senderId);
+      setQuoteData(prev => ({
+        ...prev,
+        sender_cnpj: sender.cnpj,
+        sender_company: sender.name,
+        sender_phone: sender.phone,
+        sender_address: sender.address,
+      }));
+    }
+  };
 
   const toggleCarrier = (carrierId: string) => {
     if (selectedCarriers.includes(carrierId)) {
@@ -183,36 +227,60 @@ export const FreightQuoteDialog = ({
                 ✨ Auto-preenchido
               </Badge>
             </AccordionTrigger>
-            <AccordionContent className="space-y-3">
+            <AccordionContent className="space-y-4">
+              <div className="space-y-2">
+                <Label>Selecionar Remetente *</Label>
+                <Select value={selectedSender} onValueChange={handleSenderChange}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {SENDER_OPTIONS.map((sender) => (
+                      <SelectItem key={sender.id} value={sender.id}>
+                        <div className="flex flex-col">
+                          <span className="font-medium">{sender.name}</span>
+                          <span className="text-xs text-muted-foreground">
+                            CNPJ: {sender.cnpj}
+                          </span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2">
-                  <Label>CNPJ *</Label>
+                  <Label>CNPJ</Label>
                   <Input
                     value={quoteData.sender_cnpj}
-                    onChange={(e) => setQuoteData({ ...quoteData, sender_cnpj: e.target.value })}
-                    placeholder="00.000.000/0000-00"
+                    disabled
+                    className="bg-muted"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Razão Social *</Label>
-                  <Input
-                    value={quoteData.sender_company}
-                    onChange={(e) => setQuoteData({ ...quoteData, sender_company: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Telefone *</Label>
+                  <Label>Telefone</Label>
                   <Input
                     value={quoteData.sender_phone}
-                    onChange={(e) => setQuoteData({ ...quoteData, sender_phone: e.target.value })}
-                    placeholder="(00) 0000-0000"
+                    disabled
+                    className="bg-muted"
                   />
                 </div>
                 <div className="space-y-2 col-span-2">
-                  <Label>Endereço *</Label>
+                  <Label>Razão Social</Label>
                   <Input
+                    value={quoteData.sender_company}
+                    disabled
+                    className="bg-muted"
+                  />
+                </div>
+                <div className="space-y-2 col-span-2">
+                  <Label>Endereço</Label>
+                  <Textarea
                     value={quoteData.sender_address}
-                    onChange={(e) => setQuoteData({ ...quoteData, sender_address: e.target.value })}
+                    disabled
+                    className="bg-muted resize-none"
+                    rows={2}
                   />
                 </div>
               </div>
