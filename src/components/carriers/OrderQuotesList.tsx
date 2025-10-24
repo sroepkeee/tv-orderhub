@@ -25,6 +25,42 @@ export function OrderQuotesList({
   selectedOrderId, 
   onSelectOrder 
 }: OrderQuotesListProps) {
+  // Funções auxiliares
+  const extractOrderNumber = (message: string): string | null => {
+    const { data } = formatCarrierMessage(message);
+    if (data?.observations) {
+      return data.observations;
+    }
+    
+    const match = message.match(/#?(\d{6,})/);
+    return match ? match[1] : null;
+  };
+
+  const extractQuoteData = (message: string) => {
+    const { data } = formatCarrierMessage(message);
+    if (data) {
+      return {
+        city: data.recipient_city,
+        state: data.recipient_state,
+        value: data.total_value,
+        volumes: data.volumes
+      };
+    }
+    return null;
+  };
+
+  const getQuoteStatus = (convs: CarrierConversation[]) => {
+    const hasResponse = convs.some(c => c.message_direction === 'inbound');
+    const lastOutbound = convs.find(c => c.message_direction === 'outbound');
+    
+    if (hasResponse) {
+      return { label: 'Respondida', variant: 'default' as const, color: 'text-green-600' };
+    } else if (lastOutbound) {
+      return { label: 'Aguardando', variant: 'secondary' as const, color: 'text-yellow-600' };
+    }
+    return { label: 'Pendente', variant: 'outline' as const, color: 'text-muted-foreground' };
+  };
+
   // Agrupar por order_id
   const groupedByOrder = conversations.reduce((acc, conv) => {
     const orderId = conv.order_id;
@@ -59,41 +95,6 @@ export function OrderQuotesList({
   }).sort((a, b) => 
     new Date(b.lastMessage.sent_at).getTime() - new Date(a.lastMessage.sent_at).getTime()
   );
-
-  const extractOrderNumber = (message: string): string | null => {
-    const { data } = formatCarrierMessage(message);
-    if (data?.observations) {
-      return data.observations;
-    }
-    
-    const match = message.match(/#?(\d{6,})/);
-    return match ? match[1] : null;
-  };
-
-  const getQuoteStatus = (convs: CarrierConversation[]) => {
-    const hasResponse = convs.some(c => c.message_direction === 'inbound');
-    const lastOutbound = convs.find(c => c.message_direction === 'outbound');
-    
-    if (hasResponse) {
-      return { label: 'Respondida', variant: 'default' as const, color: 'text-green-600' };
-    } else if (lastOutbound) {
-      return { label: 'Aguardando', variant: 'secondary' as const, color: 'text-yellow-600' };
-    }
-    return { label: 'Pendente', variant: 'outline' as const, color: 'text-muted-foreground' };
-  };
-
-  const extractQuoteData = (message: string) => {
-    const { data } = formatCarrierMessage(message);
-    if (data) {
-      return {
-        city: data.recipient_city,
-        state: data.recipient_state,
-        value: data.total_value,
-        volumes: data.volumes
-      };
-    }
-    return null;
-  };
 
   if (orders.length === 0) {
     return (
