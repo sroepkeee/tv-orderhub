@@ -92,11 +92,11 @@ export type Database = {
           additional_contacts: Json | null
           cnpj: string | null
           collection_email: string | null
-          contact_person: string
+          contact_person: string | null
           contact_position: string | null
           coverage_notes: string | null
           created_at: string | null
-          email: string
+          email: string | null
           id: string
           is_active: boolean | null
           name: string
@@ -111,11 +111,11 @@ export type Database = {
           additional_contacts?: Json | null
           cnpj?: string | null
           collection_email?: string | null
-          contact_person: string
+          contact_person?: string | null
           contact_position?: string | null
           coverage_notes?: string | null
           created_at?: string | null
-          email: string
+          email?: string | null
           id?: string
           is_active?: boolean | null
           name: string
@@ -130,11 +130,11 @@ export type Database = {
           additional_contacts?: Json | null
           cnpj?: string | null
           collection_email?: string | null
-          contact_person?: string
+          contact_person?: string | null
           contact_position?: string | null
           coverage_notes?: string | null
           created_at?: string | null
-          email?: string
+          email?: string | null
           id?: string
           is_active?: boolean | null
           name?: string
