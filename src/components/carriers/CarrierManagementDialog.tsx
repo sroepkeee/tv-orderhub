@@ -26,12 +26,14 @@ interface CarrierManagementDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   carrier?: Carrier | null;
+  onCarrierUpdated?: () => void;
 }
 
 export const CarrierManagementDialog = ({
   open,
   onOpenChange,
   carrier,
+  onCarrierUpdated,
 }: CarrierManagementDialogProps) => {
   const { createCarrier, updateCarrier } = useCarriers();
   const [saving, setSaving] = useState(false);
@@ -79,7 +81,8 @@ export const CarrierManagementDialog = ({
   }, [carrier, open]);
 
   const handleSubmit = async () => {
-    if (!formData.name || !formData.email || !formData.contact_person) {
+    // Apenas nome é obrigatório
+    if (!formData.name || formData.name.length < 3) {
       return;
     }
 
@@ -90,6 +93,7 @@ export const CarrierManagementDialog = ({
       } else {
         await createCarrier(formData as Omit<Carrier, 'id' | 'created_at' | 'updated_at'>);
       }
+      onCarrierUpdated?.();
       onOpenChange(false);
     } finally {
       setSaving(false);
@@ -164,8 +168,8 @@ export const CarrierManagementDialog = ({
           <div className="space-y-2">
             <Label>📧 E-mails</Label>
             <Input
-              placeholder="E-mail Principal *"
-              value={formData.email}
+              placeholder="E-mail Principal"
+              value={formData.email || ''}
               onChange={(e) => setFormData({ ...formData, email: e.target.value })}
             />
             <Input
@@ -204,10 +208,10 @@ export const CarrierManagementDialog = ({
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="contact_person">👤 Responsável *</Label>
+              <Label htmlFor="contact_person">👤 Responsável</Label>
               <Input
                 id="contact_person"
-                value={formData.contact_person}
+                value={formData.contact_person || ''}
                 onChange={(e) => setFormData({ ...formData, contact_person: e.target.value })}
               />
             </div>
@@ -269,7 +273,7 @@ export const CarrierManagementDialog = ({
           </div>
 
           <div className="space-y-2">
-            <Label>📍 Estados Atendidos *</Label>
+            <Label>📍 Estados Atendidos</Label>
             <div className="flex flex-wrap gap-2">
               {BRAZILIAN_STATES.map((state) => (
                 <Badge

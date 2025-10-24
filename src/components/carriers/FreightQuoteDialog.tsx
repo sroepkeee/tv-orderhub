@@ -17,15 +17,22 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from '@/components/ui/accordion';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, Package } from 'lucide-react';
+import { Loader2, Package, Edit, ChevronDown } from 'lucide-react';
 import { useCarriers } from '@/hooks/useCarriers';
 import { useFreightQuotes } from '@/hooks/useFreightQuotes';
 import { useOrderTotalValue } from '@/hooks/useOrderTotalValue';
 import { extractCity, extractState } from '@/lib/addressParser';
+import { CarrierManagementDialog } from '@/components/carriers/CarrierManagementDialog';
 import type { Order } from '@/components/Dashboard';
+import type { Carrier } from '@/types/carriers';
 
 // Dados dos remetentes disponíveis
 const SENDER_OPTIONS = [
@@ -68,12 +75,14 @@ export const FreightQuoteDialog = ({
   order,
   onQuoteRequested,
 }: FreightQuoteDialogProps) => {
-  const { carriers, loading: loadingCarriers } = useCarriers();
+  const { carriers, loading: loadingCarriers, loadCarriers } = useCarriers();
   const { sendQuoteRequest } = useFreightQuotes();
   const { totalValue, loading: loadingTotal } = useOrderTotalValue(order.id);
   const [sending, setSending] = useState(false);
   const [selectedCarriers, setSelectedCarriers] = useState<string[]>([]);
   const [selectedSender, setSelectedSender] = useState('imply_tech');
+  const [editingCarrier, setEditingCarrier] = useState<Carrier | null>(null);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
 
   const [quoteData, setQuoteData] = useState({
     // Remetente (dados da Imply - padrão)
@@ -159,15 +168,31 @@ export const FreightQuoteDialog = ({
     setSending(true);
     try {
       await sendQuoteRequest(order.id, selectedCarriers, quoteData);
+      onQuoteRequested?.();
       onOpenChange(false);
     } finally {
       setSending(false);
     }
   };
 
-  const filteredCarriers = carriers.filter(carrier => 
-    !quoteData.recipient_state || carrier.service_states?.includes(quoteData.recipient_state)
-  );
+  const handleEditCarrier = (carrier: Carrier) => {
+    setEditingCarrier(carrier);
+    setIsEditDialogOpen(true);
+  };
+
+  const handleCarrierUpdated = () => {
+    loadCarriers();
+    setIsEditDialogOpen(false);
+  };
+
+  // Separar transportadoras compatíveis e não compatíveis
+  const matchingCarriers = quoteData.recipient_state
+    ? carriers.filter(carrier => carrier.service_states?.includes(quoteData.recipient_state))
+    : carriers;
+
+  const nonMatchingCarriers = quoteData.recipient_state
+    ? carriers.filter(carrier => !carrier.service_states?.includes(quoteData.recipient_state))
+    : [];
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -483,59 +508,144 @@ export const FreightQuoteDialog = ({
         </Accordion>
 
         <div className="border-t pt-4 space-y-3">
-          <Label>📋 Selecione as Transportadoras</Label>
-          {quoteData.recipient_state && (
-            <p className="text-sm text-muted-foreground">
-              Filtradas por estado: {quoteData.recipient_state}
-            </p>
-          )}
+          <div className="flex items-center justify-between">
+            <Label>📋 Selecione as Transportadoras</Label>
+            {selectedCarriers.length > 0 && (
+              <Badge variant="secondary">
+                {selectedCarriers.length} selecionada(s)
+              </Badge>
+            )}
+          </div>
 
           {loadingCarriers ? (
             <div className="flex justify-center py-4">
               <Loader2 className="h-6 w-6 animate-spin" />
             </div>
-          ) : filteredCarriers.length === 0 ? (
+          ) : carriers.length === 0 ? (
             <p className="text-sm text-muted-foreground">
-              Nenhuma transportadora encontrada{quoteData.recipient_state && ' para este estado'}.
+              Nenhuma transportadora cadastrada.
             </p>
           ) : (
-            <div className="space-y-2">
-              {filteredCarriers.map((carrier) => (
-                <Card
-                  key={carrier.id}
-                  className={`p-3 cursor-pointer transition-colors ${
-                    selectedCarriers.includes(carrier.id)
-                      ? 'border-primary bg-primary/5'
-                      : ''
-                  }`}
-                  onClick={() => toggleCarrier(carrier.id)}
-                >
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-start space-x-3">
-                      <Checkbox
-                        checked={selectedCarriers.includes(carrier.id)}
-                        onCheckedChange={() => toggleCarrier(carrier.id)}
-                      />
-                       <div className="flex-1">
-                        <div className="flex items-center gap-2">
-                          <p className="font-medium">{carrier.name}</p>
-                          {quoteData.recipient_state && carrier.service_states?.includes(quoteData.recipient_state) && (
-                            <Badge variant="default" className="bg-green-500 hover:bg-green-600 text-xs">
-                              ✓ Atende {quoteData.recipient_state}
-                            </Badge>
-                          )}
-                        </div>
-                        <p className="text-sm text-muted-foreground">
-                          Estados: {carrier.service_states?.join(', ')}
-                        </p>
-                      </div>
+            <div className="space-y-4">
+              {/* Transportadoras que atendem o estado - expandidas */}
+              {matchingCarriers.length > 0 && (
+                <div className="space-y-2">
+                  {quoteData.recipient_state && (
+                    <div className="flex items-center gap-2">
+                      <Badge variant="default" className="bg-green-500 hover:bg-green-600">
+                        ✓ Atendem {quoteData.recipient_state}
+                      </Badge>
+                      <span className="text-sm text-muted-foreground">
+                        {matchingCarriers.length} transportadora(s)
+                      </span>
                     </div>
-                  </div>
-                </Card>
-              ))}
+                  )}
+                  {matchingCarriers.map((carrier) => (
+                    <Card
+                      key={carrier.id}
+                      className={`p-4 transition-all ${
+                        selectedCarriers.includes(carrier.id)
+                          ? 'border-primary bg-primary/5 border-2'
+                          : 'border-green-200 dark:border-green-900'
+                      }`}
+                    >
+                      <div className="flex items-start gap-3">
+                        <Checkbox
+                          checked={selectedCarriers.includes(carrier.id)}
+                          onCheckedChange={() => toggleCarrier(carrier.id)}
+                          className="mt-1"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-2 mb-2">
+                            <p className="font-semibold text-base">{carrier.name}</p>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleEditCarrier(carrier);
+                              }}
+                              className="shrink-0"
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                          </div>
+                          <div className="space-y-1 text-sm text-muted-foreground">
+                            {carrier.whatsapp && (
+                              <p>📱 WhatsApp: {carrier.whatsapp}</p>
+                            )}
+                            {carrier.email && (
+                              <p>📧 Email: {carrier.email}</p>
+                            )}
+                            <p className="text-xs">
+                              Estados: {carrier.service_states?.join(', ')}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              )}
+
+              {/* Transportadoras que NÃO atendem - minimizadas */}
+              {nonMatchingCarriers.length > 0 && quoteData.recipient_state && (
+                <Collapsible>
+                  <CollapsibleTrigger className="flex items-center gap-2 w-full p-3 rounded-md bg-muted/50 hover:bg-muted">
+                    <ChevronDown className="h-4 w-4" />
+                    <span className="text-sm font-medium">
+                      ⚠️ Outras transportadoras ({nonMatchingCarriers.length})
+                    </span>
+                    <span className="text-xs text-muted-foreground ml-auto">
+                      Não atendem {quoteData.recipient_state}
+                    </span>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="space-y-2 mt-2">
+                    {nonMatchingCarriers.map((carrier) => (
+                      <Card
+                        key={carrier.id}
+                        className="p-3 opacity-50 hover:opacity-100 transition-opacity"
+                      >
+                        <div className="flex items-center gap-3">
+                          <Checkbox
+                            checked={selectedCarriers.includes(carrier.id)}
+                            onCheckedChange={() => toggleCarrier(carrier.id)}
+                          />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between gap-2">
+                              <p className="font-medium text-sm">{carrier.name}</p>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleEditCarrier(carrier);
+                                }}
+                              >
+                                <Edit className="h-3 w-3" />
+                              </Button>
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                              Estados: {carrier.service_states?.join(', ')}
+                            </p>
+                          </div>
+                        </div>
+                      </Card>
+                    ))}
+                  </CollapsibleContent>
+                </Collapsible>
+              )}
             </div>
           )}
         </div>
+
+        {/* Dialog de edição inline */}
+        <CarrierManagementDialog
+          open={isEditDialogOpen}
+          onOpenChange={setIsEditDialogOpen}
+          carrier={editingCarrier}
+          onCarrierUpdated={handleCarrierUpdated}
+        />
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
@@ -544,9 +654,18 @@ export const FreightQuoteDialog = ({
           <Button
             onClick={handleSubmit}
             disabled={sending || selectedCarriers.length === 0}
+            className="gap-2"
           >
-            {sending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Enviar para {selectedCarriers.length} Transportadora(s)
+            {sending ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Enviando para {selectedCarriers.length} transportadora(s)...
+              </>
+            ) : (
+              <>
+                📤 Enviar Cotação ({selectedCarriers.length})
+              </>
+            )}
           </Button>
         </DialogFooter>
       </DialogContent>
