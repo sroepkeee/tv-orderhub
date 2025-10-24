@@ -22,6 +22,10 @@ export const FreightQuoteCard = ({
 }: FreightQuoteCardProps) => {
   const [showConversation, setShowConversation] = useState(false);
   
+  // Debug: verificar dados da transportadora
+  console.log('FreightQuoteCard - quote completo:', quote);
+  console.log('FreightQuoteCard - carrier:', quote.carrier);
+  
   const getStatusBadge = () => {
     const variants = {
       pending: 'secondary',
@@ -54,7 +58,7 @@ export const FreightQuoteCard = ({
           <div className="flex items-start justify-between">
             <div>
               <CardTitle className="text-base">
-                {(quote as any).carrier?.name || 'Transportadora'}
+                {quote.carrier?.name || 'Transportadora'}
               </CardTitle>
               <p className="text-sm text-muted-foreground mt-1">
                 Solicitação de Cotação de Frete • 
@@ -110,7 +114,7 @@ export const FreightQuoteCard = ({
         onOpenChange={setShowConversation}
         orderId={orderId}
         carrierId={quote.carrier_id}
-        carrierName={(quote as any).carrier?.name}
+        carrierName={quote.carrier?.name}
       />
     </>
   );

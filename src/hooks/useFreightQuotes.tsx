@@ -16,7 +16,7 @@ export const useFreightQuotes = () => {
         .from('freight_quotes')
         .select(`
           *,
-          carriers (
+          carrier:carriers (
             id,
             name,
             email,
@@ -28,6 +28,8 @@ export const useFreightQuotes = () => {
         .order('requested_at', { ascending: false });
 
       if (error) throw error;
+      
+      console.log('Quotes carregadas:', data);
       setQuotes((data || []) as unknown as FreightQuote[]);
     } catch (error: any) {
       toast({
