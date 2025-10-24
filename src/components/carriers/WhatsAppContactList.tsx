@@ -78,13 +78,34 @@ export function WhatsAppContactList({
   });
 
   const formatWhatsApp = (whatsapp: string) => {
-    if (whatsapp === 'sem-whatsapp') return 'Sem WhatsApp';
-    // Formato: (XX) XXXXX-XXXX
+    if (whatsapp === 'sem-whatsapp' || !whatsapp) return 'Sem WhatsApp';
+    
     const cleaned = whatsapp.replace(/\D/g, '');
+    
     if (cleaned.length === 11) {
+      // Celular: (XX) XXXXX-XXXX
       return `(${cleaned.slice(0, 2)}) ${cleaned.slice(2, 7)}-${cleaned.slice(7)}`;
+    } else if (cleaned.length === 10) {
+      // Fixo: (XX) XXXX-XXXX
+      return `(${cleaned.slice(0, 2)}) ${cleaned.slice(2, 6)}-${cleaned.slice(6)}`;
     }
+    
     return whatsapp;
+  };
+
+  const getMessagePreview = (content: string) => {
+    try {
+      const data = JSON.parse(content);
+      if (data.observations) {
+        return `Cotação #${data.observations} - ${data.recipient_city || data.recipient_state || 'Destino'}`;
+      }
+      if (data.order_number) {
+        return `Pedido #${data.order_number}`;
+      }
+      return content.substring(0, 60);
+    } catch {
+      return content.substring(0, 60);
+    }
   };
 
   return (
@@ -124,10 +145,13 @@ export function WhatsAppContactList({
                   <span className="font-semibold text-sm block mb-1">
                     {contact.carrierName}
                   </span>
-                  <span className="text-xs text-muted-foreground flex items-center gap-1">
-                    <Phone className="h-3 w-3" />
-                    {formatWhatsApp(contact.whatsapp)}
-                  </span>
+              <span className="text-xs text-muted-foreground flex items-center gap-1">
+                <Phone className="h-3 w-3" />
+                {formatWhatsApp(contact.whatsapp)}
+                {contact.whatsapp === 'sem-whatsapp' && (
+                  <Badge variant="outline" className="text-xs ml-1">⚠️ Sem contato</Badge>
+                )}
+              </span>
                 </div>
                 <span className="text-xs text-muted-foreground ml-2 whitespace-nowrap">
                   {formatDistanceToNow(new Date(contact.lastMessage.sent_at), {
@@ -150,8 +174,7 @@ export function WhatsAppContactList({
 
               <p className="text-sm text-muted-foreground truncate">
                 {contact.lastMessage.message_direction === 'outbound' ? '📤 ' : '📥 '}
-                {contact.lastMessage.message_content.substring(0, 60)}
-                {contact.lastMessage.message_content.length > 60 ? '...' : ''}
+                {getMessagePreview(contact.lastMessage.message_content)}
               </p>
             </button>
           ))

@@ -60,7 +60,13 @@ export function OrderQuotesList({
   );
 
   const extractOrderNumber = (message: string): string | null => {
-    // Tentar encontrar padrão de número de pedido
+    try {
+      const data = JSON.parse(message);
+      if (data.observations) {
+        return data.observations;
+      }
+    } catch {}
+    
     const match = message.match(/#?(\d{6,})/);
     return match ? match[1] : null;
   };

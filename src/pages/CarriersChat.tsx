@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Loader2 } from 'lucide-react';
 import { WhatsAppContactList } from '@/components/carriers/WhatsAppContactList';
 import { OrderQuotesList } from '@/components/carriers/OrderQuotesList';
 import { ConversationThread } from '@/components/carriers/ConversationThread';
@@ -11,7 +11,13 @@ import { useToast } from '@/hooks/use-toast';
 export default function CarriersChat() {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { conversations, sendMessage, loadConversations, subscribeToNewMessages } = useCarrierConversations();
+  const { 
+    conversations, 
+    loading, 
+    sendMessage, 
+    loadConversations, 
+    subscribeToNewMessages 
+  } = useCarrierConversations();
   const [selectedWhatsApp, setSelectedWhatsApp] = useState<string | null>(null);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
@@ -93,11 +99,17 @@ export default function CarriersChat() {
       </header>
 
       <div className="flex h-[calc(100vh-73px)]">
-        <WhatsAppContactList
-          conversations={conversations}
-          selectedWhatsApp={selectedWhatsApp || undefined}
-          onSelectContact={handleSelectContact}
-        />
+        {loading ? (
+          <div className="flex items-center justify-center h-full border-r w-80">
+            <Loader2 className="animate-spin h-8 w-8 text-muted-foreground" />
+          </div>
+        ) : (
+          <WhatsAppContactList
+            conversations={conversations}
+            selectedWhatsApp={selectedWhatsApp || undefined}
+            onSelectContact={handleSelectContact}
+          />
+        )}
 
         {selectedWhatsApp && (
           <OrderQuotesList

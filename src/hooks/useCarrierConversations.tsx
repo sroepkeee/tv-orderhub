@@ -20,7 +20,8 @@ export const useCarrierConversations = () => {
             id,
             name,
             email,
-            phone
+            phone,
+            whatsapp
           ),
           orders (
             order_number,
