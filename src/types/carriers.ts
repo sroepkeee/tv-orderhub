@@ -2,12 +2,12 @@ export interface Carrier {
   id: string;
   name: string;
   cnpj?: string;
-  email: string;
+  email?: string;
   quote_email?: string;
   collection_email?: string;
   whatsapp?: string;
   phone?: string;
-  contact_person: string;
+  contact_person?: string;
   contact_position?: string;
   additional_contacts: CarrierContact[];
   service_states: string[];
