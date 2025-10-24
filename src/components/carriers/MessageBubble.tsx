@@ -12,6 +12,26 @@ export function MessageBubble({ message }: MessageBubbleProps) {
   const isDelivered = !!message.delivered_at;
   const isRead = !!message.read_at;
 
+  // Tentar detectar e formatar JSON
+  const formatContent = (content: string) => {
+    try {
+      // Tentar parsear como JSON
+      const parsed = JSON.parse(content);
+      return {
+        isJson: true,
+        content: JSON.stringify(parsed, null, 2)
+      };
+    } catch {
+      // Se não for JSON, retornar como texto normal
+      return {
+        isJson: false,
+        content
+      };
+    }
+  };
+
+  const { isJson, content } = formatContent(message.message_content);
+
   return (
     <div className={`flex ${isOutbound ? 'justify-end' : 'justify-start'} mb-4`}>
       <div
@@ -21,9 +41,15 @@ export function MessageBubble({ message }: MessageBubbleProps) {
             : 'bg-muted text-foreground'
         }`}
       >
-        <p className="text-sm whitespace-pre-wrap break-words">
-          {message.message_content}
-        </p>
+        {isJson ? (
+          <pre className="text-xs font-mono whitespace-pre-wrap break-words overflow-x-auto">
+            <code>{content}</code>
+          </pre>
+        ) : (
+          <p className="text-sm whitespace-pre-wrap break-words">
+            {content}
+          </p>
+        )}
         
         <div className={`flex items-center justify-end gap-1 mt-1 text-xs ${
           isOutbound ? 'text-primary-foreground/70' : 'text-muted-foreground'
