@@ -2,6 +2,7 @@ import { CarrierConversation } from '@/types/carriers';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Check, CheckCheck } from 'lucide-react';
+import { formatCarrierMessage } from '@/lib/utils';
 
 interface MessageBubbleProps {
   message: CarrierConversation;
@@ -12,25 +13,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
   const isDelivered = !!message.delivered_at;
   const isRead = !!message.read_at;
 
-  // Tentar detectar e formatar JSON
-  const formatContent = (content: string) => {
-    try {
-      // Tentar parsear como JSON
-      const parsed = JSON.parse(content);
-      return {
-        isJson: true,
-        content: JSON.stringify(parsed, null, 2)
-      };
-    } catch {
-      // Se não for JSON, retornar como texto normal
-      return {
-        isJson: false,
-        content
-      };
-    }
-  };
-
-  const { isJson, content } = formatContent(message.message_content);
+  const { formatted, isQuote } = formatCarrierMessage(message.message_content);
 
   return (
     <div className={`flex ${isOutbound ? 'justify-end' : 'justify-start'} mb-4`}>
@@ -41,13 +24,17 @@ export function MessageBubble({ message }: MessageBubbleProps) {
             : 'bg-muted text-foreground'
         }`}
       >
-        {isJson ? (
-          <pre className="text-xs font-mono whitespace-pre-wrap break-words overflow-x-auto">
-            <code>{content}</code>
-          </pre>
+        {isQuote ? (
+          <div className="text-sm whitespace-pre-wrap break-words font-medium">
+            {formatted.split('\n').map((line, idx) => (
+              <div key={idx} className={line.startsWith('  ') ? 'ml-2 text-xs opacity-90' : ''}>
+                {line}
+              </div>
+            ))}
+          </div>
         ) : (
           <p className="text-sm whitespace-pre-wrap break-words">
-            {content}
+            {formatted}
           </p>
         )}
         

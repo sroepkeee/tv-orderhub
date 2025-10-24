@@ -10,6 +10,7 @@ import { ConversationThread } from './ConversationThread';
 import { QuoteResponsesTable } from './QuoteResponsesTable';
 import { useCarrierConversations } from '@/hooks/useCarrierConversations';
 import { useToast } from '@/hooks/use-toast';
+import { formatCarrierMessage } from '@/lib/utils';
 
 interface CarrierConversationDialogProps {
   open: boolean;
@@ -106,22 +107,36 @@ export function CarrierConversationDialog({
               <div className="text-sm text-muted-foreground">
                 {filteredConversations.length > 0 ? (
                   <div className="space-y-2">
-                    {filteredConversations.map((conv, idx) => (
-                      <div 
-                        key={conv.id} 
-                        className="p-3 border rounded-lg hover:bg-accent/50 transition-colors"
-                      >
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="text-xs font-medium">
-                            {conv.message_direction === 'outbound' ? '📤 Enviado' : '📥 Recebido'}
-                          </span>
-                          <span className="text-xs text-muted-foreground">
-                            {new Date(conv.sent_at).toLocaleString('pt-BR')}
-                          </span>
+                    {filteredConversations.map((conv) => {
+                      const { formatted, isQuote } = formatCarrierMessage(conv.message_content);
+                      
+                      return (
+                        <div 
+                          key={conv.id} 
+                          className="p-3 border rounded-lg hover:bg-accent/50 transition-colors"
+                        >
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-xs font-medium">
+                              {conv.message_direction === 'outbound' ? '📤 Enviado' : '📥 Recebido'}
+                            </span>
+                            <span className="text-xs text-muted-foreground">
+                              {new Date(conv.sent_at).toLocaleString('pt-BR')}
+                            </span>
+                          </div>
+                          {isQuote ? (
+                            <div className="text-sm whitespace-pre-wrap">
+                              {formatted.split('\n').map((line, idx) => (
+                                <div key={idx} className={line.startsWith('  ') ? 'ml-2 text-xs opacity-80' : ''}>
+                                  {line}
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="text-sm whitespace-pre-wrap">{formatted}</p>
+                          )}
                         </div>
-                        <p className="text-sm">{conv.message_content}</p>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 ) : (
                   <p>Nenhum histórico disponível para esta transportadora neste pedido.</p>

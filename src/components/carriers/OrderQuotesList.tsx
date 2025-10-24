@@ -4,6 +4,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Package, MapPin, Calendar, DollarSign } from 'lucide-react';
 import { CarrierConversation } from '@/types/carriers';
 import { format } from 'date-fns';
+import { formatCarrierMessage } from '@/lib/utils';
 
 interface OrderQuote {
   orderId: string;
@@ -60,12 +61,10 @@ export function OrderQuotesList({
   );
 
   const extractOrderNumber = (message: string): string | null => {
-    try {
-      const data = JSON.parse(message);
-      if (data.observations) {
-        return data.observations;
-      }
-    } catch {}
+    const { data } = formatCarrierMessage(message);
+    if (data?.observations) {
+      return data.observations;
+    }
     
     const match = message.match(/#?(\d{6,})/);
     return match ? match[1] : null;
@@ -84,20 +83,14 @@ export function OrderQuotesList({
   };
 
   const extractQuoteData = (message: string) => {
-    // Tentar extrair dados da cotação do JSON
-    try {
-      const jsonMatch = message.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        const data = JSON.parse(jsonMatch[0]);
-        return {
-          city: data.recipient?.city,
-          state: data.recipient?.state,
-          value: data.total_value,
-          volumes: data.volumes
-        };
-      }
-    } catch (e) {
-      // Ignorar erros de parse
+    const { data } = formatCarrierMessage(message);
+    if (data) {
+      return {
+        city: data.recipient_city,
+        state: data.recipient_state,
+        value: data.total_value,
+        volumes: data.volumes
+      };
     }
     return null;
   };

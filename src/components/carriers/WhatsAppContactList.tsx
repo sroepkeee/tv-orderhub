@@ -6,6 +6,7 @@ import { Search, Phone } from 'lucide-react';
 import { CarrierConversation } from '@/types/carriers';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { formatCarrierMessage } from '@/lib/utils';
 
 interface WhatsAppContact {
   whatsapp: string;
@@ -93,21 +94,6 @@ export function WhatsAppContactList({
     return whatsapp;
   };
 
-  const getMessagePreview = (content: string) => {
-    try {
-      const data = JSON.parse(content);
-      if (data.observations) {
-        return `Cotação #${data.observations} - ${data.recipient_city || data.recipient_state || 'Destino'}`;
-      }
-      if (data.order_number) {
-        return `Pedido #${data.order_number}`;
-      }
-      return content.substring(0, 60);
-    } catch {
-      return content.substring(0, 60);
-    }
-  };
-
   return (
     <div className="w-80 border-r bg-background flex flex-col h-full">
       <div className="p-4 border-b">
@@ -174,7 +160,7 @@ export function WhatsAppContactList({
 
               <p className="text-sm text-muted-foreground truncate">
                 {contact.lastMessage.message_direction === 'outbound' ? '📤 ' : '📥 '}
-                {getMessagePreview(contact.lastMessage.message_content)}
+                {formatCarrierMessage(contact.lastMessage.message_content).formatted.split('\n')[0]}
               </p>
             </button>
           ))
