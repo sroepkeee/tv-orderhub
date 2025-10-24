@@ -127,6 +127,63 @@ export const useFreightQuotes = () => {
     }
   };
 
+  const loadQuoteResponsesForOrder = async (orderId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('freight_quote_responses')
+        .select(`
+          *,
+          freight_quotes!inner (
+            id,
+            quote_id:id,
+            quote_request_data,
+            created_by,
+            carrier:carriers (
+              id,
+              name
+            ),
+            order_id
+          )
+        `)
+        .eq('freight_quotes.order_id', orderId)
+        .order('received_at', { ascending: false });
+
+      if (error) throw error;
+
+      // Buscar nomes dos solicitantes
+      const userIds = [...new Set(data?.map(r => r.freight_quotes?.created_by).filter(Boolean))];
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, full_name')
+        .in('id', userIds);
+
+      const profilesMap = new Map(profiles?.map(p => [p.id, p.full_name]) || []);
+
+      // Transformar dados para formato da tabela
+      const formattedData = data?.map(response => ({
+        id: response.id,
+        quote_id: response.quote_id,
+        freight_value: response.freight_value,
+        delivery_time_days: response.delivery_time_days,
+        response_text: response.response_text,
+        received_at: response.received_at,
+        is_selected: response.is_selected,
+        carrier_name: response.freight_quotes?.carrier?.name,
+        requester_name: profilesMap.get(response.freight_quotes?.created_by || '') || 'Desconhecido',
+        quote_request_data: response.freight_quotes?.quote_request_data,
+      })) || [];
+
+      return formattedData;
+    } catch (error: any) {
+      toast({
+        title: 'Erro ao carregar respostas',
+        description: error.message,
+        variant: 'destructive',
+      });
+      return [];
+    }
+  };
+
   return {
     quotes,
     responses,
@@ -135,5 +192,6 @@ export const useFreightQuotes = () => {
     loadQuoteResponses,
     sendQuoteRequest,
     selectQuote,
+    loadQuoteResponsesForOrder,
   };
 };

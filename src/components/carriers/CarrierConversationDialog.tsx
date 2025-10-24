@@ -5,7 +5,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ConversationThread } from './ConversationThread';
+import { QuoteResponsesTable } from './QuoteResponsesTable';
 import { useCarrierConversations } from '@/hooks/useCarrierConversations';
 import { useToast } from '@/hooks/use-toast';
 
@@ -70,20 +72,31 @@ export function CarrierConversationDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl h-[600px] flex flex-col p-0">
+      <DialogContent className="max-w-5xl h-[700px] flex flex-col p-0">
         <DialogHeader className="px-6 pt-6 pb-4">
           <DialogTitle>
-            Conversa - {carrierName || 'Transportadora'}
+            {carrierName || 'Transportadora'}
           </DialogTitle>
         </DialogHeader>
 
-        <div className="flex-1 overflow-hidden">
-          <ConversationThread
-            conversations={filteredConversations}
-            onSendMessage={handleSendMessage}
-            loading={loading || sending}
-          />
-        </div>
+        <Tabs defaultValue="quotes" className="flex-1 flex flex-col overflow-hidden">
+          <TabsList className="mx-6 w-fit">
+            <TabsTrigger value="quotes">Cotações Recebidas</TabsTrigger>
+            <TabsTrigger value="conversation">Conversa</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="quotes" className="flex-1 overflow-auto px-6 pb-6">
+            <QuoteResponsesTable orderId={orderId} />
+          </TabsContent>
+
+          <TabsContent value="conversation" className="flex-1 overflow-hidden">
+            <ConversationThread
+              conversations={filteredConversations}
+              onSendMessage={handleSendMessage}
+              loading={loading || sending}
+            />
+          </TabsContent>
+        </Tabs>
       </DialogContent>
     </Dialog>
   );
