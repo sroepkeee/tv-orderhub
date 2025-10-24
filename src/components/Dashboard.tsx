@@ -516,7 +516,7 @@ export const Dashboard = () => {
         customer_name: orderData.client,
         delivery_address: orderData.client,
         delivery_date: orderData.deliveryDeadline,
-        status: "pending",
+        status: "almox_ssm_pending",
         priority: orderData.priority,
         order_type: orderData.type,
         notes: orderData.deskTicket,

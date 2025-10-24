@@ -6,6 +6,7 @@
 export const STATUS_LABELS: Record<string, string> = {
   // Preparação/Planejamento
   "pending": "Pendente (Novo)",
+  "almox_ssm_pending": "ALMOX SSM - Aguardando",
   "in_analysis": "Em Análise",
   "awaiting_approval": "Aguardando Aprovação",
   "planned": "Planejado",
