@@ -40,9 +40,9 @@ export function OrderQuotesList({
     const { data } = formatCarrierMessage(message);
     if (data) {
       return {
-        city: data.recipient_city,
+        city: data.recipient_city || null,
         state: data.recipient_state,
-        value: data.total_value,
+        value: data.declared_value || data.total_value,
         volumes: data.volumes
       };
     }
@@ -146,22 +146,27 @@ export function OrderQuotesList({
 
                   {quoteData && (
                     <div className="space-y-1 text-xs text-muted-foreground">
-                      {quoteData.city && (
+                      {(quoteData.city && quoteData.city.trim()) ? (
                         <div className="flex items-center gap-1">
                           <MapPin className="h-3 w-3" />
                           <span>{quoteData.city}/{quoteData.state}</span>
                         </div>
-                      )}
+                      ) : quoteData.state ? (
+                        <div className="flex items-center gap-1">
+                          <MapPin className="h-3 w-3" />
+                          <span>Estado: {quoteData.state}</span>
+                        </div>
+                      ) : null}
                       {quoteData.value && (
                         <div className="flex items-center gap-1">
                           <DollarSign className="h-3 w-3" />
-                          <span>Valor: R$ {quoteData.value.toLocaleString('pt-BR')}</span>
+                          <span>R$ {quoteData.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                         </div>
                       )}
                       {quoteData.volumes && (
                         <div className="flex items-center gap-1">
                           <Package className="h-3 w-3" />
-                          <span>{quoteData.volumes} volume{quoteData.volumes > 1 ? 's' : ''}</span>
+                          <span>{quoteData.volumes} vol.</span>
                         </div>
                       )}
                     </div>

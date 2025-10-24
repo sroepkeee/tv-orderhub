@@ -76,27 +76,38 @@ export function formatCarrierMessage(content: string): {
     const data = JSON.parse(content);
     
     // Verificar se é uma cotação (tem campos específicos)
-    if (data.observations || data.recipient_city || data.total_value) {
+    if (data.observations || data.recipient_city || data.declared_value) {
       const lines: string[] = [];
       
       if (data.observations) {
         lines.push(`📦 Pedido: #${data.observations}`);
       }
       
-      if (data.recipient_city && data.recipient_state) {
+      // Usar recipient_city OU recipient_state
+      if (data.recipient_city && data.recipient_city.trim()) {
         lines.push(`📍 Destino: ${data.recipient_city}/${data.recipient_state}`);
+      } else if (data.recipient_state) {
+        lines.push(`📍 Estado: ${data.recipient_state}`);
       }
       
       if (data.volumes) {
         lines.push(`📊 Volumes: ${data.volumes}`);
       }
       
-      if (data.total_weight) {
-        lines.push(`⚖️ Peso Total: ${data.total_weight} kg`);
+      if (data.weight_kg && data.weight_kg > 0) {
+        lines.push(`⚖️ Peso Total: ${data.weight_kg} kg`);
       }
       
-      if (data.total_value) {
-        lines.push(`💰 Valor Total: R$ ${Number(data.total_value).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`);
+      if (data.declared_value) {
+        lines.push(`💰 Valor Declarado: R$ ${Number(data.declared_value).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`);
+      }
+      
+      if (data.product_description) {
+        lines.push(`📝 Produto: ${data.product_description}`);
+      }
+      
+      if (data.package_type) {
+        lines.push(`📦 Embalagem: ${data.package_type}`);
       }
       
       if (data.items && Array.isArray(data.items) && data.items.length > 0) {
@@ -109,7 +120,12 @@ export function formatCarrierMessage(content: string): {
       return {
         formatted: lines.join('\n'),
         isQuote: true,
-        data
+        data: {
+          ...data,
+          // Normalizar campos para facilitar acesso
+          total_value: data.declared_value,
+          total_weight: data.weight_kg
+        }
       };
     }
     
