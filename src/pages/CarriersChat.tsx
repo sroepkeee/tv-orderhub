@@ -42,9 +42,10 @@ export default function CarriersChat() {
   const handleSendMessage = async (message: string) => {
     if (!selectedOrderId || !selectedWhatsApp) return;
 
-    const conv = conversations.find(c => 
-      c.order_id === selectedOrderId && c.carrier?.whatsapp === selectedWhatsApp
-    );
+    const conv = conversations.find(c => {
+      const conversationWhatsApp = c.carrier?.whatsapp || 'sem-whatsapp';
+      return c.order_id === selectedOrderId && conversationWhatsApp === selectedWhatsApp;
+    });
     
     if (!conv) return;
 
@@ -75,7 +76,10 @@ export default function CarriersChat() {
   };
 
   const contactConversations = selectedWhatsApp
-    ? conversations.filter(c => c.carrier?.whatsapp === selectedWhatsApp)
+    ? conversations.filter(c => {
+        const conversationWhatsApp = c.carrier?.whatsapp || 'sem-whatsapp';
+        return conversationWhatsApp === selectedWhatsApp;
+      })
     : [];
 
   const threadConversations = selectedOrderId
