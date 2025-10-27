@@ -7,6 +7,7 @@ import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 import Metrics from "./pages/Metrics";
+import Production from "./pages/Production";
 import CarriersChat from "./pages/CarriersChat";
 import Carriers from "./pages/Carriers";
 import { useAuth } from "./hooks/useAuth";
@@ -55,12 +56,17 @@ const App = () => {
                 <Index />
               </ProtectedRoute>
             } />
-            <Route path="/metrics" element={
-              <ProtectedRoute>
-                <Metrics />
-              </ProtectedRoute>
-            } />
-            <Route path="/carriers-chat" element={
+          <Route path="/metrics" element={
+            <ProtectedRoute>
+              <Metrics />
+            </ProtectedRoute>
+          } />
+          <Route path="/producao" element={
+            <ProtectedRoute>
+              <Production />
+            </ProtectedRoute>
+          } />
+          <Route path="/carriers-chat" element={
               <ProtectedRoute>
                 <CarriersChat />
               </ProtectedRoute>

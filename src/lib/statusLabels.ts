@@ -47,7 +47,10 @@ export const STATUS_LABELS: Record<string, string> = {
   // Itens/Estoque/Almoxarifado
   "in_stock": "Em estoque",
   "almox_ssm_received": "Recebido no Almox (SSM)",
-  "almox_general_received": "Recebido no Almox (Geral)"
+  "almox_general_received": "Recebido no Almox (Geral)",
+  // Status de itens (item_status)
+  "awaiting_production": "Aguardando Produção",
+  "purchase_required": "Solicitar Compra"
 };
 
 /**

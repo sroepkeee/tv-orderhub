@@ -194,6 +194,31 @@ export default function Metrics() {
         </div>
       </header>
       
+      {/* Botão de acesso à Produção */}
+      <div className="mb-6 p-6 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950 dark:to-indigo-950 border border-blue-200 rounded-lg">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="bg-blue-500 p-3 rounded-lg">
+              <Package className="h-6 w-6 text-white" />
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold">Controle de Produção</h3>
+              <p className="text-sm text-muted-foreground">
+                Visualize todos os itens em produção, pendentes e para compra
+              </p>
+            </div>
+          </div>
+          <Button 
+            onClick={() => navigate('/producao')}
+            size="lg"
+            className="gap-2"
+          >
+            <Package className="h-5 w-5" />
+            Acessar Produção
+          </Button>
+        </div>
+      </div>
+
       {/* SLA Alerts */}
       <SLAAlert orders={orders} threshold={2} />
       
