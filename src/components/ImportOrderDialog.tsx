@@ -10,6 +10,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Upload, FileSpreadsheet, CheckCircle2, XCircle, AlertTriangle, Download } from "lucide-react";
 import { cleanItemDescription } from "@/lib/utils";
+import { useDuplicateOrderCheck } from "@/hooks/useDuplicateOrderCheck";
+import { DuplicateOrderWarningDialog } from "@/components/DuplicateOrderWarningDialog";
 interface ImportOrderDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -25,6 +27,13 @@ export const ImportOrderDialog = ({
   const [validation, setValidation] = useState<ValidationResult | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [step, setStep] = useState<'upload' | 'preview' | 'importing'>('upload');
+  const [duplicateWarning, setDuplicateWarning] = useState<{
+    show: boolean;
+    existingOrder: any;
+    parsedData: any;
+    duplicateType: 'totvs' | 'internal' | 'combined' | null;
+  }>({ show: false, existingOrder: null, parsedData: null, duplicateType: null });
+  const { checkDuplicate, isChecking } = useDuplicateOrderCheck();
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
     if (!selectedFile) return;
@@ -78,6 +87,34 @@ export const ImportOrderDialog = ({
   };
   const handleImport = async () => {
     if (!parsedData || !validation?.isValid) return;
+
+    // ✨ NOVO: Verificar duplicação antes de importar
+    const duplicateCheck = await checkDuplicate({
+      orderNumber: parsedData.orderInfo.orderNumber,
+      totvsOrderNumber: parsedData.orderInfo.orderNumber,
+      customerName: parsedData.orderInfo.customerName,
+      deliveryDate: parsedData.orderInfo.deliveryDate
+    });
+
+    if (duplicateCheck.isDuplicate) {
+      setDuplicateWarning({
+        show: true,
+        existingOrder: duplicateCheck.existingOrder,
+        parsedData,
+        duplicateType: duplicateCheck.duplicateType
+      });
+      return;
+    }
+
+    // Importar normalmente
+    await executeImport(parsedData);
+  };
+
+  const executeImport = async (data: ParsedOrderData, duplicateInfo?: {
+    isDuplicateApproved: boolean;
+    approvalNote: string;
+    originalOrderId: string;
+  }) => {
     setIsProcessing(true);
     setStep('importing');
     try {
@@ -102,24 +139,24 @@ export const ImportOrderDialog = ({
         error: orderError
       } = await supabase.from('orders').insert({
         user_id: user.id,
-        order_number: parsedData.orderInfo.orderNumber,
-        totvs_order_number: parsedData.orderInfo.orderNumber,
-        customer_name: parsedData.orderInfo.customerName,
-        customer_document: parsedData.orderInfo.customerDocument || null,
-        delivery_address: parsedData.orderInfo.deliveryAddress,
-        municipality: parsedData.orderInfo.municipality || null,
-        issue_date: convertDate(parsedData.orderInfo.issueDate) || null,
-        delivery_date: convertDate(parsedData.orderInfo.deliveryDate)!,
-        shipping_date: convertDate(parsedData.orderInfo.shippingDate || '') || null,
+        order_number: data.orderInfo.orderNumber,
+        totvs_order_number: data.orderInfo.orderNumber,
+        customer_name: data.orderInfo.customerName,
+        customer_document: data.orderInfo.customerDocument || null,
+        delivery_address: data.orderInfo.deliveryAddress,
+        municipality: data.orderInfo.municipality || null,
+        issue_date: convertDate(data.orderInfo.issueDate) || null,
+        delivery_date: convertDate(data.orderInfo.deliveryDate)!,
+        shipping_date: convertDate(data.orderInfo.shippingDate || '') || null,
         status: 'almox_ssm_pending',
-        priority: parsedData.orderInfo.priority || 'normal',
+        priority: data.orderInfo.priority || 'normal',
         order_type: 'vendas_balcao',
-        notes: parsedData.orderInfo.notes || '',
-        carrier_name: parsedData.orderInfo.carrier || null,
-        freight_type: parsedData.orderInfo.freightType || null,
-        freight_value: parsedData.orderInfo.freightValue || null,
-        operation_code: parsedData.orderInfo.operationCode || null,
-        executive_name: parsedData.orderInfo.executiveName || null
+        notes: data.orderInfo.notes || '',
+        carrier_name: data.orderInfo.carrier || null,
+        freight_type: data.orderInfo.freightType || null,
+        freight_value: data.orderInfo.freightValue || null,
+        operation_code: data.orderInfo.operationCode || null,
+        executive_name: data.orderInfo.executiveName || null
       }).select().single();
       if (orderError) throw orderError;
 
@@ -133,6 +170,19 @@ export const ImportOrderDialog = ({
         change_category: 'order_creation',
         change_type: 'create'
       });
+
+      // ✨ NOVO: Se for duplicata aprovada, registrar no histórico
+      if (duplicateInfo?.isDuplicateApproved) {
+        await supabase.from('order_changes').insert({
+          order_id: order.id,
+          field_name: 'duplicate_approval',
+          old_value: duplicateInfo.originalOrderId,
+          new_value: duplicateInfo.approvalNote || 'Duplicação aprovada pelo usuário',
+          changed_by: user.id,
+          change_category: 'order_creation',
+          change_type: 'create'
+        });
+      }
 
       // Fazer upload do PDF para o storage (se for PDF)
       if (file && file.name.endsWith('.pdf')) {
@@ -185,7 +235,7 @@ export const ImportOrderDialog = ({
       }
 
       // Inserir itens
-      const itemsToInsert = parsedData.items.map(item => ({
+      const itemsToInsert = data.items.map(item => ({
         user_id: user.id,
         order_id: order.id,
         item_code: item.itemCode,
@@ -194,7 +244,7 @@ export const ImportOrderDialog = ({
         delivered_quantity: 0,
         unit: item.unit,
         warehouse: item.warehouse,
-        delivery_date: convertDate(item.deliveryDate || parsedData.orderInfo.deliveryDate)!,
+        delivery_date: convertDate(item.deliveryDate || data.orderInfo.deliveryDate)!,
         item_source_type: item.sourceType || 'in_stock',
         item_status: 'pending',
         unit_price: item.unitPrice || null,
@@ -210,11 +260,11 @@ export const ImportOrderDialog = ({
       // Mensagem de sucesso diferenciada para importações com PDF
       if (file?.name.endsWith('.pdf')) {
         toast.success(
-          `✅ Pedido ${parsedData.orderInfo.orderNumber} importado com sucesso!\n\n📄 PDF salvo automaticamente na aba Anexos.`,
+          `✅ Pedido ${data.orderInfo.orderNumber} importado com sucesso!\n\n📄 PDF salvo automaticamente na aba Anexos.`,
           { duration: 5000 }
         );
       } else {
-        toast.success(`Pedido ${parsedData.orderInfo.orderNumber} importado com sucesso!`);
+        toast.success(`Pedido ${data.orderInfo.orderNumber} importado com sucesso!`);
       }
 
       // Forçar atualização da lista de pedidos
@@ -233,6 +283,24 @@ export const ImportOrderDialog = ({
     } finally {
       setIsProcessing(false);
     }
+  };
+
+  const handleConfirmDuplicate = async (approvalNote: string) => {
+    const data = duplicateWarning.parsedData;
+    await executeImport(data, {
+      isDuplicateApproved: true,
+      approvalNote,
+      originalOrderId: duplicateWarning.existingOrder.id
+    });
+    setDuplicateWarning({ show: false, existingOrder: null, parsedData: null, duplicateType: null });
+  };
+
+  const handleViewExistingOrder = () => {
+    setDuplicateWarning({ show: false, existingOrder: null, parsedData: null, duplicateType: null });
+    onOpenChange(false);
+    window.dispatchEvent(new CustomEvent('openOrder', { 
+      detail: { orderId: duplicateWarning.existingOrder.id } 
+    }));
   };
   const handleReset = () => {
     setStep('upload');
@@ -413,9 +481,9 @@ export const ImportOrderDialog = ({
               <Button variant="outline" onClick={handleReset}>
                 Cancelar
               </Button>
-              <Button onClick={handleImport} disabled={!validation.isValid || isProcessing} className="gap-2">
+              <Button onClick={handleImport} disabled={!validation.isValid || isProcessing || isChecking} className="gap-2">
                 <CheckCircle2 className="h-4 w-4" />
-                Importar Pedido
+                {isChecking ? "Verificando..." : "Importar Pedido"}
               </Button>
             </div>
           </div>}
@@ -426,6 +494,26 @@ export const ImportOrderDialog = ({
             <p className="text-muted-foreground">Importando pedido...</p>
             <p className="text-sm text-muted-foreground mt-2">Aguarde, não feche esta janela</p>
           </div>}
+
+        {/* Dialog de Aviso de Duplicação */}
+        <DuplicateOrderWarningDialog
+          open={duplicateWarning.show}
+          onOpenChange={(open) => {
+            if (!open) {
+              setDuplicateWarning({ show: false, existingOrder: null, parsedData: null, duplicateType: null });
+            }
+          }}
+          existingOrder={duplicateWarning.existingOrder}
+          newOrderData={duplicateWarning.parsedData ? {
+            orderNumber: duplicateWarning.parsedData.orderInfo.orderNumber,
+            totvsOrderNumber: duplicateWarning.parsedData.orderInfo.orderNumber,
+            customerName: duplicateWarning.parsedData.orderInfo.customerName,
+            deliveryDate: duplicateWarning.parsedData.orderInfo.deliveryDate
+          } : {}}
+          duplicateType={duplicateWarning.duplicateType}
+          onConfirm={handleConfirmDuplicate}
+          onViewExisting={handleViewExistingOrder}
+        />
       </DialogContent>
     </Dialog>;
 };

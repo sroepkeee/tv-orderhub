@@ -12,6 +12,8 @@ import { Badge } from "@/components/ui/badge";
 import { OrderTypeSelector } from "@/components/OrderTypeSelector";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Settings } from "lucide-react";
+import { useDuplicateOrderCheck } from "@/hooks/useDuplicateOrderCheck";
+import { DuplicateOrderWarningDialog } from "@/components/DuplicateOrderWarningDialog";
 
 export interface OrderItem {
   id?: string;
@@ -60,7 +62,14 @@ export const AddOrderDialog = ({ onAddOrder }: AddOrderDialogProps) => {
   const [selectedPdfFile, setSelectedPdfFile] = React.useState<File | null>(null);
   const [requiresFirmware, setRequiresFirmware] = React.useState(false);
   const [requiresImage, setRequiresImage] = React.useState(false);
+  const [duplicateWarning, setDuplicateWarning] = React.useState<{
+    show: boolean;
+    existingOrder: any;
+    newOrderData: any;
+    duplicateType: 'totvs' | 'internal' | 'combined' | null;
+  }>({ show: false, existingOrder: null, newOrderData: null, duplicateType: null });
   const { register, handleSubmit, reset, setValue, watch } = useForm<OrderFormData>();
+  const { checkDuplicate, isChecking } = useDuplicateOrderCheck();
 
   const orderType = watch("type");
 
@@ -96,7 +105,7 @@ export const AddOrderDialog = ({ onAddOrder }: AddOrderDialogProps) => {
     setItems(newItems);
   };
 
-  const onSubmit = (data: OrderFormData) => {
+  const onSubmit = async (data: OrderFormData) => {
     const hasItems = items.length > 0;
     const hasPdf = selectedPdfFile !== null;
     
@@ -128,20 +137,68 @@ export const AddOrderDialog = ({ onAddOrder }: AddOrderDialogProps) => {
       return;
     }
 
+    // ✨ NOVO: Verificar duplicação antes de criar
+    const orderNumber = `PED-${Date.now()}`;
+    const duplicateCheck = await checkDuplicate({
+      orderNumber,
+      totvsOrderNumber: data.totvsOrderNumber,
+      customerName: data.client,
+      deliveryDate: data.deliveryDeadline
+    });
+
+    if (duplicateCheck.isDuplicate) {
+      setDuplicateWarning({
+        show: true,
+        existingOrder: duplicateCheck.existingOrder,
+        newOrderData: { ...data, orderNumber },
+        duplicateType: duplicateCheck.duplicateType
+      });
+      return;
+    }
+
+    // Criar pedido normalmente
+    await createOrder(data);
+  };
+
+  const createOrder = async (data: OrderFormData, duplicateInfo?: { 
+    isDuplicateApproved: boolean; 
+    approvalNote: string; 
+    originalOrderId: string 
+  }) => {
     const orderData = { ...data, items, pdfFile: selectedPdfFile || undefined };
-    onAddOrder(orderData);
+    await onAddOrder(orderData);
     
-    const itemsText = hasItems ? `${items.length} item(ns)` : "PDF anexado";
+    const itemsText = items.length > 0 ? `${items.length} item(ns)` : "PDF anexado";
     toast({
       title: "Pedido criado com sucesso!",
       description: `Novo ${getTypeLabel(data.type)} foi adicionado com ${itemsText}.`,
     });
+    
     reset();
     setItems([]);
     setSelectedPdfFile(null);
     setRequiresFirmware(false);
     setRequiresImage(false);
     setOpen(false);
+  };
+
+  const handleConfirmDuplicate = async (approvalNote: string) => {
+    const data = duplicateWarning.newOrderData;
+    await createOrder(data, {
+      isDuplicateApproved: true,
+      approvalNote,
+      originalOrderId: duplicateWarning.existingOrder.id
+    });
+    setDuplicateWarning({ show: false, existingOrder: null, newOrderData: null, duplicateType: null });
+  };
+
+  const handleViewExistingOrder = () => {
+    // Fechar dialogs e disparar evento para abrir o pedido existente
+    setDuplicateWarning({ show: false, existingOrder: null, newOrderData: null, duplicateType: null });
+    setOpen(false);
+    window.dispatchEvent(new CustomEvent('openOrder', { 
+      detail: { orderId: duplicateWarning.existingOrder.id } 
+    }));
   };
 
   const getTypeLabel = (type: string) => {
@@ -527,11 +584,31 @@ export const AddOrderDialog = ({ onAddOrder }: AddOrderDialogProps) => {
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>
               Cancelar
             </Button>
-            <Button type="submit">
-              Criar {orderType && getTypeLabel(orderType)}
+            <Button type="submit" disabled={isChecking}>
+              {isChecking ? "Verificando..." : `Criar ${orderType && getTypeLabel(orderType)}`}
             </Button>
           </div>
         </form>
+
+        {/* Dialog de Aviso de Duplicação */}
+        <DuplicateOrderWarningDialog
+          open={duplicateWarning.show}
+          onOpenChange={(open) => {
+            if (!open) {
+              setDuplicateWarning({ show: false, existingOrder: null, newOrderData: null, duplicateType: null });
+            }
+          }}
+          existingOrder={duplicateWarning.existingOrder}
+          newOrderData={{
+            orderNumber: duplicateWarning.newOrderData?.orderNumber,
+            totvsOrderNumber: duplicateWarning.newOrderData?.totvsOrderNumber,
+            customerName: duplicateWarning.newOrderData?.client,
+            deliveryDate: duplicateWarning.newOrderData?.deliveryDeadline
+          }}
+          duplicateType={duplicateWarning.duplicateType}
+          onConfirm={handleConfirmDuplicate}
+          onViewExisting={handleViewExistingOrder}
+        />
       </DialogContent>
     </Dialog>
   );

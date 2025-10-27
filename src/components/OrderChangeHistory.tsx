@@ -72,6 +72,7 @@ export function OrderChangeHistory({ orderId }: { orderId: string }) {
     package_width_m: 'Largura (m)',
     package_length_m: 'Comprimento (m)',
     created: 'Pedido Criado',
+    duplicate_approval: 'Duplicação Aprovada',
   };
   
   // Helper: Obter ícone baseado na categoria
@@ -118,6 +119,7 @@ export function OrderChangeHistory({ orderId }: { orderId: string }) {
       <CardContent className="space-y-4">
         {changes.map((change) => {
           const isCreationEvent = change.field_name === 'created';
+          const isDuplicateApproval = change.field_name === 'duplicate_approval';
           
           return (
             <div key={change.id} className="flex gap-3 pb-4 border-b last:border-0">
@@ -139,8 +141,30 @@ export function OrderChangeHistory({ orderId }: { orderId: string }) {
                   {getCategoryBadge(change.change_category)}
                 </div>
                 
-                {/* Mensagem customizada para criação */}
-                {isCreationEvent ? (
+                {/* Mensagem customizada para duplicação aprovada */}
+                {isDuplicateApproval ? (
+                  <div className="border-l-4 border-warning pl-3 py-2 bg-warning/5 rounded-r">
+                    <Badge variant="outline" className="bg-warning/10 text-warning border-warning/30 mb-2">
+                      ⚠️ Pedido Duplicado Aprovado
+                    </Badge>
+                    <p className="text-sm mt-1">
+                      <span className="text-muted-foreground">Pedido similar detectado: </span>
+                      <span className="font-medium text-primary cursor-pointer hover:underline"
+                        onClick={() => window.dispatchEvent(new CustomEvent('openOrder', { 
+                          detail: { orderId: change.old_value } 
+                        }))}
+                      >
+                        Ver pedido #{change.old_value?.slice(0, 8)}
+                      </span>
+                    </p>
+                    {change.new_value && change.new_value !== 'Duplicação aprovada pelo usuário' && (
+                      <p className="text-xs text-muted-foreground mt-2 italic">
+                        Motivo: "{change.new_value}"
+                      </p>
+                    )}
+                  </div>
+                ) : isCreationEvent ? (
+                  /* Mensagem customizada para criação */
                   <div className="text-sm">
                     <span className="font-medium">
                       {change.new_value === 'imported' ? 
