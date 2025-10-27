@@ -11,10 +11,13 @@ import { ProductionFilters as Filters } from "@/types/production";
 import { MetricCard } from "@/components/metrics/MetricCard";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
+import { EditOrderDialog } from "@/components/EditOrderDialog";
+import { supabase } from "@/integrations/supabase/client";
+import type { Order } from "@/components/Dashboard";
 
 export default function Production() {
   const navigate = useNavigate();
-  const { items, stats, isLoading, error } = useProductionData();
+  const { items, stats, isLoading, error, refetch } = useProductionData();
   const { exportToExcel } = useProductionExport();
   
   const [filters, setFilters] = useState<Filters>({
@@ -23,6 +26,10 @@ export default function Production() {
     warehouse: '',
     searchTerm: '',
   });
+  
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [showEditDialog, setShowEditDialog] = useState(false);
+  const [loadingOrder, setLoadingOrder] = useState(false);
 
   // Extrair armazéns únicos
   const warehouses = useMemo(() => {
@@ -68,8 +75,98 @@ export default function Production() {
     exportToExcel(filteredItems, stats);
   };
 
-  const handleOrderClick = (orderId: string) => {
-    navigate(`/?orderId=${orderId}`);
+  const handleOrderClick = async (orderId: string) => {
+    setLoadingOrder(true);
+    try {
+      // Buscar pedido completo com itens
+      const { data: orderData, error: orderError } = await supabase
+        .from('orders')
+        .select('*')
+        .eq('id', orderId)
+        .single();
+
+      if (orderError) throw orderError;
+
+      const { data: itemsData, error: itemsError } = await supabase
+        .from('order_items')
+        .select('*')
+        .eq('order_id', orderId);
+
+      if (itemsError) throw itemsError;
+
+      // Montar objeto Order
+      const order: Order = {
+        id: orderData.id,
+        orderNumber: orderData.order_number,
+        client: orderData.customer_name,
+        deliveryDeadline: orderData.delivery_date,
+        status: orderData.status as any,
+        priority: orderData.priority as any,
+        type: orderData.order_type as any,
+        deskTicket: orderData.order_number,
+        item: '',
+        description: '',
+        quantity: 0,
+        createdDate: orderData.created_at,
+        delivery_address: orderData.delivery_address,
+        issueDate: orderData.issue_date,
+        items: itemsData.map(item => ({
+          id: item.id,
+          itemCode: item.item_code,
+          itemDescription: item.item_description,
+          requestedQuantity: Number(item.requested_quantity),
+          deliveredQuantity: Number(item.delivered_quantity),
+          warehouse: item.warehouse,
+          deliveryDate: item.delivery_date,
+          unit: item.unit,
+          item_status: item.item_status as any,
+          item_source_type: item.item_source_type as any,
+          production_estimated_date: item.production_estimated_date,
+          is_imported: item.is_imported,
+          import_lead_time_days: item.import_lead_time_days,
+          sla_days: item.sla_days,
+          sla_deadline: item.sla_deadline,
+          current_phase: item.current_phase,
+          phase_started_at: item.phase_started_at,
+          received_status: item.received_status as any,
+          userId: item.user_id,
+        })),
+        // Campos opcionais
+        carrier_name: orderData.carrier_name,
+        tracking_code: orderData.tracking_code,
+        freight_value: orderData.freight_value ? Number(orderData.freight_value) : undefined,
+        package_volumes: orderData.package_volumes,
+        package_weight_kg: orderData.package_weight_kg ? Number(orderData.package_weight_kg) : undefined,
+        package_height_m: orderData.package_height_m ? Number(orderData.package_height_m) : undefined,
+        package_width_m: orderData.package_width_m ? Number(orderData.package_width_m) : undefined,
+        package_length_m: orderData.package_length_m ? Number(orderData.package_length_m) : undefined,
+        freight_type: orderData.freight_type,
+        freight_modality: orderData.freight_modality,
+        totvsOrderNumber: orderData.totvs_order_number,
+        requires_firmware: orderData.requires_firmware,
+        requires_image: orderData.requires_image,
+        firmware_project_name: orderData.firmware_project_name,
+        image_project_name: orderData.image_project_name,
+      };
+
+      setSelectedOrder(order);
+      setShowEditDialog(true);
+    } catch (error) {
+      console.error('Erro ao carregar pedido:', error);
+      toast.error('Erro ao carregar pedido');
+    } finally {
+      setLoadingOrder(false);
+    }
+  };
+
+  const handleCloseDialog = () => {
+    setShowEditDialog(false);
+    setSelectedOrder(null);
+    refetch(); // Atualizar lista após edição
+  };
+
+  const handleSaveOrder = () => {
+    handleCloseDialog(); // Fecha e atualiza
   };
 
   if (error) {
@@ -192,6 +289,16 @@ export default function Production() {
           )}
         </CardContent>
       </Card>
+
+      {/* Dialog de edição */}
+      {selectedOrder && (
+        <EditOrderDialog
+          order={selectedOrder}
+          open={showEditDialog}
+          onOpenChange={handleCloseDialog}
+          onSave={handleSaveOrder}
+        />
+      )}
     </div>
   );
 }
