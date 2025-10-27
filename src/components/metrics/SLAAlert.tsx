@@ -13,7 +13,7 @@ interface SLAAlertProps {
 
 export const SLAAlert = ({ orders, threshold = 2 }: SLAAlertProps) => {
   const [isVisible, setIsVisible] = useState(true);
-  const [isExpanded, setIsExpanded] = useState(true);
+  const [isExpanded, setIsExpanded] = useState(false);
   
   const criticalOrders = orders.filter(o => {
     if (o.status === 'completed' || o.status === 'delivered' || o.status === 'cancelled') {
