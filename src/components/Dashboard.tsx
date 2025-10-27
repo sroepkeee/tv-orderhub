@@ -1010,14 +1010,25 @@ export const Dashboard = () => {
           </div>
           <DateRangeFilter dateRange={dateRange} onDateRangeChange={setDateRange} />
           <ColumnSettings visibility={columnVisibility} onVisibilityChange={setColumnVisibility} />
-          <Button variant="outline" onClick={() => navigate('/metrics')} className="gap-1.5 h-8 px-2 lg:px-3" size="sm">
-            <BarChart3 className="h-3.5 w-3.5" />
-            <span className="hidden lg:inline">Indicadores</span>
-          </Button>
-          <Button variant="outline" onClick={() => navigate('/transportadoras')} className="gap-1.5 h-8 px-2 lg:px-3" size="sm">
-            <Truck className="h-3.5 w-3.5" />
-            <span className="hidden lg:inline">Transportadoras</span>
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" className="gap-1.5 h-8 px-2 lg:px-3" size="sm">
+                <BarChart3 className="h-3.5 w-3.5" />
+                <span className="hidden lg:inline">Análises</span>
+                <ChevronDown className="h-3.5 w-3.5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => navigate('/metrics')}>
+                <BarChart3 className="h-4 w-4 mr-2" />
+                Indicadores
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => navigate('/transportadoras')}>
+                <Truck className="h-4 w-4 mr-2" />
+                Transportadoras
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           <UserMenu />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
