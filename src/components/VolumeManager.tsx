@@ -5,9 +5,11 @@ import { Label } from '@/components/ui/label';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Plus, Trash2, Edit2, Save, X, Package } from 'lucide-react';
 import { useOrderVolumes } from '@/hooks/useOrderVolumes';
 import type { OrderVolume, VolumeFormData } from '@/types/volumes';
+import { PACKAGING_TYPES } from '@/types/volumes';
 
 interface VolumeManagerProps {
   orderId: string;
@@ -23,6 +25,7 @@ export const VolumeManager = ({ orderId }: VolumeManagerProps) => {
     length_cm: 0,
     width_cm: 0,
     height_cm: 0,
+    packaging_type: 'caixa_papelao',
     description: ''
   });
 
@@ -38,6 +41,7 @@ export const VolumeManager = ({ orderId }: VolumeManagerProps) => {
       length_cm: 0,
       width_cm: 0,
       height_cm: 0,
+      packaging_type: 'caixa_papelao',
       description: ''
     });
   };
@@ -50,6 +54,7 @@ export const VolumeManager = ({ orderId }: VolumeManagerProps) => {
       length_cm: volume.length_cm,
       width_cm: volume.width_cm,
       height_cm: volume.height_cm,
+      packaging_type: volume.packaging_type || 'caixa_papelao',
       description: volume.description || ''
     });
   };
@@ -63,6 +68,7 @@ export const VolumeManager = ({ orderId }: VolumeManagerProps) => {
       length_cm: 0,
       width_cm: 0,
       height_cm: 0,
+      packaging_type: 'caixa_papelao',
       description: ''
     });
   };
@@ -150,6 +156,24 @@ export const VolumeManager = ({ orderId }: VolumeManagerProps) => {
                     />
                   </div>
                   <div>
+                    <Label className="text-xs">Tipo de Embalagem</Label>
+                    <Select
+                      value={formData.packaging_type}
+                      onValueChange={(value) => setFormData({ ...formData, packaging_type: value })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {PACKAGING_TYPES.map((type) => (
+                          <SelectItem key={type.value} value={type.value}>
+                            {type.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
                     <Label className="text-xs">Comprimento (cm)</Label>
                     <Input
                       type="number"
@@ -194,7 +218,7 @@ export const VolumeManager = ({ orderId }: VolumeManagerProps) => {
                   <Textarea
                     value={formData.description}
                     onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                    placeholder="Ex: Caixa de madeira reforçada"
+                    placeholder="Ex: Equipamento frágil, manuseio cuidadoso"
                     rows={2}
                   />
                 </div>
@@ -228,7 +252,13 @@ export const VolumeManager = ({ orderId }: VolumeManagerProps) => {
                     <span className="text-muted-foreground">Dimensões:</span>{' '}
                     <span className="font-medium">{volume.length_cm}x{volume.width_cm}x{volume.height_cm} cm</span>
                   </div>
-                  <div className="col-span-2">
+                  <div>
+                    <span className="text-muted-foreground">Embalagem:</span>{' '}
+                    <span className="font-medium">
+                      {PACKAGING_TYPES.find(t => t.value === volume.packaging_type)?.label || 'Não especificado'}
+                    </span>
+                  </div>
+                  <div>
                     <span className="text-muted-foreground">Cubagem unitária:</span>{' '}
                     <span className="font-medium">{calculateCubagem(volume.length_cm, volume.width_cm, volume.height_cm).toFixed(3)} m³</span>
                   </div>
@@ -283,6 +313,24 @@ export const VolumeManager = ({ orderId }: VolumeManagerProps) => {
                   />
                 </div>
                 <div>
+                  <Label className="text-xs">Tipo de Embalagem</Label>
+                  <Select
+                    value={formData.packaging_type}
+                    onValueChange={(value) => setFormData({ ...formData, packaging_type: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {PACKAGING_TYPES.map((type) => (
+                        <SelectItem key={type.value} value={type.value}>
+                          {type.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
                   <Label className="text-xs">Comprimento (cm)</Label>
                   <Input
                     type="number"
@@ -327,7 +375,7 @@ export const VolumeManager = ({ orderId }: VolumeManagerProps) => {
                 <Textarea
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  placeholder="Ex: Caixa de madeira reforçada"
+                  placeholder="Ex: Equipamento frágil, manuseio cuidadoso"
                   rows={2}
                 />
               </div>

@@ -28,6 +28,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Loader2, Package, Edit, ChevronDown } from 'lucide-react';
 import { useCarriers } from '@/hooks/useCarriers';
 import { useFreightQuotes } from '@/hooks/useFreightQuotes';
+import { PACKAGING_TYPES } from '@/types/volumes';
 import { useOrderTotalValue } from '@/hooks/useOrderTotalValue';
 import { useOrderVolumes } from '@/hooks/useOrderVolumes';
 import { extractCity, extractState } from '@/lib/addressParser';
@@ -391,17 +392,31 @@ export const FreightQuoteDialog = ({
                     <div className="font-medium">
                       Total: {totals.total_volumes} volumes - {totals.total_weight_kg.toFixed(2)} kg
                     </div>
-                    {volumes.map((vol, idx) => (
-                      <div key={vol.id} className="pl-4 border-l-2 border-primary/30">
-                        <div>
-                          • {vol.quantity > 1 ? `${vol.quantity} volumes - ${vol.weight_kg}kg cada` : `1 volume - ${vol.weight_kg}kg`}
+                    {volumes.map((vol, idx) => {
+                      const packagingLabel = vol.packaging_type 
+                        ? PACKAGING_TYPES.find(t => t.value === vol.packaging_type)?.label 
+                        : 'Não especificado';
+                      
+                      return (
+                        <div key={vol.id} className="pl-4 border-l-2 border-primary/30">
+                          <div>
+                            • {vol.quantity > 1 ? `${vol.quantity} volumes - ${vol.weight_kg}kg cada` : `1 volume - ${vol.weight_kg}kg`}
+                          </div>
+                          <div className="text-muted-foreground text-xs">
+                            {vol.length_cm}cm x {vol.width_cm}cm x {vol.height_cm}cm 
+                            ({((vol.length_cm * vol.width_cm * vol.height_cm) / 1000000).toFixed(3)} m³)
+                          </div>
+                          <div className="text-muted-foreground text-xs">
+                            Embalagem: {packagingLabel}
+                          </div>
+                          {vol.description && (
+                            <div className="text-muted-foreground text-xs italic">
+                              {vol.description}
+                            </div>
+                          )}
                         </div>
-                        <div className="text-muted-foreground text-xs">
-                          {vol.length_cm}cm x {vol.width_cm}cm x {vol.height_cm}cm 
-                          ({((vol.length_cm * vol.width_cm * vol.height_cm) / 1000000).toFixed(3)} m³)
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                     <div className="pt-2 border-t text-muted-foreground">
                       Cubagem Total: {totals.total_cubagem_m3.toFixed(3)} m³
                     </div>

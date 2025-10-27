@@ -7,6 +7,7 @@ export interface OrderVolume {
   length_cm: number;
   width_cm: number;
   height_cm: number;
+  packaging_type?: string;
   description?: string;
   created_at: string;
   updated_at: string;
@@ -25,5 +26,17 @@ export interface VolumeFormData {
   length_cm: number;
   width_cm: number;
   height_cm: number;
+  packaging_type?: string;
   description?: string;
 }
+
+export const PACKAGING_TYPES = [
+  { value: 'caixa_madeira', label: 'Caixa de Madeira' },
+  { value: 'caixa_papelao', label: 'Caixa de Papelão' },
+  { value: 'plastico_bolha', label: 'Plástico Bolha' },
+  { value: 'pallet', label: 'Pallet' },
+  { value: 'engradado', label: 'Engradado' },
+  { value: 'sacaria', label: 'Sacaria' },
+  { value: 'tambor', label: 'Tambor' },
+  { value: 'outros', label: 'Outros' },
+] as const;

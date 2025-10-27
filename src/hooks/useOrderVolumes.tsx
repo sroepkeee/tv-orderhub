@@ -115,11 +115,12 @@ export function useOrderVolumes(orderId: string) {
         if (error) throw error;
 
         // Log change
+        const packagingLabel = volume.packaging_type ? ` - ${volume.packaging_type}` : '';
         await supabase.from('order_changes').insert({
           order_id: orderId,
           field_name: 'volume_added',
           old_value: '',
-          new_value: `Adicionou volume ${volume.volume_number}: ${volume.quantity}x ${volume.weight_kg}kg (${volume.length_cm}x${volume.width_cm}x${volume.height_cm}cm)`,
+          new_value: `Adicionou volume ${volume.volume_number}: ${volume.quantity}x ${volume.weight_kg}kg (${volume.length_cm}x${volume.width_cm}x${volume.height_cm}cm)${packagingLabel}`,
           changed_by: user.id,
           change_category: 'volumes'
         });

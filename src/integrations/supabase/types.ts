@@ -809,6 +809,7 @@ export type Database = {
           id: string
           length_cm: number
           order_id: string
+          packaging_type: string | null
           quantity: number
           updated_at: string | null
           volume_number: number
@@ -823,6 +824,7 @@ export type Database = {
           id?: string
           length_cm: number
           order_id: string
+          packaging_type?: string | null
           quantity?: number
           updated_at?: string | null
           volume_number: number
@@ -837,6 +839,7 @@ export type Database = {
           id?: string
           length_cm?: number
           order_id?: string
+          packaging_type?: string | null
           quantity?: number
           updated_at?: string | null
           volume_number?: number
