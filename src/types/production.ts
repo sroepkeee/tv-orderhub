@@ -17,6 +17,7 @@ export interface ProductionItem {
   created_at: string;
   customerName?: string;
   orderStatus?: string;
+  production_estimated_date?: string;
 }
 
 export interface ProductionStats {

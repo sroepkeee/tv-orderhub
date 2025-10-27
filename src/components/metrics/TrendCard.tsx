@@ -10,6 +10,11 @@ interface TrendCardProps {
   icon: LucideIcon;
   status?: 'good' | 'warning' | 'critical';
   format?: 'number' | 'percentage' | 'days';
+  additionalMetrics?: Array<{
+    label: string;
+    value: string | number;
+    highlight?: boolean;
+  }>;
 }
 
 export const TrendCard = ({ 
@@ -18,7 +23,8 @@ export const TrendCard = ({
   previousValue,
   subtitle, 
   icon: Icon, 
-  status 
+  status,
+  additionalMetrics
 }: TrendCardProps) => {
   const statusStyles = {
     good: 'border-l-[hsl(var(--progress-good))] bg-[hsl(var(--priority-low-bg))]',
@@ -57,6 +63,21 @@ export const TrendCard = ({
         <div className="text-2xl font-bold">{value}</div>
         {subtitle && (
           <p className="text-xs text-muted-foreground mt-1">{subtitle}</p>
+        )}
+        {additionalMetrics && additionalMetrics.length > 0 && (
+          <div className="mt-2 space-y-1 pt-2 border-t border-border/50">
+            {additionalMetrics.map((metric, idx) => (
+              <div key={idx} className="flex items-center justify-between text-xs">
+                <span className="text-muted-foreground">{metric.label}</span>
+                <span className={cn(
+                  "font-medium",
+                  metric.highlight ? "text-destructive" : "text-foreground"
+                )}>
+                  {metric.value}
+                </span>
+              </div>
+            ))}
+          </div>
         )}
         {trend && (
           <div className="flex items-center gap-1 mt-2">

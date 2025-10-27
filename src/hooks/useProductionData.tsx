@@ -19,6 +19,7 @@ export const useProductionData = () => {
           )
         `)
         .not('orders.status', 'in', '(delivered,completed,cancelled)')
+        .not('item_status', 'eq', 'completed')
         .order('delivery_date', { ascending: true });
 
       if (error) throw error;
@@ -42,6 +43,7 @@ export const useProductionData = () => {
         created_at: item.created_at,
         customerName: item.orders.customer_name,
         orderStatus: item.orders.status,
+        production_estimated_date: item.production_estimated_date,
       })) as ProductionItem[];
     },
     staleTime: 30000, // 30 segundos

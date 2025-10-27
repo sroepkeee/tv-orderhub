@@ -5,6 +5,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowLeft, Download, Factory, Package, ShoppingCart, CheckCircle, AlertTriangle, Clock } from "lucide-react";
 import { useProductionData } from "@/hooks/useProductionData";
 import { useProductionExport } from "@/hooks/useProductionExport";
+import { useProductionTrends } from "@/hooks/useProductionTrends";
+import { 
+  calculateProductionStats, 
+  calculateCriticalItemsBreakdown, 
+  calculatePendingStats 
+} from "@/lib/metricsV2";
+import { differenceInDays } from "date-fns";
 import { ProductionFilters } from "@/components/metrics/ProductionFilters";
 import { ProductionItemsTable } from "@/components/metrics/ProductionItemsTable";
 import { ProductionFilters as Filters } from "@/types/production";
@@ -19,6 +26,7 @@ export default function Production() {
   const navigate = useNavigate();
   const { items, stats, isLoading, error, refetch } = useProductionData();
   const { exportToExcel } = useProductionExport();
+  const { trends, loading: trendsLoading } = useProductionTrends();
   
   const [filters, setFilters] = useState<Filters>({
     orderNumber: '',
@@ -220,35 +228,109 @@ export default function Production() {
             value={stats.awaiting_production}
             icon={Factory}
             status="warning"
+            percentage={(stats.awaiting_production / stats.total) * 100}
+            additionalMetrics={(() => {
+              const today = new Date();
+              const productionItems = items.filter(i => i.item_status === 'awaiting_production');
+              const lateItems = productionItems.filter(i => 
+                differenceInDays(new Date(i.deliveryDate), today) < 0
+              ).length;
+              const onTimeItems = productionItems.length - lateItems;
+              const avgDays = productionItems.length > 0
+                ? Math.round(
+                    productionItems.reduce((sum, i) => {
+                      const start = new Date(i.created_at);
+                      return sum + differenceInDays(today, start);
+                    }, 0) / productionItems.length
+                  )
+                : 0;
+              
+              return [
+                { label: "Atrasados", value: lateItems, highlight: lateItems > 0 },
+                { label: "No prazo", value: onTimeItems },
+                { label: "Tempo médio", value: `${avgDays}d` }
+              ];
+            })()}
+            trend={trends.awaiting_production.change > 0 ? 'up' : trends.awaiting_production.change < 0 ? 'down' : 'neutral'}
+            trendValue={`${trends.awaiting_production.change >= 0 ? '+' : ''}${trends.awaiting_production.change} itens`}
           />
           <MetricCard
             title="Pendentes"
             value={stats.pending}
             icon={Clock}
+            percentage={(stats.pending / stats.total) * 100}
+            additionalMetrics={(() => {
+              const pendingItems = items.filter(i => i.item_status === 'pending');
+              const today = new Date();
+              const avgTime = pendingItems.length > 0
+                ? Math.round(
+                    pendingItems.reduce((sum, i) => {
+                      const start = new Date(i.created_at);
+                      return sum + differenceInDays(today, start);
+                    }, 0) / pendingItems.length
+                  )
+                : 0;
+              
+              return [
+                { label: "Aguard. análise", value: pendingItems.length },
+                { label: "Tempo médio", value: `${avgTime}d` }
+              ];
+            })()}
+            trend={trends.pending.change > 0 ? 'up' : trends.pending.change < 0 ? 'down' : 'neutral'}
+            trendValue={`${trends.pending.change >= 0 ? '+' : ''}${trends.pending.change} itens`}
           />
           <MetricCard
             title="Solicitar Compra"
             value={stats.purchase_required}
             icon={ShoppingCart}
             status="warning"
+            percentage={(stats.purchase_required / stats.total) * 100}
+            trend={trends.purchase_required.change > 0 ? 'up' : trends.purchase_required.change < 0 ? 'down' : 'neutral'}
+            trendValue={`${trends.purchase_required.change >= 0 ? '+' : ''}${trends.purchase_required.change} itens`}
           />
           <MetricCard
             title="Concluídos"
             value={stats.completed}
             icon={CheckCircle}
             status="good"
+            percentage={(stats.completed / (stats.total + stats.completed)) * 100}
+            subtitle="Excluídos da lista"
           />
           <MetricCard
             title="Total de Itens"
             value={stats.total}
             icon={Package}
+            subtitle="Itens ativos"
           />
           <MetricCard
             title="Itens Críticos"
             value={stats.critical}
-            subtitle="Prazo < 3 dias"
+            subtitle="Prazo ≤ 3 dias"
             icon={AlertTriangle}
             status={stats.critical > 0 ? "critical" : "good"}
+            additionalMetrics={(() => {
+              const today = new Date();
+              const todayItems = items.filter(i => {
+                const days = differenceInDays(new Date(i.deliveryDate), today);
+                return days === 0 && i.item_status !== 'completed';
+              }).length;
+              const tomorrowItems = items.filter(i => {
+                const days = differenceInDays(new Date(i.deliveryDate), today);
+                return days === 1 && i.item_status !== 'completed';
+              }).length;
+              const days2to3 = items.filter(i => {
+                const days = differenceInDays(new Date(i.deliveryDate), today);
+                return days >= 2 && days <= 3 && i.item_status !== 'completed';
+              }).length;
+              
+              return [
+                { label: "Hoje", value: todayItems, highlight: todayItems > 0 },
+                { label: "Amanhã", value: tomorrowItems },
+                { label: "2-3 dias", value: days2to3 }
+              ];
+            })()}
+            trend={trends.critical.change > 0 ? 'up' : trends.critical.change < 0 ? 'down' : 'neutral'}
+            trendValue={`${trends.critical.change >= 0 ? '+' : ''}${trends.critical.change} itens`}
           />
         </div>
       )}

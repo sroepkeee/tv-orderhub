@@ -21,6 +21,14 @@ import {
   findProblematicOrders,
   countItemsBySource
 } from "@/lib/metrics";
+import { 
+  calculateRealOnTimeRate, 
+  calculateProductionTimeRange, 
+  separateOrdersByDeadline,
+  getOrdersStartedToday,
+  getOrdersEndingToday
+} from "@/lib/metricsV2";
+import { CompletedOrdersTable } from "@/components/metrics/CompletedOrdersTable";
 import { PhasePerformanceMetrics } from "@/components/metrics/PhasePerformanceMetrics";
 import { DepartmentLeaderboard } from "@/components/metrics/DepartmentLeaderboard";
 import { BottleneckAnalysis } from "@/components/metrics/BottleneckAnalysis";
@@ -163,9 +171,14 @@ export default function Metrics() {
   }
   
   const avgProductionTime = calculateAverageProductionTime(orders);
+  const realOnTimeRate = calculateRealOnTimeRate(orders);
   const onTimeRate = calculateOnTimeRate(orders, 10);
   const productionCount = getOrderCountByPhase(orders, 'production');
   const logisticsCount = getOrderCountByPhase(orders, 'logistics');
+  const productionTimeRange = calculateProductionTimeRange(orders);
+  const ordersByDeadline = separateOrdersByDeadline(orders);
+  const ordersStartedToday = getOrdersStartedToday(orders);
+  const ordersEndingToday = getOrdersEndingToday(orders);
   
   const getTimeStatus = (days: number): 'good' | 'warning' | 'critical' => {
     if (days <= 10) return 'good';
@@ -231,15 +244,25 @@ export default function Metrics() {
           subtitle="Meta: 10 dias"
           icon={Clock}
           status={getTimeStatus(avgProductionTime)}
+          additionalMetrics={[
+            { label: "Mais rápido", value: `${productionTimeRange.min}d` },
+            { label: "Mais lento", value: `${productionTimeRange.max}d` },
+            { label: "Mediana", value: `${productionTimeRange.median}d` }
+          ]}
         />
         
         <TrendCard
           title="Taxa de Cumprimento"
-          value={`${onTimeRate}%`}
+          value={`${realOnTimeRate}%`}
           previousValue={previousWeekData.onTimeRate}
-          subtitle="Entregas no prazo"
+          subtitle="Pedidos no prazo"
           icon={CheckCircle}
-          status={onTimeRate >= 85 ? 'good' : onTimeRate >= 70 ? 'warning' : 'critical'}
+          status={realOnTimeRate >= 85 ? 'good' : realOnTimeRate >= 70 ? 'warning' : 'critical'}
+          additionalMetrics={[
+            { label: "No prazo", value: ordersByDeadline.onTime },
+            { label: "Atrasados", value: ordersByDeadline.late, highlight: ordersByDeadline.late > 0 },
+            { label: "Meta", value: "85%" }
+          ]}
         />
         
         <TrendCard
@@ -256,6 +279,11 @@ export default function Metrics() {
           value={productionCount}
           subtitle="Pedidos ativos"
           icon={Package}
+          additionalMetrics={[
+            { label: "Iniciados hoje", value: ordersStartedToday },
+            { label: "Finalizando hoje", value: ordersEndingToday, highlight: ordersEndingToday > 0 },
+            { label: "Tempo médio", value: `${avgProductionTime}d` }
+          ]}
         />
         
         <MetricCard
@@ -283,6 +311,27 @@ export default function Metrics() {
             setShowEditDialog(true);
           }}
         />
+      </div>
+
+      {/* Tabela de Pedidos Concluídos Recentemente */}
+      <div className="mb-6">
+        <div className="bg-card rounded-lg border p-6">
+          <div className="mb-4">
+            <h2 className="text-xl font-bold flex items-center gap-2">
+              ✅ Pedidos Concluídos Recentemente
+            </h2>
+            <p className="text-sm text-muted-foreground mt-1">
+              Pedidos finalizados nos últimos 30 dias com análise de conformidade de prazo
+            </p>
+          </div>
+          <CompletedOrdersTable 
+            orders={orders}
+            onOrderClick={(order) => {
+              setSelectedOrder(order);
+              setShowEditDialog(true);
+            }}
+          />
+        </div>
       </div>
 
       {/* Histórico de Mudanças de Prazos (Últimas 10) */}

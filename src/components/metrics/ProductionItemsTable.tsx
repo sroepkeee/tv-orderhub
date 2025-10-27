@@ -130,6 +130,7 @@ export const ProductionItemsTable = ({ items, onOrderClick }: ProductionItemsTab
               <TableHead className="w-[120px]">
                 <SortButton field="deliveryDate">Data Entrega</SortButton>
               </TableHead>
+              <TableHead className="w-[130px]">Data Est. Produção</TableHead>
               <TableHead className="w-[100px]">Prazo</TableHead>
               <TableHead className="w-[120px]">Armazém</TableHead>
             </TableRow>
@@ -167,6 +168,34 @@ export const ProductionItemsTable = ({ items, onOrderClick }: ProductionItemsTab
                   <TableCell>{getItemStatusBadge(item.item_status)}</TableCell>
                   <TableCell>
                     {format(new Date(item.deliveryDate), 'dd/MM/yyyy', { locale: ptBR })}
+                  </TableCell>
+                  <TableCell>
+                    {item.production_estimated_date ? (
+                      <div className="flex flex-col">
+                        <span className="font-medium text-sm">
+                          {format(new Date(item.production_estimated_date), 'dd/MM/yyyy', { locale: ptBR })}
+                        </span>
+                        {(() => {
+                          const estimatedDate = new Date(item.production_estimated_date);
+                          const deliveryDate = new Date(item.deliveryDate);
+                          const diffDays = differenceInDays(deliveryDate, estimatedDate);
+                          
+                          if (diffDays < 0) {
+                            return <span className="text-xs text-red-600 font-medium">Atrasará {Math.abs(diffDays)}d</span>;
+                          } else if (diffDays === 0) {
+                            return <span className="text-xs text-orange-600">Mesmo dia</span>;
+                          } else if (diffDays <= 2) {
+                            return <span className="text-xs text-yellow-600">{diffDays}d antes</span>;
+                          } else {
+                            return <span className="text-xs text-green-600">{diffDays}d antes</span>;
+                          }
+                        })()}
+                      </div>
+                    ) : (
+                      <Badge variant="outline" className="text-xs text-muted-foreground">
+                        Não definida
+                      </Badge>
+                    )}
                   </TableCell>
                   <TableCell>{getDaysRemaining(item.deliveryDate)}</TableCell>
                   <TableCell>{item.warehouse}</TableCell>
