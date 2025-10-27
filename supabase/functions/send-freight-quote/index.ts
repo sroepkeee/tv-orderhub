@@ -12,6 +12,66 @@ interface SendQuoteRequest {
   quoteData: any;
 }
 
+function formatQuoteMessage(quoteData: any): string {
+  let message = `📦 SOLICITAÇÃO DE COTAÇÃO DE FRETE\n\n`;
+  
+  // 1. REMETENTE
+  message += `🏢 REMETENTE:\n`;
+  message += `   Empresa: ${quoteData.sender_company}\n`;
+  message += `   CNPJ: ${quoteData.sender_cnpj}\n`;
+  message += `   Telefone: ${quoteData.sender_phone}\n`;
+  message += `   Endereço: ${quoteData.sender_address}\n\n`;
+  
+  // 2. DESTINATÁRIO
+  message += `📍 DESTINATÁRIO:\n`;
+  message += `   Nome: ${quoteData.recipient_name}\n`;
+  message += `   Cidade/UF: ${quoteData.recipient_city}/${quoteData.recipient_state}\n`;
+  message += `   Endereço: ${quoteData.recipient_address}\n\n`;
+  
+  // 3. CARGA - VOLUMES DETALHADOS
+  message += `📦 CARGA:\n`;
+  message += `   Produto: ${quoteData.product_description}\n\n`;
+  
+  if (quoteData.detailed_volumes && quoteData.detailed_volumes.length > 0) {
+    message += `   VOLUMES DETALHADOS:\n`;
+    quoteData.detailed_volumes.forEach((vol: any, idx: number) => {
+      message += `   \n   Volume ${idx + 1}:\n`;
+      message += `      • Quantidade: ${vol.quantity > 1 ? `${vol.quantity} volumes` : '1 volume'}\n`;
+      message += `      • Peso unitário: ${vol.weight_kg} kg\n`;
+      message += `      • Dimensões: ${vol.dimensions.length_cm}cm x ${vol.dimensions.width_cm}cm x ${vol.dimensions.height_cm}cm\n`;
+      message += `      • Cubagem: ${vol.cubagem_m3.toFixed(3)} m³\n`;
+      message += `      • Embalagem: ${vol.packaging_type}\n`;
+      if (vol.description) {
+        message += `      • Observação: ${vol.description}\n`;
+      }
+    });
+    
+    message += `\n   TOTAIS:\n`;
+    message += `      • Total de volumes: ${quoteData.volume_totals.total_volumes}\n`;
+    message += `      • Peso total: ${quoteData.volume_totals.total_weight_kg.toFixed(2)} kg\n`;
+    message += `      • Cubagem total: ${quoteData.volume_totals.total_cubagem_m3.toFixed(3)} m³\n`;
+  } else {
+    // Fallback para formato resumido
+    message += `   Volumes: ${quoteData.volumes}\n`;
+    message += `   Peso total: ${quoteData.weight_kg} kg\n`;
+    message += `   Dimensões: ${quoteData.length_m}m x ${quoteData.width_m}m x ${quoteData.height_m}m\n`;
+    message += `   Embalagem: ${quoteData.package_type}\n`;
+  }
+  
+  // 4. OPERACIONAL
+  message += `\n💼 INFORMAÇÕES OPERACIONAIS:\n`;
+  message += `   Tipo de frete: ${quoteData.freight_type}\n`;
+  message += `   Tomador: ${quoteData.freight_payer}\n`;
+  message += `   Valor declarado: R$ ${quoteData.declared_value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\n`;
+  message += `   Seguro: ${quoteData.requires_insurance ? 'SIM' : 'NÃO'}\n`;
+  
+  if (quoteData.observations) {
+    message += `\n📝 OBSERVAÇÕES:\n   ${quoteData.observations}\n`;
+  }
+  
+  return message;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -98,7 +158,7 @@ serve(async (req) => {
           quote_id: quote.id,
           conversation_type: 'quote_request',
           message_direction: 'outbound',
-          message_content: JSON.stringify(quoteData, null, 2),
+          message_content: formatQuoteMessage(quoteData),
           message_metadata: {
             channel: carrier.whatsapp ? 'whatsapp' : 'email',
             recipient: carrier.quote_email || carrier.email,

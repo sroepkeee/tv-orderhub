@@ -132,7 +132,9 @@ export function CarrierConversationDialog({
                               ))}
                             </div>
                           ) : (
-                            <p className="text-sm whitespace-pre-wrap">{formatted}</p>
+                            <div className="bg-muted/50 rounded-lg p-3">
+                              <pre className="text-sm whitespace-pre-wrap font-sans">{formatted}</pre>
+                            </div>
                           )}
                         </div>
                       );

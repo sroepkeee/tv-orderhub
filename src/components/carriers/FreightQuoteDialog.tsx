@@ -161,7 +161,32 @@ export const FreightQuoteDialog = ({
     }
     setSending(true);
     try {
-      await sendQuoteRequest(order.id, selectedCarriers, quoteData);
+      // Enriquecer quoteData com volumes detalhados
+      const enrichedQuoteData = {
+        ...quoteData,
+        detailed_volumes: volumes.map(vol => ({
+          volume_number: vol.volume_number,
+          quantity: vol.quantity,
+          weight_kg: vol.weight_kg,
+          dimensions: {
+            length_cm: vol.length_cm,
+            width_cm: vol.width_cm,
+            height_cm: vol.height_cm,
+          },
+          cubagem_m3: (vol.length_cm * vol.width_cm * vol.height_cm) / 1000000,
+          packaging_type: vol.packaging_type 
+            ? PACKAGING_TYPES.find(t => t.value === vol.packaging_type)?.label 
+            : 'Não especificado',
+          description: vol.description
+        })),
+        volume_totals: {
+          total_volumes: totals.total_volumes,
+          total_weight_kg: totals.total_weight_kg,
+          total_cubagem_m3: totals.total_cubagem_m3
+        }
+      };
+
+      await sendQuoteRequest(order.id, selectedCarriers, enrichedQuoteData);
       onQuoteRequested?.();
       onOpenChange(false);
     } finally {
