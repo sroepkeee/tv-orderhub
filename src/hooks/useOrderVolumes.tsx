@@ -8,6 +8,45 @@ export function useOrderVolumes(orderId: string) {
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
+  const calculateTotals = useCallback((): VolumeTotals => {
+    const total_volumes = volumes.reduce((sum, vol) => sum + vol.quantity, 0);
+    const total_weight_kg = volumes.reduce((sum, vol) => sum + (vol.weight_kg * vol.quantity), 0);
+    const total_cubagem_m3 = volumes.reduce((sum, vol) => {
+      const cubagem = (vol.length_cm * vol.width_cm * vol.height_cm) / 1000000;
+      return sum + (cubagem * vol.quantity);
+    }, 0);
+
+    return {
+      total_volumes,
+      total_weight_kg,
+      total_cubagem_m3
+    };
+  }, [volumes]);
+
+  const updateOrderSummary = useCallback(async () => {
+    try {
+      const totals = calculateTotals();
+      
+      // Pegar dimensões do primeiro volume
+      const firstVolume = volumes[0];
+      
+      await supabase
+        .from('orders')
+        .update({
+          package_volumes: totals.total_volumes,
+          package_weight_kg: totals.total_weight_kg,
+          package_length_m: firstVolume ? firstVolume.length_cm / 100 : null,
+          package_width_m: firstVolume ? firstVolume.width_cm / 100 : null,
+          package_height_m: firstVolume ? firstVolume.height_cm / 100 : null,
+        })
+        .eq('id', orderId);
+      
+      console.log('✅ Resumo do pedido atualizado automaticamente');
+    } catch (error) {
+      console.error('❌ Erro ao atualizar resumo do pedido:', error);
+    }
+  }, [orderId, volumes, calculateTotals]);
+
   const loadVolumes = useCallback(async () => {
     if (!orderId) return;
     
@@ -92,6 +131,7 @@ export function useOrderVolumes(orderId: string) {
       }
 
       await loadVolumes();
+      await updateOrderSummary();
       return true;
     } catch (error: any) {
       console.error('Error saving volume:', error);
@@ -102,7 +142,7 @@ export function useOrderVolumes(orderId: string) {
       });
       return false;
     }
-  }, [orderId, loadVolumes, toast]);
+  }, [orderId, loadVolumes, updateOrderSummary, toast]);
 
   const deleteVolume = useCallback(async (volumeId: string, volumeNumber: number) => {
     try {
@@ -132,6 +172,7 @@ export function useOrderVolumes(orderId: string) {
       });
 
       await loadVolumes();
+      await updateOrderSummary();
     } catch (error: any) {
       console.error('Error deleting volume:', error);
       toast({
@@ -140,22 +181,7 @@ export function useOrderVolumes(orderId: string) {
         variant: 'destructive'
       });
     }
-  }, [orderId, loadVolumes, toast]);
-
-  const calculateTotals = useCallback((): VolumeTotals => {
-    const total_volumes = volumes.reduce((sum, vol) => sum + vol.quantity, 0);
-    const total_weight_kg = volumes.reduce((sum, vol) => sum + (vol.weight_kg * vol.quantity), 0);
-    const total_cubagem_m3 = volumes.reduce((sum, vol) => {
-      const cubagem = (vol.length_cm * vol.width_cm * vol.height_cm) / 1000000;
-      return sum + (cubagem * vol.quantity);
-    }, 0);
-
-    return {
-      total_volumes,
-      total_weight_kg,
-      total_cubagem_m3
-    };
-  }, [volumes]);
+  }, [orderId, loadVolumes, updateOrderSummary, toast]);
 
   return {
     volumes,

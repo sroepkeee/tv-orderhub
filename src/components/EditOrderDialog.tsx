@@ -119,7 +119,6 @@ export const EditOrderDialog = ({
   // Estados para controlar seções colapsáveis
   const [labConfigOpen, setLabConfigOpen] = useState(false);
   const [freightInfoOpen, setFreightInfoOpen] = useState(false);
-  const [dimensionsOpen, setDimensionsOpen] = useState(false);
 
   // Ref para rastrear últimos valores dos campos de frete
   const lastShippingRef = useRef({
@@ -1344,6 +1343,29 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
   const onSubmit = async (data: Order) => {
     console.log('💾 [INICIO] Salvando pedido com dados:', data);
     try {
+      // ✨ Sincronizar dimensões e volumes da tabela order_volumes
+      const { data: volumes } = await supabase
+        .from('order_volumes')
+        .select('*')
+        .eq('order_id', order.id);
+
+      if (volumes && volumes.length > 0) {
+        const total_volumes = volumes.reduce((sum, vol) => sum + vol.quantity, 0);
+        const total_weight_kg = volumes.reduce((sum, vol) => sum + (vol.weight_kg * vol.quantity), 0);
+        
+        // Atualizar campos resumidos automaticamente
+        data.package_volumes = total_volumes;
+        data.package_weight_kg = total_weight_kg;
+        
+        // Dimensões: pegar do primeiro volume (para compatibilidade)
+        if (volumes[0]) {
+          data.package_length_m = volumes[0].length_cm / 100;
+          data.package_width_m = volumes[0].width_cm / 100;
+          data.package_height_m = volumes[0].height_cm / 100;
+        }
+        console.log('✅ Totais calculados dos volumes:', { total_volumes, total_weight_kg });
+      }
+
       const updatedOrder = {
         ...data,
         id: order.id,
@@ -1374,28 +1396,6 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
             key: 'tracking_code',
             label: 'Código de Rastreio',
             category: 'shipping_info'
-          },
-          // ✨ Novos campos de dimensões
-          {
-            key: 'package_volumes',
-            label: 'Volumes',
-            category: 'dimensions'
-          }, {
-            key: 'package_weight_kg',
-            label: 'Peso (Kg)',
-            category: 'dimensions'
-          }, {
-            key: 'package_height_m',
-            label: 'Altura (m)',
-            category: 'dimensions'
-          }, {
-            key: 'package_width_m',
-            label: 'Largura (m)',
-            category: 'dimensions'
-          }, {
-            key: 'package_length_m',
-            label: 'Comprimento (m)',
-            category: 'dimensions'
           }];
           const changes: Array<{
             field_name: string;
@@ -1901,70 +1901,6 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                                 {getValues("tracking_code")}
                               </span>
                             </>}
-                        </div>
-                      </Card>}
-                  </CollapsibleContent>
-                </Collapsible>
-
-                {/* ✨ Seção de Dimensões e Volumes */}
-                <Collapsible open={dimensionsOpen} onOpenChange={setDimensionsOpen} className="border-t pt-4">
-                  <CollapsibleTrigger className="flex items-center justify-between w-full hover:bg-muted/50 p-2 rounded-lg transition-colors">
-                    <Label className="text-lg font-semibold flex items-center gap-2 cursor-pointer">
-                      <Package className="h-5 w-5 text-primary" />
-                      Dimensões e Volumes
-                    </Label>
-                    <ChevronDown className={`h-5 w-5 transition-transform ${dimensionsOpen ? 'rotate-180' : ''}`} />
-                  </CollapsibleTrigger>
-                  
-                  <CollapsibleContent className="space-y-4 mt-3">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <Label htmlFor="package_volumes">Volumes (Quantidade)</Label>
-                        <Input type="number" min="1" step="1" placeholder="1" {...register("package_volumes")} className="bg-white dark:bg-gray-900" />
-                        <p className="text-xs text-muted-foreground mt-1">Número de volumes/pacotes</p>
-                      </div>
-                      
-                      <div>
-                        <Label htmlFor="package_weight_kg">Peso Total (Kg)</Label>
-                        <Input type="number" min="0" step="0.001" placeholder="0.000" {...register("package_weight_kg")} className="bg-white dark:bg-gray-900" />
-                        <p className="text-xs text-muted-foreground mt-1">Peso em quilogramas</p>
-                      </div>
-                    </div>
-                    
-                    <div>
-                      <Label>Dimensões (centímetros)</Label>
-                      <Input type="text" placeholder="Ex: 30 x 40 x 50" defaultValue={order?.package_height_m && order?.package_width_m && order?.package_length_m ? `${Math.round(order.package_height_m * 100)} x ${Math.round(order.package_width_m * 100)} x ${Math.round(order.package_length_m * 100)}` : ''} onChange={e => {
-                        const value = e.target.value;
-                        // Parse formato "30 x 40 x 50" ou "30x40x50" ou "30 40 50"
-                        const match = value.match(/(\d+)\s*[x×]\s*(\d+)\s*[x×]\s*(\d+)/i) || value.match(/(\d+)\s+(\d+)\s+(\d+)/);
-                        if (match) {
-                          const [_, height, width, length] = match;
-                          setValue("package_height_m", Number(height) / 100);
-                          setValue("package_width_m", Number(width) / 100);
-                          setValue("package_length_m", Number(length) / 100);
-                        }
-                      }} className="bg-white dark:bg-gray-900" />
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Altura x Largura x Comprimento (em centímetros)
-                      </p>
-                    </div>
-                    
-                    {/* Preview card */}
-                    {(getValues("package_volumes") || getValues("package_weight_kg") || getValues("package_height_m") || getValues("package_width_m") || getValues("package_length_m")) && <Card className="p-3 bg-purple-50 dark:bg-purple-950 border-purple-200">
-                        <div className="flex items-start gap-3">
-                          <Package className="h-5 w-5 text-purple-600 mt-0.5" />
-                          <div className="space-y-1 flex-1">
-                            <p className="text-sm font-medium text-purple-900 dark:text-purple-100">
-                              Informações de Embalagem
-                            </p>
-                            <div className="text-sm text-purple-700 dark:text-purple-300">
-                              {getValues("package_volumes") && <div><span className="font-medium">{getValues("package_volumes")}</span> volume(s)</div>}
-                              {getValues("package_weight_kg") && <div><span className="font-medium">{getValues("package_weight_kg")} Kg</span> de peso total</div>}
-                              {(getValues("package_height_m") || getValues("package_width_m") || getValues("package_length_m")) && <div className="font-mono text-xs mt-1 bg-white dark:bg-gray-800 px-2 py-1 rounded inline-block">
-                                  {getValues("package_height_m") || 0} x {getValues("package_width_m") || 0} x {getValues("package_length_m") || 0} cm
-                                </div>}
-                            </div>
-                          </div>
                         </div>
                       </Card>}
                   </CollapsibleContent>
