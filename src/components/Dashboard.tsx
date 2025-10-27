@@ -1012,10 +1012,15 @@ export const Dashboard = () => {
           <ColumnSettings visibility={columnVisibility} onVisibilityChange={setColumnVisibility} />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" className="gap-1.5 h-8 px-2 lg:px-3" size="sm">
+              <Button variant="outline" className="gap-1.5 h-8 px-2 lg:px-3 relative" size="sm">
                 <BarChart3 className="h-3.5 w-3.5" />
                 <span className="hidden lg:inline">Análises</span>
                 <ChevronDown className="h-3.5 w-3.5" />
+                {unreadConversationsCount > 0 && (
+                  <span className="absolute -top-1 -right-1 h-5 w-5 bg-destructive text-destructive-foreground text-xs rounded-full flex items-center justify-center">
+                    {unreadConversationsCount}
+                  </span>
+                )}
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
@@ -1026,6 +1031,15 @@ export const Dashboard = () => {
               <DropdownMenuItem onClick={() => navigate('/transportadoras')}>
                 <Truck className="h-4 w-4 mr-2" />
                 Transportadoras
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => navigate('/carriers-chat')} className="relative">
+                <MessageSquare className="h-4 w-4 mr-2" />
+                Conversas
+                {unreadConversationsCount > 0 && (
+                  <span className="ml-auto pl-2 text-xs font-semibold text-destructive">
+                    ({unreadConversationsCount})
+                  </span>
+                )}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -1053,20 +1067,6 @@ export const Dashboard = () => {
             </DropdownMenuContent>
           </DropdownMenu>
           
-          <Button 
-            onClick={() => navigate('/carriers-chat')} 
-            variant="outline"
-            className="gap-1.5 h-8 px-2 lg:px-3 relative"
-            size="sm"
-          >
-            <MessageSquare className="h-3.5 w-3.5" />
-            <span className="hidden lg:inline">Conversas</span>
-            {unreadConversationsCount > 0 && (
-              <span className="absolute -top-1 -right-1 h-5 w-5 bg-destructive text-destructive-foreground text-xs rounded-full flex items-center justify-center">
-                {unreadConversationsCount}
-              </span>
-            )}
-          </Button>
           <AddOrderDialog onAddOrder={handleAddOrder} />
         </div>
       </div>
