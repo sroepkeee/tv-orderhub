@@ -6,6 +6,8 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Button } from '@/components/ui/button';
+import { Copy } from 'lucide-react';
 import { ConversationThread } from './ConversationThread';
 import { QuoteResponsesTable } from './QuoteResponsesTable';
 import { useCarrierConversations } from '@/hooks/useCarrierConversations';
@@ -110,6 +112,22 @@ export function CarrierConversationDialog({
                     {filteredConversations.map((conv) => {
                       const { formatted, isQuote } = formatCarrierMessage(conv.message_content);
                       
+                      const handleCopyMessage = async () => {
+                        try {
+                          await navigator.clipboard.writeText(formatted);
+                          toast({
+                            title: "Texto copiado!",
+                            description: "Mensagem copiada para a área de transferência",
+                          });
+                        } catch (error) {
+                          toast({
+                            title: "Erro ao copiar",
+                            description: "Não foi possível copiar o texto",
+                            variant: "destructive",
+                          });
+                        }
+                      };
+                      
                       return (
                         <div 
                           key={conv.id} 
@@ -119,9 +137,20 @@ export function CarrierConversationDialog({
                             <span className="text-xs font-medium">
                               {conv.message_direction === 'outbound' ? '📤 Enviado' : '📥 Recebido'}
                             </span>
-                            <span className="text-xs text-muted-foreground">
-                              {new Date(conv.sent_at).toLocaleString('pt-BR')}
-                            </span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-muted-foreground">
+                                {new Date(conv.sent_at).toLocaleString('pt-BR')}
+                              </span>
+                              <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                onClick={handleCopyMessage}
+                                className="h-6 w-6 p-0"
+                                title="Copiar mensagem"
+                              >
+                                <Copy className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
                           </div>
                           {isQuote ? (
                             <div className="text-sm whitespace-pre-wrap">
