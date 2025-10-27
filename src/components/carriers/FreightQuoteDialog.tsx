@@ -444,11 +444,26 @@ export const FreightQuoteDialog = ({
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label>Valor Declarado (R$) *</Label>
-                  <Input type="number" step="0.01" value={quoteData.declared_value} onChange={e => setQuoteData({
-                  ...quoteData,
-                  declared_value: parseFloat(e.target.value)
-                })} />
+                  <Label className="flex items-center gap-2">
+                    Valor Declarado (R$) *
+                    {loadingTotal && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
+                  </Label>
+                  <Input 
+                    type="number" 
+                    step="0.01" 
+                    value={quoteData.declared_value || ''} 
+                    onChange={e => setQuoteData({
+                      ...quoteData,
+                      declared_value: parseFloat(e.target.value) || 0
+                    })}
+                    placeholder={loadingTotal ? "Calculando total..." : "0.00"}
+                    disabled={loadingTotal}
+                  />
+                  {totalValue > 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      Total do pedido: R$ {totalValue.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </p>
+                  )}
                 </div>
                 <div className="flex items-center space-x-2 col-span-2">
                   <Checkbox id="insurance" checked={quoteData.requires_insurance} onCheckedChange={checked => setQuoteData({
