@@ -29,6 +29,7 @@ import { Loader2, Package, Edit, ChevronDown } from 'lucide-react';
 import { useCarriers } from '@/hooks/useCarriers';
 import { useFreightQuotes } from '@/hooks/useFreightQuotes';
 import { useOrderTotalValue } from '@/hooks/useOrderTotalValue';
+import { useOrderVolumes } from '@/hooks/useOrderVolumes';
 import { extractCity, extractState } from '@/lib/addressParser';
 import { CarrierManagementDialog } from '@/components/carriers/CarrierManagementDialog';
 import type { Order } from '@/components/Dashboard';
@@ -78,6 +79,7 @@ export const FreightQuoteDialog = ({
   const { carriers, loading: loadingCarriers, loadCarriers } = useCarriers();
   const { sendQuoteRequest } = useFreightQuotes();
   const { totalValue, loading: loadingTotal } = useOrderTotalValue(order.id);
+  const { volumes, loadVolumes, totals } = useOrderVolumes(order.id);
   const [sending, setSending] = useState(false);
   const [selectedCarriers, setSelectedCarriers] = useState<string[]>([]);
   const [selectedSender, setSelectedSender] = useState('imply_tech');
@@ -124,6 +126,13 @@ export const FreightQuoteDialog = ({
       }));
     }
   }, [totalValue, open]);
+
+  // Carregar volumes quando dialog abrir
+  useEffect(() => {
+    if (open) {
+      loadVolumes();
+    }
+  }, [open, loadVolumes]);
 
   // Pré-selecionar transportadora se já cadastrada no pedido
   useEffect(() => {
@@ -367,83 +376,110 @@ export const FreightQuoteDialog = ({
           <AccordionItem value="cargo">
             <AccordionTrigger>
               3. Dados da Carga
-              {(order.package_volumes || order.package_weight_kg) && (
+              {(volumes.length > 0 || order.package_volumes || order.package_weight_kg) && (
                 <Badge variant="secondary" className="ml-2 text-xs">
                   ✨ Auto-preenchido
                 </Badge>
               )}
             </AccordionTrigger>
             <AccordionContent className="space-y-3">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-2 col-span-2">
-                  <Label>Produto *</Label>
-                  <Input
-                    value={quoteData.product_description}
-                    onChange={(e) => setQuoteData({ ...quoteData, product_description: e.target.value })}
-                  />
+              {/* Exibir volumes detalhados se existirem */}
+              {volumes.length > 0 ? (
+                <Card className="p-4 bg-muted/50">
+                  <Label className="font-semibold mb-2 block">📦 Volumes Detalhados</Label>
+                  <div className="space-y-2 text-sm">
+                    <div className="font-medium">
+                      Total: {totals.total_volumes} volumes - {totals.total_weight_kg.toFixed(2)} kg
+                    </div>
+                    {volumes.map((vol, idx) => (
+                      <div key={vol.id} className="pl-4 border-l-2 border-primary/30">
+                        <div>
+                          • {vol.quantity > 1 ? `${vol.quantity} volumes - ${vol.weight_kg}kg cada` : `1 volume - ${vol.weight_kg}kg`}
+                        </div>
+                        <div className="text-muted-foreground text-xs">
+                          {vol.length_cm}cm x {vol.width_cm}cm x {vol.height_cm}cm 
+                          ({((vol.length_cm * vol.width_cm * vol.height_cm) / 1000000).toFixed(3)} m³)
+                        </div>
+                      </div>
+                    ))}
+                    <div className="pt-2 border-t text-muted-foreground">
+                      Cubagem Total: {totals.total_cubagem_m3.toFixed(3)} m³
+                    </div>
+                  </div>
+                </Card>
+              ) : (
+                // Formulário original para volumes resumidos
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2 col-span-2">
+                    <Label>Produto *</Label>
+                    <Input
+                      value={quoteData.product_description}
+                      onChange={(e) => setQuoteData({ ...quoteData, product_description: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Embalagem *</Label>
+                    <Select
+                      value={quoteData.package_type}
+                      onValueChange={(value) => setQuoteData({ ...quoteData, package_type: value })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Caixa de papelão">Caixa de papelão</SelectItem>
+                        <SelectItem value="Caixa de madeira">Caixa de madeira</SelectItem>
+                        <SelectItem value="Palete">Palete</SelectItem>
+                        <SelectItem value="Container">Container</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Volumes *</Label>
+                    <Input
+                      type="number"
+                      value={quoteData.volumes}
+                      onChange={(e) => setQuoteData({ ...quoteData, volumes: parseFloat(e.target.value) })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Peso (kg) *</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      value={quoteData.weight_kg}
+                      onChange={(e) => setQuoteData({ ...quoteData, weight_kg: parseFloat(e.target.value) })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Comprimento (m) *</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      value={quoteData.length_m}
+                      onChange={(e) => setQuoteData({ ...quoteData, length_m: parseFloat(e.target.value) })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Largura (m) *</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      value={quoteData.width_m}
+                      onChange={(e) => setQuoteData({ ...quoteData, width_m: parseFloat(e.target.value) })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Altura (m) *</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      value={quoteData.height_m}
+                      onChange={(e) => setQuoteData({ ...quoteData, height_m: parseFloat(e.target.value) })}
+                    />
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <Label>Embalagem *</Label>
-                  <Select
-                    value={quoteData.package_type}
-                    onValueChange={(value) => setQuoteData({ ...quoteData, package_type: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Caixa de papelão">Caixa de papelão</SelectItem>
-                      <SelectItem value="Caixa de madeira">Caixa de madeira</SelectItem>
-                      <SelectItem value="Palete">Palete</SelectItem>
-                      <SelectItem value="Container">Container</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Volumes *</Label>
-                  <Input
-                    type="number"
-                    value={quoteData.volumes}
-                    onChange={(e) => setQuoteData({ ...quoteData, volumes: parseFloat(e.target.value) })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Peso (kg) *</Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={quoteData.weight_kg}
-                    onChange={(e) => setQuoteData({ ...quoteData, weight_kg: parseFloat(e.target.value) })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Comprimento (m) *</Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={quoteData.length_m}
-                    onChange={(e) => setQuoteData({ ...quoteData, length_m: parseFloat(e.target.value) })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Largura (m) *</Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={quoteData.width_m}
-                    onChange={(e) => setQuoteData({ ...quoteData, width_m: parseFloat(e.target.value) })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Altura (m) *</Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={quoteData.height_m}
-                    onChange={(e) => setQuoteData({ ...quoteData, height_m: parseFloat(e.target.value) })}
-                  />
-                </div>
-              </div>
+              )}
             </AccordionContent>
           </AccordionItem>
 

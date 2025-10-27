@@ -800,6 +800,59 @@ export type Database = {
         }
         Relationships: []
       }
+      order_volumes: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          height_cm: number
+          id: string
+          length_cm: number
+          order_id: string
+          quantity: number
+          updated_at: string | null
+          volume_number: number
+          weight_kg: number
+          width_cm: number
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          height_cm: number
+          id?: string
+          length_cm: number
+          order_id: string
+          quantity?: number
+          updated_at?: string | null
+          volume_number: number
+          weight_kg: number
+          width_cm: number
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          height_cm?: number
+          id?: string
+          length_cm?: number
+          order_id?: string
+          quantity?: number
+          updated_at?: string | null
+          volume_number?: number
+          weight_kg?: number
+          width_cm?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_volumes_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       orders: {
         Row: {
           carrier_name: string | null

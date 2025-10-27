@@ -29,6 +29,7 @@ import { OrderMetricsTab } from "./metrics/OrderMetricsTab";
 import { EnhancedOrderTimeline } from "./EnhancedOrderTimeline";
 import { LabWorkView } from "./LabWorkView";
 import { CarriersTabContent } from "./carriers/CarriersTabContent";
+import { VolumeManager } from "./VolumeManager";
 interface HistoryEvent {
   id: string;
   changed_at: string;
@@ -1652,7 +1653,7 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
           </DialogHeader>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-7 h-9">
+          <TabsList className="grid w-full grid-cols-8 h-9">
             <TabsTrigger value="edit" className="flex items-center gap-1.5 data-[state=active]:bg-blue-500 data-[state=active]:text-white text-xs">
               <Edit className="h-3.5 w-3.5" />
               Editar
@@ -1664,6 +1665,10 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
             <TabsTrigger value="lab" className="flex items-center gap-1.5 data-[state=active]:bg-purple-500 data-[state=active]:text-white text-xs">
               <FileText className="h-3.5 w-3.5" />
               Laboratório
+            </TabsTrigger>
+            <TabsTrigger value="volumes" className="flex items-center gap-1.5 data-[state=active]:bg-amber-500 data-[state=active]:text-white text-xs">
+              <Package className="h-3.5 w-3.5" />
+              Volumes
             </TabsTrigger>
             <TabsTrigger value="carriers" className="flex items-center gap-1.5 data-[state=active]:bg-teal-500 data-[state=active]:text-white text-xs">
               <Send className="h-3.5 w-3.5" />
@@ -2126,6 +2131,12 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
 
           <TabsContent value="lab" className="mt-4">
             <LabWorkView orderId={order.id} items={items} requiresFirmware={order.requires_firmware} firmwareProjectName={order.firmware_project_name} requiresImage={order.requires_image} imageProjectName={order.image_project_name} />
+          </TabsContent>
+
+          <TabsContent value="volumes" className="mt-4">
+            <ScrollArea className="h-[calc(95vh-200px)] pr-4">
+              <VolumeManager orderId={order.id} />
+            </ScrollArea>
           </TabsContent>
 
           <TabsContent value="carriers" className="mt-4">
