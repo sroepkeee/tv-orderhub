@@ -30,10 +30,10 @@ export const OrderComments = ({ orderId }: OrderCommentsProps) => {
       .from('order_comments')
       .select(`
         *,
-        profiles:user_id(full_name, email),
+        profiles!order_comments_user_id_fkey(full_name, email),
         mention_tags(
           mentioned_user_id,
-          profiles:mentioned_user_id(full_name)
+          profiles!mention_tags_mentioned_user_id_fkey(full_name)
         )
       `)
       .eq('order_id', orderId)
