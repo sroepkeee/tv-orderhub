@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
-import { Bell, Check, CheckCheck, Trash2, Settings } from 'lucide-react';
+import { Bell, Check, CheckCheck, Trash2, Settings, AlertCircle } from 'lucide-react';
 import { useNotifications } from '@/hooks/useNotifications';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -21,10 +21,12 @@ export const NotificationCenter = () => {
     notifications,
     unreadCount,
     loading,
+    error,
     markAsRead,
     markAllAsRead,
     deleteNotification,
-    requestNotificationPermission
+    requestNotificationPermission,
+    refreshNotifications
   } = useNotifications();
   
   const navigate = useNavigate();
@@ -115,6 +117,19 @@ export const NotificationCenter = () => {
           {loading ? (
             <div className="p-8 text-center text-muted-foreground">
               Carregando...
+            </div>
+          ) : error ? (
+            <div className="p-8 text-center">
+              <AlertCircle className="h-12 w-12 mx-auto mb-3 text-destructive" />
+              <p className="text-sm font-medium mb-2">Erro ao carregar notificações</p>
+              <p className="text-xs text-muted-foreground mb-4">{error}</p>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={refreshNotifications}
+              >
+                Tentar novamente
+              </Button>
             </div>
           ) : notifications.length === 0 ? (
             <div className="p-8 text-center text-muted-foreground">

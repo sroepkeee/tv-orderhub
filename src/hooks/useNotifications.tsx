@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { toast } from '@/hooks/use-toast';
 
 interface Notification {
   id: string;
@@ -22,9 +23,18 @@ export const useNotifications = () => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user) {
+      console.log('🔔 [useNotifications] Usuário não autenticado');
+      return;
+    }
+
+    console.log('🔔 [useNotifications] Usuário autenticado:', {
+      id: user.id,
+      email: user.email
+    });
 
     loadNotifications();
     
@@ -40,6 +50,7 @@ export const useNotifications = () => {
           filter: `user_id=eq.${user.id}`
         },
         (payload) => {
+          console.log('🔔 [Realtime] Nova notificação recebida:', payload);
           const newNotif = payload.new as Notification;
           setNotifications(prev => [newNotif, ...prev]);
           setUnreadCount(prev => prev + 1);
@@ -57,6 +68,7 @@ export const useNotifications = () => {
           filter: `user_id=eq.${user.id}`
         },
         (payload) => {
+          console.log('🔔 [Realtime] Notificação atualizada:', payload);
           const updatedNotif = payload.new as Notification;
           setNotifications(prev => 
             prev.map(n => n.id === updatedNotif.id ? updatedNotif : n)
@@ -74,26 +86,89 @@ export const useNotifications = () => {
   const loadNotifications = async () => {
     if (!user) return;
 
-    const { data, error } = await supabase
-      .from('notifications')
-      .select(`
-        *,
-        profiles!notifications_mentioned_by_fkey(full_name, email)
-      `)
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false })
-      .limit(50);
+    console.log('🔔 [useNotifications] Iniciando carregamento...', { userId: user.id });
 
-    if (!error && data) {
-      // Transform para estrutura esperada
-      const transformedData = data.map((notif: any) => ({
+    try {
+      setError(null);
+
+      // 1. Buscar notificações
+      const { data: notificationsData, error: notifError } = await supabase
+        .from('notifications')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      if (notifError) {
+        console.error('🔔 [useNotifications] Erro ao carregar notificações:', notifError);
+        throw notifError;
+      }
+
+      if (!notificationsData || notificationsData.length === 0) {
+        console.log('🔔 [useNotifications] Nenhuma notificação encontrada');
+        setNotifications([]);
+        setLoading(false);
+        return;
+      }
+
+      console.log('🔔 [useNotifications] Notificações brutas carregadas:', notificationsData);
+
+      // 2. Buscar perfis dos autores (mentioned_by)
+      const authorIds = [
+        ...new Set(
+          notificationsData
+            .map(n => n.mentioned_by)
+            .filter(Boolean)
+        )
+      ] as string[];
+
+      let authorsMap = new Map();
+      if (authorIds.length > 0) {
+        console.log('🔔 [useNotifications] Buscando perfis dos autores:', authorIds);
+        
+        const { data: authorsData, error: authorsError } = await supabase
+          .from('profiles')
+          .select('id, full_name, email')
+          .in('id', authorIds);
+
+        if (authorsError) {
+          console.error('🔔 [useNotifications] Erro ao buscar autores:', authorsError);
+        } else {
+          console.log('🔔 [useNotifications] Perfis dos autores carregados:', authorsData);
+          authorsMap = new Map(
+            authorsData?.map(p => [p.id, p]) || []
+          );
+        }
+      }
+
+      // 3. Combinar dados
+      const enrichedNotifications: Notification[] = notificationsData.map(notif => ({
         ...notif,
-        mentioned_by: notif.profiles
+        mentioned_by: notif.mentioned_by 
+          ? authorsMap.get(notif.mentioned_by)
+          : undefined
       }));
-      setNotifications(transformedData as any);
+
+      console.log('🔔 [useNotifications] Notificações enriquecidas:', {
+        total: enrichedNotifications.length,
+        unread: enrichedNotifications.filter(n => !n.is_read).length,
+        notifications: enrichedNotifications
+      });
+
+      setNotifications(enrichedNotifications);
       updateUnreadCount();
+    } catch (err) {
+      console.error('🔔 [useNotifications] Erro fatal ao carregar notificações:', err);
+      setError('Não foi possível carregar as notificações');
+      setNotifications([]);
+      toast({
+        title: 'Erro ao carregar notificações',
+        description: 'Não foi possível carregar suas notificações. Tente novamente.',
+        variant: 'destructive'
+      });
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const updateUnreadCount = async () => {
@@ -167,6 +242,7 @@ export const useNotifications = () => {
     notifications,
     unreadCount,
     loading,
+    error,
     markAsRead,
     markAllAsRead,
     deleteNotification,
