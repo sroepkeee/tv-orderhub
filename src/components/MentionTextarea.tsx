@@ -114,7 +114,7 @@ export const MentionTextarea = ({
       />
       
       {showSuggestions && suggestions.length > 0 && (
-        <Card className="absolute bottom-full mb-2 w-full max-h-60 overflow-y-auto z-50 shadow-lg">
+        <Card className="absolute top-full mt-2 w-full max-h-60 overflow-y-auto z-50 shadow-lg">
           <div className="p-2 space-y-1">
             {suggestions.map((user, index) => (
               <div
