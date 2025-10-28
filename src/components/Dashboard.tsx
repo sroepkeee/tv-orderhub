@@ -18,6 +18,7 @@ import { PhaseButtons } from "./PhaseButtons";
 import { ColumnSettings, ColumnVisibility } from "./ColumnSettings";
 import { DateRangeFilter } from "./DateRangeFilter";
 import { UserMenu } from "./UserMenu";
+import { NotificationCenter } from "./NotificationCenter";
 import { ImportOrderDialog } from "./ImportOrderDialog";
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
@@ -1047,6 +1048,7 @@ export const Dashboard = () => {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+          <NotificationCenter />
           <UserMenu />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>

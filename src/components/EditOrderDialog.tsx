@@ -30,6 +30,7 @@ import { EnhancedOrderTimeline } from "./EnhancedOrderTimeline";
 import { LabWorkView } from "./LabWorkView";
 import { CarriersTabContent } from "./carriers/CarriersTabContent";
 import { VolumeManager } from "./VolumeManager";
+import { OrderComments } from "./OrderComments";
 interface HistoryEvent {
   id: string;
   changed_at: string;
@@ -2088,74 +2089,9 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
           </TabsContent>
 
           <TabsContent value="comments" className="mt-4">
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4 p-4 bg-muted rounded-lg">
-                <div>
-                  <p className="text-sm font-medium">Cliente</p>
-                  <p className="text-sm text-muted-foreground">{order?.client}</p>
-                </div>
-                <div>
-                  <p className="text-sm font-medium">Chamado Desk</p>
-                  <p className="text-sm text-muted-foreground">{order?.deskTicket}</p>
-                </div>
-              </div>
-
-              {/* Add new comment section */}
-              <div className="border rounded-lg p-4 space-y-3">
-                {!showCommentInput ? <Button type="button" onClick={() => setShowCommentInput(true)} className="w-full gap-2 bg-blue-600 hover:bg-blue-700">
-                    <Plus className="h-4 w-4" />
-                    Adicionar Comentário
-                  </Button> : <div className="space-y-3">
-                    <div className="flex items-center gap-2 text-sm font-medium">
-                      <MessageSquare className="h-4 w-4 text-blue-600" />
-                      <span>Novo Comentário</span>
-                    </div>
-                    <Textarea placeholder="Digite seu comentário aqui..." value={newComment} onChange={e => setNewComment(e.target.value)} className="min-h-[100px]" />
-                    <div className="flex gap-2 justify-end">
-                      <Button variant="outline" onClick={() => {
-                      setShowCommentInput(false);
-                      setNewComment("");
-                    }} disabled={savingComment}>
-                        Cancelar
-                      </Button>
-                      <Button type="button" onClick={handleSaveComment} disabled={!newComment.trim() || savingComment} className="gap-2">
-                        {savingComment ? <>
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                            Salvando...
-                          </> : "Salvar Comentário"}
-                      </Button>
-                    </div>
-                  </div>}
-              </div>
-
-              {/* Comments list */}
-              {loadingComments ? <div className="flex items-center justify-center h-[300px]">
-                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                </div> : comments.length === 0 ? <Card className="p-8 text-center">
-                  <MessageSquare className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-                  <p className="text-muted-foreground">
-                    Nenhum comentário registrado ainda
-                  </p>
-                </Card> : <ScrollArea className="h-[calc(95vh-450px)]">
-                  <div className="space-y-4">
-                    {comments.map(comment => <div key={comment.id} className="border rounded-lg p-4 space-y-2">
-                        <div className="flex items-start justify-between">
-                          <div className="flex items-center gap-2">
-                            <User className="h-4 w-4 text-muted-foreground" />
-                            <span className="font-medium text-sm">{comment.user_name}</span>
-                          </div>
-                          <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                            <Calendar className="h-3 w-3" />
-                            {format(new Date(comment.created_at), "dd/MM/yyyy HH:mm")}
-                          </div>
-                        </div>
-                        <p className="text-sm text-muted-foreground whitespace-pre-wrap pl-6">
-                          {comment.comment}
-                        </p>
-                      </div>)}
-                  </div>
-                </ScrollArea>}
-            </div>
+            <ScrollArea className="h-[calc(95vh-240px)]">
+              <OrderComments orderId={order.id} />
+            </ScrollArea>
           </TabsContent>
 
           <TabsContent value="attachments" className="mt-4">

@@ -404,6 +404,121 @@ export type Database = {
           },
         ]
       }
+      mention_tags: {
+        Row: {
+          comment_id: string
+          created_at: string | null
+          id: string
+          mentioned_by: string
+          mentioned_user_id: string
+          notification_id: string | null
+          order_id: string
+        }
+        Insert: {
+          comment_id: string
+          created_at?: string | null
+          id?: string
+          mentioned_by: string
+          mentioned_user_id: string
+          notification_id?: string | null
+          order_id: string
+        }
+        Update: {
+          comment_id?: string
+          created_at?: string | null
+          id?: string
+          mentioned_by?: string
+          mentioned_user_id?: string
+          notification_id?: string | null
+          order_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mention_tags_comment_id_fkey"
+            columns: ["comment_id"]
+            isOneToOne: false
+            referencedRelation: "order_comments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mention_tags_notification_id_fkey"
+            columns: ["notification_id"]
+            isOneToOne: false
+            referencedRelation: "notifications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mention_tags_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notifications: {
+        Row: {
+          comment_id: string | null
+          created_at: string | null
+          id: string
+          is_read: boolean
+          mentioned_by: string | null
+          message: string
+          metadata: Json | null
+          order_id: string
+          read_at: string | null
+          title: string
+          type: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          comment_id?: string | null
+          created_at?: string | null
+          id?: string
+          is_read?: boolean
+          mentioned_by?: string | null
+          message: string
+          metadata?: Json | null
+          order_id: string
+          read_at?: string | null
+          title: string
+          type?: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          comment_id?: string | null
+          created_at?: string | null
+          id?: string
+          is_read?: boolean
+          mentioned_by?: string | null
+          message?: string
+          metadata?: Json | null
+          order_id?: string
+          read_at?: string | null
+          title?: string
+          type?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_comment_id_fkey"
+            columns: ["comment_id"]
+            isOneToOne: false
+            referencedRelation: "order_comments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       order_attachments: {
         Row: {
           file_name: string

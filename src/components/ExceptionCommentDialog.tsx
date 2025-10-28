@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { MentionTextarea } from "./MentionTextarea";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { AlertCircle, Loader2 } from "lucide-react";
@@ -55,11 +56,10 @@ export const ExceptionCommentDialog = ({
             <Label htmlFor="exception-comment" className="text-sm font-medium">
               O que aconteceu? <span className="text-red-500">*</span>
             </Label>
-            <Textarea
-              id="exception-comment"
-              placeholder="Descreva o problema, mudança ou situação excepcional que ocorreu no processo..."
+            <MentionTextarea
               value={comment}
-              onChange={(e) => setComment(e.target.value)}
+              onChange={setComment}
+              placeholder="Descreva o problema... Use @ para mencionar usuários responsáveis"
               className="min-h-[120px]"
               disabled={saving}
             />
