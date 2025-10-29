@@ -544,33 +544,6 @@ export const EditOrderDialog = ({
       };
 
       // Carregar itens diretamente do banco para garantir dados atualizados
-      const loadItems = async () => {
-        const {
-          data: itemsData
-        } = await supabase.from('order_items').select('*').eq('order_id', order.id);
-        const mappedItems = (itemsData || []).map(item => ({
-          id: item.id,
-          itemCode: item.item_code,
-          itemDescription: cleanItemDescription(item.item_description),
-          unit: item.unit,
-          requestedQuantity: item.requested_quantity,
-          warehouse: item.warehouse,
-          deliveryDate: item.delivery_date,
-          deliveredQuantity: item.delivered_quantity,
-          item_source_type: item.item_source_type as 'in_stock' | 'production' | 'out_of_stock',
-          item_status: item.item_status as 'pending' | 'in_stock' | 'awaiting_production' | 'purchase_required' | 'completed',
-          received_status: item.received_status as 'pending' | 'partial' | 'completed',
-          production_estimated_date: item.production_estimated_date,
-          sla_days: item.sla_days,
-          is_imported: item.is_imported,
-          import_lead_time_days: item.import_lead_time_days,
-          sla_deadline: item.sla_deadline,
-          current_phase: item.current_phase,
-          phase_started_at: item.phase_started_at,
-          userId: item.user_id
-        }));
-        setItems(mappedItems);
-      };
       loadItems();
       setActiveTab("edit");
       setShowCommentInput(false);
@@ -666,9 +639,42 @@ export const EditOrderDialog = ({
     };
   }, [open, order?.id, watch]);
 
-  // Real-time subscription for history and comments updates
+  // Função reutilizável para carregar items
+  const loadItems = async () => {
+    if (!order?.id) return;
+    
+    const { data: itemsData } = await supabase
+      .from('order_items')
+      .select('*')
+      .eq('order_id', order.id);
+    
+    const mappedItems = (itemsData || []).map(item => ({
+      id: item.id,
+      itemCode: item.item_code,
+      itemDescription: cleanItemDescription(item.item_description),
+      unit: item.unit,
+      requestedQuantity: item.requested_quantity,
+      warehouse: item.warehouse,
+      deliveryDate: item.delivery_date,
+      deliveredQuantity: item.delivered_quantity,
+      received_status: item.received_status as "pending" | "partial" | "completed",
+      item_source_type: item.item_source_type as "in_stock" | "production" | "out_of_stock",
+      item_status: item.item_status as "pending" | "in_stock" | "awaiting_production" | "purchase_required" | "completed",
+      production_estimated_date: item.production_estimated_date,
+      is_imported: item.is_imported,
+      import_lead_time_days: item.import_lead_time_days,
+      sla_deadline: item.sla_deadline,
+      current_phase: item.current_phase,
+      phase_started_at: item.phase_started_at,
+      userId: item.user_id
+    }));
+    setItems(mappedItems);
+  };
+
+  // Real-time subscription for history, comments, attachments and items updates
   useEffect(() => {
     if (!open || !order?.id) return;
+    
     const historyChannel = supabase.channel(`order_history_${order.id}`).on('postgres_changes', {
       event: '*',
       schema: 'public',
@@ -677,6 +683,7 @@ export const EditOrderDialog = ({
     }, () => {
       loadHistory();
     }).subscribe();
+    
     const commentsChannel = supabase.channel(`order_comments_${order.id}`).on('postgres_changes', {
       event: '*',
       schema: 'public',
@@ -685,6 +692,7 @@ export const EditOrderDialog = ({
     }, () => {
       loadComments();
     }).subscribe();
+    
     const attachmentsChannel = supabase.channel(`order_attachments_${order.id}`).on('postgres_changes', {
       event: '*',
       schema: 'public',
@@ -693,10 +701,23 @@ export const EditOrderDialog = ({
     }, () => {
       loadAttachments();
     }).subscribe();
+    
+    // NOVO: Subscription para atualizar items em tempo real
+    const itemsChannel = supabase.channel(`order_items_${order.id}`).on('postgres_changes', {
+      event: '*',
+      schema: 'public',
+      table: 'order_items',
+      filter: `order_id=eq.${order.id}`
+    }, () => {
+      console.log('🔄 Items atualizados - recarregando dados...');
+      loadItems();
+    }).subscribe();
+    
     return () => {
       supabase.removeChannel(historyChannel);
       supabase.removeChannel(commentsChannel);
       supabase.removeChannel(attachmentsChannel);
+      supabase.removeChannel(itemsChannel);
     };
   }, [open, order?.id]);
   const addItem = () => {
