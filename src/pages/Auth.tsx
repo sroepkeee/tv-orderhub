@@ -191,6 +191,7 @@ export default function Auth() {
                       <SelectItem value="Almox Geral">Almox Geral</SelectItem>
                       <SelectItem value="Expedição">Expedição</SelectItem>
                       <SelectItem value="Produção">Produção</SelectItem>
+                      <SelectItem value="Projetos">Projetos</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
