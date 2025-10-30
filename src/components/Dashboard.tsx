@@ -242,15 +242,14 @@ export const Dashboard = () => {
       loadUnreadCount();
     }
   }, [user]);
-
   const loadUnreadCount = async () => {
     try {
-      const { count } = await supabase
-        .from('carrier_conversations')
-        .select('*', { count: 'exact', head: true })
-        .eq('message_direction', 'inbound')
-        .is('read_at', null);
-      
+      const {
+        count
+      } = await supabase.from('carrier_conversations').select('*', {
+        count: 'exact',
+        head: true
+      }).eq('message_direction', 'inbound').is('read_at', null);
       setUnreadConversationsCount(count || 0);
     } catch (error) {
       console.error('Erro ao carregar contador de conversas:', error);
@@ -1017,11 +1016,9 @@ export const Dashboard = () => {
                 <BarChart3 className="h-3.5 w-3.5" />
                 <span className="hidden lg:inline">Análises</span>
                 <ChevronDown className="h-3.5 w-3.5" />
-                {unreadConversationsCount > 0 && (
-                  <span className="absolute -top-1 -right-1 h-5 w-5 bg-destructive text-destructive-foreground text-xs rounded-full flex items-center justify-center">
+                {unreadConversationsCount > 0 && <span className="absolute -top-1 -right-1 h-5 w-5 bg-destructive text-destructive-foreground text-xs rounded-full flex items-center justify-center">
                     {unreadConversationsCount}
-                  </span>
-                )}
+                  </span>}
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
@@ -1040,11 +1037,9 @@ export const Dashboard = () => {
               <DropdownMenuItem onClick={() => navigate('/carriers-chat')} className="relative">
                 <MessageSquare className="h-4 w-4 mr-2" />
                 Conversas
-                {unreadConversationsCount > 0 && (
-                  <span className="ml-auto pl-2 text-xs font-semibold text-destructive">
+                {unreadConversationsCount > 0 && <span className="ml-auto pl-2 text-xs font-semibold text-destructive">
                     ({unreadConversationsCount})
-                  </span>
-                )}
+                  </span>}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -1079,12 +1074,7 @@ export const Dashboard = () => {
 
       {/* Tab Navigation - Compacta */}
       <div className="mb-3">
-        <div className="flex justify-center items-center gap-0.5 lg:gap-1 border-b border-border overflow-x-auto">
-          {tabs.map(tab => <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`px-2 py-1.5 lg:px-3 lg:py-2 text-xs lg:text-sm font-medium transition-all relative whitespace-nowrap ${activeTab === tab.id ? 'text-primary' : 'text-muted-foreground hover:text-foreground'}`}>
-              {tab.name}
-              {activeTab === tab.id && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary" />}
-            </button>)}
-        </div>
+        
       </div>
 
       {/* Content */}
