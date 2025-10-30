@@ -745,7 +745,7 @@ export const EditOrderDialog = ({
   };
 
   // NOVO: Registrar mudança de item no histórico
-  const recordItemChange = async (itemId: string, field: 'received_status' | 'delivered_quantity' | 'item_source_type' | 'item_status', oldValue: any, newValue: any, notes?: string) => {
+  const recordItemChange = async (itemId: string, field: 'received_status' | 'delivered_quantity' | 'item_source_type' | 'item_status' | 'warehouse', oldValue: any, newValue: any, notes?: string) => {
     try {
       const {
         data: {
@@ -774,6 +774,63 @@ export const EditOrderDialog = ({
       ...newItems[index],
       [field]: value
     };
+
+    // NOVO: Detectar mudança de armazém
+    if (field === 'warehouse' && oldItem.warehouse !== value && oldItem.id) {
+      console.log(`📦 Armazém mudou: ${oldItem.warehouse} → ${value}`);
+      
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error('Usuário não autenticado');
+
+        // Salvar no banco
+        const { error } = await supabase
+          .from('order_items')
+          .update({ warehouse: value })
+          .eq('id', oldItem.id);
+        
+        if (error) throw error;
+
+        // Registrar no histórico
+        await recordItemChange(oldItem.id, 'warehouse' as any, oldItem.warehouse, value, 'Armazém alterado');
+
+        // Registrar em order_changes também
+        await supabase.from('order_changes').insert({
+          order_id: order.id,
+          changed_by: user.id,
+          field_name: `item_warehouse_${oldItem.itemCode}`,
+          old_value: oldItem.warehouse,
+          new_value: value,
+          change_type: 'update',
+          change_category: 'item_update'
+        });
+
+        // Atualizar estado local
+        setItems(newItems);
+
+        // Mostrar aviso sobre TOTVS
+        toast({
+          title: "⚠️ Armazém alterado",
+          description: `Armazém alterado de "${oldItem.warehouse}" para "${value}". LEMBRE-SE: Atualize o pedido no TOTVS para faturamento correto!`,
+          variant: "default",
+          duration: 8000, // 8 segundos para dar tempo de ler
+        });
+
+        console.log(`✅ Armazém atualizado no banco e histórico`);
+        
+        // Recarregar histórico
+        loadHistory();
+        return;
+      } catch (error: any) {
+        console.error('Erro ao atualizar armazém:', error);
+        toast({
+          title: "Erro ao atualizar armazém",
+          description: error?.message || "Não foi possível salvar a alteração.",
+          variant: "destructive"
+        });
+        return; // Não atualizar UI se falhou
+      }
+    }
 
     // NOVO: Detectar mudança de deliveryDate em itens
     if (field === 'deliveryDate' && oldItem.deliveryDate !== value && oldItem.id) {
