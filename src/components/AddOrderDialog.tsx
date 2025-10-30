@@ -35,6 +35,10 @@ export interface OrderItem {
   sla_deadline?: string;
   current_phase?: string;
   phase_started_at?: string;
+  // Campos de controle de compra
+  purchase_action_started?: boolean;
+  purchase_action_started_at?: string;
+  purchase_action_started_by?: string;
 }
 
 interface OrderFormData {

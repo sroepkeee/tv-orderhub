@@ -779,6 +779,9 @@ export type Database = {
           order_id: string
           phase_started_at: string | null
           production_estimated_date: string | null
+          purchase_action_started: boolean | null
+          purchase_action_started_at: string | null
+          purchase_action_started_by: string | null
           received_status: string | null
           requested_quantity: number
           sla_days: number | null
@@ -808,6 +811,9 @@ export type Database = {
           order_id: string
           phase_started_at?: string | null
           production_estimated_date?: string | null
+          purchase_action_started?: boolean | null
+          purchase_action_started_at?: string | null
+          purchase_action_started_by?: string | null
           received_status?: string | null
           requested_quantity?: number
           sla_days?: number | null
@@ -837,6 +843,9 @@ export type Database = {
           order_id?: string
           phase_started_at?: string | null
           production_estimated_date?: string | null
+          purchase_action_started?: boolean | null
+          purchase_action_started_at?: string | null
+          purchase_action_started_by?: string | null
           received_status?: string | null
           requested_quantity?: number
           sla_days?: number | null

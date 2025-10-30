@@ -666,7 +666,11 @@ export const EditOrderDialog = ({
       sla_deadline: item.sla_deadline,
       current_phase: item.current_phase,
       phase_started_at: item.phase_started_at,
-      userId: item.user_id
+      userId: item.user_id,
+      // Campos de controle de compra
+      purchase_action_started: item.purchase_action_started,
+      purchase_action_started_at: item.purchase_action_started_at,
+      purchase_action_started_by: item.purchase_action_started_by
     }));
     setItems(mappedItems);
   };
@@ -745,7 +749,7 @@ export const EditOrderDialog = ({
   };
 
   // NOVO: Registrar mudança de item no histórico
-  const recordItemChange = async (itemId: string, field: 'received_status' | 'delivered_quantity' | 'item_source_type' | 'item_status' | 'warehouse', oldValue: any, newValue: any, notes?: string) => {
+  const recordItemChange = async (itemId: string, field: 'received_status' | 'delivered_quantity' | 'item_source_type' | 'item_status' | 'warehouse' | 'purchase_action_started', oldValue: any, newValue: any, notes?: string) => {
     try {
       const {
         data: {
@@ -2018,7 +2022,7 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                             <TableHead className="w-[100px]">Armazém</TableHead>
                               <TableHead className="w-[140px]">Data Entrega</TableHead>
                               <TableHead className="w-[180px]">Situação</TableHead>
-                              <TableHead className="w-[120px]">Importação?</TableHead>
+                              <TableHead className="w-[140px]">Compra/Import.</TableHead>
                               <TableHead className="w-[120px]">Qtd. Recebida</TableHead>
                               <TableHead className="w-[100px]">Ações</TableHead>
                           </TableRow>
@@ -2062,23 +2066,123 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                                 </Select>
                               </TableCell>
                               <TableCell>
-                                {item.item_source_type === 'out_of_stock' && <div className="flex flex-col gap-1">
-                                    <Select value={item.is_imported ? 'yes' : 'no'} onValueChange={value => {
-                                updateItem(index, "is_imported", value === 'yes');
-                                if (value === 'no') {
-                                  updateItem(index, "import_lead_time_days", null);
-                                }
-                              }}>
-                                      <SelectTrigger className="h-8 text-sm">
-                                        <SelectValue />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        <SelectItem value="no">Não</SelectItem>
-                                        <SelectItem value="yes">Sim</SelectItem>
-                                      </SelectContent>
-                                    </Select>
-                                    {item.is_imported && <Input type="number" value={item.import_lead_time_days || ''} onChange={e => updateItem(index, "import_lead_time_days", parseInt(e.target.value) || null)} placeholder="Prazo import." className="h-8 text-sm" title="Prazo de importação em dias" />}
-                                  </div>}
+                                <div className="flex flex-col gap-1.5">
+                                  {/* Checkbox para confirmar andamento na compra */}
+                                  <div className="flex items-center gap-2 px-1 py-0.5 rounded hover:bg-muted/50 transition-colors">
+                                    <Checkbox
+                                      id={`purchase-${index}`}
+                                      checked={item.purchase_action_started || false}
+                                      onCheckedChange={async (checked) => {
+                                        // Garantir que checked é boolean
+                                        const isChecked = checked === true;
+                                        
+                                        if (item.id) {
+                                          try {
+                                            const { data: { user } } = await supabase.auth.getUser();
+                                            if (!user) throw new Error('Usuário não autenticado');
+
+                                            // Atualizar no banco
+                                            const { error } = await supabase
+                                              .from('order_items')
+                                              .update({
+                                                purchase_action_started: isChecked,
+                                                purchase_action_started_at: isChecked ? new Date().toISOString() : null,
+                                                purchase_action_started_by: isChecked ? user.id : null
+                                              })
+                                              .eq('id', item.id);
+
+                                            if (error) throw error;
+
+                                            // Registrar no histórico
+                                            await recordItemChange(
+                                              item.id,
+                                              'purchase_action_started',
+                                              item.purchase_action_started ? 'true' : 'false',
+                                              isChecked ? 'true' : 'false',
+                                              isChecked ? 'Compra iniciada' : 'Compra desmarcada'
+                                            );
+
+                                            // Atualizar estado local
+                                            updateItem(index, "purchase_action_started", isChecked);
+
+                                            toast({
+                                              title: isChecked ? "✅ Compra confirmada" : "❌ Compra desmarcada",
+                                              description: isChecked 
+                                                ? "Andamento na compra registrado com sucesso" 
+                                                : "Compra desmarcada",
+                                              duration: 3000
+                                            });
+
+                                            // Recarregar itens e histórico
+                                            loadItems();
+                                            loadHistory();
+                                          } catch (error: any) {
+                                            console.error('Erro ao atualizar compra:', error);
+                                            toast({
+                                              title: "Erro ao atualizar",
+                                              description: error.message,
+                                              variant: "destructive"
+                                            });
+                                          }
+                                        } else {
+                                          // Se item não foi salvo ainda, apenas atualiza localmente
+                                          updateItem(index, "purchase_action_started", isChecked);
+                                        }
+                                      }}
+                                      className="h-4 w-4"
+                                      disabled={!item.id}
+                                    />
+                                    <Label 
+                                      htmlFor={`purchase-${index}`} 
+                                      className={`text-xs cursor-pointer select-none ${
+                                        item.purchase_action_started 
+                                          ? 'text-green-600 dark:text-green-400 font-semibold' 
+                                          : 'text-muted-foreground'
+                                      }`}
+                                    >
+                                      {item.purchase_action_started ? '✓ Compra OK' : 'Iniciar compra'}
+                                    </Label>
+                                  </div>
+
+                                  {/* Divider visual se houver campos de importação */}
+                                  {item.item_source_type === 'out_of_stock' && (
+                                    <div className="border-t border-muted my-0.5" />
+                                  )}
+
+                                  {/* Campos de importação (só aparecem para out_of_stock) */}
+                                  {item.item_source_type === 'out_of_stock' && (
+                                    <>
+                                      <Select 
+                                        value={item.is_imported ? 'yes' : 'no'} 
+                                        onValueChange={value => {
+                                          updateItem(index, "is_imported", value === 'yes');
+                                          if (value === 'no') {
+                                            updateItem(index, "import_lead_time_days", null);
+                                          }
+                                        }}
+                                      >
+                                        <SelectTrigger className="h-7 text-xs">
+                                          <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          <SelectItem value="no">🇧🇷 Nacional</SelectItem>
+                                          <SelectItem value="yes">🌍 Importado</SelectItem>
+                                        </SelectContent>
+                                      </Select>
+                                      
+                                      {item.is_imported && (
+                                        <Input
+                                          type="number"
+                                          value={item.import_lead_time_days || ''}
+                                          onChange={e => updateItem(index, "import_lead_time_days", parseInt(e.target.value) || null)}
+                                          placeholder="Prazo (dias)"
+                                          className="h-7 text-xs"
+                                          title="Prazo de importação em dias"
+                                        />
+                                      )}
+                                    </>
+                                  )}
+                                </div>
                               </TableCell>
                               <TableCell>
                                 <div className="flex items-center gap-1">
