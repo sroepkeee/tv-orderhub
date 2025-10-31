@@ -1,11 +1,12 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Skeleton } from '@/components/ui/skeleton';
 import { MentionTextarea } from './MentionTextarea';
-import { parseMentions } from '@/lib/mentionUtils';
+import { parseMentionsToReact } from '@/lib/mentionUtils';
+import { renderCommentWithImages } from '@/lib/markdownRenderer';
 import { MessageSquare, Send, AlertCircle } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -229,9 +230,12 @@ export const OrderComments = ({ orderId }: OrderCommentsProps) => {
           <MentionTextarea
             value={newComment}
             onChange={setNewComment}
-            placeholder="Adicione um comentário... Use @ para mencionar usuários"
+            placeholder="Adicione um comentário... Use @ para mencionar usuários ou cole imagens com Ctrl+V"
             className="min-h-[100px]"
             disabled={submitting}
+            orderId={orderId}
+            onImageUploadStart={() => setSubmitting(true)}
+            onImageUploadEnd={() => setSubmitting(false)}
           />
           <div className="flex justify-end">
             <Button
@@ -313,8 +317,13 @@ export const OrderComments = ({ orderId }: OrderCommentsProps) => {
                     )}
                   </div>
                   
-                  <div className="text-sm whitespace-pre-wrap">
-                    {parseMentions(comment.comment)}
+                  <div className="text-sm">
+                    {renderCommentWithImages(comment.comment).map((element, idx) => {
+                      if (typeof element === 'object' && element && 'props' in element && typeof element.props?.children === 'string') {
+                        return <React.Fragment key={idx}>{parseMentionsToReact(element.props.children)}</React.Fragment>;
+                      }
+                      return <React.Fragment key={idx}>{element}</React.Fragment>;
+                    })}
                   </div>
                   
                   {comment.mention_tags && comment.mention_tags.length > 0 && (

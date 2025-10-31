@@ -4,7 +4,9 @@ import { Card } from '@/components/ui/card';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { useMentionUsers } from '@/hooks/useMentionUsers';
+import { useImageUpload } from '@/hooks/useImageUpload';
 import { cn } from '@/lib/utils';
+import { ImagePlus, Loader2 } from 'lucide-react';
 
 interface MentionTextareaProps {
   value: string;
@@ -12,6 +14,10 @@ interface MentionTextareaProps {
   placeholder?: string;
   disabled?: boolean;
   className?: string;
+  orderId?: string;
+  commentId?: string;
+  onImageUploadStart?: () => void;
+  onImageUploadEnd?: () => void;
 }
 
 export const MentionTextarea = ({
@@ -19,9 +25,14 @@ export const MentionTextarea = ({
   onChange,
   placeholder,
   disabled,
-  className
+  className,
+  orderId,
+  commentId,
+  onImageUploadStart,
+  onImageUploadEnd
 }: MentionTextareaProps) => {
   const { users, searchUsers } = useMentionUsers();
+  const { uploadImage, uploading } = useImageUpload();
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [suggestions, setSuggestions] = useState(users);
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -79,6 +90,63 @@ export const MentionTextarea = ({
     }, 0);
   };
 
+  // Handler para Paste (Ctrl+V)
+  const handlePaste = async (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+
+    // Procurar por imagens no clipboard
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      
+      if (item.type.startsWith('image/')) {
+        e.preventDefault(); // Prevenir paste padrão
+        
+        const file = item.getAsFile();
+        if (!file) continue;
+
+        // Notificar início do upload
+        onImageUploadStart?.();
+
+        // Fazer upload
+        const imageUrl = await uploadImage({
+          orderId,
+          commentId,
+          file
+        });
+
+        // Notificar fim do upload
+        onImageUploadEnd?.();
+
+        if (imageUrl) {
+          // Inserir markdown da imagem na posição do cursor
+          const textarea = textareaRef.current;
+          if (!textarea) return;
+
+          const start = textarea.selectionStart;
+          const end = textarea.selectionEnd;
+          const textBefore = value.substring(0, start);
+          const textAfter = value.substring(end);
+          
+          const imageName = file.name.split('.')[0] || 'Imagem';
+          const imageMarkdown = `\n![${imageName}](${imageUrl})\n`;
+          const newValue = textBefore + imageMarkdown + textAfter;
+          
+          onChange(newValue);
+          
+          // Reposicionar cursor após a imagem
+          setTimeout(() => {
+            const newCursorPos = start + imageMarkdown.length;
+            textarea.setSelectionRange(newCursorPos, newCursorPos);
+            textarea.focus();
+          }, 0);
+        }
+        
+        break; // Apenas primeira imagem
+      }
+    }
+  };
+
   // Navegação por teclado
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (!showSuggestions) return;
@@ -108,10 +176,27 @@ export const MentionTextarea = ({
         value={value}
         onChange={handleChange}
         onKeyDown={handleKeyDown}
+        onPaste={handlePaste}
         placeholder={placeholder}
-        disabled={disabled}
+        disabled={disabled || uploading}
         className={className}
       />
+      
+      {/* Dica visual */}
+      <div className="absolute bottom-2 right-2 text-xs text-muted-foreground flex items-center gap-1 pointer-events-none">
+        <ImagePlus className="h-3 w-3" />
+        <span>Ctrl+V para colar imagem</span>
+      </div>
+
+      {/* Indicador de upload */}
+      {uploading && (
+        <div className="absolute inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center rounded-md">
+          <div className="flex items-center gap-2 text-sm">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            <span>Anexando imagem...</span>
+          </div>
+        </div>
+      )}
       
       {showSuggestions && suggestions.length > 0 && (
         <Card className="absolute top-full mt-2 w-full max-h-60 overflow-y-auto z-50 shadow-lg">

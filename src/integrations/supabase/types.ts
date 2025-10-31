@@ -521,36 +521,46 @@ export type Database = {
       }
       order_attachments: {
         Row: {
+          comment_id: string | null
           file_name: string
           file_path: string
           file_size: number
           file_type: string
           id: string
-          order_id: string
+          order_id: string | null
           uploaded_at: string | null
           uploaded_by: string
         }
         Insert: {
+          comment_id?: string | null
           file_name: string
           file_path: string
           file_size: number
           file_type?: string
           id?: string
-          order_id: string
+          order_id?: string | null
           uploaded_at?: string | null
           uploaded_by: string
         }
         Update: {
+          comment_id?: string | null
           file_name?: string
           file_path?: string
           file_size?: number
           file_type?: string
           id?: string
-          order_id?: string
+          order_id?: string | null
           uploaded_at?: string | null
           uploaded_by?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "order_attachments_comment_id_fkey"
+            columns: ["comment_id"]
+            isOneToOne: false
+            referencedRelation: "order_comments"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "order_attachments_order_id_fkey"
             columns: ["order_id"]

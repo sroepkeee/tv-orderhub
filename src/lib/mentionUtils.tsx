@@ -1,7 +1,7 @@
 import React from 'react';
 
-// Parser de menções para exibição
-export const parseMentions = (text: string): React.ReactNode[] => {
+// Parser de menções para exibição (retorna React nodes com badges)
+export const parseMentionsToReact = (text: string): React.ReactNode[] => {
   const mentionPattern = /@\[([^\]]+)\]\(([a-f0-9-]{36})\)/g;
   const parts: React.ReactNode[] = [];
   let lastIndex = 0;
@@ -36,4 +36,9 @@ export const parseMentions = (text: string): React.ReactNode[] => {
   }
 
   return parts.length > 0 ? parts : [text];
+};
+
+// Parser simples de menções para string (apenas extrai o nome)
+export const parseMentions = (text: string): string => {
+  return text.replace(/@\[([^\]]+)\]\(([^)]+)\)/g, '@$1');
 };
