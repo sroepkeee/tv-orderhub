@@ -89,7 +89,8 @@ export const FreightQuoteDialog = ({
     recipient_name: order.client || '',
     recipient_city: extractCity(order.delivery_address),
     recipient_state: extractState(order.delivery_address),
-    recipient_address: order.delivery_address || '',
+    recipient_address: '',
+    delivery_address: order.delivery_address || '',
     // Carga
     product_description: order.description || order.item || '',
     package_type: 'Caixa de madeira',
@@ -285,8 +286,24 @@ export const FreightQuoteDialog = ({
                   </Select>
                 </div>
                 <div className="space-y-2 col-span-2">
-                  <Label className="text-xs">Endereço *</Label>
-                  <Input value={quoteData.recipient_address} onChange={e => setQuoteData({...quoteData, recipient_address: e.target.value})} className="h-9" />
+                  <Label className="text-xs">Endereço</Label>
+                  <Input 
+                    value={quoteData.recipient_address} 
+                    onChange={e => setQuoteData({...quoteData, recipient_address: e.target.value})} 
+                    className="h-9"
+                    placeholder="Endereço principal do destinatário" 
+                  />
+                </div>
+                <div className="space-y-2 col-span-2">
+                  <Label className="text-xs flex items-center gap-1">
+                    🚚 Endereço de Entrega *
+                  </Label>
+                  <Input 
+                    value={quoteData.delivery_address} 
+                    onChange={e => setQuoteData({...quoteData, delivery_address: e.target.value})} 
+                    className="h-9"
+                    placeholder="Local onde a carga será entregue" 
+                  />
                 </div>
               </div>
             </Card>
