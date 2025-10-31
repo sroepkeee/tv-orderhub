@@ -102,7 +102,7 @@ export function CarriersTabContent({ order }: CarriersTabContentProps) {
             {/* Quotes List */}
             <div className="space-y-2">
               <h4 className="text-sm font-semibold text-muted-foreground">Cotações Enviadas</h4>
-              <ScrollArea className="h-[400px]">
+              <ScrollArea className="h-[280px]">
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 pr-4">
                   {quotes.map((quote) => {
                     const quoteResponses = responses.filter(r => r.quote_id === quote.id);
@@ -121,7 +121,7 @@ export function CarriersTabContent({ order }: CarriersTabContentProps) {
             </div>
 
             {/* Approval Table Section - Bottom Area - Always Visible */}
-            <div className="space-y-2 pt-4 border-t">
+            <div className="space-y-2 pt-2 border-t">
               <h3 className="text-lg font-semibold">📋 Aprovação de Cotações</h3>
               <p className="text-sm text-muted-foreground mb-4">
                 Compare as cotações recebidas e aprove a melhor opção para este pedido
