@@ -54,15 +54,6 @@ export function CarriersTabContent({ order }: CarriersTabContentProps) {
           </Card>
         ) : (
           <>
-            {/* Quote Summary Table */}
-            {respondedQuotes.length > 0 && (
-              <QuoteSummaryTable 
-                quotes={quotes}
-                responses={responses}
-                onSelectQuote={selectQuote}
-              />
-            )}
-
             {/* Status Summary */}
             <Card className="p-4 bg-muted/50">
               <div className="flex items-center justify-between">
@@ -108,39 +99,48 @@ export function CarriersTabContent({ order }: CarriersTabContentProps) {
               </div>
             )}
 
-            {/* Approval Table Section */}
-            {respondedQuotes.length > 0 && (
-              <QuoteApprovalTable
-                quotes={quotes}
-                responses={responses}
-                onApprove={async (quoteId, responseId) => {
-                  await selectQuote(quoteId, responseId);
-                  await loadQuotesByOrder(order.id);
-                }}
-                onReject={async (quoteId, responseId) => {
-                  await rejectQuote(quoteId, responseId);
-                  await loadQuotesByOrder(order.id);
-                }}
-              />
-            )}
-
             {/* Quotes List */}
-            <ScrollArea className="h-[400px]">
-              <div className="space-y-4">
-                {quotes.map((quote) => {
-                  const quoteResponses = responses.filter(r => r.quote_id === quote.id);
-                  return (
-                    <FreightQuoteCard
-                      key={quote.id}
-                      quote={quote}
-                      responses={quoteResponses}
-                      onSelectQuote={selectQuote}
-                      orderId={order.id}
-                    />
-                  );
-                })}
+            <div className="space-y-2">
+              <h4 className="text-sm font-semibold text-muted-foreground">Cotações Enviadas</h4>
+              <ScrollArea className="h-[250px]">
+                <div className="space-y-4 pr-4">
+                  {quotes.map((quote) => {
+                    const quoteResponses = responses.filter(r => r.quote_id === quote.id);
+                    return (
+                      <FreightQuoteCard
+                        key={quote.id}
+                        quote={quote}
+                        responses={quoteResponses}
+                        onSelectQuote={selectQuote}
+                        orderId={order.id}
+                      />
+                    );
+                  })}
+                </div>
+              </ScrollArea>
+            </div>
+
+            {/* Approval Table Section - Bottom Area */}
+            {respondedQuotes.length > 0 && (
+              <div className="space-y-2 pt-4 border-t">
+                <h3 className="text-lg font-semibold">📋 Aprovação de Cotações</h3>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Compare as cotações recebidas e aprove a melhor opção para este pedido
+                </p>
+                <QuoteApprovalTable
+                  quotes={quotes}
+                  responses={responses}
+                  onApprove={async (quoteId, responseId) => {
+                    await selectQuote(quoteId, responseId);
+                    await loadQuotesByOrder(order.id);
+                  }}
+                  onReject={async (quoteId, responseId) => {
+                    await rejectQuote(quoteId, responseId);
+                    await loadQuotesByOrder(order.id);
+                  }}
+                />
               </div>
-            </ScrollArea>
+            )}
           </>
         )}
       </div>
