@@ -19,6 +19,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
 
 interface WhatsAppContact {
   whatsapp: string;
@@ -46,6 +48,7 @@ export function WhatsAppContactList({
   const [searchQuery, setSearchQuery] = useState('');
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [contactToDelete, setContactToDelete] = useState<WhatsAppContact | null>(null);
+  const [deleteQuotesAndClearOrders, setDeleteQuotesAndClearOrders] = useState(false);
   const { toast } = useToast();
 
   // Agrupar por chave única (WhatsApp ou carrier_id para casos sem WhatsApp)
@@ -121,9 +124,48 @@ export function WhatsAppContactList({
     if (!contactToDelete) return;
 
     try {
-      // Excluir todas as conversas deste contato
       const conversationIds = contactToDelete.conversations.map(c => c.id);
-      
+      const orderIds = [...new Set(contactToDelete.conversations.map(c => c.order_id))];
+
+      // Se opção marcada, excluir cotações e limpar dados dos pedidos
+      if (deleteQuotesAndClearOrders) {
+        // 1. Buscar IDs das cotações deste carrier para estes pedidos
+        const { data: quotes } = await supabase
+          .from('freight_quotes')
+          .select('id')
+          .eq('carrier_id', contactToDelete.carrierId)
+          .in('order_id', orderIds);
+
+        if (quotes && quotes.length > 0) {
+          const quoteIds = quotes.map(q => q.id);
+
+          // 2. Excluir respostas de cotações
+          await supabase
+            .from('freight_quote_responses')
+            .delete()
+            .in('quote_id', quoteIds);
+
+          // 3. Excluir cotações
+          await supabase
+            .from('freight_quotes')
+            .delete()
+            .in('id', quoteIds);
+        }
+
+        // 4. Limpar campos de frete dos pedidos
+        await supabase
+          .from('orders')
+          .update({
+            freight_type: null,
+            freight_value: null,
+            freight_modality: null,
+            carrier_name: null,
+            tracking_code: null
+          })
+          .in('id', orderIds);
+      }
+
+      // 5. Excluir conversas
       const { error } = await supabase
         .from('carrier_conversations')
         .delete()
@@ -133,10 +175,11 @@ export function WhatsAppContactList({
 
       toast({
         title: '✅ Conversas excluídas',
-        description: `Todas as mensagens com ${contactToDelete.carrierName} foram removidas.`,
+        description: deleteQuotesAndClearOrders 
+          ? `Conversas, cotações e dados de frete dos pedidos foram removidos.`
+          : `Todas as mensagens com ${contactToDelete.carrierName} foram removidas.`,
       });
 
-      // Atualizar lista
       onConversationsUpdate?.();
     } catch (error) {
       console.error('Erro ao excluir conversas:', error);
@@ -148,6 +191,7 @@ export function WhatsAppContactList({
     } finally {
       setDeleteDialogOpen(false);
       setContactToDelete(null);
+      setDeleteQuotesAndClearOrders(false);
     }
   };
 
@@ -242,6 +286,26 @@ export function WhatsAppContactList({
               Todas as mensagens com <strong>{contactToDelete?.carrierName}</strong> ({contactToDelete?.orderCount} {contactToDelete?.orderCount === 1 ? 'pedido' : 'pedidos'}) serão permanentemente excluídas. Esta ação não pode ser desfeita.
             </AlertDialogDescription>
           </AlertDialogHeader>
+          
+          <div className="flex items-start space-x-2 py-4">
+            <Checkbox 
+              id="delete-quotes" 
+              checked={deleteQuotesAndClearOrders}
+              onCheckedChange={(checked) => setDeleteQuotesAndClearOrders(checked === true)}
+            />
+            <div className="grid gap-1.5 leading-none">
+              <Label 
+                htmlFor="delete-quotes" 
+                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+              >
+                Excluir também cotações e limpar campos dos pedidos
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                Remove cotações de frete e limpa os campos freight_type, freight_value, freight_modality, carrier_name e tracking_code dos pedidos relacionados.
+              </p>
+            </div>
+          </div>
+
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction onClick={handleConfirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">

@@ -370,8 +370,18 @@ export const Dashboard = () => {
     setLoading(true);
     setErrorMessage(null);
     try {
+      // Aplicar filtro padrão de 120 dias para melhor performance
+      const fourMonthsAgo = new Date();
+      fourMonthsAgo.setDate(fourMonthsAgo.getDate() - 120);
+      
       // Fetch all orders in a single query with timeout
-      const ordersQueryPromise = Promise.resolve(supabase.from('orders').select('*').order('created_at', { ascending: false }));
+      const ordersQueryPromise = Promise.resolve(
+        supabase
+          .from('orders')
+          .select('*')
+          .gte('created_at', fourMonthsAgo.toISOString())
+          .order('created_at', { ascending: false })
+      );
       const ordersResult = await fetchWithTimeout(ordersQueryPromise);
       const { data: ordersData, error: ordersError } = ordersResult as any;
       if (ordersError) throw ordersError;
