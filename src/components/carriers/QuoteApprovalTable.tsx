@@ -3,7 +3,8 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { CheckCircle2, XCircle, Trophy, AlertTriangle } from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
+import { CheckCircle2, XCircle, Trophy, AlertTriangle, Clock } from 'lucide-react';
 import { FreightQuote, FreightQuoteResponse } from '@/types/carriers';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -73,17 +74,8 @@ export function QuoteApprovalTable({
     }
   };
 
-  if (quotesWithResponses.length === 0) {
-    return (
-      <Card className="p-6">
-        <div className="text-center text-muted-foreground">
-          <AlertTriangle className="h-12 w-12 mx-auto mb-3 text-yellow-500" />
-          <p className="text-lg font-semibold">Nenhuma cotação disponível para aprovação</p>
-          <p className="text-sm mt-1">Aguarde as transportadoras responderem</p>
-        </div>
-      </Card>
-    );
-  }
+  // Renderizar placeholder rows se não houver dados
+  const showPlaceholder = quotesWithResponses.length === 0;
 
   return (
     <Card className="p-6">
@@ -91,137 +83,189 @@ export function QuoteApprovalTable({
         <div className="flex items-center justify-between">
           <div>
             <h3 className="text-lg font-bold flex items-center gap-2">
-              🎯 Aprovação de Cotações
+              🎯 Tabela de Aprovação de Cotações
             </h3>
             <p className="text-sm text-muted-foreground mt-1">
-              Análise comparativa para decisão final
+              {showPlaceholder ? 'Aguardando respostas das transportadoras' : 'Análise comparativa para decisão final'}
             </p>
           </div>
-          {!hasMinimumQuotes && (
-            <Badge variant="outline" className="border-yellow-500 text-yellow-700 bg-yellow-50">
-              <AlertTriangle className="h-3 w-3 mr-1" />
-              Mínimo 3 cotações necessárias ({quotesWithResponses.length}/3)
-            </Badge>
-          )}
-          {hasMinimumQuotes && (
-            <Badge variant="outline" className="border-green-500 text-green-700 bg-green-50">
-              <CheckCircle2 className="h-3 w-3 mr-1" />
-              Pronto para aprovação
-            </Badge>
+          {!showPlaceholder && (
+            <>
+              {!hasMinimumQuotes && (
+                <Badge variant="outline" className="border-yellow-500 text-yellow-700 bg-yellow-50">
+                  <AlertTriangle className="h-3 w-3 mr-1" />
+                  Mínimo 3 cotações necessárias ({quotesWithResponses.length}/3)
+                </Badge>
+              )}
+              {hasMinimumQuotes && (
+                <Badge variant="outline" className="border-green-500 text-green-700 bg-green-50">
+                  <CheckCircle2 className="h-3 w-3 mr-1" />
+                  Pronto para aprovação
+                </Badge>
+              )}
+            </>
           )}
         </div>
 
-        <div className="border rounded-lg overflow-hidden">
+        <div className="border rounded-lg overflow-x-auto">
           <Table>
             <TableHeader>
-              <TableRow>
-                <TableHead className="w-[50px]"></TableHead>
-                <TableHead>Transportadora</TableHead>
-                <TableHead>Valor do Frete</TableHead>
-                <TableHead>Prazo de Entrega</TableHead>
-                <TableHead>Recebido em</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-center">Ações</TableHead>
+              <TableRow className="bg-green-600 hover:bg-green-600">
+                <TableHead className="text-white font-semibold text-xs">Código</TableHead>
+                <TableHead className="text-white font-semibold text-xs">Data</TableHead>
+                <TableHead className="text-white font-semibold text-xs">Origem</TableHead>
+                <TableHead className="text-white font-semibold text-xs">Transportadora</TableHead>
+                <TableHead className="text-white font-semibold text-xs">Valor</TableHead>
+                <TableHead className="text-white font-semibold text-xs">Prazo</TableHead>
+                <TableHead className="text-white font-semibold text-xs">Vol</TableHead>
+                <TableHead className="text-white font-semibold text-xs">Peso/Kg</TableHead>
+                <TableHead className="text-white font-semibold text-xs">Valor p/km</TableHead>
+                <TableHead className="text-white font-semibold text-xs">Saída</TableHead>
+                <TableHead className="text-white font-semibold text-xs">Destino</TableHead>
+                <TableHead className="text-white font-semibold text-xs">Tipo</TableHead>
+                <TableHead className="text-white font-semibold text-xs">Status</TableHead>
+                <TableHead className="text-white font-semibold text-xs text-center">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {quotesWithResponses.map((item, index) => {
-                const isBest = item === bestQuote;
-                const isSelected = item.response?.is_selected;
-                const isProcessing = processingId === item.response?.id;
-                
-                return (
-                  <TableRow 
-                    key={item.response?.id}
-                    className={isBest ? 'bg-green-50 dark:bg-green-950/20' : ''}
-                  >
-                    <TableCell>
-                      {isBest && (
-                        <Trophy className="h-5 w-5 text-yellow-500" />
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <div className="font-medium flex items-center gap-2">
-                        {item.quote.carrier?.name}
-                        {isBest && (
-                          <Badge variant="secondary" className="text-xs">
-                            Melhor Preço
-                          </Badge>
+              {showPlaceholder ? (
+                // Placeholder rows quando não há dados
+                <>
+                  {[1, 2, 3].map((i) => (
+                    <TableRow key={`placeholder-${i}`}>
+                      <TableCell className="text-xs"><Skeleton className="h-4 w-16" /></TableCell>
+                      <TableCell className="text-xs"><Skeleton className="h-4 w-20" /></TableCell>
+                      <TableCell className="text-xs"><Skeleton className="h-4 w-24" /></TableCell>
+                      <TableCell className="text-xs">
+                        <div className="flex items-center gap-2">
+                          <Clock className="h-4 w-4 text-muted-foreground animate-pulse" />
+                          <span className="text-muted-foreground">Aguardando...</span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-xs"><Skeleton className="h-4 w-20" /></TableCell>
+                      <TableCell className="text-xs"><Skeleton className="h-4 w-16" /></TableCell>
+                      <TableCell className="text-xs"><Skeleton className="h-4 w-12" /></TableCell>
+                      <TableCell className="text-xs"><Skeleton className="h-4 w-16" /></TableCell>
+                      <TableCell className="text-xs"><Skeleton className="h-4 w-16" /></TableCell>
+                      <TableCell className="text-xs"><Skeleton className="h-4 w-12" /></TableCell>
+                      <TableCell className="text-xs"><Skeleton className="h-4 w-24" /></TableCell>
+                      <TableCell className="text-xs"><Skeleton className="h-4 w-20" /></TableCell>
+                      <TableCell className="text-xs">
+                        <Badge variant="outline" className="text-xs">
+                          <Clock className="h-3 w-3 mr-1" />
+                          Pendente
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-xs">
+                        <div className="flex gap-1 justify-center">
+                          <Skeleton className="h-7 w-20" />
+                          <Skeleton className="h-7 w-20" />
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </>
+              ) : (
+                // Dados reais quando houver cotações
+                quotesWithResponses.map((item, index) => {
+                  const isBest = item === bestQuote;
+                  const isSelected = item.response?.is_selected;
+                  const isProcessing = processingId === item.response?.id;
+                  
+                  // Extrair dados do quote_request_data
+                  const requestData = item.quote.quote_request_data;
+                  const volumes = requestData?.cargo?.volumes || 0;
+                  const weight = requestData?.cargo?.total_weight_kg || 0;
+                  const origin = requestData?.sender?.address || 'N/A';
+                  const originState = requestData?.sender?.address?.split(',').pop()?.trim() || 'N/A';
+                  const destinationCity = requestData?.recipient?.city || 'N/A';
+                  const destinationState = requestData?.recipient?.state || 'N/A';
+                  const productType = requestData?.cargo?.product_description || 'N/A';
+                  
+                  return (
+                    <TableRow 
+                      key={item.response?.id}
+                      className={isBest ? 'bg-green-50 dark:bg-green-950/20' : ''}
+                    >
+                      <TableCell className="text-xs font-mono">
+                        {item.quote.id.substring(0, 8)}
+                      </TableCell>
+                      <TableCell className="text-xs">
+                        {item.response?.received_at && (
+                          format(new Date(item.response.received_at), "dd/MM/yy", { locale: ptBR })
                         )}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="font-bold text-lg">
-                        {formatCurrency(item.response?.freight_value)}
-                      </div>
-                      {isBest && quotesWithResponses.length > 1 && (
-                        <div className="text-xs text-green-600 dark:text-green-400">
-                          Economia de {formatCurrency(
-                            (quotesWithResponses[1]?.response?.freight_value || 0) - 
-                            (item.response?.freight_value || 0)
+                      </TableCell>
+                      <TableCell className="text-xs">{origin.substring(0, 25)}...</TableCell>
+                      <TableCell className="text-xs">
+                        <div className="font-medium flex items-center gap-1">
+                          {isBest && <Trophy className="h-3 w-3 text-yellow-500" />}
+                          {item.quote.carrier?.name}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-xs">
+                        <div className="font-bold">
+                          {formatCurrency(item.response?.freight_value)}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-xs">
+                        {item.response?.delivery_time_days ? (
+                          <span>{item.response.delivery_time_days}d</span>
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-xs text-center">{volumes}</TableCell>
+                      <TableCell className="text-xs text-center">{weight.toFixed(1)}</TableCell>
+                      <TableCell className="text-xs text-center text-muted-foreground">N/A</TableCell>
+                      <TableCell className="text-xs">{originState}</TableCell>
+                      <TableCell className="text-xs">{destinationCity}/{destinationState}</TableCell>
+                      <TableCell className="text-xs">{productType.substring(0, 20)}</TableCell>
+                      <TableCell className="text-xs">
+                        {isSelected ? (
+                          <Badge className="bg-green-600 text-xs">
+                            <CheckCircle2 className="h-3 w-3 mr-1" />
+                            Aprovada
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-xs">Pendente</Badge>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-xs">
+                        <div className="flex items-center justify-center gap-1">
+                          {!isSelected ? (
+                            <>
+                              <Button
+                                size="sm"
+                                variant="default"
+                                onClick={() => handleApprove(item.quote.id, item.response?.id || '')}
+                                disabled={isProcessing || !hasMinimumQuotes}
+                                className="gap-1 h-7 text-xs px-2"
+                              >
+                                <CheckCircle2 className="h-3 w-3" />
+                                Aprovar
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="destructive"
+                                onClick={() => handleReject(item.quote.id, item.response?.id || '')}
+                                disabled={isProcessing}
+                                className="gap-1 h-7 text-xs px-2"
+                              >
+                                <XCircle className="h-3 w-3" />
+                                Reprovar
+                              </Button>
+                            </>
+                          ) : (
+                            <Badge variant="outline" className="text-green-600 border-green-600 text-xs">
+                              ✓ Selecionada
+                            </Badge>
                           )}
                         </div>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {item.response?.delivery_time_days ? (
-                        <span>{item.response.delivery_time_days} dias</span>
-                      ) : (
-                        <span className="text-muted-foreground">Não informado</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {item.response?.received_at && (
-                        <span className="text-sm">
-                          {format(new Date(item.response.received_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}
-                        </span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {isSelected ? (
-                        <Badge className="bg-green-600">
-                          <CheckCircle2 className="h-3 w-3 mr-1" />
-                          Aprovada
-                        </Badge>
-                      ) : (
-                        <Badge variant="outline">Pendente</Badge>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center justify-center gap-2">
-                        {!isSelected ? (
-                          <>
-                            <Button
-                              size="sm"
-                              variant="default"
-                              onClick={() => handleApprove(item.quote.id, item.response?.id || '')}
-                              disabled={isProcessing || !hasMinimumQuotes}
-                              className="gap-1"
-                            >
-                              <CheckCircle2 className="h-3 w-3" />
-                              Aprovar
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="destructive"
-                              onClick={() => handleReject(item.quote.id, item.response?.id || '')}
-                              disabled={isProcessing}
-                              className="gap-1"
-                            >
-                              <XCircle className="h-3 w-3" />
-                              Reprovar
-                            </Button>
-                          </>
-                        ) : (
-                          <Badge variant="outline" className="text-green-600 border-green-600">
-                            ✓ Selecionada
-                          </Badge>
-                        )}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
+              )}
             </TableBody>
           </Table>
         </div>

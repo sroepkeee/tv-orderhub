@@ -120,27 +120,25 @@ export function CarriersTabContent({ order }: CarriersTabContentProps) {
               </ScrollArea>
             </div>
 
-            {/* Approval Table Section - Bottom Area */}
-            {respondedQuotes.length > 0 && (
-              <div className="space-y-2 pt-4 border-t">
-                <h3 className="text-lg font-semibold">📋 Aprovação de Cotações</h3>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Compare as cotações recebidas e aprove a melhor opção para este pedido
-                </p>
-                <QuoteApprovalTable
-                  quotes={quotes}
-                  responses={responses}
-                  onApprove={async (quoteId, responseId) => {
-                    await selectQuote(quoteId, responseId);
-                    await loadQuotesByOrder(order.id);
-                  }}
-                  onReject={async (quoteId, responseId) => {
-                    await rejectQuote(quoteId, responseId);
-                    await loadQuotesByOrder(order.id);
-                  }}
-                />
-              </div>
-            )}
+            {/* Approval Table Section - Bottom Area - Always Visible */}
+            <div className="space-y-2 pt-4 border-t">
+              <h3 className="text-lg font-semibold">📋 Aprovação de Cotações</h3>
+              <p className="text-sm text-muted-foreground mb-4">
+                Compare as cotações recebidas e aprove a melhor opção para este pedido
+              </p>
+              <QuoteApprovalTable
+                quotes={quotes}
+                responses={responses}
+                onApprove={async (quoteId, responseId) => {
+                  await selectQuote(quoteId, responseId);
+                  await loadQuotesByOrder(order.id);
+                }}
+                onReject={async (quoteId, responseId) => {
+                  await rejectQuote(quoteId, responseId);
+                  await loadQuotesByOrder(order.id);
+                }}
+              />
+            </div>
           </>
         )}
       </div>
