@@ -1,11 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { MessageSquare, CheckCircle, RefreshCw, Mail } from 'lucide-react';
+import { MessageSquare, CheckCircle, Check, CheckCheck, Clock, AlertCircle } from 'lucide-react';
 import type { FreightQuote, FreightQuoteResponse } from '@/types/carriers';
 import { format } from 'date-fns';
 import { CarrierConversationDialog } from './CarrierConversationDialog';
+import { supabase } from '@/integrations/supabase/client';
 
 interface FreightQuoteCardProps {
   quote: FreightQuote;
@@ -21,10 +22,60 @@ export const FreightQuoteCard = ({
   orderId,
 }: FreightQuoteCardProps) => {
   const [showConversation, setShowConversation] = useState(false);
+  const [messageStatus, setMessageStatus] = useState<{
+    sent_at?: string;
+    delivered_at?: string;
+    read_at?: string;
+  }>({});
   
-  // Debug: verificar dados da transportadora
-  console.log('FreightQuoteCard - quote completo:', quote);
-  console.log('FreightQuoteCard - carrier:', quote.carrier);
+  // Carregar status da mensagem
+  useEffect(() => {
+    const loadMessageStatus = async () => {
+      if (quote.id) {
+        const { data } = await supabase
+          .from('carrier_conversations')
+          .select('sent_at, delivered_at, read_at')
+          .eq('quote_id', quote.id)
+          .eq('message_direction', 'outbound')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .single();
+        
+        if (data) {
+          setMessageStatus(data);
+        }
+      }
+    };
+    
+    loadMessageStatus();
+    
+    // Subscrever a mudanças em tempo real
+    const channel = supabase
+      .channel(`quote-${quote.id}-status`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'carrier_conversations',
+          filter: `quote_id=eq.${quote.id}`
+        },
+        (payload) => {
+          if (payload.new) {
+            setMessageStatus({
+              sent_at: payload.new.sent_at,
+              delivered_at: payload.new.delivered_at,
+              read_at: payload.new.read_at
+            });
+          }
+        }
+      )
+      .subscribe();
+    
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [quote.id]);
   
   const getStatusBadge = () => {
     if (selectedResponse) {
@@ -35,21 +86,43 @@ export const FreightQuoteCard = ({
       return <Badge className="bg-blue-600 hover:bg-blue-700">✅ Respondida</Badge>;
     }
 
-    const variants = {
-      pending: 'secondary',
-      sent: 'secondary',
-      accepted: 'default',
-      rejected: 'destructive',
-      expired: 'secondary',
-    };
+    return null;
+  };
 
+  const getDeliveryStatusBadge = () => {
+    // Verificar status de entrega da mensagem
+    if (messageStatus.read_at) {
+      return (
+        <Badge className="bg-blue-600 hover:bg-blue-700 flex items-center gap-1">
+          <CheckCheck className="h-3 w-3" />
+          Lido
+        </Badge>
+      );
+    }
+    
+    if (messageStatus.delivered_at) {
+      return (
+        <Badge className="bg-gray-600 hover:bg-gray-700 flex items-center gap-1">
+          <CheckCheck className="h-3 w-3" />
+          Entregue
+        </Badge>
+      );
+    }
+    
+    if (messageStatus.sent_at || quote.sent_at) {
+      return (
+        <Badge variant="secondary" className="flex items-center gap-1">
+          <Check className="h-3 w-3" />
+          Enviado
+        </Badge>
+      );
+    }
+    
+    // Status pendente
     return (
-      <Badge variant={variants[quote.status] as any}>
-        {quote.status === 'pending' && '⏳ Pendente'}
-        {quote.status === 'sent' && '⏳ Aguardando'}
-        {quote.status === 'accepted' && '✓ Aceito'}
-        {quote.status === 'rejected' && '✗ Rejeitado'}
-        {quote.status === 'expired' && '⏰ Expirado'}
+      <Badge variant="outline" className="flex items-center gap-1">
+        <Clock className="h-3 w-3" />
+        Pendente
       </Badge>
     );
   };
@@ -76,17 +149,38 @@ export const FreightQuoteCard = ({
                 {quote.quote_request_data?.recipient?.state && `/${quote.quote_request_data.recipient.state}`}
               </p>
             </div>
-            {getStatusBadge()}
+            <div className="flex flex-col gap-2 items-end">
+              {getStatusBadge()}
+              {getDeliveryStatusBadge()}
+            </div>
           </div>
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="text-sm space-y-1">
             <p>Solicitado: {format(new Date(quote.requested_at), 'dd/MM/yyyy HH:mm')}</p>
-            {quote.sent_at && (
-              <p>Enviado: {format(new Date(quote.sent_at), 'dd/MM/yyyy HH:mm')}</p>
+            {(messageStatus.sent_at || quote.sent_at) && (
+              <p className="flex items-center gap-1">
+                <Check className="h-3 w-3 text-muted-foreground" />
+                Enviado: {format(new Date(messageStatus.sent_at || quote.sent_at), 'dd/MM/yyyy HH:mm')}
+              </p>
+            )}
+            {messageStatus.delivered_at && (
+              <p className="flex items-center gap-1">
+                <CheckCheck className="h-3 w-3 text-muted-foreground" />
+                Entregue: {format(new Date(messageStatus.delivered_at), 'dd/MM/yyyy HH:mm')}
+              </p>
+            )}
+            {messageStatus.read_at && (
+              <p className="flex items-center gap-1">
+                <CheckCheck className="h-3 w-3 text-blue-600" />
+                Lido: {format(new Date(messageStatus.read_at), 'dd/MM/yyyy HH:mm')}
+              </p>
             )}
             {quote.response_received_at && (
-              <p>Respondido: {format(new Date(quote.response_received_at), 'dd/MM/yyyy HH:mm')}</p>
+              <p className="flex items-center gap-1 text-green-600 font-semibold">
+                <CheckCircle className="h-3 w-3" />
+                Respondido: {format(new Date(quote.response_received_at), 'dd/MM/yyyy HH:mm')}
+              </p>
             )}
           </div>
 
