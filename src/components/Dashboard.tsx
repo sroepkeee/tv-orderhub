@@ -205,28 +205,62 @@ export const Dashboard = () => {
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
   const [loading, setLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const isUpdatingRef = useRef(false);
+  const mountedRef = useRef(true);
+  const isLoadingRef = useRef(false);
 
   // Column visibility state with user-specific localStorage persistence
   const [columnVisibility, setColumnVisibility] = useState<ColumnVisibility>(() => {
-    const saved = user ? localStorage.getItem(`columnVisibility_${user.id}`) : null;
-    return saved ? JSON.parse(saved) : {
-      priority: true,
-      orderNumber: true,
-      item: false,
-      description: false,
-      quantity: false,
-      createdDate: false,
-      status: false,
-      client: false,
-      deskTicket: true,
-      deliveryDeadline: true,
-      daysRemaining: true,
-      labStatus: false,
-      phaseManagement: true,
-      actions: false
-    };
+    try {
+      const saved = user ? localStorage.getItem(`columnVisibility_${user.id}`) : null;
+      return saved ? JSON.parse(saved) : {
+        priority: true,
+        orderNumber: true,
+        item: false,
+        description: false,
+        quantity: false,
+        createdDate: false,
+        status: false,
+        client: false,
+        deskTicket: true,
+        deliveryDeadline: true,
+        daysRemaining: true,
+        labStatus: false,
+        phaseManagement: true,
+        actions: false
+      };
+    } catch {
+      return {
+        priority: true,
+        orderNumber: true,
+        item: false,
+        description: false,
+        quantity: false,
+        createdDate: false,
+        status: false,
+        client: false,
+        deskTicket: true,
+        deliveryDeadline: true,
+        daysRemaining: true,
+        labStatus: false,
+        phaseManagement: true,
+        actions: false
+      };
+    }
   });
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
+  // Sync loading state with ref
+  useEffect(() => {
+    isLoadingRef.current = loading;
+  }, [loading]);
 
   // Save column visibility to localStorage whenever it changes
   useEffect(() => {
@@ -268,28 +302,32 @@ export const Dashboard = () => {
   useEffect(() => {
     if (!user) return;
     let timeoutId: NodeJS.Timeout;
+    
+    const scheduleReload = () => {
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        if (!isUpdatingRef.current && !isLoadingRef.current) {
+          loadOrders();
+        }
+      }, 500);
+    };
+
     const channel = supabase.channel('orders-changes').on('postgres_changes', {
       event: '*',
       schema: 'public',
       table: 'orders'
     }, () => {
-      clearTimeout(timeoutId);
-      timeoutId = setTimeout(() => {
-        if (!isUpdatingRef.current) {
-          loadOrders();
-        }
-      }, 500);
+      if (!isUpdatingRef.current && !isLoadingRef.current) {
+        scheduleReload();
+      }
     }).on('postgres_changes', {
       event: '*',
       schema: 'public',
       table: 'order_items'
     }, () => {
-      clearTimeout(timeoutId);
-      timeoutId = setTimeout(() => {
-        if (!isUpdatingRef.current) {
-          loadOrders();
-        }
-      }, 500);
+      if (!isUpdatingRef.current && !isLoadingRef.current) {
+        scheduleReload();
+      }
     }).subscribe();
     return () => {
       clearTimeout(timeoutId);
@@ -309,25 +347,60 @@ export const Dashboard = () => {
       window.removeEventListener('ordersUpdated', handleOrdersUpdated);
     };
   }, [user]);
+
+  // Helper: timeout wrapper for promises
+  const fetchWithTimeout = <T,>(promise: Promise<T>, ms = 20000): Promise<T> => {
+    return new Promise((resolve, reject) => {
+      const timeoutId = setTimeout(() => reject(new Error('Timeout ao carregar pedidos')), ms);
+      promise.then(
+        (res) => {
+          clearTimeout(timeoutId);
+          resolve(res);
+        },
+        (err) => {
+          clearTimeout(timeoutId);
+          reject(err);
+        }
+      );
+    });
+  };
+
   const loadOrders = async () => {
     if (!user) return;
     setLoading(true);
+    setErrorMessage(null);
     try {
-      // Load all orders for shared viewing
-      const {
-        data,
-        error
-      } = await supabase.from('orders').select('*').order('created_at', {
-        ascending: false
-      });
-      if (error) throw error;
+      // Fetch all orders in a single query with timeout
+      const ordersQueryPromise = Promise.resolve(supabase.from('orders').select('*').order('created_at', { ascending: false }));
+      const ordersResult = await fetchWithTimeout(ordersQueryPromise);
+      const { data: ordersData, error: ordersError } = ordersResult as any;
+      if (ordersError) throw ordersError;
 
-      // Load items for each order
-      const ordersWithItems = await Promise.all((data || []).map(async dbOrder => {
-        const {
-          data: itemsData
-        } = await supabase.from('order_items').select('*').eq('order_id', dbOrder.id);
-        const items = (itemsData || []).map(item => ({
+      const orderIds = (ordersData || []).map((o: any) => o.id);
+      let itemsByOrder: Record<string, any[]> = {};
+
+      // Fetch all items for all orders in a single batched query with timeout
+      if (orderIds.length > 0) {
+        const itemsQueryPromise = Promise.resolve(supabase.from('order_items').select('*').in('order_id', orderIds));
+        const itemsResult = await fetchWithTimeout(itemsQueryPromise);
+        const { data: itemsData, error: itemsError } = itemsResult as any;
+        if (itemsError) {
+          console.error('[Dashboard] Error loading items:', itemsError);
+          // Continue without items instead of failing completely
+        } else {
+          for (const item of (itemsData || [])) {
+            if (!itemsByOrder[item.order_id]) {
+              itemsByOrder[item.order_id] = [];
+            }
+            itemsByOrder[item.order_id].push(item);
+          }
+        }
+      }
+
+      // Map orders with their items
+      const ordersWithItems = (ordersData || []).map((dbOrder: any) => {
+        const itemsData = itemsByOrder[dbOrder.id] || [];
+        const items = itemsData.map((item: any) => ({
           id: item.id,
           itemCode: item.item_code,
           itemDescription: cleanItemDescription(item.item_description),
@@ -359,7 +432,7 @@ export const Dashboard = () => {
           description: firstItem?.itemDescription || dbOrder.notes || "",
           quantity: totalRequested,
           createdDate: new Date(dbOrder.created_at).toISOString().split('T')[0],
-          issueDate: (dbOrder as any).issue_date || undefined,
+          issueDate: dbOrder.issue_date || undefined,
           status: dbOrder.status as OrderStatus,
           client: dbOrder.customer_name,
           deliveryDeadline: dbOrder.delivery_date,
@@ -368,19 +441,16 @@ export const Dashboard = () => {
           totvsOrderNumber: dbOrder.totvs_order_number || undefined,
           items,
           order_category: dbOrder.order_category,
-          // Campos de frete e transporte
           freight_modality: dbOrder.freight_modality || null,
           carrier_name: dbOrder.carrier_name || null,
           freight_type: dbOrder.freight_type || null,
           freight_value: dbOrder.freight_value || null,
           tracking_code: dbOrder.tracking_code || null,
-          // Campos de embalagem
           package_volumes: dbOrder.package_volumes || null,
           package_weight_kg: dbOrder.package_weight_kg || null,
           package_length_m: dbOrder.package_length_m || null,
           package_width_m: dbOrder.package_width_m || null,
           package_height_m: dbOrder.package_height_m || null,
-          // Campos adicionais
           customer_document: dbOrder.customer_document || null,
           municipality: dbOrder.municipality || null,
           operation_code: dbOrder.operation_code || null,
@@ -393,16 +463,21 @@ export const Dashboard = () => {
           vehicle_plate: dbOrder.vehicle_plate || null,
           driver_name: dbOrder.driver_name || null
         };
-      }));
-      setOrders(ordersWithItems);
-    } catch (error: any) {
-      toast({
-        title: "Erro ao carregar pedidos",
-        description: error.message,
-        variant: "destructive"
       });
+
+      if (mountedRef.current) {
+        setOrders(ordersWithItems);
+      }
+    } catch (error: any) {
+      console.error('[Dashboard] loadOrders error:', error);
+      if (mountedRef.current) {
+        setOrders([]);
+        setErrorMessage(error?.message || 'Falha ao carregar pedidos');
+      }
     } finally {
-      setLoading(false);
+      if (mountedRef.current) {
+        setLoading(false);
+      }
     }
   };
   const handleDeleteOrder = async () => {
@@ -1078,12 +1153,23 @@ export const Dashboard = () => {
       </div>
 
       {/* Content */}
-      {loading ? <div className="flex items-center justify-center py-20">
+      {loading ? (
+        <div className="flex items-center justify-center py-20">
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
             <p className="text-muted-foreground">Carregando pedidos...</p>
           </div>
-        </div> : activeTab === "all" ? <PriorityView orders={filteredOrders} onEdit={handleEditOrder} onDuplicate={handleDuplicateOrder} onApprove={handleApproveOrder} onCancel={handleCancelOrder} onStatusChange={handleStatusChange} onRowClick={order => {
+        </div>
+      ) : errorMessage ? (
+        <div className="flex items-center justify-center py-20">
+          <div className="text-center space-y-4">
+            <p className="text-sm text-destructive font-medium">{errorMessage}</p>
+            <Button variant="default" onClick={loadOrders}>
+              Tentar novamente
+            </Button>
+          </div>
+        </div>
+      ) : activeTab === "all" ? <PriorityView orders={filteredOrders} onEdit={handleEditOrder} onDuplicate={handleDuplicateOrder} onApprove={handleApproveOrder} onCancel={handleCancelOrder} onStatusChange={handleStatusChange} onRowClick={order => {
       setSelectedOrder(order);
       setShowEditDialog(true);
     }} /> : <div className="bg-card rounded-lg border overflow-hidden">
