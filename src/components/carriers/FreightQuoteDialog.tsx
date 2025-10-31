@@ -205,99 +205,78 @@ export const FreightQuoteDialog = ({
   // Separar transportadoras compatíveis e não compatíveis
   const matchingCarriers = quoteData.recipient_state ? carriers.filter(carrier => carrier.service_states?.includes(quoteData.recipient_state)) : carriers;
   const nonMatchingCarriers = quoteData.recipient_state ? carriers.filter(carrier => !carrier.service_states?.includes(quoteData.recipient_state)) : [];
+  // Helper para gerar cor do avatar baseado no nome
+  const getCarrierColor = (name: string) => {
+    const colors = [
+      'bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-orange-500', 
+      'bg-pink-500', 'bg-teal-500', 'bg-indigo-500', 'bg-red-500'
+    ];
+    const index = name.charCodeAt(0) % colors.length;
+    return colors[index];
+  };
+
+  const getCarrierInitials = (name: string) => {
+    return name.split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase();
+  };
+
   return <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>
-            📦 Solicitar Cotação de Frete
+      <DialogContent className="max-w-[95vw] w-[1400px] max-h-[92vh] overflow-hidden flex flex-col">
+        <DialogHeader className="flex-shrink-0">
+          <DialogTitle className="text-xl">
+            📦 Solicitar Cotação de Frete - Pedido: {order.orderNumber}
           </DialogTitle>
-          <p className="text-sm text-muted-foreground">
-            Pedido: {order.orderNumber}
-          </p>
         </DialogHeader>
 
-        {/* Resumo do Pedido */}
-        {totalValue > 0 || order.package_volumes}
-
-        <Accordion type="multiple" defaultValue={['sender', 'recipient', 'cargo', 'operational']}>
-          <AccordionItem value="sender">
-            <AccordionTrigger>
-              1. Dados do Remetente
-              <Badge variant="secondary" className="ml-2 text-xs">
-                ✨ Auto-preenchido
-              </Badge>
-            </AccordionTrigger>
-            <AccordionContent className="space-y-4">
-              <div className="space-y-2">
-                <Label>Selecionar Remetente *</Label>
+        <div className="flex-1 grid grid-cols-[1fr_500px] gap-6 overflow-hidden">
+          {/* Coluna Esquerda: Dados do Frete */}
+          <div className="overflow-y-auto pr-2 space-y-4">
+            {/* Remetente */}
+            <Card className="p-4">
+              <div className="flex items-center justify-between mb-3">
+                <Label className="text-base font-semibold">1. Remetente</Label>
+                <Badge variant="secondary" className="text-xs">✨ Auto</Badge>
+              </div>
+              <div className="space-y-3">
                 <Select value={selectedSender} onValueChange={handleSenderChange}>
-                  <SelectTrigger>
+                  <SelectTrigger className="w-full">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     {SENDER_OPTIONS.map(sender => <SelectItem key={sender.id} value={sender.id}>
-                        <div className="flex flex-col">
-                          <span className="font-medium">{sender.name}</span>
-                          <span className="text-xs text-muted-foreground">
-                            CNPJ: {sender.cnpj}
-                          </span>
-                        </div>
+                        {sender.name}
                       </SelectItem>)}
                   </SelectContent>
                 </Select>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-2">
-                  <Label>CNPJ</Label>
-                  <Input value={quoteData.sender_cnpj} disabled className="bg-muted" />
-                </div>
-                <div className="space-y-2">
-                  <Label>Telefone</Label>
-                  <Input value={quoteData.sender_phone} disabled className="bg-muted" />
-                </div>
-                <div className="space-y-2 col-span-2">
-                  <Label>Razão Social</Label>
-                  <Input value={quoteData.sender_company} disabled className="bg-muted" />
-                </div>
-                <div className="space-y-2 col-span-2">
-                  <Label>Endereço</Label>
-                  <Textarea value={quoteData.sender_address} disabled className="bg-muted resize-none" rows={2} />
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div>
+                    <span className="text-muted-foreground">CNPJ:</span> {quoteData.sender_cnpj}
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Tel:</span> {quoteData.sender_phone}
+                  </div>
                 </div>
               </div>
-            </AccordionContent>
-          </AccordionItem>
+            </Card>
 
-          <AccordionItem value="recipient">
-            <AccordionTrigger>
-              2. Dados do Destinatário
-              {order.delivery_address && <Badge variant="secondary" className="ml-2 text-xs">
-                  ✨ Auto-preenchido
-                </Badge>}
-            </AccordionTrigger>
-            <AccordionContent className="space-y-3">
+            {/* Destinatário */}
+            <Card className="p-4">
+              <div className="flex items-center justify-between mb-3">
+                <Label className="text-base font-semibold">2. Destinatário</Label>
+                {order.delivery_address && <Badge variant="secondary" className="text-xs">✨ Auto</Badge>}
+              </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2">
-                  <Label>Nome *</Label>
-                  <Input value={quoteData.recipient_name} onChange={e => setQuoteData({
-                  ...quoteData,
-                  recipient_name: e.target.value
-                })} />
+                  <Label className="text-xs">Nome *</Label>
+                  <Input value={quoteData.recipient_name} onChange={e => setQuoteData({...quoteData, recipient_name: e.target.value})} className="h-9" />
                 </div>
                 <div className="space-y-2">
-                  <Label>Cidade *</Label>
-                  <Input value={quoteData.recipient_city} onChange={e => setQuoteData({
-                  ...quoteData,
-                  recipient_city: e.target.value
-                })} />
+                  <Label className="text-xs">Cidade *</Label>
+                  <Input value={quoteData.recipient_city} onChange={e => setQuoteData({...quoteData, recipient_city: e.target.value})} className="h-9" />
                 </div>
-                <div className="space-y-2">
-                  <Label>Estado *</Label>
-                  <Select value={quoteData.recipient_state} onValueChange={value => setQuoteData({
-                  ...quoteData,
-                  recipient_state: value
-                })}>
-                    <SelectTrigger>
+                <div className="space-y-2 col-span-2">
+                  <Label className="text-xs">Estado *</Label>
+                  <Select value={quoteData.recipient_state} onValueChange={value => setQuoteData({...quoteData, recipient_state: value})}>
+                    <SelectTrigger className="h-9">
                       <SelectValue placeholder="Selecione" />
                     </SelectTrigger>
                     <SelectContent>
@@ -306,135 +285,61 @@ export const FreightQuoteDialog = ({
                   </Select>
                 </div>
                 <div className="space-y-2 col-span-2">
-                  <Label>Endereço *</Label>
-                  <Input value={quoteData.recipient_address} onChange={e => setQuoteData({
-                  ...quoteData,
-                  recipient_address: e.target.value
-                })} />
+                  <Label className="text-xs">Endereço *</Label>
+                  <Input value={quoteData.recipient_address} onChange={e => setQuoteData({...quoteData, recipient_address: e.target.value})} className="h-9" />
                 </div>
               </div>
-            </AccordionContent>
-          </AccordionItem>
+            </Card>
 
-          <AccordionItem value="cargo">
-            <AccordionTrigger>
-              3. Dados da Carga
-              {(volumes.length > 0 || order.package_volumes || order.package_weight_kg) && <Badge variant="secondary" className="ml-2 text-xs">
-                  ✨ Auto-preenchido
-                </Badge>}
-            </AccordionTrigger>
-            <AccordionContent className="space-y-3">
-              {/* Exibir volumes detalhados se existirem */}
-              {volumes.length > 0 ? <Card className="p-4 bg-muted/50">
-                  <Label className="font-semibold mb-2 block">📦 Volumes Detalhados</Label>
-                  <div className="space-y-2 text-sm">
-                    <div className="font-medium">
-                      Total: {totals.total_volumes} volumes - {totals.total_weight_kg.toFixed(2)} kg
-                    </div>
-                    {volumes.map((vol, idx) => {
-                  const packagingLabel = vol.packaging_type ? PACKAGING_TYPES.find(t => t.value === vol.packaging_type)?.label : 'Não especificado';
-                  return <div key={vol.id} className="pl-4 border-l-2 border-primary/30">
-                          <div>
-                            • {vol.quantity > 1 ? `${vol.quantity} volumes - ${vol.weight_kg}kg cada` : `1 volume - ${vol.weight_kg}kg`}
-                          </div>
-                          <div className="text-muted-foreground text-xs">
-                            {vol.length_cm}cm x {vol.width_cm}cm x {vol.height_cm}cm 
-                            ({(vol.length_cm * vol.width_cm * vol.height_cm / 1000000).toFixed(3)} m³)
-                          </div>
-                          <div className="text-muted-foreground text-xs">
-                            Embalagem: {packagingLabel}
-                          </div>
-                          {vol.description && <div className="text-muted-foreground text-xs italic">
-                              {vol.description}
-                            </div>}
-                        </div>;
-                })}
-                    <div className="pt-2 border-t text-muted-foreground">
-                      Cubagem Total: {totals.total_cubagem_m3.toFixed(3)} m³
-                    </div>
+            {/* Carga */}
+            <Card className="p-4">
+              <div className="flex items-center justify-between mb-3">
+                <Label className="text-base font-semibold">3. Carga</Label>
+                {(volumes.length > 0 || order.package_volumes) && <Badge variant="secondary" className="text-xs">✨ Auto</Badge>}
+              </div>
+              {volumes.length > 0 ? (
+                <div className="bg-muted/50 rounded-md p-3 space-y-2">
+                  <div className="font-medium text-sm">
+                    Total: {totals.total_volumes} volumes • {totals.total_weight_kg.toFixed(2)} kg • {totals.total_cubagem_m3.toFixed(3)} m³
                   </div>
-                </Card> :
-            // Formulário original para volumes resumidos
-            <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-2 col-span-2">
-                    <Label>Produto *</Label>
-                    <Input value={quoteData.product_description} onChange={e => setQuoteData({
-                  ...quoteData,
-                  product_description: e.target.value
-                })} />
+                  <div className="max-h-32 overflow-y-auto space-y-2">
+                    {volumes.map((vol) => (
+                      <div key={vol.id} className="text-xs pl-3 border-l-2 border-primary/30">
+                        <div>{vol.quantity > 1 ? `${vol.quantity}x ${vol.weight_kg}kg` : `${vol.weight_kg}kg`} • {vol.length_cm}×{vol.width_cm}×{vol.height_cm}cm</div>
+                        {vol.description && <div className="text-muted-foreground italic">{vol.description}</div>}
+                      </div>
+                    ))}
                   </div>
-                  <div className="space-y-2">
-                    <Label>Embalagem *</Label>
-                    <Select value={quoteData.package_type} onValueChange={value => setQuoteData({
-                  ...quoteData,
-                  package_type: value
-                })}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Caixa de papelão">Caixa de papelão</SelectItem>
-                        <SelectItem value="Caixa de madeira">Caixa de madeira</SelectItem>
-                        <SelectItem value="Palete">Palete</SelectItem>
-                        <SelectItem value="Container">Container</SelectItem>
-                      </SelectContent>
-                    </Select>
+                </div>
+              ) : (
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Volumes</Label>
+                    <Input type="number" value={quoteData.volumes} onChange={e => setQuoteData({...quoteData, volumes: parseFloat(e.target.value)})} className="h-9" />
                   </div>
-                  <div className="space-y-2">
-                    <Label>Volumes *</Label>
-                    <Input type="number" value={quoteData.volumes} onChange={e => setQuoteData({
-                  ...quoteData,
-                  volumes: parseFloat(e.target.value)
-                })} />
+                  <div className="space-y-1">
+                    <Label className="text-xs">Peso (kg)</Label>
+                    <Input type="number" step="0.01" value={quoteData.weight_kg} onChange={e => setQuoteData({...quoteData, weight_kg: parseFloat(e.target.value)})} className="h-9" />
                   </div>
-                  <div className="space-y-2">
-                    <Label>Peso (kg) *</Label>
-                    <Input type="number" step="0.01" value={quoteData.weight_kg} onChange={e => setQuoteData({
-                  ...quoteData,
-                  weight_kg: parseFloat(e.target.value)
-                })} />
+                  <div className="space-y-1">
+                    <Label className="text-xs">Altura (m)</Label>
+                    <Input type="number" step="0.01" value={quoteData.height_m} onChange={e => setQuoteData({...quoteData, height_m: parseFloat(e.target.value)})} className="h-9" />
                   </div>
-                  <div className="space-y-2">
-                    <Label>Comprimento (m) *</Label>
-                    <Input type="number" step="0.01" value={quoteData.length_m} onChange={e => setQuoteData({
-                  ...quoteData,
-                  length_m: parseFloat(e.target.value)
-                })} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Largura (m) *</Label>
-                    <Input type="number" step="0.01" value={quoteData.width_m} onChange={e => setQuoteData({
-                  ...quoteData,
-                  width_m: parseFloat(e.target.value)
-                })} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Altura (m) *</Label>
-                    <Input type="number" step="0.01" value={quoteData.height_m} onChange={e => setQuoteData({
-                  ...quoteData,
-                  height_m: parseFloat(e.target.value)
-                })} />
-                  </div>
-                </div>}
-            </AccordionContent>
-          </AccordionItem>
+                </div>
+              )}
+            </Card>
 
-          <AccordionItem value="operational">
-            <AccordionTrigger>
-              4. Informações Operacionais
-              {(totalValue > 0 || order.freight_type) && <Badge variant="secondary" className="ml-2 text-xs">
-                  ✨ Auto-preenchido
-                </Badge>}
-            </AccordionTrigger>
-            <AccordionContent className="space-y-3">
+            {/* Operacional */}
+            <Card className="p-4">
+              <div className="flex items-center justify-between mb-3">
+                <Label className="text-base font-semibold">4. Operacional</Label>
+                {(totalValue > 0 || order.freight_type) && <Badge variant="secondary" className="text-xs">✨ Auto</Badge>}
+              </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2">
-                  <Label>Tomador do Frete *</Label>
-                  <Select value={quoteData.freight_payer} onValueChange={value => setQuoteData({
-                  ...quoteData,
-                  freight_payer: value
-                })}>
-                    <SelectTrigger>
+                  <Label className="text-xs">Tomador *</Label>
+                  <Select value={quoteData.freight_payer} onValueChange={value => setQuoteData({...quoteData, freight_payer: value})}>
+                    <SelectTrigger className="h-9">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -444,130 +349,150 @@ export const FreightQuoteDialog = ({
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label className="flex items-center gap-2">
-                    Valor Declarado (R$) *
-                    {loadingTotal && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
+                  <Label className="text-xs flex items-center gap-1">
+                    Valor (R$) {loadingTotal && <Loader2 className="h-3 w-3 animate-spin" />}
                   </Label>
                   <Input 
                     type="number" 
                     step="0.01" 
                     value={quoteData.declared_value || ''} 
-                    onChange={e => setQuoteData({
-                      ...quoteData,
-                      declared_value: parseFloat(e.target.value) || 0
-                    })}
-                    placeholder={loadingTotal ? "Calculando total..." : "0.00"}
+                    onChange={e => setQuoteData({...quoteData, declared_value: parseFloat(e.target.value) || 0})}
+                    placeholder="0.00"
                     disabled={loadingTotal}
+                    className="h-9"
                   />
-                  {totalValue > 0 && (
-                    <p className="text-xs text-muted-foreground">
-                      Total do pedido: R$ {totalValue.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </p>
-                  )}
                 </div>
                 <div className="flex items-center space-x-2 col-span-2">
-                  <Checkbox id="insurance" checked={quoteData.requires_insurance} onCheckedChange={checked => setQuoteData({
-                  ...quoteData,
-                  requires_insurance: checked as boolean
-                })} />
-                  <Label htmlFor="insurance" className="cursor-pointer">
-                    Requer Seguro
-                  </Label>
+                  <Checkbox id="insurance" checked={quoteData.requires_insurance} onCheckedChange={checked => setQuoteData({...quoteData, requires_insurance: checked as boolean})} />
+                  <Label htmlFor="insurance" className="text-sm cursor-pointer">Requer Seguro</Label>
                 </div>
                 <div className="space-y-2 col-span-2">
-                  <Label>Observações</Label>
-                  <Textarea value={quoteData.observations} onChange={e => setQuoteData({
-                  ...quoteData,
-                  observations: e.target.value
-                })} rows={3} />
+                  <Label className="text-xs">Observações</Label>
+                  <Textarea value={quoteData.observations} onChange={e => setQuoteData({...quoteData, observations: e.target.value})} rows={2} className="text-sm" />
                 </div>
               </div>
-            </AccordionContent>
-          </AccordionItem>
-        </Accordion>
-
-        <div className="border-t pt-4 space-y-3">
-          <div className="flex items-center justify-between">
-            <Label>📋 Selecione as Transportadoras</Label>
-            {selectedCarriers.length > 0 && <Badge variant="secondary">
-                {selectedCarriers.length} selecionada(s)
-              </Badge>}
+            </Card>
           </div>
 
-          {loadingCarriers ? <div className="flex justify-center py-4">
-              <Loader2 className="h-6 w-6 animate-spin" />
-            </div> : carriers.length === 0 ? <p className="text-sm text-muted-foreground">
-              Nenhuma transportadora cadastrada.
-            </p> : <div className="space-y-4">
-              {/* Transportadoras que atendem o estado - expandidas */}
-              {matchingCarriers.length > 0 && <div className="space-y-2">
-                  {quoteData.recipient_state && <div className="flex items-center gap-2">
-                      <Badge variant="default" className="bg-green-500 hover:bg-green-600">
-                        ✓ Atendem {quoteData.recipient_state}
-                      </Badge>
-                      <span className="text-sm text-muted-foreground">
-                        {matchingCarriers.length} transportadora(s)
-                      </span>
-                    </div>}
-                  {matchingCarriers.map(carrier => <Card key={carrier.id} className={`p-4 transition-all ${selectedCarriers.includes(carrier.id) ? 'border-primary bg-primary/5 border-2' : 'border-green-200 dark:border-green-900'}`}>
+          {/* Coluna Direita: Transportadoras */}
+          <div className="flex flex-col overflow-hidden border-l pl-6">
+            <div className="flex-shrink-0 mb-4">
+              <div className="flex items-center justify-between mb-3">
+                <Label className="text-base font-semibold">📋 Transportadoras</Label>
+                {selectedCarriers.length > 0 && (
+                  <Badge variant="default" className="bg-primary">
+                    {selectedCarriers.length} selecionada{selectedCarriers.length > 1 ? 's' : ''}
+                  </Badge>
+                )}
+              </div>
+              {quoteData.recipient_state && matchingCarriers.length > 0 && (
+                <Badge variant="secondary" className="bg-green-500/10 text-green-700 dark:text-green-400">
+                  ✓ {matchingCarriers.length} atendem {quoteData.recipient_state}
+                </Badge>
+              )}
+            </div>
+
+            {loadingCarriers ? (
+              <div className="flex items-center justify-center h-full">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              </div>
+            ) : carriers.length === 0 ? (
+              <div className="flex items-center justify-center h-full text-muted-foreground">
+                <p className="text-sm">Nenhuma transportadora cadastrada</p>
+              </div>
+            ) : (
+              <div className="flex-1 overflow-y-auto pr-2">
+                {/* Transportadoras que atendem */}
+                <div className="grid grid-cols-2 gap-3 mb-4">
+                  {matchingCarriers.map(carrier => (
+                    <Card 
+                      key={carrier.id} 
+                      className={`p-3 cursor-pointer transition-all hover:shadow-md ${
+                        selectedCarriers.includes(carrier.id) 
+                          ? 'border-primary bg-primary/5 border-2' 
+                          : 'border-green-200 dark:border-green-900/50 hover:border-primary/50'
+                      }`}
+                      onClick={() => toggleCarrier(carrier.id)}
+                    >
                       <div className="flex items-start gap-3">
-                        <Checkbox checked={selectedCarriers.includes(carrier.id)} onCheckedChange={() => toggleCarrier(carrier.id)} className="mt-1" />
+                        <div className={`w-12 h-12 rounded-lg ${getCarrierColor(carrier.name)} flex items-center justify-center text-white font-bold text-sm flex-shrink-0`}>
+                          {getCarrierInitials(carrier.name)}
+                        </div>
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between gap-2 mb-2">
-                            <p className="font-semibold text-base">{carrier.name}</p>
-                            <Button variant="ghost" size="sm" onClick={e => {
-                      e.stopPropagation();
-                      handleEditCarrier(carrier);
-                    }} className="shrink-0">
-                              <Edit className="h-4 w-4" />
-                            </Button>
+                          <div className="flex items-start justify-between gap-1 mb-2">
+                            <h4 className="font-semibold text-sm leading-tight line-clamp-2">{carrier.name}</h4>
+                            <Checkbox 
+                              checked={selectedCarriers.includes(carrier.id)} 
+                              onCheckedChange={() => toggleCarrier(carrier.id)}
+                              className="flex-shrink-0"
+                            />
                           </div>
-                          <div className="space-y-1 text-sm text-muted-foreground">
-                            {carrier.whatsapp && <p>📱 WhatsApp: {carrier.whatsapp}</p>}
-                            {carrier.email && <p>📧 Email: {carrier.email}</p>}
-                            <p className="text-xs">
-                              Estados: {carrier.service_states?.join(', ')}
-                            </p>
+                          <div className="space-y-1">
+                            {carrier.whatsapp && (
+                              <p className="text-xs text-muted-foreground truncate">📱 {carrier.whatsapp}</p>
+                            )}
+                            {carrier.email && (
+                              <p className="text-xs text-muted-foreground truncate">📧 {carrier.email}</p>
+                            )}
                           </div>
+                          <Button 
+                            variant="ghost" 
+                            size="xs" 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleEditCarrier(carrier);
+                            }} 
+                            className="mt-2 h-6 px-2 text-xs w-full"
+                          >
+                            <Edit className="h-3 w-3 mr-1" />
+                            Editar
+                          </Button>
                         </div>
                       </div>
-                    </Card>)}
-                </div>}
+                    </Card>
+                  ))}
+                </div>
 
-              {/* Transportadoras que NÃO atendem - minimizadas */}
-              {nonMatchingCarriers.length > 0 && quoteData.recipient_state && <Collapsible>
-                  <CollapsibleTrigger className="flex items-center gap-2 w-full p-3 rounded-md bg-muted/50 hover:bg-muted">
-                    <ChevronDown className="h-4 w-4" />
-                    <span className="text-sm font-medium">
-                      ⚠️ Outras transportadoras ({nonMatchingCarriers.length})
-                    </span>
-                    <span className="text-xs text-muted-foreground ml-auto">
-                      Não atendem {quoteData.recipient_state}
-                    </span>
-                  </CollapsibleTrigger>
-                  <CollapsibleContent className="space-y-2 mt-2">
-                    {nonMatchingCarriers.map(carrier => <Card key={carrier.id} className="p-3 opacity-50 hover:opacity-100 transition-opacity">
-                        <div className="flex items-center gap-3">
-                          <Checkbox checked={selectedCarriers.includes(carrier.id)} onCheckedChange={() => toggleCarrier(carrier.id)} />
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center justify-between gap-2">
-                              <p className="font-medium text-sm">{carrier.name}</p>
-                              <Button variant="ghost" size="sm" onClick={e => {
-                        e.stopPropagation();
-                        handleEditCarrier(carrier);
-                      }}>
-                                <Edit className="h-3 w-3" />
-                              </Button>
+                {/* Transportadoras que não atendem */}
+                {nonMatchingCarriers.length > 0 && quoteData.recipient_state && (
+                  <Collapsible>
+                    <CollapsibleTrigger className="flex items-center gap-2 w-full p-2 rounded-md bg-muted/50 hover:bg-muted mb-2">
+                      <ChevronDown className="h-4 w-4" />
+                      <span className="text-xs font-medium">
+                        ⚠️ Outras ({nonMatchingCarriers.length})
+                      </span>
+                      <span className="text-xs text-muted-foreground ml-auto">
+                        Não atendem {quoteData.recipient_state}
+                      </span>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="grid grid-cols-2 gap-2 mt-2">
+                      {nonMatchingCarriers.map(carrier => (
+                        <Card 
+                          key={carrier.id} 
+                          className="p-2 opacity-60 hover:opacity-100 cursor-pointer transition-all"
+                          onClick={() => toggleCarrier(carrier.id)}
+                        >
+                          <div className="flex items-start gap-2">
+                            <div className={`w-8 h-8 rounded ${getCarrierColor(carrier.name)} flex items-center justify-center text-white font-bold text-xs flex-shrink-0`}>
+                              {getCarrierInitials(carrier.name)}
                             </div>
-                            <p className="text-xs text-muted-foreground">
-                              Estados: {carrier.service_states?.join(', ')}
-                            </p>
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium text-xs line-clamp-2">{carrier.name}</p>
+                              <Checkbox 
+                                checked={selectedCarriers.includes(carrier.id)}
+                                onCheckedChange={() => toggleCarrier(carrier.id)}
+                                className="mt-1"
+                              />
+                            </div>
                           </div>
-                        </div>
-                      </Card>)}
-                  </CollapsibleContent>
-                </Collapsible>}
-            </div>}
+                        </Card>
+                      ))}
+                    </CollapsibleContent>
+                  </Collapsible>
+                )}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Dialog de edição inline */}
