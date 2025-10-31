@@ -206,9 +206,12 @@ export const Dashboard = () => {
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [pageSize, setPageSize] = useState(400);
+  const [hasMore, setHasMore] = useState(false);
   const isUpdatingRef = useRef(false);
   const mountedRef = useRef(true);
   const isLoadingRef = useRef(false);
+  const currentLoadIdRef = useRef(0);
 
   // Column visibility state with user-specific localStorage persistence
   const [columnVisibility, setColumnVisibility] = useState<ColumnVisibility>(() => {
@@ -276,14 +279,28 @@ export const Dashboard = () => {
       loadUnreadCount();
     }
   }, [user]);
+
+  // Reload orders when date range changes
+  useEffect(() => {
+    if (user && dateRange) {
+      loadOrders();
+    }
+  }, [dateRange]);
   const loadUnreadCount = async () => {
     try {
-      const {
-        count
-      } = await supabase.from('carrier_conversations').select('*', {
+      const sixMonthsAgo = new Date();
+      sixMonthsAgo.setDate(sixMonthsAgo.getDate() - 180);
+      
+      const query = supabase.from('carrier_conversations').select('*', {
         count: 'exact',
         head: true
-      }).eq('message_direction', 'inbound').is('read_at', null);
+      })
+      .eq('message_direction', 'inbound')
+      .is('read_at', null)
+      .gte('sent_at', sixMonthsAgo.toISOString());
+      
+      const result = await fetchWithTimeout(Promise.resolve(query), 15000);
+      const { count } = result as any;
       setUnreadConversationsCount(count || 0);
     } catch (error) {
       console.error('Erro ao carregar contador de conversas:', error);
@@ -365,50 +382,101 @@ export const Dashboard = () => {
     });
   };
 
+  // Helper: chunk array
+  const chunkArray = <T,>(arr: T[], size: number): T[][] => {
+    const chunks: T[][] = [];
+    for (let i = 0; i < arr.length; i += size) {
+      chunks.push(arr.slice(i, i + size));
+    }
+    return chunks;
+  };
+
   const loadOrders = async () => {
     if (!user) return;
+    const loadId = Date.now();
+    currentLoadIdRef.current = loadId;
+    
     setLoading(true);
     setErrorMessage(null);
     try {
-      // Aplicar filtro padrão de 120 dias para melhor performance
-      const fourMonthsAgo = new Date();
-      fourMonthsAgo.setDate(fourMonthsAgo.getDate() - 120);
+      // Calcular período efetivo (server-side filter)
+      const from = dateRange?.from ?? (() => {
+        const fourMonthsAgo = new Date();
+        fourMonthsAgo.setDate(fourMonthsAgo.getDate() - 120);
+        return fourMonthsAgo;
+      })();
+      const to = dateRange?.to;
       
-      // Fetch all orders in a single query with timeout
-      const ordersQueryPromise = Promise.resolve(
-        supabase
-          .from('orders')
-          .select('*')
-          .gte('created_at', fourMonthsAgo.toISOString())
-          .order('created_at', { ascending: false })
-      );
-      const ordersResult = await fetchWithTimeout(ordersQueryPromise);
+      // Fetch orders com filtro server-side e limit+1 para detectar hasMore
+      let ordersQuery = supabase
+        .from('orders')
+        .select('id, order_type, priority, order_number, customer_name, delivery_address, delivery_date, status, notes, created_at, issue_date, order_category, totvs_order_number, freight_modality, carrier_name, freight_type, freight_value, tracking_code, package_volumes, package_weight_kg, package_length_m, package_width_m, package_height_m, customer_document, municipality, operation_code, executive_name, firmware_project_name, image_project_name, requires_firmware, requires_image, shipping_date, vehicle_plate, driver_name')
+        .gte('created_at', from.toISOString())
+        .order('created_at', { ascending: false })
+        .limit(pageSize + 1);
+      
+      if (to) {
+        ordersQuery = ordersQuery.lte('created_at', to.toISOString());
+      }
+      
+      const ordersResult = await fetchWithTimeout(Promise.resolve(ordersQuery));
       const { data: ordersData, error: ordersError } = ordersResult as any;
       if (ordersError) throw ordersError;
 
-      const orderIds = (ordersData || []).map((o: any) => o.id);
+      // Verificar se há mais pedidos
+      const hasMoreResults = (ordersData || []).length > pageSize;
+      setHasMore(hasMoreResults);
+      
+      // Truncar para pageSize
+      const limitedOrdersData = hasMoreResults ? ordersData.slice(0, pageSize) : ordersData;
+      const orderIds = (limitedOrdersData || []).map((o: any) => o.id);
       let itemsByOrder: Record<string, any[]> = {};
 
-      // Fetch all items for all orders in a single batched query with timeout
+      // Fetch items em chunks com concorrência controlada
       if (orderIds.length > 0) {
-        const itemsQueryPromise = Promise.resolve(supabase.from('order_items').select('*').in('order_id', orderIds));
-        const itemsResult = await fetchWithTimeout(itemsQueryPromise);
-        const { data: itemsData, error: itemsError } = itemsResult as any;
-        if (itemsError) {
-          console.error('[Dashboard] Error loading items:', itemsError);
-          // Continue without items instead of failing completely
-        } else {
-          for (const item of (itemsData || [])) {
-            if (!itemsByOrder[item.order_id]) {
-              itemsByOrder[item.order_id] = [];
+        const chunks = chunkArray(orderIds, 100);
+        const windowSize = 4; // Processar 4 chunks em paralelo
+        
+        for (let i = 0; i < chunks.length; i += windowSize) {
+          const window = chunks.slice(i, i + windowSize);
+          const itemsPromises = window.map((chunk: string[]) =>
+            fetchWithTimeout(
+              Promise.resolve(
+                supabase
+                  .from('order_items')
+                  .select('id, order_id, item_code, item_description, unit, requested_quantity, warehouse, delivery_date, delivered_quantity, item_source_type, item_status, received_status, production_estimated_date, sla_days, is_imported, import_lead_time_days, sla_deadline, current_phase, phase_started_at, user_id')
+                  .in('order_id', chunk)
+              ),
+              20000
+            )
+          );
+          
+          const itemsResults = await Promise.all(itemsPromises);
+          
+          for (const result of itemsResults) {
+            const { data: itemsData, error: itemsError } = result as any;
+            if (itemsError) {
+              console.error('[Dashboard] Error loading items chunk:', itemsError);
+            } else {
+              for (const item of (itemsData || [])) {
+                if (!itemsByOrder[item.order_id]) {
+                  itemsByOrder[item.order_id] = [];
+                }
+                itemsByOrder[item.order_id].push(item);
+              }
             }
-            itemsByOrder[item.order_id].push(item);
           }
         }
       }
 
+      // Verificar se resultado ainda é válido (evitar race condition)
+      if (currentLoadIdRef.current !== loadId) {
+        console.log('[Dashboard] Ignorando resultado obsoleto de loadOrders');
+        return;
+      }
+
       // Map orders with their items
-      const ordersWithItems = (ordersData || []).map((dbOrder: any) => {
+      const ordersWithItems = (limitedOrdersData || []).map((dbOrder: any) => {
         const itemsData = itemsByOrder[dbOrder.id] || [];
         const items = itemsData.map((item: any) => ({
           id: item.id,
@@ -475,20 +543,25 @@ export const Dashboard = () => {
         };
       });
 
-      if (mountedRef.current) {
+      if (mountedRef.current && currentLoadIdRef.current === loadId) {
         setOrders(ordersWithItems);
       }
     } catch (error: any) {
       console.error('[Dashboard] loadOrders error:', error);
-      if (mountedRef.current) {
+      if (mountedRef.current && currentLoadIdRef.current === loadId) {
         setOrders([]);
         setErrorMessage(error?.message || 'Falha ao carregar pedidos');
       }
     } finally {
-      if (mountedRef.current) {
+      if (mountedRef.current && currentLoadIdRef.current === loadId) {
         setLoading(false);
       }
     }
+  };
+
+  const handleLoadMore = () => {
+    setPageSize(prev => prev + 400);
+    loadOrders();
   };
   const handleDeleteOrder = async () => {
     // Atualização otimista: remove o pedido do estado imediatamente
@@ -1256,6 +1329,18 @@ export const Dashboard = () => {
               <p>Nenhum pedido encontrado para os filtros aplicados.</p>
             </div>}
         </div>}
+
+      {/* Load More Button */}
+      {!loading && !errorMessage && hasMore && (
+        <div className="mt-6 flex flex-col items-center gap-3">
+          <p className="text-sm text-muted-foreground">
+            Exibindo os {pageSize} pedidos mais recentes
+          </p>
+          <Button onClick={handleLoadMore} variant="outline" size="lg">
+            Carregar mais pedidos
+          </Button>
+        </div>
+      )}
 
       {/* Edit Dialog with integrated History */}
       {selectedOrder && <EditOrderDialog order={selectedOrder} open={showEditDialog} onOpenChange={setShowEditDialog} onSave={handleEditOrder} onDelete={handleDeleteOrder} />}

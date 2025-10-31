@@ -187,11 +187,18 @@ export const useCarrierConversations = () => {
 
   const getUnreadCount = async () => {
     try {
-      const { count, error } = await supabase
+      const sixMonthsAgo = new Date();
+      sixMonthsAgo.setDate(sixMonthsAgo.getDate() - 180);
+      
+      const query = supabase
         .from('carrier_conversations')
         .select('*', { count: 'exact', head: true })
         .eq('message_direction', 'inbound')
-        .is('read_at', null);
+        .is('read_at', null)
+        .gte('sent_at', sixMonthsAgo.toISOString());
+
+      const result = await fetchWithTimeout(Promise.resolve(query), 15000);
+      const { count, error } = result as any;
 
       if (error) throw error;
       setUnreadCount(count || 0);

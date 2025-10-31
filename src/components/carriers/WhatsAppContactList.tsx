@@ -127,51 +127,81 @@ export function WhatsAppContactList({
       const conversationIds = contactToDelete.conversations.map(c => c.id);
       const orderIds = [...new Set(contactToDelete.conversations.map(c => c.order_id))];
 
+      // Helper para processar em chunks
+      const chunkArray = <T,>(arr: T[], size: number): T[][] => {
+        const chunks: T[][] = [];
+        for (let i = 0; i < arr.length; i += size) {
+          chunks.push(arr.slice(i, i + size));
+        }
+        return chunks;
+      };
+
       // Se opção marcada, excluir cotações e limpar dados dos pedidos
       if (deleteQuotesAndClearOrders) {
-        // 1. Buscar IDs das cotações deste carrier para estes pedidos
-        const { data: quotes } = await supabase
-          .from('freight_quotes')
-          .select('id')
-          .eq('carrier_id', contactToDelete.carrierId)
-          .in('order_id', orderIds);
+        // 1. Buscar IDs das cotações deste carrier para estes pedidos (em chunks se muitos pedidos)
+        const orderChunks = chunkArray(orderIds, 100);
+        let allQuoteIds: string[] = [];
 
-        if (quotes && quotes.length > 0) {
-          const quoteIds = quotes.map(q => q.id);
-
-          // 2. Excluir respostas de cotações
-          await supabase
-            .from('freight_quote_responses')
-            .delete()
-            .in('quote_id', quoteIds);
-
-          // 3. Excluir cotações
-          await supabase
+        for (const chunk of orderChunks) {
+          const { data: quotes } = await supabase
             .from('freight_quotes')
-            .delete()
-            .in('id', quoteIds);
+            .select('id')
+            .eq('carrier_id', contactToDelete.carrierId)
+            .in('order_id', chunk);
+
+          if (quotes && quotes.length > 0) {
+            allQuoteIds = [...allQuoteIds, ...quotes.map(q => q.id)];
+          }
         }
 
-        // 4. Limpar campos de frete dos pedidos
-        await supabase
-          .from('orders')
-          .update({
-            freight_type: null,
-            freight_value: null,
-            freight_modality: null,
-            carrier_name: null,
-            tracking_code: null
-          })
-          .in('id', orderIds);
+        if (allQuoteIds.length > 0) {
+          const quoteChunks = chunkArray(allQuoteIds, 100);
+
+          // 2. Excluir respostas de cotações em chunks
+          for (const chunk of quoteChunks) {
+            await supabase
+              .from('freight_quote_responses')
+              .delete()
+              .in('quote_id', chunk);
+          }
+
+          // 3. Excluir cotações em chunks
+          for (const chunk of quoteChunks) {
+            await supabase
+              .from('freight_quotes')
+              .delete()
+              .in('id', chunk);
+          }
+        }
+
+        // 4. Limpar campos de frete dos pedidos em chunks
+        for (const chunk of orderChunks) {
+          await supabase
+            .from('orders')
+            .update({
+              freight_type: null,
+              freight_value: null,
+              freight_modality: null,
+              carrier_name: null,
+              tracking_code: null
+            })
+            .in('id', chunk);
+        }
+
+        toast({
+          title: '🔄 Processando exclusão...',
+          description: `Removendo ${allQuoteIds.length} cotações e atualizando ${orderIds.length} pedidos...`,
+        });
       }
 
-      // 5. Excluir conversas
-      const { error } = await supabase
-        .from('carrier_conversations')
-        .delete()
-        .in('id', conversationIds);
-
-      if (error) throw error;
+      // 5. Excluir conversas em chunks
+      const conversationChunks = chunkArray(conversationIds, 100);
+      for (const chunk of conversationChunks) {
+        await supabase
+          .from('carrier_conversations')
+          .delete()
+          .in('id', chunk);
+      }
 
       toast({
         title: '✅ Conversas excluídas',
