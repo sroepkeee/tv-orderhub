@@ -24,7 +24,7 @@ export function QuoteApprovalTable({
 }: QuoteApprovalTableProps) {
   const [processingId, setProcessingId] = useState<string | null>(null);
 
-  // Combina quotes com suas respostas
+  // Combina quotes com suas respostas (inclui cotações sem resposta)
   const quotesWithResponses = quotes
     .map(quote => {
       const quoteResponses = responses.filter(r => r.quote_id === quote.id);
@@ -33,7 +33,7 @@ export function QuoteApprovalTable({
         if (!current.freight_value) return best;
         if (!best.freight_value) return current;
         return current.freight_value < best.freight_value ? current : best;
-      }, quoteResponses[0]);
+      }, quoteResponses[0]) || null;
       
       return {
         quote,
@@ -41,12 +41,18 @@ export function QuoteApprovalTable({
         allResponses: quoteResponses,
       };
     })
-    .filter(item => item.response && item.response.freight_value) // Apenas cotações com valor
-    .sort((a, b) => (a.response?.freight_value || 0) - (b.response?.freight_value || 0));
+    // Ordena: respondidas com valor primeiro (por valor), depois pendentes
+    .sort((a, b) => {
+      const aValue = a.response?.freight_value || Infinity;
+      const bValue = b.response?.freight_value || Infinity;
+      return aValue - bValue;
+    });
 
-  // Encontra a melhor cotação (menor valor)
-  const bestQuote = quotesWithResponses[0];
-  const hasMinimumQuotes = quotesWithResponses.length >= 3;
+  // Encontra a melhor cotação (menor valor) entre as respondidas
+  const respondedQuotes = quotesWithResponses.filter(q => q.response?.freight_value);
+  const bestQuote = respondedQuotes[0];
+  const hasMinimumQuotes = respondedQuotes.length >= 3;
+  const pendingQuotes = quotesWithResponses.filter(q => !q.response?.freight_value);
 
   const formatCurrency = (value?: number) => {
     if (!value) return 'N/A';
@@ -86,7 +92,9 @@ export function QuoteApprovalTable({
               🎯 Tabela de Aprovação de Cotações
             </h3>
             <p className="text-sm text-muted-foreground mt-1">
-              {showPlaceholder ? 'Aguardando respostas das transportadoras' : 'Análise comparativa para decisão final'}
+              {showPlaceholder 
+                ? 'Nenhuma cotação solicitada ainda' 
+                : `Análise comparativa • ${respondedQuotes.length} respondida(s) • ${pendingQuotes.length} aguardando`}
             </p>
           </div>
           {!showPlaceholder && (
@@ -94,7 +102,7 @@ export function QuoteApprovalTable({
               {!hasMinimumQuotes && (
                 <Badge variant="outline" className="border-yellow-500 text-yellow-700 bg-yellow-50">
                   <AlertTriangle className="h-3 w-3 mr-1" />
-                  Mínimo 3 cotações necessárias ({quotesWithResponses.length}/3)
+                  Mínimo 3 cotações necessárias ({respondedQuotes.length}/3)
                 </Badge>
               )}
               {hasMinimumQuotes && (
@@ -129,73 +137,42 @@ export function QuoteApprovalTable({
             </TableHeader>
             <TableBody>
               {showPlaceholder ? (
-                // Placeholder rows quando não há dados
-                <>
-                  {[1, 2, 3].map((i) => (
-                    <TableRow key={`placeholder-${i}`}>
-                      <TableCell className="text-xs"><Skeleton className="h-4 w-16" /></TableCell>
-                      <TableCell className="text-xs"><Skeleton className="h-4 w-20" /></TableCell>
-                      <TableCell className="text-xs"><Skeleton className="h-4 w-24" /></TableCell>
-                      <TableCell className="text-xs">
-                        <div className="flex items-center gap-2">
-                          <Clock className="h-4 w-4 text-muted-foreground animate-pulse" />
-                          <span className="text-muted-foreground">Aguardando...</span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-xs"><Skeleton className="h-4 w-20" /></TableCell>
-                      <TableCell className="text-xs"><Skeleton className="h-4 w-16" /></TableCell>
-                      <TableCell className="text-xs"><Skeleton className="h-4 w-12" /></TableCell>
-                      <TableCell className="text-xs"><Skeleton className="h-4 w-16" /></TableCell>
-                      <TableCell className="text-xs"><Skeleton className="h-4 w-16" /></TableCell>
-                      <TableCell className="text-xs"><Skeleton className="h-4 w-12" /></TableCell>
-                      <TableCell className="text-xs"><Skeleton className="h-4 w-24" /></TableCell>
-                      <TableCell className="text-xs"><Skeleton className="h-4 w-20" /></TableCell>
-                      <TableCell className="text-xs">
-                        <Badge variant="outline" className="text-xs">
-                          <Clock className="h-3 w-3 mr-1" />
-                          Pendente
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-xs">
-                        <div className="flex gap-1 justify-center">
-                          <Skeleton className="h-7 w-20" />
-                          <Skeleton className="h-7 w-20" />
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </>
+                // Mensagem quando realmente não há nenhuma cotação
+                <TableRow>
+                  <TableCell colSpan={14} className="text-center py-8 text-muted-foreground">
+                    Nenhuma cotação solicitada ainda. Clique em "Solicitar Nova Cotação" para começar.
+                  </TableCell>
+                </TableRow>
               ) : (
                 // Dados reais quando houver cotações
                 quotesWithResponses.map((item, index) => {
-                  const isBest = item === bestQuote;
+                  const hasResponse = !!item.response?.freight_value;
+                  const isBest = hasResponse && item === bestQuote;
                   const isSelected = item.response?.is_selected;
                   const isProcessing = processingId === item.response?.id;
                   
-                  // Extrair dados do quote_request_data
+                  // Extrair dados do quote_request_data (sempre disponível)
                   const requestData = item.quote.quote_request_data;
                   const volumes = requestData?.cargo?.volumes || 0;
                   const weight = requestData?.cargo?.total_weight_kg || 0;
                   const origin = requestData?.sender?.address || 'N/A';
-                  const originState = requestData?.sender?.address?.split(',').pop()?.trim() || 'N/A';
+                  const originCity = origin.split(',')[1]?.trim() || origin.split(',')[0]?.trim() || 'N/A';
                   const destinationCity = requestData?.recipient?.city || 'N/A';
                   const destinationState = requestData?.recipient?.state || 'N/A';
                   const productType = requestData?.cargo?.product_description || 'N/A';
                   
                   return (
                     <TableRow 
-                      key={item.response?.id}
-                      className={isBest ? 'bg-green-50 dark:bg-green-950/20' : ''}
+                      key={item.quote.id}
+                      className={isBest ? 'bg-green-50 dark:bg-green-950/20' : hasResponse ? '' : 'opacity-60'}
                     >
                       <TableCell className="text-xs font-mono">
                         {item.quote.id.substring(0, 8)}
                       </TableCell>
                       <TableCell className="text-xs">
-                        {item.response?.received_at && (
-                          format(new Date(item.response.received_at), "dd/MM/yy", { locale: ptBR })
-                        )}
+                        {format(new Date(item.quote.requested_at), "dd/MM/yy", { locale: ptBR })}
                       </TableCell>
-                      <TableCell className="text-xs">{origin.substring(0, 25)}...</TableCell>
+                      <TableCell className="text-xs">{originCity.substring(0, 25)}</TableCell>
                       <TableCell className="text-xs">
                         <div className="font-medium flex items-center gap-1">
                           {isBest && <Trophy className="h-3 w-3 text-yellow-500" />}
@@ -203,21 +180,25 @@ export function QuoteApprovalTable({
                         </div>
                       </TableCell>
                       <TableCell className="text-xs">
-                        <div className="font-bold">
-                          {formatCurrency(item.response?.freight_value)}
-                        </div>
+                        {hasResponse ? (
+                          <div className="font-bold">
+                            {formatCurrency(item.response.freight_value)}
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground text-xs">Aguardando...</span>
+                        )}
                       </TableCell>
                       <TableCell className="text-xs">
-                        {item.response?.delivery_time_days ? (
+                        {hasResponse && item.response?.delivery_time_days ? (
                           <span>{item.response.delivery_time_days}d</span>
                         ) : (
-                          <span className="text-muted-foreground">-</span>
+                          <span className="text-muted-foreground">---</span>
                         )}
                       </TableCell>
                       <TableCell className="text-xs text-center">{volumes}</TableCell>
                       <TableCell className="text-xs text-center">{weight.toFixed(1)}</TableCell>
                       <TableCell className="text-xs text-center text-muted-foreground">N/A</TableCell>
-                      <TableCell className="text-xs">{originState}</TableCell>
+                      <TableCell className="text-xs">{originCity}</TableCell>
                       <TableCell className="text-xs">{destinationCity}/{destinationState}</TableCell>
                       <TableCell className="text-xs">{productType.substring(0, 20)}</TableCell>
                       <TableCell className="text-xs">
@@ -226,41 +207,52 @@ export function QuoteApprovalTable({
                             <CheckCircle2 className="h-3 w-3 mr-1" />
                             Aprovada
                           </Badge>
-                        ) : (
+                        ) : hasResponse ? (
                           <Badge variant="outline" className="text-xs">Pendente</Badge>
+                        ) : (
+                          <Badge variant="outline" className="border-yellow-500 text-xs">
+                            <Clock className="h-3 w-3 mr-1" />
+                            Aguardando
+                          </Badge>
                         )}
                       </TableCell>
                       <TableCell className="text-xs">
-                        <div className="flex items-center justify-center gap-1">
-                          {!isSelected ? (
-                            <>
-                              <Button
-                                size="sm"
-                                variant="default"
-                                onClick={() => handleApprove(item.quote.id, item.response?.id || '')}
-                                disabled={isProcessing || !hasMinimumQuotes}
-                                className="gap-1 h-7 text-xs px-2"
-                              >
-                                <CheckCircle2 className="h-3 w-3" />
-                                Aprovar
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="destructive"
-                                onClick={() => handleReject(item.quote.id, item.response?.id || '')}
-                                disabled={isProcessing}
-                                className="gap-1 h-7 text-xs px-2"
-                              >
-                                <XCircle className="h-3 w-3" />
-                                Reprovar
-                              </Button>
-                            </>
-                          ) : (
-                            <Badge variant="outline" className="text-green-600 border-green-600 text-xs">
-                              ✓ Selecionada
-                            </Badge>
-                          )}
-                        </div>
+                        {hasResponse ? (
+                          <div className="flex items-center justify-center gap-1">
+                            {!isSelected ? (
+                              <>
+                                <Button
+                                  size="sm"
+                                  variant="default"
+                                  onClick={() => handleApprove(item.quote.id, item.response?.id || '')}
+                                  disabled={isProcessing || !hasMinimumQuotes}
+                                  className="gap-1 h-7 text-xs px-2"
+                                >
+                                  <CheckCircle2 className="h-3 w-3" />
+                                  Aprovar
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="destructive"
+                                  onClick={() => handleReject(item.quote.id, item.response?.id || '')}
+                                  disabled={isProcessing}
+                                  className="gap-1 h-7 text-xs px-2"
+                                >
+                                  <XCircle className="h-3 w-3" />
+                                  Reprovar
+                                </Button>
+                              </>
+                            ) : (
+                              <Badge variant="outline" className="text-green-600 border-green-600 text-xs">
+                                ✓ Selecionada
+                              </Badge>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="text-center text-xs text-muted-foreground">
+                            Sem resposta
+                          </div>
+                        )}
                       </TableCell>
                     </TableRow>
                   );
@@ -270,11 +262,12 @@ export function QuoteApprovalTable({
           </Table>
         </div>
 
-        {!hasMinimumQuotes && (
+        {!hasMinimumQuotes && quotesWithResponses.length > 0 && (
           <div className="bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
             <p className="text-sm text-yellow-800 dark:text-yellow-200">
               <strong>⚠️ Atenção:</strong> É necessário ter pelo menos 3 cotações com valores para prosseguir com a aprovação.
-              Aguarde mais respostas das transportadoras ou solicite novas cotações.
+              {pendingQuotes.length > 0 && ` Aguardando resposta de ${pendingQuotes.length} transportadora(s).`}
+              {pendingQuotes.length === 0 && ' Solicite mais cotações para prosseguir.'}
             </p>
           </div>
         )}
