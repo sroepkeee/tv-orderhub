@@ -191,7 +191,7 @@ export default function Production() {
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <div className="w-full px-6 py-6 space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
@@ -216,13 +216,13 @@ export default function Production() {
 
       {/* Métricas */}
       {isLoading ? (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-6">
+        <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-6 xl:grid-cols-6">
           {Array.from({ length: 6 }).map((_, i) => (
             <Skeleton key={i} className="h-32" />
           ))}
         </div>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-6">
+        <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-6 xl:grid-cols-6">
           <MetricCard
             title="Em Produção"
             value={stats.awaiting_production}
@@ -343,8 +343,8 @@ export default function Production() {
       />
 
       {/* Tabela */}
-      <Card>
-        <CardHeader>
+      <Card className="overflow-hidden">
+        <CardHeader className="px-6">
           <CardTitle className="flex items-center justify-between">
             <span>
               Itens de Produção ({filteredItems.length})
@@ -356,7 +356,7 @@ export default function Production() {
             )}
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-0">
           {isLoading ? (
             <div className="space-y-3">
               {Array.from({ length: 10 }).map((_, i) => (

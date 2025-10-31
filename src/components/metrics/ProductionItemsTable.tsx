@@ -107,33 +107,33 @@ export const ProductionItemsTable = ({ items, onOrderClick }: ProductionItemsTab
 
   return (
     <div className="space-y-4">
-      <div className="rounded-md border">
-        <Table>
+      <div className="rounded-md border overflow-x-auto">
+        <Table className="min-w-[1400px]">
           <TableHeader>
             <TableRow>
-              <TableHead className="w-[100px]">
+              <TableHead className="w-[90px]">
                 <SortButton field="orderNumber">Pedido</SortButton>
               </TableHead>
-              <TableHead className="w-[120px]">
+              <TableHead className="w-[110px]">
                 <SortButton field="itemCode">Código</SortButton>
               </TableHead>
-              <TableHead>Descrição</TableHead>
-              <TableHead className="w-[60px]">Und</TableHead>
-              <TableHead className="w-[100px] text-right">
+              <TableHead className="min-w-[300px] w-[35%]">Descrição</TableHead>
+              <TableHead className="w-[70px]">Und</TableHead>
+              <TableHead className="w-[90px] text-right">
                 <SortButton field="requestedQuantity">Qtd Solic.</SortButton>
               </TableHead>
-              <TableHead className="w-[100px] text-right">Qtd Rec.</TableHead>
+              <TableHead className="w-[90px] text-right">Qtd Rec.</TableHead>
               <TableHead className="w-[80px] text-right">Saldo</TableHead>
-              <TableHead className="w-[180px]">
+              <TableHead className="w-[140px]">
                 <SortButton field="item_status">Situação</SortButton>
               </TableHead>
               <TableHead className="w-[120px]">
                 <SortButton field="deliveryDate">Data Entrega</SortButton>
               </TableHead>
               <TableHead className="w-[130px]">Data Est. Produção</TableHead>
-              <TableHead className="w-[100px]">Prazo</TableHead>
+              <TableHead className="w-[80px]">Prazo</TableHead>
               <TableHead className="w-[100px]">Compra OK?</TableHead>
-              <TableHead className="w-[120px]">Armazém</TableHead>
+              <TableHead className="w-[100px]">Armazém</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
