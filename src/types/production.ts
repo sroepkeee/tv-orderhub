@@ -18,6 +18,9 @@ export interface ProductionItem {
   customerName?: string;
   orderStatus?: string;
   production_estimated_date?: string;
+  purchase_action_started?: boolean;
+  purchase_action_started_at?: string;
+  purchase_action_started_by?: string;
 }
 
 export interface ProductionStats {

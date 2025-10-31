@@ -2,7 +2,7 @@ import { useState, useMemo } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ArrowUpDown, ExternalLink } from "lucide-react";
+import { ArrowUpDown, ExternalLink, CheckCircle2, XCircle } from "lucide-react";
 import { ProductionItem } from "@/types/production";
 import { format, differenceInDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -132,6 +132,7 @@ export const ProductionItemsTable = ({ items, onOrderClick }: ProductionItemsTab
               </TableHead>
               <TableHead className="w-[130px]">Data Est. Produção</TableHead>
               <TableHead className="w-[100px]">Prazo</TableHead>
+              <TableHead className="w-[100px]">Compra OK?</TableHead>
               <TableHead className="w-[120px]">Armazém</TableHead>
             </TableRow>
           </TableHeader>
@@ -198,6 +199,23 @@ export const ProductionItemsTable = ({ items, onOrderClick }: ProductionItemsTab
                     )}
                   </TableCell>
                   <TableCell>{getDaysRemaining(item.deliveryDate)}</TableCell>
+                  <TableCell>
+                    {item.item_status === 'purchase_required' && (
+                      <div className="flex items-center gap-1.5">
+                        {item.purchase_action_started ? (
+                          <>
+                            <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />
+                            <span className="text-xs text-green-600 dark:text-green-400 font-semibold">Sim</span>
+                          </>
+                        ) : (
+                          <>
+                            <XCircle className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+                            <span className="text-xs text-orange-600 dark:text-orange-400">Não</span>
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </TableCell>
                   <TableCell>{item.warehouse}</TableCell>
                 </TableRow>
               );

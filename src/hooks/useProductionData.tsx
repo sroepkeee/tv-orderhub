@@ -44,6 +44,9 @@ export const useProductionData = () => {
         customerName: item.orders.customer_name,
         orderStatus: item.orders.status,
         production_estimated_date: item.production_estimated_date,
+        purchase_action_started: item.purchase_action_started,
+        purchase_action_started_at: item.purchase_action_started_at,
+        purchase_action_started_by: item.purchase_action_started_by,
       })) as ProductionItem[];
     },
     staleTime: 30000, // 30 segundos
