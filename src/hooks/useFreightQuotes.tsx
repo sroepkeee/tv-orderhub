@@ -22,7 +22,8 @@ export const useFreightQuotes = () => {
             email,
             phone,
             whatsapp
-          )
+          ),
+          responses:freight_quote_responses (*)
         `)
         .eq('order_id', orderId)
         .order('requested_at', { ascending: false });
@@ -31,6 +32,10 @@ export const useFreightQuotes = () => {
       
       console.log('Quotes carregadas:', data);
       setQuotes((data || []) as unknown as FreightQuote[]);
+      
+      // Extract all responses and set them
+      const allResponses = data?.flatMap(quote => quote.responses || []) || [];
+      setResponses(allResponses as unknown as FreightQuoteResponse[]);
     } catch (error: any) {
       toast({
         title: 'Erro ao carregar cotações',
@@ -111,15 +116,54 @@ export const useFreightQuotes = () => {
 
       if (error) throw error;
 
+      // Update quote status to accepted
+      await supabase
+        .from('freight_quotes')
+        .update({ status: 'accepted' })
+        .eq('id', quoteId);
+
       toast({
-        title: 'Cotação selecionada',
-        description: 'Cotação marcada como aceita.',
+        title: 'Cotação aprovada',
+        description: 'Cotação aprovada com sucesso e marcada como aceita.',
       });
 
       return true;
     } catch (error: any) {
       toast({
         title: 'Erro ao selecionar cotação',
+        description: error.message,
+        variant: 'destructive',
+      });
+      return false;
+    }
+  };
+
+  const rejectQuote = async (quoteId: string, responseId: string) => {
+    try {
+      // Mark response as not selected
+      const { error } = await supabase
+        .from('freight_quote_responses')
+        .update({ is_selected: false })
+        .eq('id', responseId);
+
+      if (error) throw error;
+
+      // Update quote status to rejected
+      await supabase
+        .from('freight_quotes')
+        .update({ status: 'rejected' })
+        .eq('id', quoteId);
+
+      toast({
+        title: 'Cotação reprovada',
+        description: 'Cotação marcada como reprovada.',
+        variant: 'destructive',
+      });
+
+      return true;
+    } catch (error: any) {
+      toast({
+        title: 'Erro ao reprovar cotação',
         description: error.message,
         variant: 'destructive',
       });
@@ -192,6 +236,7 @@ export const useFreightQuotes = () => {
     loadQuoteResponses,
     sendQuoteRequest,
     selectQuote,
+    rejectQuote,
     loadQuoteResponsesForOrder,
   };
 };

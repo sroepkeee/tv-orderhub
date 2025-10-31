@@ -8,6 +8,7 @@ import { FreightQuoteDialog } from './FreightQuoteDialog';
 import { FreightQuoteCard } from './FreightQuoteCard';
 import { QuoteComparisonTable } from './QuoteComparisonTable';
 import { QuoteSummaryTable } from './QuoteSummaryTable';
+import { QuoteApprovalTable } from './QuoteApprovalTable';
 import { useFreightQuotes } from '@/hooks/useFreightQuotes';
 import { Order } from '@/components/Dashboard';
 
@@ -18,7 +19,7 @@ interface CarriersTabContentProps {
 export function CarriersTabContent({ order }: CarriersTabContentProps) {
   const [showQuoteDialog, setShowQuoteDialog] = useState(false);
   const [showComparison, setShowComparison] = useState(false);
-  const { quotes, responses, loadQuotesByOrder, selectQuote, loading } = useFreightQuotes();
+  const { quotes, responses, loadQuotesByOrder, selectQuote, rejectQuote, loading } = useFreightQuotes();
 
   useEffect(() => {
     if (order.id) {
@@ -105,6 +106,22 @@ export function CarriersTabContent({ order }: CarriersTabContentProps) {
                   onSelectQuote={selectQuote}
                 />
               </div>
+            )}
+
+            {/* Approval Table Section */}
+            {respondedQuotes.length > 0 && (
+              <QuoteApprovalTable
+                quotes={quotes}
+                responses={responses}
+                onApprove={async (quoteId, responseId) => {
+                  await selectQuote(quoteId, responseId);
+                  await loadQuotesByOrder(order.id);
+                }}
+                onReject={async (quoteId, responseId) => {
+                  await rejectQuote(quoteId, responseId);
+                  await loadQuotesByOrder(order.id);
+                }}
+              />
             )}
 
             {/* Quotes List */}
