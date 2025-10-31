@@ -51,9 +51,9 @@ export const VolumeManager = ({ orderId }: VolumeManagerProps) => {
     setFormData({
       quantity: volume.quantity,
       weight_kg: volume.weight_kg,
-      length_cm: volume.length_cm,
-      width_cm: volume.width_cm,
-      height_cm: volume.height_cm,
+      length_cm: volume.length_cm / 100, // Converter cm para m
+      width_cm: volume.width_cm / 100,   // Converter cm para m
+      height_cm: volume.height_cm / 100, // Converter cm para m
       packaging_type: volume.packaging_type || 'caixa_papelao',
       description: volume.description || ''
     });
@@ -76,6 +76,9 @@ export const VolumeManager = ({ orderId }: VolumeManagerProps) => {
   const handleSave = async () => {
     const volumeData: Partial<OrderVolume> = {
       ...formData,
+      length_cm: formData.length_cm * 100, // Converter m para cm para o banco
+      width_cm: formData.width_cm * 100,   // Converter m para cm para o banco
+      height_cm: formData.height_cm * 100, // Converter m para cm para o banco
       volume_number: isAdding ? volumes.length + 1 : volumes.find(v => v.id === editingId)?.volume_number || 1
     };
 
@@ -96,7 +99,7 @@ export const VolumeManager = ({ orderId }: VolumeManagerProps) => {
   };
 
   const calculateCubagem = (length: number, width: number, height: number) => {
-    return (length * width * height) / 1000000;
+    return length * width * height; // Já em metros, resultado em m³
   };
 
   return (
@@ -174,7 +177,7 @@ export const VolumeManager = ({ orderId }: VolumeManagerProps) => {
                     </Select>
                   </div>
                   <div>
-                    <Label className="text-xs">Comprimento (cm)</Label>
+                    <Label className="text-xs">Comprimento (m)</Label>
                     <Input
                       type="number"
                       step="0.01"
@@ -184,7 +187,7 @@ export const VolumeManager = ({ orderId }: VolumeManagerProps) => {
                     />
                   </div>
                   <div>
-                    <Label className="text-xs">Largura (cm)</Label>
+                    <Label className="text-xs">Largura (m)</Label>
                     <Input
                       type="number"
                       step="0.01"
@@ -194,7 +197,7 @@ export const VolumeManager = ({ orderId }: VolumeManagerProps) => {
                     />
                   </div>
                   <div>
-                    <Label className="text-xs">Altura (cm)</Label>
+                    <Label className="text-xs">Altura (m)</Label>
                     <Input
                       type="number"
                       step="0.01"
@@ -250,7 +253,7 @@ export const VolumeManager = ({ orderId }: VolumeManagerProps) => {
                   </div>
                   <div>
                     <span className="text-muted-foreground">Dimensões:</span>{' '}
-                    <span className="font-medium">{volume.length_cm}x{volume.width_cm}x{volume.height_cm} cm</span>
+                    <span className="font-medium">{(volume.length_cm / 100).toFixed(2)}x{(volume.width_cm / 100).toFixed(2)}x{(volume.height_cm / 100).toFixed(2)} m</span>
                   </div>
                   <div>
                     <span className="text-muted-foreground">Embalagem:</span>{' '}
@@ -331,7 +334,7 @@ export const VolumeManager = ({ orderId }: VolumeManagerProps) => {
                   </Select>
                 </div>
                 <div>
-                  <Label className="text-xs">Comprimento (cm)</Label>
+                  <Label className="text-xs">Comprimento (m)</Label>
                   <Input
                     type="number"
                     step="0.01"
@@ -341,7 +344,7 @@ export const VolumeManager = ({ orderId }: VolumeManagerProps) => {
                   />
                 </div>
                 <div>
-                  <Label className="text-xs">Largura (cm)</Label>
+                  <Label className="text-xs">Largura (m)</Label>
                   <Input
                     type="number"
                     step="0.01"
@@ -351,7 +354,7 @@ export const VolumeManager = ({ orderId }: VolumeManagerProps) => {
                   />
                 </div>
                 <div>
-                  <Label className="text-xs">Altura (cm)</Label>
+                  <Label className="text-xs">Altura (m)</Label>
                   <Input
                     type="number"
                     step="0.01"
