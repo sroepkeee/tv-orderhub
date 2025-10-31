@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { MessageSquare, CheckCircle, Check, CheckCheck, Clock, AlertCircle } from 'lucide-react';
+import { MessageSquare, CheckCircle, Clock, Calendar, MapPin } from 'lucide-react';
 import type { FreightQuote, FreightQuoteResponse } from '@/types/carriers';
 import { format } from 'date-fns';
 import { CarrierConversationDialog } from './CarrierConversationDialog';
@@ -76,56 +76,6 @@ export const FreightQuoteCard = ({
       supabase.removeChannel(channel);
     };
   }, [quote.id]);
-  
-  const getStatusBadge = () => {
-    if (selectedResponse) {
-      return <Badge className="bg-green-600 hover:bg-green-700 animate-pulse">✓ Selecionada</Badge>;
-    }
-    
-    if (quote.status === 'responded' || responses.length > 0) {
-      return <Badge className="bg-blue-600 hover:bg-blue-700">✅ Respondida</Badge>;
-    }
-
-    return null;
-  };
-
-  const getDeliveryStatusBadge = () => {
-    // Verificar status de entrega da mensagem
-    if (messageStatus.read_at) {
-      return (
-        <Badge className="bg-blue-600 hover:bg-blue-700 flex items-center gap-1">
-          <CheckCheck className="h-3 w-3" />
-          Lido
-        </Badge>
-      );
-    }
-    
-    if (messageStatus.delivered_at) {
-      return (
-        <Badge className="bg-gray-600 hover:bg-gray-700 flex items-center gap-1">
-          <CheckCheck className="h-3 w-3" />
-          Entregue
-        </Badge>
-      );
-    }
-    
-    if (messageStatus.sent_at || quote.sent_at) {
-      return (
-        <Badge variant="secondary" className="flex items-center gap-1">
-          <Check className="h-3 w-3" />
-          Enviado
-        </Badge>
-      );
-    }
-    
-    // Status pendente
-    return (
-      <Badge variant="outline" className="flex items-center gap-1">
-        <Clock className="h-3 w-3" />
-        Pendente
-      </Badge>
-    );
-  };
 
   const selectedResponse = responses.find(r => r.is_selected);
   const bestResponse = responses.sort((a, b) => {
@@ -134,119 +84,99 @@ export const FreightQuoteCard = ({
     return a.freight_value - b.freight_value;
   })[0];
 
+  const hasResponse = !!bestResponse?.freight_value;
+  const cardBorderClass = selectedResponse 
+    ? 'border-green-500 bg-green-50/30' 
+    : hasResponse 
+    ? 'border-green-200' 
+    : 'border-yellow-200';
+
+  const formatCurrency = (value: number) => 
+    new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
+
   return (
     <>
-      <Card>
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3 min-w-0 flex-1">
-              <div className="font-semibold text-sm truncate">
-                {quote.carrier?.name || 'Transportadora'}
-              </div>
-              <div className="flex items-center gap-1 flex-shrink-0">
-                {getDeliveryStatusBadge()}
-                {getStatusBadge()}
-              </div>
+      <Card className={`hover:shadow-md transition-all hover:scale-105 ${cardBorderClass}`}>
+        <CardHeader className="p-3 pb-2">
+          <div className="flex flex-col gap-1">
+            <h3 className="text-xs font-bold truncate" title={quote.carrier?.name}>
+              {quote.carrier?.name || 'Transportadora'}
+            </h3>
+            <div className="flex items-center gap-1">
+              {selectedResponse ? (
+                <Badge className="bg-green-600 text-white text-xs px-2 py-0.5">
+                  <CheckCircle className="h-3 w-3 mr-1" />
+                  Selecionada
+                </Badge>
+              ) : hasResponse ? (
+                <Badge className="bg-green-100 text-green-700 text-xs px-2 py-0.5">
+                  Respondida
+                </Badge>
+              ) : (
+                <Badge variant="outline" className="border-yellow-500 text-yellow-700 text-xs px-2 py-0.5">
+                  <Clock className="h-3 w-3 mr-1" />
+                  Aguardando
+                </Badge>
+              )}
             </div>
-          </div>
-          
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground mt-2">
-            <span className="flex items-center gap-1">
-              📅 {format(new Date(quote.requested_at), 'dd/MM HH:mm')}
-            </span>
-            {(messageStatus.sent_at || quote.sent_at) && (
-              <>
-                <span>•</span>
-                <span className="flex items-center gap-1">
-                  <Check className="h-3 w-3" />
-                  Enviado {format(new Date(messageStatus.sent_at || quote.sent_at), 'dd/MM HH:mm')}
-                </span>
-              </>
-            )}
-            {messageStatus.delivered_at && (
-              <>
-                <span>•</span>
-                <span className="flex items-center gap-1">
-                  <CheckCheck className="h-3 w-3" />
-                  Entregue {format(new Date(messageStatus.delivered_at), 'dd/MM HH:mm')}
-                </span>
-              </>
-            )}
-            {messageStatus.read_at && (
-              <>
-                <span>•</span>
-                <span className="flex items-center gap-1 text-blue-600">
-                  <CheckCheck className="h-3 w-3" />
-                  Lido {format(new Date(messageStatus.read_at), 'dd/MM HH:mm')}
-                </span>
-              </>
-            )}
-            {quote.response_received_at && (
-              <>
-                <span>•</span>
-                <span className="flex items-center gap-1 text-green-600 font-semibold">
-                  <CheckCircle className="h-3 w-3" />
-                  Respondido {format(new Date(quote.response_received_at), 'dd/MM HH:mm')}
-                </span>
-              </>
-            )}
-            {quote.quote_request_data?.recipient?.city && (
-              <>
-                <span>•</span>
-                <span>
-                  Destino: {quote.quote_request_data.recipient.city}
-                  {quote.quote_request_data.recipient.state && `/${quote.quote_request_data.recipient.state}`}
-                </span>
-              </>
-            )}
           </div>
         </CardHeader>
         
-        <CardContent className="pt-0 space-y-2">
-          {bestResponse && (
-            <div className="border-t pt-2 bg-primary/5 -mx-6 px-6 pb-2">
-              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
-                {bestResponse.freight_value && (
-                  <span className="font-bold text-base flex items-center gap-1">
-                    💰 {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(bestResponse.freight_value)}
-                  </span>
-                )}
-                {bestResponse.delivery_time_days && (
-                  <span className="flex items-center gap-1 font-semibold">
-                    ⏱️ {bestResponse.delivery_time_days} dias úteis
-                  </span>
-                )}
-                {selectedResponse && (
-                  <Badge variant="outline" className="text-xs bg-green-100 text-green-700 border-green-300">
-                    ✓ Selecionada
-                  </Badge>
-                )}
+        <CardContent className="p-3 pt-0 space-y-2">
+          {/* Informações Principais */}
+          <div className="space-y-1 text-xs">
+            {hasResponse && bestResponse?.freight_value ? (
+              <div className="font-bold text-sm text-green-700">
+                💰 {formatCurrency(bestResponse.freight_value)}
               </div>
-              {bestResponse.response_text && (
-                <p className="text-xs text-muted-foreground mt-1">📝 {bestResponse.response_text}</p>
-              )}
+            ) : (
+              <div className="text-muted-foreground text-sm">
+                💰 Aguardando...
+              </div>
+            )}
+            
+            {hasResponse && bestResponse?.delivery_time_days ? (
+              <div className="text-muted-foreground flex items-center gap-1">
+                <Clock className="h-3 w-3" />
+                {bestResponse.delivery_time_days} dias
+              </div>
+            ) : (
+              <div className="text-muted-foreground flex items-center gap-1">
+                <Clock className="h-3 w-3" />
+                ---
+              </div>
+            )}
+            
+            <div className="text-muted-foreground flex items-center gap-1">
+              <Calendar className="h-3 w-3" />
+              {format(new Date(quote.requested_at), 'dd/MM HH:mm')}
             </div>
-          )}
+            
+            {quote.quote_request_data?.recipient?.city && (
+              <div className="text-muted-foreground truncate flex items-center gap-1" title={`${quote.quote_request_data.recipient.city}/${quote.quote_request_data.recipient.state}`}>
+                <MapPin className="h-3 w-3 flex-shrink-0" />
+                {quote.quote_request_data.recipient.city}/{quote.quote_request_data.recipient.state}
+              </div>
+            )}
+          </div>
 
-          <div className="flex gap-2 mt-2">
+          {/* Botões Compactos */}
+          <div className="flex gap-1">
             <Button 
               variant="outline" 
               size="sm" 
               onClick={() => setShowConversation(true)}
-              className="flex-1"
+              className="flex-1 h-7 text-xs px-2"
             >
-              <MessageSquare className="h-4 w-4 mr-1" />
-              Chat
+              <MessageSquare className="h-3 w-3" />
             </Button>
             {bestResponse && !selectedResponse && (
               <Button 
-                variant="default" 
                 size="sm" 
                 onClick={() => onSelectQuote(quote.id, bestResponse.id)}
-                className="flex-1 bg-green-600 hover:bg-green-700"
+                className="flex-1 h-7 text-xs px-2 bg-green-600 hover:bg-green-700"
               >
-                <CheckCircle className="h-4 w-4 mr-1" />
-                Selecionar
+                <CheckCircle className="h-3 w-3" />
               </Button>
             )}
           </div>

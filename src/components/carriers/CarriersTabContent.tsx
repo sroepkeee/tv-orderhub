@@ -102,8 +102,8 @@ export function CarriersTabContent({ order }: CarriersTabContentProps) {
             {/* Quotes List */}
             <div className="space-y-2">
               <h4 className="text-sm font-semibold text-muted-foreground">Cotações Enviadas</h4>
-              <ScrollArea className="h-[250px]">
-                <div className="space-y-2 pr-4">
+              <ScrollArea className="h-[400px]">
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 pr-4">
                   {quotes.map((quote) => {
                     const quoteResponses = responses.filter(r => r.quote_id === quote.id);
                     return (
