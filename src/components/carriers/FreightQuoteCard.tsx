@@ -137,89 +137,106 @@ export const FreightQuoteCard = ({
   return (
     <>
       <Card>
-        <CardHeader>
-          <div className="flex items-start justify-between">
-            <div>
-              <CardTitle className="text-base">
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3 min-w-0 flex-1">
+              <div className="font-semibold text-sm truncate">
                 {quote.carrier?.name || 'Transportadora'}
-              </CardTitle>
-              <p className="text-sm text-muted-foreground mt-1">
-                Solicitação de Cotação de Frete • 
-                {quote.quote_request_data?.recipient?.city && ` ${quote.quote_request_data.recipient.city}`}
-                {quote.quote_request_data?.recipient?.state && `/${quote.quote_request_data.recipient.state}`}
-              </p>
-            </div>
-            <div className="flex flex-col gap-2 items-end">
-              {getStatusBadge()}
-              {getDeliveryStatusBadge()}
+              </div>
+              <div className="flex items-center gap-1 flex-shrink-0">
+                {getDeliveryStatusBadge()}
+                {getStatusBadge()}
+              </div>
             </div>
           </div>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="text-sm space-y-1">
-            <p>Solicitado: {format(new Date(quote.requested_at), 'dd/MM/yyyy HH:mm')}</p>
+          
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground mt-2">
+            <span className="flex items-center gap-1">
+              📅 {format(new Date(quote.requested_at), 'dd/MM HH:mm')}
+            </span>
             {(messageStatus.sent_at || quote.sent_at) && (
-              <p className="flex items-center gap-1">
-                <Check className="h-3 w-3 text-muted-foreground" />
-                Enviado: {format(new Date(messageStatus.sent_at || quote.sent_at), 'dd/MM/yyyy HH:mm')}
-              </p>
+              <>
+                <span>•</span>
+                <span className="flex items-center gap-1">
+                  <Check className="h-3 w-3" />
+                  Enviado {format(new Date(messageStatus.sent_at || quote.sent_at), 'dd/MM HH:mm')}
+                </span>
+              </>
             )}
             {messageStatus.delivered_at && (
-              <p className="flex items-center gap-1">
-                <CheckCheck className="h-3 w-3 text-muted-foreground" />
-                Entregue: {format(new Date(messageStatus.delivered_at), 'dd/MM/yyyy HH:mm')}
-              </p>
+              <>
+                <span>•</span>
+                <span className="flex items-center gap-1">
+                  <CheckCheck className="h-3 w-3" />
+                  Entregue {format(new Date(messageStatus.delivered_at), 'dd/MM HH:mm')}
+                </span>
+              </>
             )}
             {messageStatus.read_at && (
-              <p className="flex items-center gap-1">
-                <CheckCheck className="h-3 w-3 text-blue-600" />
-                Lido: {format(new Date(messageStatus.read_at), 'dd/MM/yyyy HH:mm')}
-              </p>
+              <>
+                <span>•</span>
+                <span className="flex items-center gap-1 text-blue-600">
+                  <CheckCheck className="h-3 w-3" />
+                  Lido {format(new Date(messageStatus.read_at), 'dd/MM HH:mm')}
+                </span>
+              </>
             )}
             {quote.response_received_at && (
-              <p className="flex items-center gap-1 text-green-600 font-semibold">
-                <CheckCircle className="h-3 w-3" />
-                Respondido: {format(new Date(quote.response_received_at), 'dd/MM/yyyy HH:mm')}
-              </p>
+              <>
+                <span>•</span>
+                <span className="flex items-center gap-1 text-green-600 font-semibold">
+                  <CheckCircle className="h-3 w-3" />
+                  Respondido {format(new Date(quote.response_received_at), 'dd/MM HH:mm')}
+                </span>
+              </>
+            )}
+            {quote.quote_request_data?.recipient?.city && (
+              <>
+                <span>•</span>
+                <span>
+                  Destino: {quote.quote_request_data.recipient.city}
+                  {quote.quote_request_data.recipient.state && `/${quote.quote_request_data.recipient.state}`}
+                </span>
+              </>
             )}
           </div>
-
+        </CardHeader>
+        
+        <CardContent className="pt-0 space-y-2">
           {bestResponse && (
-            <div className="border-t pt-3 space-y-2 bg-primary/5 -mx-6 px-6 pb-3">
-              <p className="text-xs font-semibold text-primary uppercase">Resposta Recebida</p>
-              {bestResponse.freight_value && (
-                <p className="font-bold text-lg flex items-center gap-2">
-                  💰 {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(bestResponse.freight_value)}
-                  {selectedResponse && (
-                    <Badge variant="outline" className="text-xs bg-green-100 text-green-700 border-green-300">
-                      ✓ Selecionada
-                    </Badge>
-                  )}
-                </p>
-              )}
-              {bestResponse.delivery_time_days && (
-                <p className="flex items-center gap-2">
-                  ⏱️ <span className="font-semibold">{bestResponse.delivery_time_days} dias úteis</span>
-                </p>
-              )}
+            <div className="border-t pt-2 bg-primary/5 -mx-6 px-6 pb-2">
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+                {bestResponse.freight_value && (
+                  <span className="font-bold text-base flex items-center gap-1">
+                    💰 {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(bestResponse.freight_value)}
+                  </span>
+                )}
+                {bestResponse.delivery_time_days && (
+                  <span className="flex items-center gap-1 font-semibold">
+                    ⏱️ {bestResponse.delivery_time_days} dias úteis
+                  </span>
+                )}
+                {selectedResponse && (
+                  <Badge variant="outline" className="text-xs bg-green-100 text-green-700 border-green-300">
+                    ✓ Selecionada
+                  </Badge>
+                )}
+              </div>
               {bestResponse.response_text && (
-                <p className="text-sm text-muted-foreground">📝 {bestResponse.response_text}</p>
+                <p className="text-xs text-muted-foreground mt-1">📝 {bestResponse.response_text}</p>
               )}
-              <p className="text-xs text-muted-foreground">
-                Recebido: {format(new Date(bestResponse.received_at), 'dd/MM/yyyy HH:mm')}
-              </p>
             </div>
           )}
 
-          <div className="flex gap-2">
+          <div className="flex gap-2 mt-2">
             <Button 
               variant="outline" 
               size="sm" 
               onClick={() => setShowConversation(true)}
               className="flex-1"
             >
-              <MessageSquare className="h-4 w-4 mr-2" />
-              💬 Abrir Chat
+              <MessageSquare className="h-4 w-4 mr-1" />
+              Chat
             </Button>
             {bestResponse && !selectedResponse && (
               <Button 
@@ -228,8 +245,8 @@ export const FreightQuoteCard = ({
                 onClick={() => onSelectQuote(quote.id, bestResponse.id)}
                 className="flex-1 bg-green-600 hover:bg-green-700"
               >
-                <CheckCircle className="h-4 w-4 mr-2" />
-                Selecionar Cotação
+                <CheckCircle className="h-4 w-4 mr-1" />
+                Selecionar
               </Button>
             )}
           </div>
