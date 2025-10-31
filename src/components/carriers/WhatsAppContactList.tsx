@@ -123,20 +123,35 @@ export function WhatsAppContactList({
   const handleConfirmDelete = async () => {
     if (!contactToDelete) return;
 
+    const conversationIds = contactToDelete.conversationIds;
+    const orderIds = contactToDelete.orderIds;
+
+    // Helper para processar em chunks
+    const chunkArray = <T,>(arr: T[], size = 100): T[][] => {
+      const chunks: T[][] = [];
+      for (let i = 0; i < arr.length; i += size) {
+        chunks.push(arr.slice(i, i + size));
+      }
+      return chunks;
+    };
+
+    const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
     try {
-      const conversationIds = contactToDelete.conversations.map(c => c.id);
-      const orderIds = [...new Set(contactToDelete.conversations.map(c => c.order_id))];
+      toast.info(`Excluindo ${conversationIds.length} conversas...`);
+      const convChunks = chunkArray(conversationIds);
+      
+      for (let i = 0; i < convChunks.length; i += 3) {
+        const window = convChunks.slice(i, i + 3);
+        await Promise.all(
+          window.map(chunk =>
+            supabase.from("carrier_conversations").delete().in("id", chunk)
+          )
+        );
+        
+        if (convChunks.length > 10) await sleep(100);
+      }
 
-      // Helper para processar em chunks
-      const chunkArray = <T,>(arr: T[], size: number): T[][] => {
-        const chunks: T[][] = [];
-        for (let i = 0; i < arr.length; i += size) {
-          chunks.push(arr.slice(i, i + size));
-        }
-        return chunks;
-      };
-
-      // Se opção marcada, excluir cotações e limpar dados dos pedidos
       if (deleteQuotesAndClearOrders) {
         // 1. Buscar IDs das cotações deste carrier para estes pedidos (em chunks se muitos pedidos)
         const orderChunks = chunkArray(orderIds, 100);

@@ -4,10 +4,13 @@ import { useToast } from '@/hooks/use-toast';
 import type { CarrierConversation } from '@/types/carriers';
 
 // Helper para evitar timeout em queries lentas
-function fetchWithTimeout<T>(promise: Promise<T>, ms = 15000): Promise<T> {
+function fetchWithTimeout<T>(
+  queryBuilder: { then: (onfulfilled: (value: any) => any) => Promise<T> },
+  ms = 15000
+): Promise<T> {
   return new Promise((resolve, reject) => {
     const timeoutId = setTimeout(() => reject(new Error('Timeout ao carregar conversas')), ms);
-    promise.then(
+    queryBuilder.then(
       (res) => { clearTimeout(timeoutId); resolve(res); },
       (err) => { clearTimeout(timeoutId); reject(err); }
     );
@@ -41,7 +44,7 @@ export const useCarrierConversations = () => {
         .order('sent_at', { ascending: false })
         .limit(500);
 
-      const { data, error } = await fetchWithTimeout(Promise.resolve(query));
+      const { data, error } = await fetchWithTimeout(query);
 
       if (error) throw error;
       setConversations((data || []) as unknown as CarrierConversation[]);
@@ -80,7 +83,7 @@ export const useCarrierConversations = () => {
         .order('sent_at', { ascending: true })
         .limit(500);
 
-      const { data, error } = await fetchWithTimeout(Promise.resolve(query));
+      const { data, error } = await fetchWithTimeout(query);
 
       if (error) throw error;
       
@@ -122,7 +125,7 @@ export const useCarrierConversations = () => {
         .order('sent_at', { ascending: true })
         .limit(500);
 
-      const { data, error } = await fetchWithTimeout(Promise.resolve(query));
+      const { data, error } = await fetchWithTimeout(query);
 
       if (error) throw error;
       
@@ -197,8 +200,7 @@ export const useCarrierConversations = () => {
         .is('read_at', null)
         .gte('sent_at', sixMonthsAgo.toISOString());
 
-      const result = await fetchWithTimeout(Promise.resolve(query), 15000);
-      const { count, error } = result as any;
+      const { count, error } = await fetchWithTimeout(query, 15000);
 
       if (error) throw error;
       setUnreadCount(count || 0);
