@@ -191,38 +191,6 @@ const tabs = [{
   id: "completed",
   name: "Concluídos"
 }];
-
-// Helper function to wrap Supabase queries with timeout
-const fetchWithTimeout = <T,>(
-  queryBuilder: { then: (onfulfilled: (value: any) => any) => Promise<T> },
-  timeoutMs: number
-): Promise<T> => {
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => {
-      reject(new Error(`Request timeout after ${timeoutMs}ms`));
-    }, timeoutMs);
-
-    queryBuilder
-      .then((result) => {
-        clearTimeout(timer);
-        resolve(result as T);
-      })
-      .catch((err) => {
-        clearTimeout(timer);
-        reject(err);
-      });
-  });
-};
-
-// Helper to chunk arrays
-const chunkArray = <T,>(array: T[], size: number): T[][] => {
-  const chunks: T[][] = [];
-  for (let i = 0; i < array.length; i += size) {
-    chunks.push(array.slice(i, i + size));
-  }
-  return chunks;
-};
-
 export const Dashboard = () => {
   const {
     user
@@ -237,66 +205,28 @@ export const Dashboard = () => {
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
   const [loading, setLoading] = useState(true);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [pageSize, setPageSize] = useState(200);
-  const [hasMore, setHasMore] = useState(false);
-  const [safeMode, setSafeMode] = useState(false);
   const isUpdatingRef = useRef(false);
-  const mountedRef = useRef(true);
-  const isLoadingRef = useRef(false);
-  const currentLoadIdRef = useRef(0);
 
   // Column visibility state with user-specific localStorage persistence
   const [columnVisibility, setColumnVisibility] = useState<ColumnVisibility>(() => {
-    try {
-      const saved = user ? localStorage.getItem(`columnVisibility_${user.id}`) : null;
-      return saved ? JSON.parse(saved) : {
-        priority: true,
-        orderNumber: true,
-        item: false,
-        description: false,
-        quantity: false,
-        createdDate: false,
-        status: false,
-        client: false,
-        deskTicket: true,
-        deliveryDeadline: true,
-        daysRemaining: true,
-        labStatus: false,
-        phaseManagement: true,
-        actions: false
-      };
-    } catch {
-      return {
-        priority: true,
-        orderNumber: true,
-        item: false,
-        description: false,
-        quantity: false,
-        createdDate: false,
-        status: false,
-        client: false,
-        deskTicket: true,
-        deliveryDeadline: true,
-        daysRemaining: true,
-        labStatus: false,
-        phaseManagement: true,
-        actions: false
-      };
-    }
-  });
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      mountedRef.current = false;
+    const saved = user ? localStorage.getItem(`columnVisibility_${user.id}`) : null;
+    return saved ? JSON.parse(saved) : {
+      priority: true,
+      orderNumber: true,
+      item: false,
+      description: false,
+      quantity: false,
+      createdDate: false,
+      status: false,
+      client: false,
+      deskTicket: true,
+      deliveryDeadline: true,
+      daysRemaining: true,
+      labStatus: false,
+      phaseManagement: true,
+      actions: false
     };
-  }, []);
-
-  // Sync loading state with ref
-  useEffect(() => {
-    isLoadingRef.current = loading;
-  }, [loading]);
+  });
 
   // Save column visibility to localStorage whenever it changes
   useEffect(() => {
@@ -305,15 +235,6 @@ export const Dashboard = () => {
     }
   }, [columnVisibility, user]);
 
-  // Check for safe mode URL parameter
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    if (params.get('safe') === '1') {
-      setSafeMode(true);
-      console.log('[Dashboard] Safe mode activated - items will not be loaded');
-    }
-  }, []);
-
   // Load orders from Supabase
   useEffect(() => {
     if (user) {
@@ -321,35 +242,17 @@ export const Dashboard = () => {
       loadUnreadCount();
     }
   }, [user]);
-
-  // Reload orders when date range changes
-  useEffect(() => {
-    loadOrders();
-  }, [dateRange]);
-
   const loadUnreadCount = async () => {
     try {
-      const today = new Date();
-      const sixMonthsAgo = new Date(today.getTime() - 180 * 24 * 60 * 60 * 1000);
-      
-      const query = supabase
-        .from("carrier_conversations")
-        .select("*", { count: "exact", head: true })
-        .eq("message_direction", "inbound")
-        .is("read_at", null)
-        .gte("sent_at", sixMonthsAgo.toISOString());
-
-      const { count, error } = await fetchWithTimeout(query, 15000);
-
-      if (error) {
-        console.error("[Dashboard] Error loading unread count:", error);
-        return;
-      }
-
+      const {
+        count
+      } = await supabase.from('carrier_conversations').select('*', {
+        count: 'exact',
+        head: true
+      }).eq('message_direction', 'inbound').is('read_at', null);
       setUnreadConversationsCount(count || 0);
     } catch (error) {
-      console.error("[Dashboard] Failed to load unread count:", error);
-      // Don't block UI for unread count failures
+      console.error('Erro ao carregar contador de conversas:', error);
     }
   };
 
@@ -365,32 +268,28 @@ export const Dashboard = () => {
   useEffect(() => {
     if (!user) return;
     let timeoutId: NodeJS.Timeout;
-    
-    const scheduleReload = () => {
-      clearTimeout(timeoutId);
-      timeoutId = setTimeout(() => {
-        if (!isUpdatingRef.current && !isLoadingRef.current) {
-          loadOrders();
-        }
-      }, 500);
-    };
-
     const channel = supabase.channel('orders-changes').on('postgres_changes', {
       event: '*',
       schema: 'public',
       table: 'orders'
     }, () => {
-      if (!isUpdatingRef.current && !isLoadingRef.current) {
-        scheduleReload();
-      }
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        if (!isUpdatingRef.current) {
+          loadOrders();
+        }
+      }, 500);
     }).on('postgres_changes', {
       event: '*',
       schema: 'public',
       table: 'order_items'
     }, () => {
-      if (!isUpdatingRef.current && !isLoadingRef.current) {
-        scheduleReload();
-      }
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        if (!isUpdatingRef.current) {
+          loadOrders();
+        }
+      }, 500);
     }).subscribe();
     return () => {
       clearTimeout(timeoutId);
@@ -410,68 +309,45 @@ export const Dashboard = () => {
       window.removeEventListener('ordersUpdated', handleOrdersUpdated);
     };
   }, [user]);
-
   const loadOrders = async () => {
+    if (!user) return;
+    setLoading(true);
     try {
-      setLoading(true);
-      setErrorMessage(null);
-      
-      const loadId = Date.now();
-      currentLoadIdRef.current = loadId;
+      // Load all orders for shared viewing
+      const {
+        data,
+        error
+      } = await supabase.from('orders').select('*').order('created_at', {
+        ascending: false
+      });
+      if (error) throw error;
 
-      // Calculate date range with default of 120 days
-      const today = new Date();
-      const from = dateRange?.from ?? new Date(today.getTime() - 120 * 24 * 60 * 60 * 1000);
-      const to = dateRange?.to ?? null;
-
-      console.time('[Dashboard] ordersQuery');
-
-      // Query orders with server-side date filtering
-      let ordersQuery = supabase
-        .from("orders")
-        .select("id, order_type, priority, order_number, customer_name, delivery_address, delivery_date, status, notes, created_at, issue_date, order_category, totvs_order_number, freight_modality, carrier_name, freight_type, freight_value, tracking_code, package_volumes, package_weight_kg, package_length_m, package_width_m, package_height_m, customer_document, municipality, operation_code, executive_name, firmware_project_name, image_project_name, requires_firmware, requires_image, shipping_date, vehicle_plate, driver_name")
-        .gte("created_at", from.toISOString())
-        .order("created_at", { ascending: false })
-        .limit(pageSize + 1);
-
-      if (to) {
-        ordersQuery = ordersQuery.lte("created_at", to.toISOString());
-      }
-
-      const { data: ordersData, error: ordersError } = await fetchWithTimeout(
-        ordersQuery,
-        20000
-      );
-
-      console.timeEnd('[Dashboard] ordersQuery');
-
-      if (ordersError) throw ordersError;
-      if (!ordersData) {
-        setOrders([]);
-        setLoading(false);
-        return;
-      }
-
-      // Check if stale
-      if (currentLoadIdRef.current !== loadId) {
-        console.log('[Dashboard] Load cancelled - newer request in progress');
-        return;
-      }
-
-      // Determine if there are more orders
-      const hasMoreOrders = ordersData.length > pageSize;
-      setHasMore(hasMoreOrders);
-      const ordersToUse = hasMoreOrders ? ordersData.slice(0, pageSize) : ordersData;
-
-      // PHASE 1: Set orders immediately without items
-      const ordersWithEmptyItems = ordersToUse.map(order => ({
-        ...order,
-        items: []
-      }));
-      
-      // Map to Order format
-      const mappedOrders = ordersWithEmptyItems.map((dbOrder: any) => {
-        const items: any[] = dbOrder.items || [];
+      // Load items for each order
+      const ordersWithItems = await Promise.all((data || []).map(async dbOrder => {
+        const {
+          data: itemsData
+        } = await supabase.from('order_items').select('*').eq('order_id', dbOrder.id);
+        const items = (itemsData || []).map(item => ({
+          id: item.id,
+          itemCode: item.item_code,
+          itemDescription: cleanItemDescription(item.item_description),
+          unit: item.unit,
+          requestedQuantity: item.requested_quantity,
+          warehouse: item.warehouse,
+          deliveryDate: item.delivery_date,
+          deliveredQuantity: item.delivered_quantity,
+          item_source_type: item.item_source_type as 'in_stock' | 'production' | 'out_of_stock',
+          item_status: item.item_status as 'pending' | 'in_stock' | 'awaiting_production' | 'purchase_required' | 'completed',
+          received_status: item.received_status as 'pending' | 'partial' | 'completed',
+          production_estimated_date: item.production_estimated_date,
+          sla_days: item.sla_days,
+          is_imported: item.is_imported,
+          import_lead_time_days: item.import_lead_time_days,
+          sla_deadline: item.sla_deadline,
+          current_phase: item.current_phase,
+          phase_started_at: item.phase_started_at,
+          userId: item.user_id
+        }));
         const totalRequested = items.reduce((sum, item) => sum + item.requestedQuantity, 0);
         const firstItem = items[0];
         return {
@@ -483,7 +359,7 @@ export const Dashboard = () => {
           description: firstItem?.itemDescription || dbOrder.notes || "",
           quantity: totalRequested,
           createdDate: new Date(dbOrder.created_at).toISOString().split('T')[0],
-          issueDate: dbOrder.issue_date || undefined,
+          issueDate: (dbOrder as any).issue_date || undefined,
           status: dbOrder.status as OrderStatus,
           client: dbOrder.customer_name,
           deliveryDeadline: dbOrder.delivery_date,
@@ -492,16 +368,19 @@ export const Dashboard = () => {
           totvsOrderNumber: dbOrder.totvs_order_number || undefined,
           items,
           order_category: dbOrder.order_category,
+          // Campos de frete e transporte
           freight_modality: dbOrder.freight_modality || null,
           carrier_name: dbOrder.carrier_name || null,
           freight_type: dbOrder.freight_type || null,
           freight_value: dbOrder.freight_value || null,
           tracking_code: dbOrder.tracking_code || null,
+          // Campos de embalagem
           package_volumes: dbOrder.package_volumes || null,
           package_weight_kg: dbOrder.package_weight_kg || null,
           package_length_m: dbOrder.package_length_m || null,
           package_width_m: dbOrder.package_width_m || null,
           package_height_m: dbOrder.package_height_m || null,
+          // Campos adicionais
           customer_document: dbOrder.customer_document || null,
           municipality: dbOrder.municipality || null,
           operation_code: dbOrder.operation_code || null,
@@ -514,286 +393,778 @@ export const Dashboard = () => {
           vehicle_plate: dbOrder.vehicle_plate || null,
           driver_name: dbOrder.driver_name || null
         };
-      });
-      
-      setOrders(mappedOrders);
-      setLoading(false);
-
-      // Skip items loading in safe mode
-      if (safeMode) {
-        console.log('[Dashboard] Safe mode - skipping items load');
-        return;
-      }
-
-      // PHASE 2: Load items progressively in background
-      const orderIds = ordersToUse.map(o => o.id);
-      const chunks = chunkArray(orderIds, 60); // Smaller chunks for reliability
-      const itemsByOrder = new Map<string, any[]>();
-
-      console.log(`[Dashboard] Loading ${chunks.length} chunks of items (${orderIds.length} orders)`);
-
-      // Process chunks with limited concurrency (2 parallel)
-      for (let i = 0; i < chunks.length; i += 2) {
-        // Check if stale before each window
-        if (currentLoadIdRef.current !== loadId) {
-          console.log('[Dashboard] Load cancelled during items fetch');
-          return;
-        }
-
-        const window = chunks.slice(i, i + 2);
-        console.time(`[Dashboard] itemsWindow ${i / 2 + 1}`);
-
-        const promises = window.map(async (chunk, idx) => {
-          try {
-            const itemsQuery = supabase
-              .from("order_items")
-              .select("id, order_id, item_code, item_description, unit, requested_quantity, warehouse, delivery_date, delivered_quantity, item_source_type, item_status, received_status, production_estimated_date, sla_days, is_imported, import_lead_time_days, sla_deadline, current_phase, phase_started_at, user_id")
-              .in("order_id", chunk);
-
-            const { data, error } = await fetchWithTimeout(itemsQuery, 12000);
-
-            if (error) {
-              console.error(`[Dashboard] Error loading items chunk ${i + idx}:`, error);
-              return;
-            }
-
-            if (data) {
-              data.forEach((item) => {
-                if (!itemsByOrder.has(item.order_id)) {
-                  itemsByOrder.set(item.order_id, []);
-                }
-                itemsByOrder.get(item.order_id)!.push(item);
-              });
-            }
-          } catch (err) {
-            console.error(`[Dashboard] Failed to load items chunk ${i + idx}:`, err);
-            // Continue with other chunks - don't break UI
-          }
-        });
-
-        await Promise.all(promises);
-        console.timeEnd(`[Dashboard] itemsWindow ${i / 2 + 1}`);
-
-        // Update orders with items progressively
-        if (currentLoadIdRef.current === loadId) {
-          const updatedOrders = ordersToUse.map((dbOrder: any) => {
-            const itemsData = itemsByOrder.get(dbOrder.id) || [];
-            const items = itemsData.map((item: any) => ({
-              id: item.id,
-              itemCode: item.item_code,
-              itemDescription: cleanItemDescription(item.item_description),
-              unit: item.unit,
-              requestedQuantity: item.requested_quantity,
-              warehouse: item.warehouse,
-              deliveryDate: item.delivery_date,
-              deliveredQuantity: item.delivered_quantity,
-              item_source_type: item.item_source_type as 'in_stock' | 'production' | 'out_of_stock',
-              item_status: item.item_status as 'pending' | 'in_stock' | 'awaiting_production' | 'purchase_required' | 'completed',
-              received_status: item.received_status as 'pending' | 'partial' | 'completed',
-              production_estimated_date: item.production_estimated_date,
-              sla_days: item.sla_days,
-              is_imported: item.is_imported,
-              import_lead_time_days: item.import_lead_time_days,
-              sla_deadline: item.sla_deadline,
-              current_phase: item.current_phase,
-              phase_started_at: item.phase_started_at,
-              userId: item.user_id
-            }));
-            const totalRequested = items.reduce((sum, item) => sum + item.requestedQuantity, 0);
-            const firstItem = items[0];
-            return {
-              id: dbOrder.id,
-              type: dbOrder.order_type as OrderType,
-              priority: dbOrder.priority as Priority,
-              orderNumber: dbOrder.order_number,
-              item: firstItem ? `${firstItem.itemCode} (+${items.length - 1})` : dbOrder.customer_name,
-              description: firstItem?.itemDescription || dbOrder.notes || "",
-              quantity: totalRequested,
-              createdDate: new Date(dbOrder.created_at).toISOString().split('T')[0],
-              issueDate: dbOrder.issue_date || undefined,
-              status: dbOrder.status as OrderStatus,
-              client: dbOrder.customer_name,
-              deliveryDeadline: dbOrder.delivery_date,
-              delivery_address: dbOrder.delivery_address || dbOrder.customer_name,
-              deskTicket: dbOrder.notes || dbOrder.order_number,
-              totvsOrderNumber: dbOrder.totvs_order_number || undefined,
-              items,
-              order_category: dbOrder.order_category,
-              freight_modality: dbOrder.freight_modality || null,
-              carrier_name: dbOrder.carrier_name || null,
-              freight_type: dbOrder.freight_type || null,
-              freight_value: dbOrder.freight_value || null,
-              tracking_code: dbOrder.tracking_code || null,
-              package_volumes: dbOrder.package_volumes || null,
-              package_weight_kg: dbOrder.package_weight_kg || null,
-              package_length_m: dbOrder.package_length_m || null,
-              package_width_m: dbOrder.package_width_m || null,
-              package_height_m: dbOrder.package_height_m || null,
-              customer_document: dbOrder.customer_document || null,
-              municipality: dbOrder.municipality || null,
-              operation_code: dbOrder.operation_code || null,
-              executive_name: dbOrder.executive_name || null,
-              firmware_project_name: dbOrder.firmware_project_name || null,
-              image_project_name: dbOrder.image_project_name || null,
-              requires_firmware: dbOrder.requires_firmware || false,
-              requires_image: dbOrder.requires_image || false,
-              shipping_date: dbOrder.shipping_date || null,
-              vehicle_plate: dbOrder.vehicle_plate || null,
-              driver_name: dbOrder.driver_name || null
-            };
-          });
-          setOrders(updatedOrders);
-        }
-      }
-
-      console.log('[Dashboard] All items loaded successfully');
+      }));
+      setOrders(ordersWithItems);
     } catch (error: any) {
-      console.error("[Dashboard] Error loading orders:", error);
-      setErrorMessage(error.message || "Erro ao carregar pedidos");
+      toast({
+        title: "Erro ao carregar pedidos",
+        description: error.message,
+        variant: "destructive"
+      });
+    } finally {
       setLoading(false);
     }
   };
+  const handleDeleteOrder = async () => {
+    // Atualização otimista: remove o pedido do estado imediatamente
+    if (selectedOrder) {
+      setOrders(prevOrders => prevOrders.filter(o => o.id !== selectedOrder.id));
+      setSelectedOrder(null);
+      setShowEditDialog(false);
+    }
 
-  // Handle add order dialog open
-  const handleAddOrder = () => {
-    setShowEditDialog(false);
-    setSelectedOrder(null);
-    // Open add order dialog logic here
+    // Recarrega do banco para garantir sincronização
+    await loadOrders();
+  };
+  const getPriorityClass = (priority: Priority) => {
+    switch (priority) {
+      case "high":
+        return "priority-high-row";
+      case "medium":
+        return "priority-medium-row";
+      case "low":
+        return "priority-low-row";
+      default:
+        return "";
+    }
+  };
+  const getPriorityLabel = (priority: Priority) => {
+    switch (priority) {
+      case "high":
+        return "Alta";
+      case "medium":
+        return "Média";
+      case "low":
+        return "Baixa";
+      default:
+        return priority;
+    }
+  };
+  const getProgressBarColor = (daysRemaining: number) => {
+    if (daysRemaining > 7) return "bg-progress-good";
+    if (daysRemaining > 3) return "bg-progress-warning";
+    return "bg-progress-critical";
+  };
+  const getProgressWidth = (daysRemaining: number) => {
+    const maxDays = 30;
+    const percentage = Math.max(0, Math.min(100, daysRemaining / maxDays * 100));
+    return percentage;
   };
 
-  // Handle edit order dialog open
-  const handleEditOrder = (order: Order) => {
+  // Helper function to check if order is in production phase
+  const isInProductionPhase = (status: OrderStatus) => {
+    return ["separation_started", "in_production", "awaiting_material", "separation_completed", "production_completed"].includes(status);
+  };
+
+  // Helper function to check if ecommerce order should appear in sales tab
+  const isEcommerceInSalesPhase = (status: OrderStatus) => {
+    const salesPhaseStatuses: OrderStatus[] = [
+    // Preparação
+    "pending", "in_analysis", "awaiting_approval", "planned",
+    // Faturamento
+    "invoice_requested", "awaiting_invoice", "invoice_issued", "invoice_sent",
+    // Produção
+    "separation_started", "in_production", "awaiting_material", "separation_completed", "production_completed",
+    // Laboratório
+    "awaiting_lab", "in_lab_analysis", "lab_completed",
+    // Embalagem
+    "in_quality_check", "in_packaging", "ready_for_shipping",
+    // Expedição
+    "released_for_shipping", "in_expedition", "pickup_scheduled", "awaiting_pickup"];
+    return salesPhaseStatuses.includes(status);
+  };
+
+  // Filter orders based on active tab, search, and date range
+  const filteredOrders = orders.filter(order => {
+    let matchesTab = false;
+    if (activeTab === "all") {
+      matchesTab = true;
+    } else if (activeTab === "production") {
+      matchesTab = isInProductionPhase(order.status);
+    } else if (activeTab === "in_transit") {
+      matchesTab = order.status === "collected" || order.status === "in_transit";
+    } else if (activeTab === "completed") {
+      matchesTab = order.status === "delivered" || order.status === "completed";
+    } else if (activeTab === "sales") {
+      // Todos os pedidos de vendas e e-commerce devem ser visíveis independente do status
+      matchesTab = order.type === "sales" || order.type.includes("ecommerce") || order.type.includes("vendas");
+    } else if (activeTab === "materials") {
+      matchesTab = order.type === "materials";
+    }
+    const matchesSearch = order.orderNumber.toLowerCase().includes(searchQuery.toLowerCase()) || order.item.toLowerCase().includes(searchQuery.toLowerCase()) || order.client.toLowerCase().includes(searchQuery.toLowerCase()) || order.deskTicket.toLowerCase().includes(searchQuery.toLowerCase());
+
+    // Date range filter
+    let matchesDate = true;
+    if (dateRange?.from) {
+      const orderDate = new Date(order.createdDate);
+      matchesDate = orderDate >= dateRange.from;
+      if (dateRange.to) {
+        matchesDate = matchesDate && orderDate <= dateRange.to;
+      }
+    }
+    return matchesTab && matchesSearch && matchesDate;
+  });
+
+  // Action handlers
+  const handleAddOrder = async (orderData: any) => {
+    if (!user) return;
+    try {
+      const orderNumber = generateOrderNumber(orderData.type);
+      const {
+        data: orderRow,
+        error: orderError
+      } = await supabase.from('orders').insert({
+        user_id: user.id,
+        order_number: orderNumber,
+        customer_name: orderData.client,
+        delivery_address: orderData.client,
+        delivery_date: orderData.deliveryDeadline,
+        status: "almox_ssm_pending",
+        priority: orderData.priority,
+        order_type: orderData.type,
+        notes: orderData.deskTicket,
+        totvs_order_number: orderData.totvsOrderNumber || orderNumber
+      }).select().single();
+      if (orderError) throw orderError;
+
+      // Register manual creation in history
+      await supabase.from('order_changes').insert({
+        order_id: orderRow.id,
+        field_name: 'created',
+        old_value: '',
+        new_value: 'manual_creation',
+        changed_by: user.id,
+        change_category: 'order_creation',
+        change_type: 'create'
+      });
+
+      // Insert all items
+      if (orderData.items && orderData.items.length > 0) {
+        const itemsToInsert = orderData.items.map((item: any) => ({
+          order_id: orderRow.id,
+          user_id: user.id,
+          item_code: item.itemCode,
+          item_description: item.itemDescription,
+          unit: item.unit,
+          requested_quantity: item.requestedQuantity,
+          warehouse: item.warehouse,
+          delivery_date: item.deliveryDate,
+          delivered_quantity: item.deliveredQuantity,
+          item_source_type: item.item_source_type || 'in_stock',
+          received_status: item.received_status || 'pending',
+          production_estimated_date: item.production_estimated_date || null
+        }));
+        const {
+          error: itemsError
+        } = await supabase.from('order_items').insert(itemsToInsert);
+        if (itemsError) throw itemsError;
+      }
+
+      // Upload PDF to Storage
+      if (orderData.pdfFile) {
+        const fileName = `${orderNumber}_${Date.now()}.pdf`;
+        const filePath = `${user.id}/${fileName}`;
+        const {
+          data: uploadData,
+          error: uploadError
+        } = await supabase.storage.from('order-attachments').upload(filePath, orderData.pdfFile, {
+          contentType: 'application/pdf',
+          cacheControl: '3600',
+          upsert: false
+        });
+        if (uploadError) {
+          console.error("Error uploading PDF:", uploadError);
+          throw new Error(`Erro ao fazer upload do PDF: ${uploadError.message}`);
+        }
+
+        // Save attachment metadata
+        const {
+          error: attachmentError
+        } = await supabase.from('order_attachments').insert({
+          order_id: orderRow.id,
+          file_name: orderData.pdfFile.name,
+          file_path: uploadData.path,
+          file_size: orderData.pdfFile.size,
+          file_type: orderData.pdfFile.type,
+          uploaded_by: user.id
+        });
+        if (attachmentError) {
+          console.error("Error saving attachment metadata:", attachmentError);
+          throw new Error("Erro ao salvar informações do anexo");
+        }
+      }
+      await loadOrders();
+      toast({
+        title: "Pedido criado com sucesso!",
+        description: `${orderNumber} foi criado com ${orderData.items?.length || 0} item(ns) e PDF anexado.`
+      });
+    } catch (error: any) {
+      toast({
+        title: "Erro ao criar pedido",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
+  };
+  const generateOrderNumber = (type: OrderType) => {
+    const prefix = type === "production" ? "PRD" : type === "sales" ? "VND" : type === "ecommerce" ? "ECOM" : "MAT";
+    const year = new Date().getFullYear();
+    const count = orders.filter(o => o.type === type).length + 1;
+    return `${prefix}-${year}-${count.toString().padStart(3, '0')}`;
+  };
+
+  // Compute received_status based on quantities
+  const computeReceivedStatus = (delivered: number, requested: number): 'pending' | 'partial' | 'completed' => {
+    if (!requested || delivered <= 0) return 'pending';
+    if (delivered < requested) return 'partial';
+    return 'completed';
+  };
+  const handleEditOrder = async (updatedOrder: Order) => {
+    if (!user) return;
+
+    // Marcar que estamos atualizando localmente
+    isUpdatingRef.current = true;
+    try {
+      const {
+        data: updatedRow,
+        error: orderError
+      } = await supabase.from('orders').update({
+        customer_name: updatedOrder.client,
+        delivery_address: updatedOrder.client,
+        delivery_date: updatedOrder.deliveryDeadline,
+        status: updatedOrder.status,
+        priority: updatedOrder.priority,
+        order_type: updatedOrder.type,
+        notes: updatedOrder.deskTicket,
+        totvs_order_number: updatedOrder.totvsOrderNumber || null,
+        customer_document: (updatedOrder as any).customerDocument || null,
+        municipality: (updatedOrder as any).municipality || null,
+        operation_code: (updatedOrder as any).operationCode || null,
+        executive_name: (updatedOrder as any).executiveName || null,
+        // Campos de frete (usando snake_case correto)
+        freight_modality: (updatedOrder as any).freight_modality || null,
+        carrier_name: (updatedOrder as any).carrier_name || null,
+        freight_type: (updatedOrder as any).freight_type || null,
+        freight_value: (updatedOrder as any).freight_value || null,
+        tracking_code: (updatedOrder as any).tracking_code || null
+      }).eq('id', updatedOrder.id).select('id').single();
+      if (orderError) throw orderError;
+      if (!updatedRow) throw new Error("Sem permissão para atualizar este pedido.");
+
+      // Update items - handle existing, new, and deleted items
+      if (updatedOrder.items) {
+        // Get existing item IDs and owners from database
+        const {
+          data: existingItems
+        } = await supabase.from('order_items').select('id, user_id').eq('order_id', updatedOrder.id);
+        const existingItemIds = new Set((existingItems || []).map(item => item.id));
+        const currentItemIds = new Set(updatedOrder.items.filter(item => item.id).map(item => item.id as string));
+
+        // Delete only items owned by current user and removed from the list
+        const itemsToDelete = (existingItems || []).filter(row => !currentItemIds.has(row.id) && row.user_id === user.id).map(row => row.id);
+        if (itemsToDelete.length > 0) {
+          const {
+            error: deleteError
+          } = await supabase.from('order_items').delete().in('id', itemsToDelete);
+          if (deleteError) throw deleteError;
+        }
+
+        // Update existing items (only own items) and insert new ones
+        for (const item of updatedOrder.items) {
+          // Calculate correct status based on quantities
+          const statusToSave = computeReceivedStatus(item.deliveredQuantity, item.requestedQuantity);
+          if (item.id) {
+            // Skip updating items not owned by current user (RLS)
+            if (item.userId && item.userId !== user.id) continue;
+            const {
+              error: updateError
+            } = await supabase.from('order_items').update({
+              item_code: item.itemCode,
+              item_description: item.itemDescription,
+              unit: item.unit,
+              requested_quantity: item.requestedQuantity,
+              warehouse: item.warehouse,
+              delivery_date: item.deliveryDate,
+              delivered_quantity: Math.max(0, Math.min(item.deliveredQuantity, item.requestedQuantity)),
+              item_source_type: item.item_source_type || 'in_stock',
+              item_status: item.item_status || 'in_stock',
+              received_status: statusToSave,
+              production_estimated_date: item.production_estimated_date || null,
+              sla_days: item.sla_days,
+              is_imported: item.is_imported,
+              import_lead_time_days: item.import_lead_time_days
+            }).eq('id', item.id);
+            if (updateError) throw updateError;
+          } else {
+            // Insert new item (owned by current user)
+            const {
+              error: insertError
+            } = await supabase.from('order_items').insert({
+              order_id: updatedOrder.id,
+              user_id: user.id,
+              item_code: item.itemCode,
+              item_description: item.itemDescription,
+              unit: item.unit,
+              requested_quantity: item.requestedQuantity,
+              warehouse: item.warehouse,
+              delivery_date: item.deliveryDate,
+              delivered_quantity: Math.max(0, Math.min(item.deliveredQuantity, item.requestedQuantity)),
+              item_source_type: item.item_source_type || 'in_stock',
+              item_status: item.item_status || 'in_stock',
+              received_status: statusToSave,
+              production_estimated_date: item.production_estimated_date || null,
+              sla_days: item.sla_days,
+              is_imported: item.is_imported,
+              import_lead_time_days: item.import_lead_time_days
+            });
+            if (insertError) throw insertError;
+          }
+        }
+      }
+      await loadOrders();
+
+      // Só mostrar toast após confirmar sucesso da atualização local
+      toast({
+        title: "Pedido atualizado",
+        description: `Pedido ${updatedOrder.orderNumber} foi atualizado com sucesso.`
+      });
+    } catch (error: any) {
+      toast({
+        title: "Erro ao atualizar pedido",
+        description: error.message,
+        variant: "destructive"
+      });
+    } finally {
+      setSelectedOrder(null);
+      // Resetar flag após 1 segundo
+      setTimeout(() => {
+        isUpdatingRef.current = false;
+      }, 1000);
+    }
+  };
+  const handleDuplicateOrder = async (originalOrder: Order) => {
+    if (!user) return;
+    try {
+      const {
+        data,
+        error
+      } = await supabase.from('orders').insert({
+        user_id: user.id,
+        order_number: generateOrderNumber(originalOrder.type),
+        customer_name: originalOrder.client,
+        delivery_address: originalOrder.client,
+        delivery_date: originalOrder.deliveryDeadline,
+        status: "pending",
+        priority: originalOrder.priority,
+        order_type: originalOrder.type,
+        notes: originalOrder.description
+      }).select().single();
+      if (error) throw error;
+      await loadOrders();
+      toast({
+        title: "Pedido duplicado",
+        description: "Um novo pedido foi criado com base no original."
+      });
+    } catch (error: any) {
+      toast({
+        title: "Erro ao duplicar pedido",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
+  };
+  const handleApproveOrder = async (orderId: string) => {
+    if (!user) return;
+    const order = orders.find(o => o.id === orderId);
+    if (!order) return;
+    try {
+      const {
+        error
+      } = await supabase.from('orders').update({
+        status: "planned"
+      }).eq('id', orderId);
+      if (error) throw error;
+
+      // Register in history
+      await saveOrderHistory(orderId, order.status, "planned", order.orderNumber);
+      await loadOrders();
+      toast({
+        title: "Pedido aprovado",
+        description: "Pedido foi planejado e aprovado para produção."
+      });
+    } catch (error: any) {
+      toast({
+        title: "Erro ao aprovar pedido",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
+  };
+  const handleCancelOrder = async (orderId: string) => {
+    if (!user) return;
+    const order = orders.find(o => o.id === orderId);
+    if (!order) return;
+    try {
+      const {
+        error
+      } = await supabase.from('orders').update({
+        status: "cancelled"
+      }).eq('id', orderId);
+      if (error) throw error;
+
+      // Register in history
+      await saveOrderHistory(orderId, order.status, "cancelled", order.orderNumber);
+      await loadOrders();
+      toast({
+        title: "Pedido cancelado",
+        description: "Pedido foi marcado como cancelado.",
+        variant: "destructive"
+      });
+    } catch (error: any) {
+      toast({
+        title: "Erro ao cancelar pedido",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
+  };
+  const handleStatusChange = async (orderId: string, newStatus: OrderStatus) => {
+    if (!user) return;
+    const order = orders.find(o => o.id === orderId);
+    const previousStatus = order?.status;
+    try {
+      // Detectar mudança para fase "Gerar Ordem"
+      const orderGenerationStatuses = ['order_generation_pending', 'order_in_creation', 'order_generated'];
+      const isMovingToOrderGeneration = orderGenerationStatuses.includes(newStatus);
+      let updateData: any = {
+        status: newStatus
+      };
+
+      // Se está mudando para fase "Gerar Ordem", calcular novo prazo baseado no SLA
+      if (isMovingToOrderGeneration && order) {
+        // Buscar SLA padrão do tipo de pedido
+        const {
+          data: orderTypeConfig
+        } = await supabase.from('order_type_config').select('default_sla_days').eq('order_type', order.type).single();
+        if (orderTypeConfig?.default_sla_days) {
+          // Calcular nova data de entrega: hoje + SLA padrão
+          const today = new Date();
+          const newDeliveryDate = new Date(today);
+          newDeliveryDate.setDate(newDeliveryDate.getDate() + orderTypeConfig.default_sla_days);
+          updateData.delivery_date = newDeliveryDate.toISOString().split('T')[0];
+          console.log(`📅 Calculando prazo: hoje + ${orderTypeConfig.default_sla_days} dias = ${updateData.delivery_date}`);
+        }
+      }
+      const {
+        error
+      } = await supabase.from('orders').update(updateData).eq('id', orderId);
+      if (error) throw error;
+
+      // Save to history
+      if (order && previousStatus) {
+        await saveOrderHistory(orderId, previousStatus, newStatus, order.orderNumber);
+      }
+
+      // ✨ Registrar mudança de status em order_changes para rastreamento completo
+      if (previousStatus !== newStatus) {
+        await supabase.from('order_changes').insert({
+          order_id: orderId,
+          field_name: 'status',
+          old_value: previousStatus,
+          new_value: newStatus,
+          changed_by: user.id,
+          change_category: 'status_change'
+        });
+        console.log('✅ Mudança de status registrada em order_changes:', {
+          usuario: user.email,
+          de: previousStatus,
+          para: newStatus
+        });
+      }
+      await loadOrders();
+      const description = isMovingToOrderGeneration && updateData.delivery_date ? `Pedido ${order?.orderNumber} movido para ${getStatusLabel(newStatus)} - Prazo calculado automaticamente` : `Pedido ${order?.orderNumber} movido para ${getStatusLabel(newStatus)}`;
+      toast({
+        title: "Status atualizado",
+        description
+      });
+    } catch (error: any) {
+      toast({
+        title: "Erro ao atualizar status",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
+  };
+  const saveOrderHistory = async (orderId: string, previousStatus: OrderStatus, newStatus: OrderStatus, orderNumber: string) => {
+    if (!user) return;
+    try {
+      const {
+        error
+      } = await supabase.from('order_history').insert({
+        order_id: orderId,
+        user_id: user.id,
+        old_status: previousStatus,
+        new_status: newStatus
+      });
+      if (error) throw error;
+    } catch (error: any) {
+      console.error("Erro ao salvar histórico:", error.message);
+    }
+  };
+  const getStatusColor = (status: string) => {
+    const colors: Record<string, string> = {
+      // Preparação/Planejamento
+      "pending": "bg-status-pending-bg text-status-pending",
+      "in_analysis": "bg-status-analysis-bg text-status-analysis",
+      "awaiting_approval": "bg-status-awaiting-bg text-status-awaiting",
+      "planned": "bg-status-planned-bg text-status-planned",
+      // Separação/Produção
+      "separation_started": "bg-status-separation-bg text-status-separation",
+      "in_production": "bg-status-production-bg text-status-production",
+      "awaiting_material": "bg-status-material-bg text-status-material",
+      "separation_completed": "bg-status-sep-complete-bg text-status-sep-complete",
+      "production_completed": "bg-status-prod-complete-bg text-status-prod-complete",
+      // Faturamento
+      "invoice_requested": "bg-blue-100 text-blue-700",
+      "awaiting_invoice": "bg-blue-100 text-blue-700",
+      "invoice_issued": "bg-blue-200 text-blue-800",
+      "invoice_sent": "bg-blue-300 text-blue-900",
+      // Embalagem/Conferência
+      "in_quality_check": "bg-status-quality-bg text-status-quality",
+      "in_packaging": "bg-status-packaging-bg text-status-packaging",
+      "ready_for_shipping": "bg-status-ready-bg text-status-ready",
+      // Expedição/Logística
+      "released_for_shipping": "bg-status-released-bg text-status-released",
+      "in_expedition": "bg-status-expedition-bg text-status-expedition",
+      "in_transit": "bg-status-transit-bg text-status-transit",
+      "pickup_scheduled": "bg-status-scheduled-bg text-status-scheduled",
+      "awaiting_pickup": "bg-status-pickup-bg text-status-pickup",
+      "collected": "bg-status-collected-bg text-status-collected",
+      // Conclusão
+      "delivered": "bg-status-delivered-bg text-status-delivered",
+      "completed": "bg-status-completed-bg text-status-completed",
+      // Exceção/Problemas
+      "cancelled": "bg-status-cancelled-bg text-status-cancelled",
+      "on_hold": "bg-status-hold-bg text-status-hold",
+      "delayed": "bg-status-delayed-bg text-status-delayed",
+      "returned": "bg-status-returned-bg text-status-returned"
+    };
+    return colors[status] || "bg-gray-100 text-gray-700";
+  };
+  const calculateDaysRemaining = (deadline: string) => {
+    const today = new Date();
+    const deliveryDate = new Date(deadline);
+    const diffTime = deliveryDate.getTime() - today.getTime();
+    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  };
+  const getLabStatusLabel = (labStatus: string | null | undefined) => {
+    if (!labStatus) return "-";
+    const labels: Record<string, string> = {
+      "in_production": "Em Produção",
+      "quality_check": "Controle de Qualidade",
+      "ready": "Pronto",
+      "error": "Erro de Produção"
+    };
+    return labels[labStatus] || labStatus;
+  };
+  const getLabStatusColor = (labStatus: string | null | undefined) => {
+    if (!labStatus) return "bg-gray-100 text-gray-600";
+    const colors: Record<string, string> = {
+      "in_production": "bg-yellow-100 text-yellow-700",
+      "quality_check": "bg-blue-100 text-blue-700",
+      "ready": "bg-green-100 text-green-700",
+      "error": "bg-red-100 text-red-700"
+    };
+    return colors[labStatus] || "bg-gray-100 text-gray-600";
+  };
+  const handleRowClick = (order: Order, e?: React.MouseEvent) => {
+    // Prevent opening if clicking on buttons or interactive elements
+    if (e) {
+      const target = e.target as HTMLElement;
+      if (target.closest('button') || target.closest('[role="button"]')) {
+        return;
+      }
+    }
+    console.log('Opening edit dialog for order:', order.orderNumber);
+
+    // Auto-navigate to appropriate tab based on order status
+    if (order.status === "collected" || order.status === "in_transit") {
+      setActiveTab("in_transit");
+    } else if (order.status === "delivered" || order.status === "completed") {
+      setActiveTab("completed");
+    }
     setSelectedOrder(order);
     setShowEditDialog(true);
   };
-
-  // Handle close edit dialog
-  const handleCloseEditDialog = () => {
-    setShowEditDialog(false);
-    setSelectedOrder(null);
-  };
-
-  // Handle tab change
-  const handleTabChange = (tabId: string) => {
-    setActiveTab(tabId);
-  };
-
-  // Handle search input change
-  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSearchQuery(e.target.value);
-  };
-
-  // Filter orders based on active tab and search query
-  const filteredOrders = orders.filter(order => {
-    if (activeTab !== "all" && order.type !== activeTab && !(activeTab === "in_transit" && order.status === "in_transit") && !(activeTab === "completed" && order.status === "completed")) {
-      return false;
-    }
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      return order.orderNumber.toLowerCase().includes(query) ||
-        order.item.toLowerCase().includes(query) ||
-        order.client.toLowerCase().includes(query);
-    }
-    return true;
-  });
-
-  return (
-    <div className="dashboard-container">
-      <header className="dashboard-header">
-        <img src={logo} alt="Logo" className="logo" />
-        <UserMenu unreadCount={unreadConversationsCount} />
-      </header>
-
-      <nav className="dashboard-tabs">
-        {tabs.map(tab => (
-          <button
-            key={tab.id}
-            className={`tab-button ${activeTab === tab.id ? "active" : ""}`}
-            onClick={() => handleTabChange(tab.id)}
-          >
-            {tab.name}
-          </button>
-        ))}
-      </nav>
-
-      <div className="dashboard-controls">
-        <Input
-          placeholder="Buscar pedidos..."
-          value={searchQuery}
-          onChange={handleSearchChange}
-          icon={<Search />}
-        />
-        <DateRangeFilter dateRange={dateRange} onChange={setDateRange} />
-        <Button onClick={() => setShowImportDialog(true)} icon={<FileSpreadsheet />}>Importar</Button>
-        <Button onClick={handleAddOrder} icon={<Plus />}>Novo Pedido</Button>
-        <ColumnSettings columnVisibility={columnVisibility} onChange={setColumnVisibility} />
+  return <div className="min-h-screen bg-background p-4 lg:p-6">
+      {/* Compact Header */}
+      <div className="flex items-center justify-between mb-4 lg:mb-6">
+        <div className="flex items-center gap-2 lg:gap-4">
+          <img src={logo} alt="Imply Logo" className="h-12 lg:h-16 w-auto" />
+          <h1 className="text-base md:text-lg lg:text-xl font-bold text-dashboard-header tracking-tight">Sistema Integrado de Produção e Logística SSM</h1>
+        </div>
+        <div className="flex items-center gap-1.5 lg:gap-2">
+          <div className="relative hidden sm:block">
+            <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 text-muted-foreground h-3.5 w-3.5" />
+            <Input placeholder="Buscar..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="pl-8 w-32 lg:w-40 h-8 text-sm" />
+          </div>
+          <DateRangeFilter dateRange={dateRange} onDateRangeChange={setDateRange} />
+          <ColumnSettings visibility={columnVisibility} onVisibilityChange={setColumnVisibility} />
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" className="gap-1.5 h-8 px-2 lg:px-3 relative" size="sm">
+                <BarChart3 className="h-3.5 w-3.5" />
+                <span className="hidden lg:inline">Análises</span>
+                <ChevronDown className="h-3.5 w-3.5" />
+                {unreadConversationsCount > 0 && <span className="absolute -top-1 -right-1 h-5 w-5 bg-destructive text-destructive-foreground text-xs rounded-full flex items-center justify-center">
+                    {unreadConversationsCount}
+                  </span>}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => navigate('/metrics')}>
+                <BarChart3 className="h-4 w-4 mr-2" />
+                Indicadores
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => navigate('/producao')}>
+                <Package className="h-4 w-4 mr-2" />
+                Acessar Produção
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => navigate('/transportadoras')}>
+                <Truck className="h-4 w-4 mr-2" />
+                Transportadoras
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => navigate('/carriers-chat')} className="relative">
+                <MessageSquare className="h-4 w-4 mr-2" />
+                Conversas
+                {unreadConversationsCount > 0 && <span className="ml-auto pl-2 text-xs font-semibold text-destructive">
+                    ({unreadConversationsCount})
+                  </span>}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <NotificationCenter />
+          <UserMenu />
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button className="gap-1.5 h-8 px-2 lg:px-3" size="sm">
+                <Plus className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Novo</span>
+                <ChevronDown className="h-3.5 w-3.5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => {
+              const addButton = document.querySelector('[data-add-order-trigger]') as HTMLElement;
+              addButton?.click();
+            }}>
+                <Plus className="h-4 w-4 mr-2" />
+                Lançamento Manual
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setShowImportDialog(true)}>
+                <FileSpreadsheet className="h-4 w-4 mr-2" />
+                Importar do TOTVS
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          
+          <AddOrderDialog onAddOrder={handleAddOrder} />
+        </div>
       </div>
 
-      {loading && <Progress />}
+      {/* Tab Navigation - Compacta */}
+      <div className="mb-3">
+        
+      </div>
 
-      {errorMessage && <div className="error-message">{errorMessage}</div>}
+      {/* Content */}
+      {loading ? <div className="flex items-center justify-center py-20">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+            <p className="text-muted-foreground">Carregando pedidos...</p>
+          </div>
+        </div> : activeTab === "all" ? <PriorityView orders={filteredOrders} onEdit={handleEditOrder} onDuplicate={handleDuplicateOrder} onApprove={handleApproveOrder} onCancel={handleCancelOrder} onStatusChange={handleStatusChange} onRowClick={order => {
+      setSelectedOrder(order);
+      setShowEditDialog(true);
+    }} /> : <div className="bg-card rounded-lg border overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full">
+               <thead className="dashboard-header">
+                <tr>
+                  {columnVisibility.priority && <th className="text-left p-4 font-semibold">Prioridade</th>}
+                  {columnVisibility.orderNumber && <th className="text-left p-4 font-semibold">Número do Pedido</th>}
+                  {columnVisibility.item && <th className="text-left p-4 font-semibold">Item</th>}
+                  {columnVisibility.description && <th className="text-left p-4 font-semibold">Descrição</th>}
+                  {columnVisibility.quantity && <th className="text-left p-4 font-semibold">Quantidade</th>}
+                  {columnVisibility.createdDate && <th className="text-left p-4 font-semibold">Data de Criação</th>}
+                  {columnVisibility.status && <th className="text-left p-4 font-semibold">Status</th>}
+                  {columnVisibility.client && <th className="text-left p-4 font-semibold">Cliente</th>}
+                  {columnVisibility.deskTicket && <th className="text-left p-4 font-semibold">Chamado Desk</th>}
+                  {columnVisibility.deliveryDeadline && <th className="text-left p-4 font-semibold">Prazo de Entrega</th>}
+                  {columnVisibility.daysRemaining && <th className="text-left p-4 font-semibold">Dias Restantes</th>}
+                  {columnVisibility.labStatus && <th className="text-left p-4 font-semibold">Status Laboratório</th>}
+                  {columnVisibility.phaseManagement && <th className="text-left p-4 font-semibold">Gestão de Fase</th>}
+                  {columnVisibility.actions && <th className="text-center p-4 font-semibold">Ações</th>}
+                </tr>
+              </thead>
+              <tbody>
+                {filteredOrders.map(order => {
+              const daysRemaining = calculateDaysRemaining(order.deliveryDeadline);
+              return <tr key={order.id} onClick={e => handleRowClick(order, e)} className={`border-t transition-colors hover:bg-muted/50 cursor-pointer ${getPriorityClass(order.priority)}`}>
+                      {columnVisibility.priority && <td className="p-4">
+                          <span className={`font-medium ${order.priority === "high" ? "priority-blink" : ""}`}>
+                            {getPriorityLabel(order.priority)}
+                          </span>
+                        </td>}
+                      {columnVisibility.orderNumber && <td className="p-4 font-mono text-sm">{order.orderNumber}</td>}
+                      {columnVisibility.item && <td className="p-4 font-medium">{order.item}</td>}
+                      {columnVisibility.description && <td className="p-4 text-sm text-muted-foreground">{order.description}</td>}
+                      {columnVisibility.quantity && <td className="p-4 text-center">{order.quantity}</td>}
+                      {columnVisibility.createdDate && <td className="p-4 text-sm">{new Date(order.createdDate).toLocaleDateString('pt-BR')}</td>}
+                      {columnVisibility.status && <td className="p-4">
+                          <Badge className={`status-badge ${getStatusColor(order.status)}`}>
+                            {getStatusLabel(order.status)}
+                          </Badge>
+                        </td>}
+                      {columnVisibility.client && <td className="p-4 text-sm">{order.client}</td>}
+                      {columnVisibility.deskTicket && <td className="p-4 text-sm font-mono">{order.deskTicket}</td>}
+                      {columnVisibility.deliveryDeadline && <td className="p-4 text-sm">{new Date(order.deliveryDeadline).toLocaleDateString('pt-BR')}</td>}
+                      {columnVisibility.daysRemaining && <td className="p-4">
+                          <div className="flex items-center gap-2">
+                            <Progress value={getProgressWidth(daysRemaining)} className="h-2 flex-1" />
+                            <span className="text-xs font-medium w-8 text-right">{daysRemaining}d</span>
+                          </div>
+                        </td>}
+                      {columnVisibility.labStatus && <td className="p-4">
+                          <div className="flex flex-col gap-1">
+                            {(order as any).lab_ticket_id && <span className="text-xs font-mono text-muted-foreground">
+                                #{(order as any).lab_ticket_id}
+                              </span>}
+                            <Badge className={getLabStatusColor((order as any).lab_status)}>
+                              {getLabStatusLabel((order as any).lab_status)}
+                            </Badge>
+                          </div>
+                        </td>}
+                      {columnVisibility.phaseManagement && <td className="p-4">
+                          <PhaseButtons order={order} onStatusChange={handleStatusChange} />
+                        </td>}
+                      {columnVisibility.actions && <td className="p-4">
+                          <ActionButtons order={order} onEdit={handleEditOrder} onDuplicate={handleDuplicateOrder} onApprove={handleApproveOrder} onCancel={handleCancelOrder} />
+                        </td>}
+                    </tr>;
+            })}
+              </tbody>
+            </table>
+          </div>
+          {filteredOrders.length === 0 && <div className="text-center py-8 text-muted-foreground">
+              <p>Nenhum pedido encontrado para os filtros aplicados.</p>
+            </div>}
+        </div>}
 
-      <table className="orders-table">
-        <thead>
-          <tr>
-            {columnVisibility.priority && <th>Prioridade</th>}
-            {columnVisibility.orderNumber && <th>Número</th>}
-            {columnVisibility.item && <th>Item</th>}
-            {columnVisibility.description && <th>Descrição</th>}
-            {columnVisibility.quantity && <th>Quantidade</th>}
-            {columnVisibility.createdDate && <th>Data Criação</th>}
-            {columnVisibility.status && <th>Status</th>}
-            {columnVisibility.client && <th>Cliente</th>}
-            {columnVisibility.deskTicket && <th>Ticket</th>}
-            {columnVisibility.deliveryDeadline && <th>Entrega</th>}
-            {columnVisibility.daysRemaining && <th>Dias Restantes</th>}
-            {columnVisibility.labStatus && <th>Status Lab</th>}
-            {columnVisibility.phaseManagement && <th>Fases</th>}
-            {columnVisibility.actions && <th>Ações</th>}
-          </tr>
-        </thead>
-        <tbody>
-          {filteredOrders.map(order => (
-            <tr key={order.id} onClick={() => handleEditOrder(order)}>
-              {columnVisibility.priority && <td><PriorityView priority={order.priority} /></td>}
-              {columnVisibility.orderNumber && <td>{order.orderNumber}</td>}
-              {columnVisibility.item && <td>{order.item}</td>}
-              {columnVisibility.description && <td>{order.description}</td>}
-              {columnVisibility.quantity && <td>{order.quantity}</td>}
-              {columnVisibility.createdDate && <td>{order.createdDate}</td>}
-              {columnVisibility.status && <td><Badge>{getStatusLabel(order.status)}</Badge></td>}
-              {columnVisibility.client && <td>{order.client}</td>}
-              {columnVisibility.deskTicket && <td>{order.deskTicket}</td>}
-              {columnVisibility.deliveryDeadline && <td>{order.deliveryDeadline}</td>}
-              {columnVisibility.daysRemaining && <td>{order.daysOpen ?? "-"}</td>}
-              {columnVisibility.labStatus && <td>{/* Lab status component or info here */}</td>}
-              {columnVisibility.phaseManagement && <td><PhaseButtons order={order} /></td>}
-              {columnVisibility.actions && <td><ActionButtons order={order} /></td>}
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      {/* Edit Dialog with integrated History */}
+      {selectedOrder && <EditOrderDialog order={selectedOrder} open={showEditDialog} onOpenChange={setShowEditDialog} onSave={handleEditOrder} onDelete={handleDeleteOrder} />}
 
-      {showEditDialog && selectedOrder && (
-        <EditOrderDialog
-          order={selectedOrder}
-          onClose={handleCloseEditDialog}
-          onSave={() => {
-            setShowEditDialog(false);
-            loadOrders();
-          }}
-        />
-      )}
-
-      {showImportDialog && (
-        <ImportOrderDialog
-          onClose={() => setShowImportDialog(false)}
-          onImport={() => {
-            setShowImportDialog(false);
-            loadOrders();
-          }}
-        />
-      )}
-    </div>
-  );
+      {/* Import Dialog */}
+      <ImportOrderDialog open={showImportDialog} onOpenChange={setShowImportDialog} onImportSuccess={loadOrders} />
+    </div>;
 };

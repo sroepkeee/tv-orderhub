@@ -3,20 +3,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import type { CarrierConversation } from '@/types/carriers';
 
-// Helper para evitar timeout em queries lentas
-function fetchWithTimeout<T>(
-  queryBuilder: { then: (onfulfilled: (value: any) => any) => Promise<T> },
-  ms = 15000
-): Promise<T> {
-  return new Promise((resolve, reject) => {
-    const timeoutId = setTimeout(() => reject(new Error('Timeout ao carregar conversas')), ms);
-    queryBuilder.then(
-      (res) => { clearTimeout(timeoutId); resolve(res); },
-      (err) => { clearTimeout(timeoutId); reject(err); }
-    );
-  });
-}
-
 export const useCarrierConversations = () => {
   const [conversations, setConversations] = useState<CarrierConversation[]>([]);
   const [loading, setLoading] = useState(false);
@@ -26,36 +12,32 @@ export const useCarrierConversations = () => {
   const loadConversations = async () => {
     setLoading(true);
     try {
-      // Filtrar últimos 180 dias e limitar a 500 registros
-      const sixMonthsAgo = new Date();
-      sixMonthsAgo.setDate(sixMonthsAgo.getDate() - 180);
-      
-      const query = supabase
+      const { data, error } = await supabase
         .from('carrier_conversations')
         .select(`
           *,
           carriers (
             id,
             name,
+            email,
+            phone,
             whatsapp
+          ),
+          orders (
+            order_number,
+            customer_name
           )
         `)
-        .gte('sent_at', sixMonthsAgo.toISOString())
-        .order('sent_at', { ascending: false })
-        .limit(500);
-
-      const { data, error } = await fetchWithTimeout(query);
+        .order('sent_at', { ascending: false });
 
       if (error) throw error;
       setConversations((data || []) as unknown as CarrierConversation[]);
     } catch (error: any) {
-      console.error('[useCarrierConversations] loadConversations error:', error);
       toast({
         title: 'Erro ao carregar conversas',
         description: error.message,
         variant: 'destructive',
       });
-      setConversations([]);
     } finally {
       setLoading(false);
     }
@@ -64,39 +46,37 @@ export const useCarrierConversations = () => {
   const loadConversationsByCarrier = async (carrierId: string) => {
     setLoading(true);
     try {
-      const sixMonthsAgo = new Date();
-      sixMonthsAgo.setDate(sixMonthsAgo.getDate() - 180);
-      
-      const query = supabase
+      const { data, error } = await supabase
         .from('carrier_conversations')
         .select(`
           *,
           carriers (
             id,
             name,
+            email,
+            quote_email,
             whatsapp,
-            phone
+            phone,
+            contact_person
+          ),
+          orders (
+            order_number,
+            customer_name
           )
         `)
         .eq('carrier_id', carrierId)
-        .gte('sent_at', sixMonthsAgo.toISOString())
-        .order('sent_at', { ascending: true })
-        .limit(500);
-
-      const { data, error } = await fetchWithTimeout(query);
+        .order('sent_at', { ascending: true });
 
       if (error) throw error;
       
       setConversations((data || []) as unknown as CarrierConversation[]);
       return data || [];
     } catch (error: any) {
-      console.error('[useCarrierConversations] loadConversationsByCarrier error:', error);
       toast({
         title: 'Erro ao carregar conversa',
         description: error.message,
         variant: 'destructive',
       });
-      setConversations([]);
       return [];
     } finally {
       setLoading(false);
@@ -106,39 +86,37 @@ export const useCarrierConversations = () => {
   const loadConversationsByOrder = async (orderId: string) => {
     setLoading(true);
     try {
-      const sixMonthsAgo = new Date();
-      sixMonthsAgo.setDate(sixMonthsAgo.getDate() - 180);
-      
-      const query = supabase
+      const { data, error } = await supabase
         .from('carrier_conversations')
         .select(`
           *,
           carriers (
             id,
             name,
+            email,
+            quote_email,
             whatsapp,
-            phone
+            phone,
+            contact_person
+          ),
+          orders (
+            order_number,
+            customer_name
           )
         `)
         .eq('order_id', orderId)
-        .gte('sent_at', sixMonthsAgo.toISOString())
-        .order('sent_at', { ascending: true })
-        .limit(500);
-
-      const { data, error } = await fetchWithTimeout(query);
+        .order('sent_at', { ascending: true });
 
       if (error) throw error;
       
       setConversations((data || []) as unknown as CarrierConversation[]);
       return data || [];
     } catch (error: any) {
-      console.error('[useCarrierConversations] loadConversationsByOrder error:', error);
       toast({
         title: 'Erro ao carregar conversas',
         description: error.message,
         variant: 'destructive',
       });
-      setConversations([]);
       return [];
     } finally {
       setLoading(false);
@@ -190,17 +168,11 @@ export const useCarrierConversations = () => {
 
   const getUnreadCount = async () => {
     try {
-      const sixMonthsAgo = new Date();
-      sixMonthsAgo.setDate(sixMonthsAgo.getDate() - 180);
-      
-      const query = supabase
+      const { count, error } = await supabase
         .from('carrier_conversations')
         .select('*', { count: 'exact', head: true })
         .eq('message_direction', 'inbound')
-        .is('read_at', null)
-        .gte('sent_at', sixMonthsAgo.toISOString());
-
-      const { count, error } = await fetchWithTimeout(query, 15000);
+        .is('read_at', null);
 
       if (error) throw error;
       setUnreadCount(count || 0);
