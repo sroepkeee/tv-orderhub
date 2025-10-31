@@ -112,6 +112,7 @@ export default function CarriersChat() {
             conversations={conversations}
             selectedWhatsApp={selectedWhatsApp || undefined}
             onSelectContact={handleSelectContact}
+            onConversationsUpdate={loadConversations}
           />
         )}
 
