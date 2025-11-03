@@ -361,23 +361,90 @@ function findItemDescription(text: string, itemCode: string, itemNumber: string)
 function extractItemsTable(text: string): ParsedOrderData['items'] {
   const items: ParsedOrderData['items'] = [];
   
-  // Encontrar início da tabela de composição
-  const composicaoIndex = text.search(/COMPOSI[ÇC][ÃA]O/i);
-  if (composicaoIndex === -1) {
-    console.warn('⚠️ Tabela de composição não encontrada');
+  // Localizar cabeçalho da tabela (mais robusto que "COMPOSIÇÃO")
+  const headerPatterns = [
+    /(?:^|\n)\s*(?:#\s+)?Item\s+.*?C[óo]digo\s+.*?Descri[çc][ãa]o\s+.*?Qtde/i,
+    /(?:^|\n)\s*C[óo]digo\s+Descri[çc][ãa]o\s+Qtde\s+Un/i,
+    /COMPOSI[ÇC][ÃA]O/i
+  ];
+  let tableStart = -1;
+  for (const pat of headerPatterns) {
+    const idx = text.search(pat);
+    if (idx !== -1) { tableStart = idx; break; }
+  }
+  if (tableStart === -1) {
+    console.warn('⚠️ Cabeçalho da tabela de itens não encontrado');
     return items;
   }
-  
-  const tableText = text.substring(composicaoIndex);
-  
+
+  // Encontrar o fim da tabela
+  const endPatterns = [
+    /TOTAL\s+DO\s+PEDIDO/i,
+    /LGPD:/i,
+    /Observa[çc][õo]es\s+Gerais/i
+  ];
+  let tableEnd = text.length;
+  for (const pat of endPatterns) {
+    const m = text.slice(tableStart).search(pat);
+    if (m !== -1) { tableEnd = tableStart + m; break; }
+  }
+
+  const tableText = text.slice(tableStart, tableEnd);
+
   // Log detalhado para debug (apenas em DEV)
   if (import.meta.env.DEV) {
     console.log('🔍 Iniciando extração de itens da tabela...');
     console.log('📄 Texto da tabela (primeiros 2000 chars):', tableText.substring(0, 2000));
     console.log('📄 Texto da tabela (últimos 1000 chars):', tableText.substring(Math.max(0, tableText.length - 1000)));
   }
-  
-  // REGEX MELHORADO: Captura Item + Código + Qtde + Uni (campos obrigatórios)
+
+  // Primeira passagem: parser linha-a-linha (linhas não trazem a palavra "Item")
+  const lines = tableText.split(/\n|\r\n?/);
+  const rowRegex = /^\s*(\d{1,3})\s+(\d{4,})\s+(.+?)\s+(\d+(?:[.,]\d{1,3})?)\s+([A-ZÇ]{1,3})\s+(\d{1,3})\s+R?\$?\s*([\d.]*\d,[\d]{2}|\d+(?:[.,]\d{2})?)\s+R?\$?\s*([\d.]*\d,[\d]{2}|\d+(?:[.,]\d{2})?)\s*$/;
+
+  let buffer = '';
+  for (const rawLine of lines) {
+    const line = rawLine.trim().replace(/\s{2,}/g, ' ');
+    if (!line) continue;
+    buffer = buffer ? `${buffer} ${line}` : line;
+
+    const m = buffer.match(rowRegex);
+    if (m) {
+      const [, itemNum, codigo, descricao, qtd, unidade, armazem, vUnit, vTotal] = m;
+      const quantity = parseFloat(qtd.replace(/\./g, '').replace(',', '.'));
+      const unitPrice = parseFloat(vUnit.replace(/\./g, '').replace(',', '.'));
+      const total = parseFloat(vTotal.replace(/\./g, '').replace(',', '.'));
+      if (!isNaN(quantity) && quantity > 0) {
+        items.push({
+          itemNumber: itemNum.trim(),
+          itemCode: codigo.trim(),
+          description: descricao.trim().substring(0, 200),
+          quantity,
+          unit: unidade.trim(),
+          warehouse: armazem.trim(),
+          deliveryDate: '',
+          sourceType: 'in_stock',
+          unitPrice: isNaN(unitPrice) ? 0 : unitPrice,
+          discount: 0,
+          ipiPercent: 0,
+          icmsPercent: 0,
+          totalValue: isNaN(total) ? 0 : total
+        });
+      }
+      buffer = '';
+    } else {
+      // Evitar buffers muito longos caso o layout não combine
+      if (/R?\$?\s*[\d.]*\d,\d{2}\s*$/.test(line) && buffer.length > 400) {
+        buffer = '';
+      }
+    }
+  }
+
+  if (import.meta.env.DEV) {
+    console.log(`📊 Passagem linha-a-linha: ${items.length} itens extraídos`);
+  }
+
+  // REGEX MELHORADO: Captura blocos com a palavra "Item" quando existir (complementa a primeira passagem)
   // Todos os outros campos são opcionais para lidar com formatação variável
   // Regex mais robusto que captura unidades como PC, CT, UN, KG, MT, etc.
   const blockRegex = /Item\s+(\d+)\s+C[óo]digo\s+(\d+)\s+Qtde\s+([\d.,]+)\s+Uni?\s+([A-Z]{2,})\s+(?:V\.?\s*Unit?\.?\s+([\d.,]+)\s+)?(?:Desc\.?\s+([\d.,]+)\s+)?(?:V\.\s*C\/\s*Desc\s+([\d.,]+)\s+)?(?:%IPI\s+([\d.,]+)\s+)?(?:Val\.\s*IPI\s+([\d.,]+)\s+)?(?:ICMS\s+([\d.,]+)\s+)?(?:Total\s+([\d.,]+)\s+)?(?:Total\s+c\/\s*IPI\s+([\d.,]+)\s+)?(?:Armaz[ée]m\s+(\d+))?/gi;
@@ -406,21 +473,25 @@ function extractItemsTable(text: string): ParsedOrderData['items'] {
         console.log(`📦 Item ${itemNum}: Código ${codigo}, Qtde ${quantity} ${unidade}, Desc: ${itemDescription.substring(0, 50)}...`);
       }
       
-      items.push({
-        itemNumber: itemNum.trim(),
-        itemCode: codigo.trim(),
-        description: itemDescription,
-        quantity,
-        unit: unidade.trim(),
-        warehouse: armazem?.trim() || 'PRINCIPAL',
-        deliveryDate: '',
-        sourceType: 'in_stock',
-        unitPrice: vlrUnit ? parseFloat(vlrUnit.replace(/\./g, '').replace(',', '.')) : 0,
-        discount: desc ? parseFloat(desc.replace(',', '.')) : 0,
-        ipiPercent: 0,
-        icmsPercent: 0,
-        totalValue: total ? parseFloat(total.replace(/\./g, '').replace(',', '.')) : 0
-      });
+      // Evitar duplicatas (mesma combinação itemNumber + itemCode)
+      const isDuplicate = items.some(i => i.itemCode === codigo.trim() && i.itemNumber === itemNum.trim());
+      if (!isDuplicate) {
+        items.push({
+          itemNumber: itemNum.trim(),
+          itemCode: codigo.trim(),
+          description: itemDescription,
+          quantity,
+          unit: unidade.trim(),
+          warehouse: armazem?.trim() || 'PRINCIPAL',
+          deliveryDate: '',
+          sourceType: 'in_stock',
+          unitPrice: vlrUnit ? parseFloat(vlrUnit.replace(/\./g, '').replace(',', '.')) : 0,
+          discount: desc ? parseFloat(desc.replace(',', '.')) : 0,
+          ipiPercent: 0,
+          icmsPercent: 0,
+          totalValue: total ? parseFloat(total.replace(/\./g, '').replace(',', '.')) : 0
+        });
+      }
       itemIndex++;
     } catch (e) {
       console.error(`❌ Erro ao parsear item:`, e);
