@@ -206,6 +206,7 @@ export const Dashboard = () => {
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [isBatchImporting, setIsBatchImporting] = useState(false);
   const isUpdatingRef = useRef(false);
   const loadingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isLoadingRef = useRef(false);
@@ -214,6 +215,7 @@ export const Dashboard = () => {
   const requestIdRef = useRef(0);
   const refreshQueueRef = useRef<NodeJS.Timeout | null>(null);
   const pendingRefreshRef = useRef(false);
+  const isBatchImportingRef = useRef(false);
   const lastToastTimeRef = useRef(0);
 
   // Column visibility state with user-specific localStorage persistence
@@ -275,6 +277,12 @@ export const Dashboard = () => {
 
   // Fila de Refresh com Throttle Inteligente
   const queueRefresh = () => {
+    // ✅ Ignorar eventos durante batch import
+    if (isBatchImportingRef.current) {
+      console.log('📦 [queueRefresh] Batch import em andamento, ignorando evento Realtime');
+      return;
+    }
+    
     if (pendingRefreshRef.current) return; // Já tem refresh agendado
     
     pendingRefreshRef.current = true;
@@ -307,6 +315,40 @@ export const Dashboard = () => {
       supabase.removeChannel(channel);
     };
   }, [user]);
+
+  // 📦 Listeners para controle de batch import
+  useEffect(() => {
+    const handleBatchStart = () => {
+      console.log('📦 [Dashboard] Batch import iniciado, pausando Realtime refresh');
+      isBatchImportingRef.current = true;
+      setIsBatchImporting(true);
+    };
+    
+    const handleBatchComplete = () => {
+      console.log('✅ [Dashboard] Batch import concluído, recarregando lista');
+      isBatchImportingRef.current = false;
+      setIsBatchImporting(false);
+      // Incrementar requestId e agendar novo carregamento
+      requestIdRef.current++;
+      pendingRefreshRef.current = false;
+      if (!isLoadingRef.current && !isUpdatingRef.current) {
+        // Chamar loadOrders através de um setTimeout para evitar problemas de dependência
+        setTimeout(() => {
+          if (!isLoadingRef.current) {
+            window.location.reload();
+          }
+        }, 100);
+      }
+    };
+    
+    window.addEventListener('batchImportStart', handleBatchStart);
+    window.addEventListener('batchImportComplete', handleBatchComplete);
+    
+    return () => {
+      window.removeEventListener('batchImportStart', handleBatchStart);
+      window.removeEventListener('batchImportComplete', handleBatchComplete);
+    };
+  }, []);
 
   // Listener removido - usando apenas Realtime com throttle
   // Toast consolidado e limitado
@@ -1465,9 +1507,14 @@ export const Dashboard = () => {
           </DropdownMenu>
           <NotificationCenter />
           <UserMenu />
+          {isBatchImporting && (
+            <Badge variant="secondary" className="animate-pulse gap-1 h-8 px-2">
+              📦 Importando...
+            </Badge>
+          )}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button className="gap-1.5 h-8 px-2 lg:px-3" size="sm">
+              <Button className="gap-1.5 h-8 px-2 lg:px-3" size="sm" disabled={isBatchImporting}>
                 <Plus className="h-3.5 w-3.5" />
                 <span className="hidden sm:inline">Novo</span>
                 <ChevronDown className="h-3.5 w-3.5" />
@@ -1477,11 +1524,11 @@ export const Dashboard = () => {
               <DropdownMenuItem onClick={() => {
               const addButton = document.querySelector('[data-add-order-trigger]') as HTMLElement;
               addButton?.click();
-            }}>
+            }} disabled={isBatchImporting}>
                 <Plus className="h-4 w-4 mr-2" />
                 Lançamento Manual
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setShowImportDialog(true)}>
+              <DropdownMenuItem onClick={() => setShowImportDialog(true)} disabled={isBatchImporting}>
                 <FileSpreadsheet className="h-4 w-4 mr-2" />
                 Importar do TOTVS
               </DropdownMenuItem>

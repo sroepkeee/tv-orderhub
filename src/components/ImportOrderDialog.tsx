@@ -117,6 +117,15 @@ export const ImportOrderDialog = ({
   }) => {
     setIsProcessing(true);
     setStep('importing');
+    
+    // 🆕 Sinalizar início de batch import
+    console.log('📦 [executeImport] Iniciando importação:', {
+      orderNumber: data.orderInfo.orderNumber,
+      itemsCount: data.items.length,
+      hasPdf: file?.name.endsWith('.pdf')
+    });
+    window.dispatchEvent(new CustomEvent('batchImportStart'));
+    
     try {
       const {
         data: {
@@ -159,6 +168,8 @@ export const ImportOrderDialog = ({
         executive_name: data.orderInfo.executiveName || null
       }).select().single();
       if (orderError) throw orderError;
+      
+      console.log('✅ [executeImport] Pedido inserido:', order.id);
 
       // Registrar criação por importação no histórico
       await supabase.from('order_changes').insert({
@@ -204,8 +215,8 @@ export const ImportOrderDialog = ({
               fileSize: file.size
             });
             toast.warning('Pedido criado, mas não foi possível anexar o PDF: ' + uploadError.message);
-          } else {
-            console.log('✅ PDF uploaded com sucesso:', filePath);
+            } else {
+              console.log('✅ [executeImport] PDF uploaded:', filePath);
 
             // Registrar o anexo na tabela order_attachments
             const {
@@ -257,6 +268,8 @@ export const ImportOrderDialog = ({
         error: itemsError
       } = await supabase.from('order_items').insert(itemsToInsert);
       if (itemsError) throw itemsError;
+      
+      console.log('✅ [executeImport] Items inseridos:', itemsToInsert.length);
       // Mensagem de sucesso diferenciada para importações com PDF
       if (file?.name.endsWith('.pdf')) {
         toast.success(
@@ -267,8 +280,8 @@ export const ImportOrderDialog = ({
         toast.success(`Pedido ${data.orderInfo.orderNumber} importado com sucesso!`);
       }
 
-      // Forçar atualização da lista de pedidos
-      window.dispatchEvent(new CustomEvent('ordersUpdated'));
+      // ✅ Sinalizar conclusão de batch import
+      window.dispatchEvent(new CustomEvent('batchImportComplete'));
       onImportSuccess();
       onOpenChange(false);
 
@@ -278,7 +291,12 @@ export const ImportOrderDialog = ({
       setValidation(null);
       setStep('upload');
     } catch (error: any) {
+      console.error('❌ [executeImport] Erro:', error);
       toast.error(`Erro ao importar: ${error.message}`);
+      
+      // 🆕 Liberar flag mesmo em caso de erro
+      window.dispatchEvent(new CustomEvent('batchImportComplete'));
+      
       setStep('preview');
     } finally {
       setIsProcessing(false);
