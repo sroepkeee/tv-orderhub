@@ -238,8 +238,23 @@ export const Dashboard = () => {
   // Load orders from Supabase
   useEffect(() => {
     if (user) {
+      // Adicionar timeout de segurança
+      const timeoutId = setTimeout(() => {
+        if (loading) {
+          console.error('⏱️ Timeout ao carregar pedidos');
+          setLoading(false);
+          toast({
+            title: "Tempo esgotado",
+            description: "O carregamento está demorando muito. Recarregue a página.",
+            variant: "destructive"
+          });
+        }
+      }, 15000); // 15 segundos
+
       loadOrders();
       loadUnreadCount();
+
+      return () => clearTimeout(timeoutId);
     }
   }, [user]);
   const loadUnreadCount = async () => {
@@ -313,21 +328,23 @@ export const Dashboard = () => {
     if (!user) return;
     setLoading(true);
     try {
-      // Load all orders for shared viewing
+      // ✅ Query única otimizada com JOIN
       const {
         data,
         error
-      } = await supabase.from('orders').select('*').order('created_at', {
-        ascending: false
-      });
+      } = await supabase
+        .from('orders')
+        .select(`
+          *,
+          order_items (*)
+        `)
+        .order('created_at', { ascending: false });
+
       if (error) throw error;
 
-      // Load items for each order
-      const ordersWithItems = await Promise.all((data || []).map(async dbOrder => {
-        const {
-          data: itemsData
-        } = await supabase.from('order_items').select('*').eq('order_id', dbOrder.id);
-        const items = (itemsData || []).map(item => ({
+      // Processar dados com JOIN
+      const ordersWithItems = (data || []).map(dbOrder => {
+        const items = (dbOrder.order_items || []).map(item => ({
           id: item.id,
           itemCode: item.item_code,
           itemDescription: cleanItemDescription(item.item_description),
@@ -348,8 +365,10 @@ export const Dashboard = () => {
           phase_started_at: item.phase_started_at,
           userId: item.user_id
         }));
+
         const totalRequested = items.reduce((sum, item) => sum + item.requestedQuantity, 0);
         const firstItem = items[0];
+
         return {
           id: dbOrder.id,
           type: dbOrder.order_type as OrderType,
@@ -393,9 +412,11 @@ export const Dashboard = () => {
           vehicle_plate: dbOrder.vehicle_plate || null,
           driver_name: dbOrder.driver_name || null
         };
-      }));
+      });
+
       setOrders(ordersWithItems);
     } catch (error: any) {
+      console.error('❌ Erro ao carregar pedidos:', error);
       toast({
         title: "Erro ao carregar pedidos",
         description: error.message,
