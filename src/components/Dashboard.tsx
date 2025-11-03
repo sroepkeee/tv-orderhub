@@ -404,7 +404,7 @@ export const Dashboard = () => {
           shipping_date,
           vehicle_plate,
           driver_name,
-          order_items!inner (
+          order_items (
             id,
             item_code,
             item_description,
@@ -457,8 +457,150 @@ export const Dashboard = () => {
         throw error;
       }
 
-      console.log('🔧 [loadOrders] Processando dados (JOIN)...');
-      // Processar dados com JOIN
+      // Fallback para resultado vazio do JOIN
+      if (!data || data.length === 0) {
+        console.log('⚠️ [loadOrders] Resultado vazio no JOIN, aplicando fallback LEFT/N+1...');
+        
+        // Fallback: buscar apenas orders
+        const { data: ordersData, error: ordersError } = await supabase
+          .from('orders')
+          .select(`
+            id,
+            order_number,
+            customer_name,
+            delivery_address,
+            status,
+            priority,
+            order_type,
+            order_category,
+            delivery_date,
+            created_at,
+            updated_at,
+            notes,
+            totvs_order_number,
+            freight_type,
+            freight_value,
+            carrier_name,
+            tracking_code,
+            customer_document,
+            operation_code,
+            executive_name,
+            municipality,
+            issue_date,
+            requires_firmware,
+            firmware_project_name,
+            requires_image,
+            image_project_name,
+            package_volumes,
+            package_weight_kg,
+            package_height_m,
+            package_width_m,
+            package_length_m,
+            freight_modality,
+            shipping_date,
+            vehicle_plate,
+            driver_name
+          `)
+          .range(0, 99)
+          .order('created_at', { ascending: false })
+          .abortSignal(abortControllerRef.current.signal);
+
+        if (ordersError) throw ordersError;
+
+        // Buscar order_items separadamente (N+1)
+        const ordersWithItems = await Promise.all(
+          (ordersData || []).map(async (dbOrder: any) => {
+            const { data: itemsData } = await supabase
+              .from('order_items')
+              .select('*')
+              .eq('order_id', dbOrder.id)
+              .abortSignal(abortControllerRef.current!.signal);
+
+            const items = (itemsData || []).map((item: any) => ({
+              id: item.id,
+              itemCode: item.item_code,
+              itemDescription: cleanItemDescription(item.item_description),
+              unit: item.unit,
+              requestedQuantity: item.requested_quantity,
+              warehouse: item.warehouse,
+              deliveryDate: item.delivery_date,
+              deliveredQuantity: item.delivered_quantity,
+              item_source_type: item.item_source_type as 'in_stock' | 'production' | 'out_of_stock',
+              item_status: item.item_status as 'pending' | 'in_stock' | 'awaiting_production' | 'purchase_required' | 'completed',
+              received_status: item.received_status as 'pending' | 'partial' | 'completed',
+              production_estimated_date: item.production_estimated_date,
+              sla_days: item.sla_days,
+              is_imported: item.is_imported,
+              import_lead_time_days: item.import_lead_time_days,
+              sla_deadline: item.sla_deadline,
+              current_phase: item.current_phase,
+              phase_started_at: item.phase_started_at,
+              userId: item.user_id
+            }));
+
+            const totalRequested = items.reduce((sum, item) => sum + item.requestedQuantity, 0);
+            const firstItem = items[0];
+
+            return {
+              id: dbOrder.id,
+              type: dbOrder.order_type as OrderType,
+              priority: dbOrder.priority as Priority,
+              orderNumber: dbOrder.order_number,
+              item: firstItem ? `${firstItem.itemCode} (+${items.length - 1})` : dbOrder.customer_name,
+              description: firstItem?.itemDescription || dbOrder.notes || "",
+              quantity: totalRequested,
+              createdDate: new Date(dbOrder.created_at).toISOString().split('T')[0],
+              issueDate: dbOrder.issue_date || undefined,
+              status: dbOrder.status as OrderStatus,
+              client: dbOrder.customer_name,
+              deliveryDeadline: dbOrder.delivery_date,
+              delivery_address: dbOrder.delivery_address || dbOrder.customer_name,
+              deskTicket: dbOrder.notes || dbOrder.order_number,
+              totvsOrderNumber: dbOrder.totvs_order_number || undefined,
+              items,
+              order_category: dbOrder.order_category,
+              freight_modality: dbOrder.freight_modality || null,
+              carrier_name: dbOrder.carrier_name || null,
+              freight_type: dbOrder.freight_type || null,
+              freight_value: dbOrder.freight_value || null,
+              tracking_code: dbOrder.tracking_code || null,
+              package_volumes: dbOrder.package_volumes || null,
+              package_weight_kg: dbOrder.package_weight_kg || null,
+              package_length_m: dbOrder.package_length_m || null,
+              package_width_m: dbOrder.package_width_m || null,
+              package_height_m: dbOrder.package_height_m || null,
+              customer_document: dbOrder.customer_document || null,
+              municipality: dbOrder.municipality || null,
+              operation_code: dbOrder.operation_code || null,
+              executive_name: dbOrder.executive_name || null,
+              firmware_project_name: dbOrder.firmware_project_name || null,
+              image_project_name: dbOrder.image_project_name || null,
+              requires_firmware: dbOrder.requires_firmware || false,
+              requires_image: dbOrder.requires_image || false,
+              shipping_date: dbOrder.shipping_date || null,
+              vehicle_plate: dbOrder.vehicle_plate || null,
+              driver_name: dbOrder.driver_name || null
+            };
+          })
+        );
+
+        console.log('✅ [loadOrders] Fallback concluído (empty result)', { 
+          totalProcessed: ordersWithItems.length, 
+          fallbackEmptyResult: true 
+        });
+        
+        if (currentRequestId !== requestIdRef.current) {
+          console.log('⏭️ [loadOrders] Fallback obsoleto, não atualizando...');
+          return;
+        }
+        
+        setOrders(ordersWithItems);
+        hasLoadedOnceRef.current = true;
+        return; // Sair antes de processar dados vazios
+      }
+
+      console.log('🔧 [loadOrders] Processando dados (LEFT JOIN)...');
+      // Processar dados com LEFT JOIN
       const ordersWithItems = (data || []).map((dbOrder: any) => {
         const items = (dbOrder.order_items || []).map((item: any) => ({
           id: item.id,
@@ -1435,8 +1577,21 @@ export const Dashboard = () => {
               </tbody>
             </table>
           </div>
-          {filteredOrders.length === 0 && <div className="text-center py-8 text-muted-foreground">
-              <p>Nenhum pedido encontrado para os filtros aplicados.</p>
+          {filteredOrders.length === 0 && <div className="text-center py-12 text-muted-foreground">
+              <p className="text-lg mb-4">Nenhum pedido encontrado para os filtros aplicados.</p>
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  setSearchQuery("");
+                  setDateRange(undefined);
+                  setActiveTab("all");
+                  queueRefresh();
+                }}
+                className="gap-2"
+              >
+                <Search className="h-4 w-4" />
+                Redefinir Filtros
+              </Button>
             </div>}
         </div>}
 
