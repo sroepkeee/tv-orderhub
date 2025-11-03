@@ -206,6 +206,8 @@ export const Dashboard = () => {
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
   const [loading, setLoading] = useState(true);
   const isUpdatingRef = useRef(false);
+  const loadingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isLoadingRef = useRef(false);
 
   // Column visibility state with user-specific localStorage persistence
   const [columnVisibility, setColumnVisibility] = useState<ColumnVisibility>(() => {
@@ -238,23 +240,8 @@ export const Dashboard = () => {
   // Load orders from Supabase
   useEffect(() => {
     if (user) {
-      // Adicionar timeout de segurança
-      const timeoutId = setTimeout(() => {
-        if (loading) {
-          console.error('⏱️ Timeout ao carregar pedidos');
-          setLoading(false);
-          toast({
-            title: "Tempo esgotado",
-            description: "O carregamento está demorando muito. Recarregue a página.",
-            variant: "destructive"
-          });
-        }
-      }, 10000); // 10 segundos
-
       loadOrders();
       loadUnreadCount();
-
-      return () => clearTimeout(timeoutId);
     }
   }, [user]);
   const loadUnreadCount = async () => {
@@ -290,21 +277,10 @@ export const Dashboard = () => {
     }, () => {
       clearTimeout(timeoutId);
       timeoutId = setTimeout(() => {
-        if (!isUpdatingRef.current) {
+        if (!isUpdatingRef.current && !isLoadingRef.current) {
           loadOrders();
         }
-      }, 500);
-    }).on('postgres_changes', {
-      event: '*',
-      schema: 'public',
-      table: 'order_items'
-    }, () => {
-      clearTimeout(timeoutId);
-      timeoutId = setTimeout(() => {
-        if (!isUpdatingRef.current) {
-          loadOrders();
-        }
-      }, 500);
+      }, 1000); // Aumentado para 1s para evitar cargas excessivas
     }).subscribe();
     return () => {
       clearTimeout(timeoutId);
@@ -326,8 +302,29 @@ export const Dashboard = () => {
   }, [user]);
   const loadOrders = async () => {
     if (!user) return;
+    
+    // Evitar carregamentos concorrentes
+    if (isLoadingRef.current) {
+      console.log('⏭️ [loadOrders] Carregamento já em andamento, ignorando...');
+      return;
+    }
+    
+    isLoadingRef.current = true;
     console.log('🔄 [loadOrders] Iniciando carregamento...', { userId: user.id });
     setLoading(true);
+    
+    // Timeout de segurança por chamada
+    loadingTimeoutRef.current = setTimeout(() => {
+      console.error('⏱️ [loadOrders] Timeout de 15s atingido');
+      setLoading(false);
+      isLoadingRef.current = false;
+      toast({
+        title: "Tempo esgotado",
+        description: "O carregamento demorou muito. Tente recarregar a página.",
+        variant: "destructive"
+      });
+    }, 15000);
+    
     try {
       console.log('📡 [loadOrders] Executando query com JOIN...');
       const { data, error } = await supabase
@@ -521,8 +518,15 @@ export const Dashboard = () => {
         });
       }
     } finally {
+      // Limpar timeout de segurança
+      if (loadingTimeoutRef.current) {
+        clearTimeout(loadingTimeoutRef.current);
+        loadingTimeoutRef.current = null;
+      }
+      
       console.log('🏁 [loadOrders] Finalizando (setLoading false)');
       setLoading(false);
+      isLoadingRef.current = false;
     }
   };
   const handleDeleteOrder = async () => {
