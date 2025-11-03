@@ -205,9 +205,16 @@ export const Dashboard = () => {
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const isUpdatingRef = useRef(false);
   const loadingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isLoadingRef = useRef(false);
+  const hasLoadedOnceRef = useRef(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const requestIdRef = useRef(0);
+  const refreshQueueRef = useRef<NodeJS.Timeout | null>(null);
+  const pendingRefreshRef = useRef(false);
+  const lastToastTimeRef = useRef(0);
 
   // Column visibility state with user-specific localStorage persistence
   const [columnVisibility, setColumnVisibility] = useState<ColumnVisibility>(() => {
@@ -266,40 +273,54 @@ export const Dashboard = () => {
     }
   }, [orders, selectedOrder]);
 
-  // Realtime subscription for orders - shared view with debounce
+  // Fila de Refresh com Throttle Inteligente
+  const queueRefresh = () => {
+    if (pendingRefreshRef.current) return; // Já tem refresh agendado
+    
+    pendingRefreshRef.current = true;
+    
+    if (refreshQueueRef.current) {
+      clearTimeout(refreshQueueRef.current);
+    }
+    
+    refreshQueueRef.current = setTimeout(() => {
+      pendingRefreshRef.current = false;
+      if (!isLoadingRef.current && !isUpdatingRef.current) {
+        loadOrders();
+      }
+    }, 2000); // Coalescer em 2 segundos
+  };
+
+  // Realtime subscription for orders - unified with throttle
   useEffect(() => {
     if (!user) return;
-    let timeoutId: NodeJS.Timeout;
     const channel = supabase.channel('orders-changes').on('postgres_changes', {
       event: '*',
       schema: 'public',
       table: 'orders'
     }, () => {
-      clearTimeout(timeoutId);
-      timeoutId = setTimeout(() => {
-        if (!isUpdatingRef.current && !isLoadingRef.current) {
-          loadOrders();
-        }
-      }, 1000); // Aumentado para 1s para evitar cargas excessivas
+      console.log('📡 [Realtime] Evento detectado, adicionando à fila...');
+      queueRefresh();
     }).subscribe();
     return () => {
-      clearTimeout(timeoutId);
+      if (refreshQueueRef.current) clearTimeout(refreshQueueRef.current);
       supabase.removeChannel(channel);
     };
   }, [user]);
 
-  // Listener for custom order import events
-  useEffect(() => {
-    const handleOrdersUpdated = () => {
-      if (user && !isUpdatingRef.current) {
-        loadOrders();
-      }
-    };
-    window.addEventListener('ordersUpdated', handleOrdersUpdated);
-    return () => {
-      window.removeEventListener('ordersUpdated', handleOrdersUpdated);
-    };
-  }, [user]);
+  // Listener removido - usando apenas Realtime com throttle
+  // Toast consolidado e limitado
+  const showLimitedToast = (title: string, description: string, variant: "default" | "destructive" = "default") => {
+    const now = Date.now();
+    if (now - lastToastTimeRef.current < 300000) { // 5 minutos
+      console.log('🔕 Toast suprimido (cooldown ativo)');
+      return;
+    }
+    
+    lastToastTimeRef.current = now;
+    toast({ title, description, variant });
+  };
+
   const loadOrders = async () => {
     if (!user) return;
     
@@ -309,36 +330,132 @@ export const Dashboard = () => {
       return;
     }
     
+    // Cancelar requisição anterior se existir
+    if (abortControllerRef.current) {
+      console.log('🛑 [loadOrders] Cancelando requisição anterior...');
+      abortControllerRef.current.abort();
+    }
+
+    // Criar novo AbortController e requestId
+    abortControllerRef.current = new AbortController();
+    const currentRequestId = ++requestIdRef.current;
+    
     isLoadingRef.current = true;
-    console.log('🔄 [loadOrders] Iniciando carregamento...', { userId: user.id });
-    setLoading(true);
+    const startTime = performance.now();
+    console.log('🔄 [loadOrders] Iniciando carregamento...', { userId: user.id, requestId: currentRequestId });
+    
+    // Loading state bifurcado
+    if (!hasLoadedOnceRef.current) {
+      setLoading(true);
+    } else {
+      setRefreshing(true);
+    }
     
     // Timeout de segurança por chamada
     loadingTimeoutRef.current = setTimeout(() => {
       console.error('⏱️ [loadOrders] Timeout de 15s atingido');
       setLoading(false);
+      setRefreshing(false);
       isLoadingRef.current = false;
-      toast({
-        title: "Tempo esgotado",
-        description: "O carregamento demorou muito. Tente recarregar a página.",
-        variant: "destructive"
-      });
+      showLimitedToast(
+        "Carregamento lento",
+        "A conexão está demorando. Tente novamente.",
+        "default"
+      );
     }, 15000);
     
     try {
-      console.log('📡 [loadOrders] Executando query com JOIN...');
+      console.log('📡 [loadOrders] Executando query otimizada...');
       const { data, error } = await supabase
         .from('orders')
         .select(`
-          *,
-          order_items (*)
+          id,
+          order_number,
+          customer_name,
+          delivery_address,
+          status,
+          priority,
+          order_type,
+          order_category,
+          delivery_date,
+          created_at,
+          updated_at,
+          notes,
+          totvs_order_number,
+          freight_type,
+          freight_value,
+          carrier_name,
+          tracking_code,
+          customer_document,
+          operation_code,
+          executive_name,
+          municipality,
+          issue_date,
+          requires_firmware,
+          firmware_project_name,
+          requires_image,
+          image_project_name,
+          package_volumes,
+          package_weight_kg,
+          package_height_m,
+          package_width_m,
+          package_length_m,
+          freight_modality,
+          shipping_date,
+          vehicle_plate,
+          driver_name,
+          order_items!inner (
+            id,
+            item_code,
+            item_description,
+            requested_quantity,
+            delivered_quantity,
+            delivery_date,
+            item_status,
+            item_source_type,
+            current_phase,
+            warehouse,
+            unit,
+            sla_days,
+            sla_deadline,
+            received_status,
+            production_estimated_date,
+            is_imported,
+            import_lead_time_days,
+            phase_started_at,
+            user_id
+          )
         `)
+        .range(0, 99)
         .order('created_at', { ascending: false })
+        .abortSignal(abortControllerRef.current.signal)
         .returns<any[]>();
 
-      console.log('📊 [loadOrders] Resultado da query:', { totalOrders: data?.length, hasError: !!error, errorMsg: (error as any)?.message });
+      // Verificar se é a requisição mais recente
+      if (currentRequestId !== requestIdRef.current) {
+        console.log('⏭️ [loadOrders] Resposta obsoleta, ignorando...', { currentRequestId, latestRequestId: requestIdRef.current });
+        return;
+      }
 
-      if (error) throw error;
+      const endTime = performance.now();
+      const duration = endTime - startTime;
+      const payloadSize = data ? JSON.stringify(data).length : 0;
+
+      console.log('📊 [loadOrders] Métricas:', {
+        duration: `${duration.toFixed(0)}ms`,
+        payloadSize: `${(payloadSize / 1024).toFixed(1)}KB`,
+        ordersCount: data?.length || 0,
+        hasError: !!error
+      });
+
+      if (error) {
+        // Verificar se foi cancelamento
+        if (error.message?.includes('aborted')) {
+          console.log('🛑 [loadOrders] Requisição cancelada propositalmente');
+          return;
+        }
+        throw error;
+      }
 
       console.log('🔧 [loadOrders] Processando dados (JOIN)...');
       // Processar dados com JOIN
@@ -414,16 +531,37 @@ export const Dashboard = () => {
       });
 
       console.log('✅ [loadOrders] Processamento concluído', { totalProcessed: ordersWithItems.length });
+      
+      // Verificar novamente se ainda é a requisição mais recente antes de atualizar state
+      if (currentRequestId !== requestIdRef.current) {
+        console.log('⏭️ [loadOrders] State obsoleto, não atualizando...', { currentRequestId, latestRequestId: requestIdRef.current });
+        return;
+      }
+      
       setOrders(ordersWithItems);
+      hasLoadedOnceRef.current = true;
     } catch (err: any) {
-      console.warn('⚠️ [loadOrders] JOIN falhou, aplicando fallback limitado a 50 pedidos...', err);
+      // Verificar se foi cancelamento
+      if (err.message?.includes('aborted') || err.name === 'AbortError') {
+        console.log('🛑 [loadOrders] Requisição cancelada (catch)');
+        return;
+      }
+      
+      // Verificar se ainda é a requisição mais recente
+      if (currentRequestId !== requestIdRef.current) {
+        console.log('⏭️ [loadOrders] Erro em requisição obsoleta, ignorando...', { currentRequestId, latestRequestId: requestIdRef.current });
+        return;
+      }
+      
+      console.warn('⚠️ [loadOrders] Query otimizada falhou, aplicando fallback...', err);
       try {
         console.log('📡 [loadOrders] Fallback: carregando pedidos (limit 50)...');
         const { data: ordersData, error: ordersError } = await supabase
           .from('orders')
           .select('*')
           .order('created_at', { ascending: false })
-          .limit(50);
+          .limit(50)
+          .abortSignal(abortControllerRef.current!.signal);
 
         if (ordersError) throw ordersError;
 
@@ -433,7 +571,8 @@ export const Dashboard = () => {
             const { data: itemsData, error: itemsError } = await supabase
               .from('order_items')
               .select('*')
-              .eq('order_id', dbOrder.id);
+              .eq('order_id', dbOrder.id)
+              .abortSignal(abortControllerRef.current!.signal);
 
             if (itemsError) {
               console.warn('⚠️ [loadOrders] Fallback: erro ao carregar itens do pedido', { orderId: dbOrder.id, error: itemsError.message });
@@ -508,14 +647,28 @@ export const Dashboard = () => {
         );
 
         console.log('✅ [loadOrders] Fallback concluído', { totalProcessed: ordersWithItems.length });
+        
+        // Verificar se ainda é a requisição mais recente
+        if (currentRequestId !== requestIdRef.current) {
+          console.log('⏭️ [loadOrders] Fallback obsoleto, não atualizando...', { currentRequestId, latestRequestId: requestIdRef.current });
+          return;
+        }
+        
         setOrders(ordersWithItems);
+        hasLoadedOnceRef.current = true;
       } catch (fallbackError: any) {
+        // Verificar se foi cancelamento
+        if (fallbackError.message?.includes('aborted') || fallbackError.name === 'AbortError') {
+          console.log('🛑 [loadOrders] Fallback cancelado');
+          return;
+        }
+        
         console.error('❌ [loadOrders] Erro no fallback:', fallbackError);
-        toast({
-          title: "Erro ao carregar pedidos",
-          description: fallbackError.message || "Erro desconhecido ao carregar pedidos",
-          variant: "destructive"
-        });
+        showLimitedToast(
+          "Erro ao carregar pedidos",
+          fallbackError.message || "Erro desconhecido ao carregar pedidos",
+          "destructive"
+        );
       }
     } finally {
       // Limpar timeout de segurança
@@ -524,8 +677,9 @@ export const Dashboard = () => {
         loadingTimeoutRef.current = null;
       }
       
-      console.log('🏁 [loadOrders] Finalizando (setLoading false)');
+      console.log('🏁 [loadOrders] Finalizando');
       setLoading(false);
+      setRefreshing(false);
       isLoadingRef.current = false;
     }
   };
@@ -1206,8 +1360,7 @@ export const Dashboard = () => {
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
             <p className="text-muted-foreground">Carregando pedidos...</p>
-            <p className="text-xs text-muted-foreground mt-1">Aguarde enquanto processamos os dados</p>
-            <p className="text-xs text-muted-foreground">Se demorar mais de 10 segundos, recarregue a página</p>
+            <p className="text-xs text-muted-foreground mt-1">Primeira carga - aguarde...</p>
           </div>
         </div> : activeTab === "all" ? <PriorityView orders={filteredOrders} onEdit={handleEditOrder} onDuplicate={handleDuplicateOrder} onApprove={handleApproveOrder} onCancel={handleCancelOrder} onStatusChange={handleStatusChange} onRowClick={order => {
       setSelectedOrder(order);
@@ -1287,10 +1440,18 @@ export const Dashboard = () => {
             </div>}
         </div>}
 
+      {/* Refresh indicator - discreto */}
+      {refreshing && (
+        <div className="fixed bottom-4 right-4 bg-primary text-primary-foreground px-4 py-2 rounded-lg shadow-lg flex items-center gap-2 animate-fade-in z-50">
+          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary-foreground"></div>
+          <span className="text-sm">Atualizando...</span>
+        </div>
+      )}
+
       {/* Edit Dialog with integrated History */}
       {selectedOrder && <EditOrderDialog order={selectedOrder} open={showEditDialog} onOpenChange={setShowEditDialog} onSave={handleEditOrder} onDelete={handleDeleteOrder} />}
 
       {/* Import Dialog */}
-      <ImportOrderDialog open={showImportDialog} onOpenChange={setShowImportDialog} onImportSuccess={loadOrders} />
+      <ImportOrderDialog open={showImportDialog} onOpenChange={setShowImportDialog} onImportSuccess={queueRefresh} />
     </div>;
 };
