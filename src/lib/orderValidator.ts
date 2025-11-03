@@ -89,7 +89,13 @@ export function validatePdfOrder(data: any): ValidationResult {
   // Verificar itens sem valores financeiros
   const itemsWithoutPrice = data.items.filter((i: any) => !i.unitPrice || i.unitPrice === 0);
   if (itemsWithoutPrice.length > 0) {
-    result.warnings.push(`${itemsWithoutPrice.length} item(ns) sem valor unitário`);
+    result.warnings.push(`${itemsWithoutPrice.length} item(ns) sem valor unitário - verifique se o PDF contém os valores ou insira manualmente`);
+  }
+  
+  // Verificar itens com descrições genéricas
+  const itemsWithGenericDesc = data.items.filter((i: any) => i.description === 'Produto TOTVS');
+  if (itemsWithGenericDesc.length > 0) {
+    result.warnings.push(`${itemsWithGenericDesc.length} item(ns) com descrição genérica - considere editar após importar`);
   }
   
   // Qualidade da extração

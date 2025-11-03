@@ -317,6 +317,26 @@ function extractOrderHeader(text: string): ParsedOrderData['orderInfo'] {
   return orderInfo;
 }
 
+// Helper function to find item description separately
+function findItemDescription(text: string, itemCode: string, itemNumber: string): string {
+  // Try multiple patterns to find description
+  // Pattern 1: "Descrição XXXXX" near the item
+  const descRegex1 = new RegExp(`Item\\s+${itemNumber}[\\s\\S]{0,300}?Descri[çc][ãa]o\\s+([^\\n]+?)(?=Item\\s+\\d+|C[óo]digo\\s+\\d+|$)`, 'i');
+  const match1 = text.match(descRegex1);
+  if (match1 && match1[1].trim().length > 3) {
+    return match1[1].trim().substring(0, 200);
+  }
+  
+  // Pattern 2: "Código XXXXX ... Descrição XXXXX"
+  const descRegex2 = new RegExp(`C[óo]digo\\s+${itemCode}[\\s\\S]{0,300}?Descri[çc][ãa]o\\s+([^\\n]+?)(?=Item\\s+\\d+|C[óo]digo\\s+\\d+|Qtde|$)`, 'i');
+  const match2 = text.match(descRegex2);
+  if (match2 && match2[1].trim().length > 3) {
+    return match2[1].trim().substring(0, 200);
+  }
+  
+  return 'Produto TOTVS';
+}
+
 function extractItemsTable(text: string): ParsedOrderData['items'] {
   const items: ParsedOrderData['items'] = [];
   
@@ -328,11 +348,15 @@ function extractItemsTable(text: string): ParsedOrderData['items'] {
   }
   
   const tableText = text.substring(composicaoIndex);
-  console.log('📋 Primeiras linhas da tabela:', tableText.substring(0, 500));
   
-  // NOVO PADRÃO ROBUSTO: Buscar blocos "Item XX ... Código XXXXXX ... Qtde XX,XX"
-  // Permite qualquer quantidade de espaços/pipes entre os campos
-  const blockRegex = /Item\s+(\d+)\s+.*?C[óo]digo\s+(\d+)\s+.*?Qtde\s+([\d,]+)\s+.*?Uni?\s+([A-Z]+)\s+.*?V\.?\s*Unit?\s+([\d.,]+)\s+.*?(?:Desc|%Desc)\s+([\d.,]+)\s+.*?%IPI\s+([\d.,]+)\s+.*?%ICMS\s+([\d.,]+)\s+.*?Total(?:\s+c\/\s*IPI)?\s+([\d.,]+)\s+.*?Armaz[ée]m\s+(\S+)\s+.*?Descri[çc][ãa]o\s+(.+?)(?=Item\s+\d+|$)/gis;
+  // Log detalhado para debug (apenas em DEV)
+  if (import.meta.env.DEV) {
+    console.log('📄 Texto da tabela (preview):', tableText.substring(0, 1000));
+  }
+  
+  // PADRÃO MELHORADO: Campos opcionais para maior flexibilidade
+  // Captura Item + Código + Qtde + Uni (obrigatórios) e tenta capturar valores quando disponíveis
+  const blockRegex = /Item\s+(\d+)\s+.*?C[óo]digo\s+(\d+)\s+.*?Qtde\s+([\d,]+)\s+.*?Uni?\s+([A-Z]+)(?:\s+.*?V\.?\s*Unit?\.?\s+([\d.,]+))?(?:\s+.*?(?:Desc|%Desc)\.?\s+([\d.,]+))?(?:\s+.*?%IPI\s+([\d.,]+))?(?:\s+.*?%ICMS\s+([\d.,]+))?(?:\s+.*?Total(?:\s+c\/\s*IPI)?\s+([\d.,]+))?(?:\s+.*?Armaz[ée]m\s+(\S+))?(?:\s+.*?Descri[çc][ãa]o\s+([^\n]+?))?(?=Item\s+\d+|$)/gis;
   
   let match;
   let itemIndex = 1;
@@ -351,22 +375,30 @@ function extractItemsTable(text: string): ParsedOrderData['items'] {
         continue;
       }
       
-      console.log(`📦 Item ${itemNum}: Código ${codigo}, Qtde ${quantity}, Uni ${unidade}`);
+      // Buscar descrição: usar a capturada ou buscar separadamente
+      let itemDescription = descricao?.trim();
+      if (!itemDescription || itemDescription.length < 3) {
+        itemDescription = findItemDescription(tableText, codigo.trim(), itemNum.trim());
+      } else {
+        itemDescription = itemDescription.split('\n')[0].substring(0, 200);
+      }
+      
+      console.log(`📦 Item ${itemNum}: Código ${codigo}, Qtde ${quantity}, Desc: ${itemDescription.substring(0, 50)}...`);
       
       items.push({
         itemNumber: itemNum.trim(),
         itemCode: codigo.trim(),
-        description: descricao.trim().split('\n')[0].substring(0, 200), // Pega primeira linha, max 200 chars
+        description: itemDescription,
         quantity,
         unit: unidade.trim(),
-        warehouse: armazem.trim(),
+        warehouse: armazem?.trim() || 'PRINCIPAL',
         deliveryDate: '',
         sourceType: 'in_stock',
-        unitPrice: parseFloat(vlrUnit.replace(/\./g, '').replace(',', '.')),
-        discount: parseFloat(desc.replace(',', '.')),
-        ipiPercent: parseFloat(ipi.replace(',', '.')),
-        icmsPercent: parseFloat(icms.replace(',', '.')),
-        totalValue: parseFloat(total.replace(/\./g, '').replace(',', '.'))
+        unitPrice: vlrUnit ? parseFloat(vlrUnit.replace(/\./g, '').replace(',', '.')) : 0,
+        discount: desc ? parseFloat(desc.replace(',', '.')) : 0,
+        ipiPercent: ipi ? parseFloat(ipi.replace(',', '.')) : 0,
+        icmsPercent: icms ? parseFloat(icms.replace(',', '.')) : 0,
+        totalValue: total ? parseFloat(total.replace(/\./g, '').replace(',', '.')) : 0
       });
       itemIndex++;
     } catch (e) {
@@ -375,14 +407,16 @@ function extractItemsTable(text: string): ParsedOrderData['items'] {
     }
   }
   
-  // FALLBACK 1: Padrão simplificado sem todos os campos
+  // FALLBACK 1: Padrão melhorado - tenta extrair valores disponíveis
   if (items.length === 0) {
-    console.warn('⚠️ Tentando fallback: padrão simplificado');
-    const simpleBlockRegex = /Item\s+(\d+)\s+.*?C[óo]digo\s+(\d+)\s+.*?Qtde\s+([\d,]+)\s+.*?Uni?\s+([A-Z]+)/gis;
+    console.warn('⚠️ Tentando fallback melhorado: extrair valores disponíveis');
     
-    while ((match = simpleBlockRegex.exec(tableText)) !== null) {
+    // Regex mais permissivo que captura o máximo possível
+    const flexibleRegex = /Item\s+(\d+)\s+.*?C[óo]digo\s+(\d+)\s+.*?Qtde\s+([\d,]+)\s+.*?Uni?\s+([A-Z]+)(?:.*?V\.?\s*Unit?\.?\s+([\d.,]+))?(?:.*?Total.*?\s+([\d.,]+))?(?:.*?Armaz[ée]m\s+(\S+))?/gis;
+    
+    while ((match = flexibleRegex.exec(tableText)) !== null) {
       try {
-        const [, itemNum, codigo, qtd, unidade] = match;
+        const [, itemNum, codigo, qtd, unidade, vlrUnit, total, armazem] = match;
         
         const quantityStr = qtd.trim().replace(',', '.');
         const quantity = parseFloat(quantityStr);
@@ -392,22 +426,28 @@ function extractItemsTable(text: string): ParsedOrderData['items'] {
           continue;
         }
         
-        console.log(`📦 Item ${itemNum} (fallback): Código ${codigo}, Qtde ${quantity}`);
+        // Buscar descrição separadamente
+        const description = findItemDescription(tableText, codigo.trim(), itemNum.trim());
+        
+        const unitPrice = vlrUnit ? parseFloat(vlrUnit.replace(/\./g, '').replace(',', '.')) : 0;
+        const totalValue = total ? parseFloat(total.replace(/\./g, '').replace(',', '.')) : 0;
+        
+        console.log(`📦 Item ${itemNum} (fallback): Código ${codigo}, Qtde ${quantity}, Vlr Unit: ${unitPrice}, Total: ${totalValue}`);
         
         items.push({
           itemNumber: itemNum.trim(),
           itemCode: codigo.trim(),
-          description: 'Produto TOTVS',
+          description,
           quantity,
           unit: unidade.trim(),
-          warehouse: 'PRINCIPAL',
+          warehouse: armazem?.trim() || 'PRINCIPAL',
           deliveryDate: '',
           sourceType: 'in_stock',
-          unitPrice: 0,
+          unitPrice,
           discount: 0,
           ipiPercent: 0,
           icmsPercent: 0,
-          totalValue: 0
+          totalValue
         });
       } catch (e) {
         console.error(`❌ Erro ao parsear item (fallback):`, e);
