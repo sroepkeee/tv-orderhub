@@ -502,6 +502,26 @@ export const ImportOrderDialog = ({
                           {(parsedData as any).quality.itemsCount > 0 ? '✅' : '⚠️'}
                           <span>Itens: {(parsedData as any).quality.itemsCount} encontrados</span>
                         </div>
+                        {(parsedData as any).quality.expectedCount > 0 && (
+                          <div className="flex items-center gap-2">
+                            <span className="text-muted-foreground">
+                              Linhas detectadas: {(parsedData as any).quality.markdownRowsCount || (parsedData as any).quality.expectedCount}
+                            </span>
+                          </div>
+                        )}
+                        {(parsedData as any).quality.detectedItemNumbers && (parsedData as any).quality.detectedItemNumbers.length > 0 && (
+                          <div className="text-xs text-muted-foreground pt-1">
+                            <div>Números de item: {(parsedData as any).quality.detectedItemNumbers.join(', ')}</div>
+                          </div>
+                        )}
+                        {(parsedData as any).quality.expectedCount > 0 && (
+                          <div className="flex items-center gap-2 pt-1">
+                            <span className="text-xs">
+                              Cobertura: {(parsedData as any).quality.itemsCount}/{(parsedData as any).quality.expectedCount} (
+                              {Math.round(((parsedData as any).quality.itemsCount / (parsedData as any).quality.expectedCount) * 100)}%)
+                            </span>
+                          </div>
+                        )}
                         <div className="flex items-center gap-2">
                           {(parsedData as any).quality.itemsWithPrice === (parsedData as any).quality.itemsCount ? '✅' : '⚠️'}
                           <span>Valores: {(parsedData as any).quality.itemsWithPrice}/{(parsedData as any).quality.itemsCount} itens com preço</span>

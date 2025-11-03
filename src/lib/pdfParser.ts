@@ -45,6 +45,11 @@ interface ExtractionQuality {
   itemsWithPrice: number;
   totalFields: number;
   extractedFields: number;
+  expectedCount: number;
+  detectedItemNumbers: string[];
+  markdownRowsCount: number;
+  unitDistribution: Record<string, number>;
+  tableTextRaw?: string;
 }
 
 export interface ParseOptions {
@@ -112,11 +117,11 @@ export async function parsePdfOrder(
     }
     
     // SEMPRE extrair itens do texto acumulado
-    const newItems = extractItemsTable(fullText);
+    const extractionResult = extractItemsTable(fullText);
     
     // Mesclar novos itens com os existentes (evitar duplicatas)
-    if (newItems.length > 0) {
-      newItems.forEach(newItem => {
+    if (extractionResult.items.length > 0) {
+      extractionResult.items.forEach(newItem => {
         const exists = items.some(
           existing => existing.itemCode === newItem.itemCode && existing.itemNumber === newItem.itemNumber
         );
@@ -149,11 +154,14 @@ export async function parsePdfOrder(
   }
   
   // Se não extraímos ainda, tentar agora com texto completo
+  let extractionMetrics = { expectedCount: 0, markdownRowsCount: 0, tableTextRaw: '' };
   if (!orderHeader) {
     orderHeader = extractOrderHeader(fullText);
   }
   if (items.length === 0) {
-    items = extractItemsTable(fullText);
+    const result = extractItemsTable(fullText);
+    items = result.items;
+    extractionMetrics = result.metrics;
   }
   
   if (import.meta.env.DEV) {
@@ -166,7 +174,14 @@ export async function parsePdfOrder(
     }
   }
   
-  // Calcular qualidade da extração
+  // Calcular qualidade da extração com métricas enriquecidas
+  const unitDistribution: Record<string, number> = {};
+  items.forEach((item: any) => {
+    unitDistribution[item.unit] = (unitDistribution[item.unit] || 0) + 1;
+  });
+  
+  const detectedItemNumbers = items.map((item: any) => item.itemNumber).sort();
+  
   const quality: ExtractionQuality = {
     orderNumber: !!orderHeader?.orderNumber,
     customerName: !!orderHeader?.customerName,
@@ -185,7 +200,12 @@ export async function parsePdfOrder(
       orderHeader?.municipality,
       orderHeader?.freightValue,
       orderHeader?.customerDocument
-    ].filter(Boolean).length
+    ].filter(Boolean).length,
+    expectedCount: extractionMetrics.expectedCount,
+    detectedItemNumbers,
+    markdownRowsCount: extractionMetrics.markdownRowsCount,
+    unitDistribution,
+    tableTextRaw: extractionMetrics.tableTextRaw
   };
   
   return {
@@ -358,7 +378,7 @@ function findItemDescription(text: string, itemCode: string, itemNumber: string)
   return 'Produto TOTVS';
 }
 
-function extractItemsTable(text: string): ParsedOrderData['items'] {
+function extractItemsTable(text: string): { items: ParsedOrderData['items']; metrics: { expectedCount: number; markdownRowsCount: number; tableTextRaw: string } } {
   const items: ParsedOrderData['items'] = [];
   
   // 1. SANITIZAÇÃO ROBUSTA: Normalizar espaços, quebras e remover separadores de tabela
@@ -386,7 +406,14 @@ function extractItemsTable(text: string): ParsedOrderData['items'] {
   }
   if (tableStart === -1) {
     console.warn('⚠️ Cabeçalho da tabela de itens não encontrado');
-    return items;
+    return {
+      items: [],
+      metrics: {
+        expectedCount: 0,
+        markdownRowsCount: 0,
+        tableTextRaw: ''
+      }
+    };
   }
 
   // 3. Encontrar o fim da tabela
@@ -456,7 +483,15 @@ function extractItemsTable(text: string): ParsedOrderData['items'] {
   // Se não encontrou nem âncoras nem candidatos, tentar fallback simples
   if (expectedCount === 0) {
     console.warn('⚠️ Nenhum item detectado, tentando fallback...');
-    return extractItemsFallback(tableText);
+    const fallbackItems = extractItemsFallback(tableText);
+    return {
+      items: fallbackItems,
+      metrics: {
+        expectedCount: 0,
+        markdownRowsCount: 0,
+        tableTextRaw: tableTextRaw.substring(0, 3000)
+      }
+    };
   }
   
   // 5. EXTRAÇÃO POR BLOCOS "Item N" (quando disponíveis)
@@ -1093,7 +1128,14 @@ function extractItemsTable(text: string): ParsedOrderData['items'] {
     console.error('❌ Nenhum item encontrado com nenhum dos padrões');
   }
   
-  return items;
+  return {
+    items,
+    metrics: {
+      expectedCount,
+      markdownRowsCount: markdownRowCandidatesCount,
+      tableTextRaw: tableTextRaw.substring(0, 3000) // Limitar tamanho
+    }
+  };
 }
 
 // FUNÇÃO AUXILIAR: Fallback para extração simplificada
