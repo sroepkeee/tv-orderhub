@@ -48,6 +48,7 @@ export const KanbanView = ({ orders, onEdit, onStatusChange }: KanbanViewProps) 
 
   const getPhaseFromStatus = (status: Order["status"]): Phase => {
     switch (status) {
+      case "almox_ssm_pending":
       case "almox_ssm_received":
       case "almox_ssm_in_review":
       case "almox_ssm_approved":

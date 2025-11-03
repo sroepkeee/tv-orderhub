@@ -28,7 +28,7 @@ import { supabase } from "@/integrations/supabase/client";
 type Priority = "high" | "medium" | "low";
 type OrderStatus =
 // Fase: Almox SSM
-"almox_ssm_received" | "almox_ssm_in_review" | "almox_ssm_approved"
+"almox_ssm_pending" | "almox_ssm_received" | "almox_ssm_in_review" | "almox_ssm_approved"
 // Fase: Gerar Ordem
 | "order_generation_pending" | "order_in_creation" | "order_generated"
 // Fase: Almox Geral
