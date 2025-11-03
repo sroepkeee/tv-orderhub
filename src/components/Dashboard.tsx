@@ -249,7 +249,7 @@ export const Dashboard = () => {
             variant: "destructive"
           });
         }
-      }, 15000); // 15 segundos
+      }, 10000); // 10 segundos
 
       loadOrders();
       loadUnreadCount();
@@ -326,25 +326,27 @@ export const Dashboard = () => {
   }, [user]);
   const loadOrders = async () => {
     if (!user) return;
+    console.log('🔄 [loadOrders] Iniciando carregamento...', { userId: user.id });
     setLoading(true);
     try {
-      // ✅ Query única otimizada com JOIN
-      const {
-        data,
-        error
-      } = await supabase
+      console.log('📡 [loadOrders] Executando query com JOIN...');
+      const { data, error } = await supabase
         .from('orders')
         .select(`
           *,
           order_items (*)
         `)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .returns<any[]>();
+
+      console.log('📊 [loadOrders] Resultado da query:', { totalOrders: data?.length, hasError: !!error, errorMsg: (error as any)?.message });
 
       if (error) throw error;
 
+      console.log('🔧 [loadOrders] Processando dados (JOIN)...');
       // Processar dados com JOIN
-      const ordersWithItems = (data || []).map(dbOrder => {
-        const items = (dbOrder.order_items || []).map(item => ({
+      const ordersWithItems = (data || []).map((dbOrder: any) => {
+        const items = (dbOrder.order_items || []).map((item: any) => ({
           id: item.id,
           itemCode: item.item_code,
           itemDescription: cleanItemDescription(item.item_description),
@@ -414,15 +416,112 @@ export const Dashboard = () => {
         };
       });
 
+      console.log('✅ [loadOrders] Processamento concluído', { totalProcessed: ordersWithItems.length });
       setOrders(ordersWithItems);
-    } catch (error: any) {
-      console.error('❌ Erro ao carregar pedidos:', error);
-      toast({
-        title: "Erro ao carregar pedidos",
-        description: error.message,
-        variant: "destructive"
-      });
+    } catch (err: any) {
+      console.warn('⚠️ [loadOrders] JOIN falhou, aplicando fallback limitado a 50 pedidos...', err);
+      try {
+        console.log('📡 [loadOrders] Fallback: carregando pedidos (limit 50)...');
+        const { data: ordersData, error: ordersError } = await supabase
+          .from('orders')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .limit(50);
+
+        if (ordersError) throw ordersError;
+
+        console.log('📡 [loadOrders] Fallback: carregando itens por pedido...');
+        const ordersWithItems = await Promise.all(
+          (ordersData || []).map(async (dbOrder: any) => {
+            const { data: itemsData, error: itemsError } = await supabase
+              .from('order_items')
+              .select('*')
+              .eq('order_id', dbOrder.id);
+
+            if (itemsError) {
+              console.warn('⚠️ [loadOrders] Fallback: erro ao carregar itens do pedido', { orderId: dbOrder.id, error: itemsError.message });
+            }
+
+            const items = (itemsData || []).map((item: any) => ({
+              id: item.id,
+              itemCode: item.item_code,
+              itemDescription: cleanItemDescription(item.item_description),
+              unit: item.unit,
+              requestedQuantity: item.requested_quantity,
+              warehouse: item.warehouse,
+              deliveryDate: item.delivery_date,
+              deliveredQuantity: item.delivered_quantity,
+              item_source_type: item.item_source_type as 'in_stock' | 'production' | 'out_of_stock',
+              item_status: item.item_status as 'pending' | 'in_stock' | 'awaiting_production' | 'purchase_required' | 'completed',
+              received_status: item.received_status as 'pending' | 'partial' | 'completed',
+              production_estimated_date: item.production_estimated_date,
+              sla_days: item.sla_days,
+              is_imported: item.is_imported,
+              import_lead_time_days: item.import_lead_time_days,
+              sla_deadline: item.sla_deadline,
+              current_phase: item.current_phase,
+              phase_started_at: item.phase_started_at,
+              userId: item.user_id
+            }));
+
+            const totalRequested = items.reduce((sum, item) => sum + item.requestedQuantity, 0);
+            const firstItem = items[0];
+
+            return {
+              id: dbOrder.id,
+              type: dbOrder.order_type as OrderType,
+              priority: dbOrder.priority as Priority,
+              orderNumber: dbOrder.order_number,
+              item: firstItem ? `${firstItem.itemCode} (+${items.length - 1})` : dbOrder.customer_name,
+              description: firstItem?.itemDescription || dbOrder.notes || "",
+              quantity: totalRequested,
+              createdDate: new Date(dbOrder.created_at).toISOString().split('T')[0],
+              issueDate: (dbOrder as any).issue_date || undefined,
+              status: dbOrder.status as OrderStatus,
+              client: dbOrder.customer_name,
+              deliveryDeadline: dbOrder.delivery_date,
+              delivery_address: dbOrder.delivery_address || dbOrder.customer_name,
+              deskTicket: dbOrder.notes || dbOrder.order_number,
+              totvsOrderNumber: dbOrder.totvs_order_number || undefined,
+              items,
+              order_category: dbOrder.order_category,
+              freight_modality: dbOrder.freight_modality || null,
+              carrier_name: dbOrder.carrier_name || null,
+              freight_type: dbOrder.freight_type || null,
+              freight_value: dbOrder.freight_value || null,
+              tracking_code: dbOrder.tracking_code || null,
+              package_volumes: dbOrder.package_volumes || null,
+              package_weight_kg: dbOrder.package_weight_kg || null,
+              package_length_m: dbOrder.package_length_m || null,
+              package_width_m: dbOrder.package_width_m || null,
+              package_height_m: dbOrder.package_height_m || null,
+              customer_document: dbOrder.customer_document || null,
+              municipality: dbOrder.municipality || null,
+              operation_code: dbOrder.operation_code || null,
+              executive_name: dbOrder.executive_name || null,
+              firmware_project_name: dbOrder.firmware_project_name || null,
+              image_project_name: dbOrder.image_project_name || null,
+              requires_firmware: dbOrder.requires_firmware || false,
+              requires_image: dbOrder.requires_image || false,
+              shipping_date: dbOrder.shipping_date || null,
+              vehicle_plate: dbOrder.vehicle_plate || null,
+              driver_name: dbOrder.driver_name || null
+            };
+          })
+        );
+
+        console.log('✅ [loadOrders] Fallback concluído', { totalProcessed: ordersWithItems.length });
+        setOrders(ordersWithItems);
+      } catch (fallbackError: any) {
+        console.error('❌ [loadOrders] Erro no fallback:', fallbackError);
+        toast({
+          title: "Erro ao carregar pedidos",
+          description: fallbackError.message || "Erro desconhecido ao carregar pedidos",
+          variant: "destructive"
+        });
+      }
     } finally {
+      console.log('🏁 [loadOrders] Finalizando (setLoading false)');
       setLoading(false);
     }
   };
@@ -1103,6 +1202,8 @@ export const Dashboard = () => {
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
             <p className="text-muted-foreground">Carregando pedidos...</p>
+            <p className="text-xs text-muted-foreground mt-1">Aguarde enquanto processamos os dados</p>
+            <p className="text-xs text-muted-foreground">Se demorar mais de 10 segundos, recarregue a página</p>
           </div>
         </div> : activeTab === "all" ? <PriorityView orders={filteredOrders} onEdit={handleEditOrder} onDuplicate={handleDuplicateOrder} onApprove={handleApproveOrder} onCancel={handleCancelOrder} onStatusChange={handleStatusChange} onRowClick={order => {
       setSelectedOrder(order);
