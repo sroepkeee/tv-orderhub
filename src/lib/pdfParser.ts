@@ -111,14 +111,30 @@ export async function parsePdfOrder(
       orderHeader = extractOrderHeader(fullText);
     }
     
-    if (items.length === 0) {
-      items = extractItemsTable(fullText);
+    // SEMPRE extrair itens do texto acumulado
+    const newItems = extractItemsTable(fullText);
+    
+    // Mesclar novos itens com os existentes (evitar duplicatas)
+    if (newItems.length > 0) {
+      newItems.forEach(newItem => {
+        const exists = items.some(
+          existing => existing.itemCode === newItem.itemCode && existing.itemNumber === newItem.itemNumber
+        );
+        if (!exists) {
+          items.push(newItem);
+        }
+      });
+      
+      if (import.meta.env.DEV) {
+        console.log(`📄 Página ${i}: Total acumulado de ${items.length} itens`);
+      }
     }
     
-    // Early stop: se já temos pedido + itens, parar
-    if (options?.earlyStop && orderHeader?.orderNumber && items.length > 0) {
+    // Early stop apenas quando detectar fim do documento
+    const hasEndMarker = fullText.includes('TOTAL DO PEDIDO') || fullText.includes('LGPD:');
+    if (options?.earlyStop && orderHeader?.orderNumber && items.length > 0 && hasEndMarker) {
       if (import.meta.env.DEV) {
-        console.log(`✅ [pdfParser] Early stop na página ${i}/${pagesToRead}`);
+        console.log(`✅ [pdfParser] Early stop na página ${i}/${pagesToRead} - Fim do documento detectado`);
       }
       break;
     }
@@ -142,7 +158,12 @@ export async function parsePdfOrder(
   
   if (import.meta.env.DEV) {
     console.log('✅ Pedido identificado:', orderHeader?.orderNumber);
-    console.log('📦 Total de itens encontrados:', items.length);
+    console.log(`📦 Parsing concluído: ${items.length} itens extraídos de ${pagesToRead} página(s)`);
+    
+    // Avisar se parece incompleto
+    if (items.length > 0 && items.length < 5 && totalPages > 1) {
+      console.warn(`⚠️ Apenas ${items.length} itens extraídos de um PDF com ${totalPages} páginas - pode estar incompleto`);
+    }
   }
   
   // Calcular qualidade da extração

@@ -98,7 +98,7 @@ export const ImportOrderDialog = ({
     
     try {
       const data = await parsePdfOrder(file, {
-        maxPages: analyzeComplete ? undefined : 10,
+        maxPages: analyzeComplete ? undefined : 50,
         earlyStop: !analyzeComplete,
         signal: controller.signal,
         onProgress: (page: number, total: number) => {
