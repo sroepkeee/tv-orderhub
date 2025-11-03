@@ -154,7 +154,13 @@ export async function parsePdfOrder(
   }
   
   // Se não extraímos ainda, tentar agora com texto completo
-  let extractionMetrics = { expectedCount: 0, markdownRowsCount: 0, tableTextRaw: '' };
+  let extractionMetrics = { 
+    expectedCount: 0, 
+    markdownRowsCount: 0, 
+    detectedItemNumbers: [] as string[], 
+    unitDistribution: {} as Record<string, number>,
+    tableTextRaw: '' 
+  };
   if (!orderHeader) {
     orderHeader = extractOrderHeader(fullText);
   }
@@ -175,13 +181,6 @@ export async function parsePdfOrder(
   }
   
   // Calcular qualidade da extração com métricas enriquecidas
-  const unitDistribution: Record<string, number> = {};
-  items.forEach((item: any) => {
-    unitDistribution[item.unit] = (unitDistribution[item.unit] || 0) + 1;
-  });
-  
-  const detectedItemNumbers = items.map((item: any) => item.itemNumber).sort();
-  
   const quality: ExtractionQuality = {
     orderNumber: !!orderHeader?.orderNumber,
     customerName: !!orderHeader?.customerName,
@@ -202,9 +201,9 @@ export async function parsePdfOrder(
       orderHeader?.customerDocument
     ].filter(Boolean).length,
     expectedCount: extractionMetrics.expectedCount,
-    detectedItemNumbers,
+    detectedItemNumbers: extractionMetrics.detectedItemNumbers,
     markdownRowsCount: extractionMetrics.markdownRowsCount,
-    unitDistribution,
+    unitDistribution: extractionMetrics.unitDistribution,
     tableTextRaw: extractionMetrics.tableTextRaw
   };
   
@@ -378,7 +377,16 @@ function findItemDescription(text: string, itemCode: string, itemNumber: string)
   return 'Produto TOTVS';
 }
 
-function extractItemsTable(text: string): { items: ParsedOrderData['items']; metrics: { expectedCount: number; markdownRowsCount: number; tableTextRaw: string } } {
+function extractItemsTable(text: string): { 
+  items: ParsedOrderData['items']; 
+  metrics: { 
+    expectedCount: number; 
+    markdownRowsCount: number; 
+    detectedItemNumbers: string[];
+    unitDistribution: Record<string, number>;
+    tableTextRaw: string;
+  } 
+} {
   const items: ParsedOrderData['items'] = [];
   
   // 1. SANITIZAÇÃO ROBUSTA: Normalizar espaços, quebras e remover separadores de tabela
@@ -411,6 +419,8 @@ function extractItemsTable(text: string): { items: ParsedOrderData['items']; met
       metrics: {
         expectedCount: 0,
         markdownRowsCount: 0,
+        detectedItemNumbers: [],
+        unitDistribution: {},
         tableTextRaw: ''
       }
     };
@@ -436,49 +446,62 @@ function extractItemsTable(text: string): { items: ParsedOrderData['items']; met
     console.log('📄 Texto da tabela (primeiros 1500 chars):', tableText.substring(0, 1500));
   }
 
-  // 4. CONTAGEM DE CANDIDATOS (âncoras + linhas tabulares + linhas compactas + markdown tables)
-  // Detectar âncoras "Item N"
+  // 4. CONTAGEM DE CANDIDATOS - STRICT MODE (apenas linhas válidas de item)
+  // Detectar âncoras "Item N" e coletar números detectados
   const itemAnchorsRegex = /(?:^|\s)Item\s+(\d{1,3})(?=\s)/gi;
   const anchors: { itemNumber: string; start: number }[] = [];
+  const detectedItemNumbers = new Set<string>();
   let anchorMatch;
   
   while ((anchorMatch = itemAnchorsRegex.exec(tableText)) !== null) {
+    const num = anchorMatch[1].padStart(2, '0');
     anchors.push({
       itemNumber: anchorMatch[1],
       start: anchorMatch.index
     });
+    detectedItemNumbers.add(num);
   }
   
-  // Detectar linhas tabulares com rótulos (candidatos a item)
-  const rowCandidateRegex = /(?:Item\s+)?\d{1,3}\s+C[óo]digo\s+\d{4,}\s+Qtde\s+[\d.,]+\s+(?:Uni(?:d|dade)?\.?\s+)?[A-ZÇÃÕ]{1,4}/gi;
-  const rowCandidates = tableText.match(rowCandidateRegex) || [];
-  const rowCandidatesCount = rowCandidates.length;
+  // CONTAGEM STRICT: Apenas linhas com TODOS os campos necessários (número, código, qtde, unidade)
+  // Usamos regex que exige os 4 campos principais em formato de tabela com pipes
+  const strictMarkdownRowRegex = /^\s*\|\s*(\d{1,3})\s*\|\s*(\d{4,})\s*\|\s*([\d.,]+)\s*\|\s*([A-ZÇÃÕ]{2,4})\s*\|/gmi;
+  const strictMarkdownMatches = Array.from(tableTextRaw.matchAll(strictMarkdownRowRegex));
+  const markdownRowsCount = strictMarkdownMatches.length;
   
-  // Detectar linhas compactas SEM rótulos (formato: "número código qtde unidade")
-  const genericRowCandidateRegex = /(?:^|\s)(\d{1,3})\s+(\d{4,})\s+([\d.]*\d,\d{2})\s+([A-ZÇÃÕ]{1,4})(?=\s)/g;
-  const genericRowCandidates = tableText.match(genericRowCandidateRegex) || [];
-  const genericRowCandidatesCount = genericRowCandidates.length;
+  // Coletar números de item detectados nas linhas markdown
+  strictMarkdownMatches.forEach(match => {
+    detectedItemNumbers.add(match[1].padStart(2, '0'));
+  });
   
-  // Detectar ocorrências apenas de "Código XXXXX" como estimativa mínima de linhas
-  const codeOnlyRegex = /(?:^|\s)C[óo]digo\s+(\d{4,})\b/gi;
-  const codeOnlyCandidates = tableText.match(codeOnlyRegex) || [];
-  const codeOnlyCount = codeOnlyCandidates.length;
-  
-  // Detectar tabelas markdown/pipe-separated (antes de remover pipes)
-  const markdownRowRegex = /\|\s*(\d{1,3})\s*\|\s*(\d{4,})\s*\|\s*([\d.,]+)\s*\|\s*([A-ZÇÃÕ]{1,4})\s*\|/g;
-  const markdownRowCandidates = tableTextRaw.match(markdownRowRegex) || [];
-  const markdownRowCandidatesCount = markdownRowCandidates.length;
+  // EXPECTED COUNT: usar markdownRowsCount se disponível (é o mais confiável)
+  // Caso contrário, usar anchors.length (segundo mais confiável)
+  let expectedCount: number;
+  if (markdownRowsCount > 0) {
+    expectedCount = markdownRowsCount;
+    if (import.meta.env.DEV) {
+      console.log(`📊 Usando contagem STRICT de linhas markdown: ${markdownRowsCount}`);
+    }
+  } else if (anchors.length > 0) {
+    expectedCount = anchors.length;
+    if (import.meta.env.DEV) {
+      console.log(`📊 Usando contagem de âncoras "Item N": ${anchors.length}`);
+    }
+  } else {
+    // Fallback: tentar contar por outras formas
+    const rowCandidateRegex = /(?:Item\s+)?\d{1,3}\s+C[óo]digo\s+\d{4,}\s+Qtde\s+[\d.,]+\s+(?:Uni(?:d|dade)?\.?\s+)?[A-ZÇÃÕ]{2,4}/gi;
+    const rowCandidates = tableText.match(rowCandidateRegex) || [];
+    expectedCount = rowCandidates.length;
+    if (import.meta.env.DEV) {
+      console.log(`📊 Usando contagem de candidatos com rótulos: ${expectedCount}`);
+    }
+  }
   
   if (import.meta.env.DEV) {
     console.log(`📍 Âncoras "Item N" detectadas: ${anchors.length}`, anchors.map(a => a.itemNumber).join(', '));
-    console.log(`📋 Candidatos de linha (com rótulos): ${rowCandidatesCount}`);
-    console.log(`📋 Candidatos de linha (compactos, sem rótulos): ${genericRowCandidatesCount}`);
-    console.log(`📋 Candidatos apenas por Código: ${codeOnlyCount}`);
-    console.log(`📋 Candidatos de tabela markdown (com pipes): ${markdownRowCandidatesCount}`);
+    console.log(`📋 Linhas de tabela markdown (STRICT): ${markdownRowsCount}`);
+    console.log(`📋 Números de item detectados: ${Array.from(detectedItemNumbers).sort().join(', ')}`);
+    console.log(`📋 Expected count: ${expectedCount}`);
   }
-  
-  // Usar a MAIOR contagem como referência esperada
-  const expectedCount = Math.max(anchors.length, rowCandidatesCount, genericRowCandidatesCount, codeOnlyCount, markdownRowCandidatesCount);
   
   // Se não encontrou nem âncoras nem candidatos, tentar fallback simples
   if (expectedCount === 0) {
@@ -489,6 +512,8 @@ function extractItemsTable(text: string): { items: ParsedOrderData['items']; met
       metrics: {
         expectedCount: 0,
         markdownRowsCount: 0,
+        detectedItemNumbers: [],
+        unitDistribution: {},
         tableTextRaw: tableTextRaw.substring(0, 3000)
       }
     };
@@ -728,7 +753,8 @@ function extractItemsTable(text: string): { items: ParsedOrderData['items']; met
   
   // 7. VARREDURA DE TABELAS MARKDOWN/PIPE (antes da remoção de pipes)
   // Processar primeiro as linhas com pipes explícitos na versão raw
-  const markdownLineRegex = /\|\s*(\d{1,3})\s*\|\s*(\d{4,})\s*\|\s*([\d.,]+)\s*\|\s*([A-ZÇÃÕ]{1,4})\s*\|/gi;
+  // MELHORADO: tolerância a unidades de 2-4 letras
+  const markdownLineRegex = /\|\s*(\d{1,3})\s*\|\s*(\d{4,})\s*\|\s*([\d.,]+)\s*\|\s*([A-ZÇÃÕ]{2,4})\s*\|/gi;
   
   let markdownMatch;
   while ((markdownMatch = markdownLineRegex.exec(tableTextRaw)) !== null) {
@@ -766,18 +792,26 @@ function extractItemsTable(text: string): { items: ParsedOrderData['items']; met
       const armazemMatch = context.match(/Armaz[ée]m\s+(\d{1,3})/i);
       const warehouse = armazemMatch ? armazemMatch[1] : 'PRINCIPAL';
       
-      // Buscar descrição
+      // Buscar descrição - MELHORADO: suportar "| Descrição:" em linha separada
       let description = 'Produto TOTVS';
-      const descPatterns = [
-        new RegExp(`Descri[çc][ãa]o[:\\s]+(.+?)(?=Item\\s+\\d+|C[óo]digo\\s+\\d+|Qtde|\\||LGPD|$)`, 'is'),
-        new RegExp(`C[óo]digo\\s+${itemCode}[\\s\\S]{0,400}?Descri[çc][ãa]o[:\\s]+(.+?)(?=Item\\s+\\d+|C[óo]digo\\s+\\d+|\\||$)`, 'is'),
-      ];
       
-      for (const pattern of descPatterns) {
-        const dm = context.match(pattern);
-        if (dm && dm[1].trim().length > 3) {
-          description = dm[1].trim().replace(/\s+/g, ' ').replace(/^\d+\s*-?\s*/, '').substring(0, 200);
-          break;
+      // Verificar se a próxima linha é "| Descrição: ..."
+      const nextLineMatch = context.match(/\|\s*Descri[çc][ãa]o:\s*([^|]+?)\s*\|/i);
+      if (nextLineMatch && nextLineMatch[1].trim().length > 3) {
+        description = nextLineMatch[1].trim().replace(/\s+/g, ' ').substring(0, 200);
+      } else {
+        // Padrões de descrição padrão
+        const descPatterns = [
+          new RegExp(`Descri[çc][ãa]o[:\\s]+(.+?)(?=Item\\s+\\d+|C[óo]digo\\s+\\d+|Qtde|\\||LGPD|$)`, 'is'),
+          new RegExp(`C[óo]digo\\s+${itemCode}[\\s\\S]{0,400}?Descri[çc][ãa]o[:\\s]+(.+?)(?=Item\\s+\\d+|C[óo]digo\\s+\\d+|\\||$)`, 'is'),
+        ];
+        
+        for (const pattern of descPatterns) {
+          const dm = context.match(pattern);
+          if (dm && dm[1].trim().length > 3) {
+            description = dm[1].trim().replace(/\s+/g, ' ').replace(/^\d+\s*-?\s*/, '').substring(0, 200);
+            break;
+          }
         }
       }
       
@@ -996,11 +1030,9 @@ function extractItemsTable(text: string): { items: ParsedOrderData['items']; met
   if (import.meta.env.DEV) {
     console.log(`\n📊 Métricas de extração:`);
     console.log(`   - Âncoras "Item N": ${anchors.length}`);
-    console.log(`   - Candidatos com rótulos: ${rowCandidatesCount}`);
-    console.log(`   - Candidatos compactos: ${genericRowCandidatesCount}`);
-    console.log(`   - Candidatos markdown (pipes): ${markdownRowCandidatesCount}`);
-    console.log(`   - Candidatos apenas por Código: ${codeOnlyCount}`);
-    console.log(`   - Expected Count (max): ${expectedCount}`);
+    console.log(`   - Linhas markdown (STRICT): ${markdownRowsCount}`);
+    console.log(`   - Números detectados: ${Array.from(detectedItemNumbers).sort().join(', ')}`);
+    console.log(`   - Expected Count: ${expectedCount}`);
     console.log(`   - Itens extraídos: ${extractedCount}`);
     console.log(`   - Completude: ${completeness.toFixed(1)}%`);
     console.log(`   - Distribuição por unidade:`, unitDistribution);
@@ -1010,31 +1042,15 @@ function extractItemsTable(text: string): { items: ParsedOrderData['items']; met
   if (completeness < 90 && expectedCount > 0) {
     console.warn(`⚠️ Apenas ${completeness.toFixed(1)}% dos itens foram extraídos. Executando fallback adicional...`);
     
-    // Determinar números faltantes baseado na lista mais abrangente de candidatos
-    let missingNumbers: string[] = [];
-    
-    // Preferir markdown candidates (mais específico para tabelas com pipes)
-    if (markdownRowCandidatesCount > 0) {
-      const markdownNumbers = Array.from(markdownRowCandidates, match => {
-        const m = match.match(/\|\s*(\d{1,3})\s*\|/);
-        return m ? m[1].padStart(2, '0') : null;
-      }).filter(Boolean) as string[];
-      missingNumbers = markdownNumbers.filter(num => !items.some(i => i.itemNumber === num));
-    } else if (anchors.length > 0) {
-      missingNumbers = anchors
-        .map(a => a.itemNumber.padStart(2, '0'))
-        .filter(num => !items.some(i => i.itemNumber === num));
-    } else if (genericRowCandidatesCount > 0) {
-      // Extrair números dos candidatos genéricos
-      const genericNumbers = Array.from(genericRowCandidates, match => {
-        const m = match.match(/^\s*(\d{1,3})/);
-        return m ? m[1].padStart(2, '0') : null;
-      }).filter(Boolean) as string[];
-      missingNumbers = genericNumbers.filter(num => !items.some(i => i.itemNumber === num));
-    }
+    // Determinar números faltantes baseado APENAS nos números realmente detectados no PDF
+    // NÃO inferir itens faltantes pelo maior número
+    const extractedNumbers = new Set(items.map(i => i.itemNumber));
+    const missingNumbers = Array.from(detectedItemNumbers)
+      .filter(num => !extractedNumbers.has(num))
+      .sort();
     
     if (import.meta.env.DEV && missingNumbers.length > 0) {
-      console.log(`📋 Itens faltantes detectados: ${missingNumbers.join(', ')}`);
+      console.log(`📋 Itens detectados mas não extraídos: ${missingNumbers.join(', ')}`);
     }
     
     // Tentar extração simplificada (usando tableTextRaw para capturar também linhas com pipes)
@@ -1057,25 +1073,32 @@ function extractItemsTable(text: string): { items: ParsedOrderData['items']; met
     }
   }
   
-  // 9. VALIDAÇÃO ESPECÍFICA PARA PEDIDOS DE TESTE
-  const testOrderMatch = tableText.match(/132081|132087/);
-  if (testOrderMatch && items.length < 32) {
-    console.error(
-      `❌ ERRO CRÍTICO: Pedido ${testOrderMatch[0]} deveria ter 32 itens, ` +
-      `mas apenas ${items.length} foram extraídos (${((items.length / 32) * 100).toFixed(1)}%)`
-    );
+  // 9. VALIDAÇÃO ESPECÍFICA PARA PEDIDOS DE TESTE (baseado em linhas REAIS detectadas)
+  const testOrderMatch = tableText.match(/PEDIDO\s+N[º°]:\s*(132081|132087)/i);
+  if (testOrderMatch && import.meta.env.DEV) {
+    const orderNum = testOrderMatch[1];
+    const detectedCount = detectedItemNumbers.size;
     
-    if (import.meta.env.DEV) {
-      const missingNumbers = Array.from({ length: 32 }, (_, i) => String(i + 1).padStart(2, '0'))
-        .filter(num => !items.some(i => i.itemNumber === num));
-      console.error(`📋 Itens faltantes no pedido de teste: ${missingNumbers.join(', ')}`);
+    console.log(`\n🧪 VALIDAÇÃO PEDIDO ${orderNum}:`);
+    console.log(`   - Linhas de item detectadas: ${detectedCount}`);
+    console.log(`   - Números de item no PDF: ${Array.from(detectedItemNumbers).sort().join(', ')}`);
+    console.log(`   - Itens extraídos com sucesso: ${items.length}`);
+    console.log(`   - Taxa de extração: ${detectedCount > 0 ? ((items.length / detectedCount) * 100).toFixed(1) : 0}%`);
+    
+    if (items.length < detectedCount) {
+      const extractedNumbers = new Set(items.map(i => i.itemNumber));
+      const missingNumbers = Array.from(detectedItemNumbers)
+        .filter(num => !extractedNumbers.has(num))
+        .sort();
+      
+      console.warn(`⚠️ Itens detectados mas não extraídos: ${missingNumbers.join(', ')}`);
       
       // Mostrar snippets dos itens faltantes (primeiros 3)
       missingNumbers.slice(0, 3).forEach(num => {
-        const regex = new RegExp(`Item\\s+${num}[\\s\\S]{0,200}`, 'i');
-        const snippet = tableText.match(regex);
+        const regex = new RegExp(`\\|\\s*${num}\\s*\\|[\\s\\S]{0,200}`, 'i');
+        const snippet = tableTextRaw.match(regex);
         if (snippet) {
-          console.error(`   Item ${num} snippet:`, snippet[0].substring(0, 150));
+          console.warn(`   Item ${num} snippet:`, snippet[0].substring(0, 150).replace(/\n/g, ' '));
         }
       });
     }
@@ -1085,38 +1108,34 @@ function extractItemsTable(text: string): { items: ParsedOrderData['items']; met
   if (import.meta.env.DEV) {
     console.log(`\n📦 ═══ EXTRAÇÃO CONCLUÍDA ═══`);
     console.log(`📊 Total de itens: ${items.length}`);
-    console.log(`📊 Âncoras detectadas: ${anchors.length}`);
-    console.log(`📊 Candidatos com rótulos: ${rowCandidatesCount}`);
-    console.log(`📊 Candidatos compactos: ${genericRowCandidatesCount}`);
-    console.log(`📊 Candidatos markdown (pipes): ${markdownRowCandidatesCount}`);
-    console.log(`📊 Candidatos apenas por Código: ${codeOnlyCount}`);
-    console.log(`📊 Expected count (max): ${expectedCount}`);
+    console.log(`📊 Âncoras "Item N" detectadas: ${anchors.length}`);
+    console.log(`📊 Linhas de tabela markdown (STRICT): ${markdownRowsCount}`);
+    console.log(`📊 Números de item detectados: ${Array.from(detectedItemNumbers).sort().join(', ')}`);
+    console.log(`📊 Expected count: ${expectedCount}`);
     console.log(`📊 Completude final: ${((items.length / expectedCount) * 100).toFixed(1)}%`);
     console.log('📊 Distribuição por unidade:', unitDistribution);
     
-    // Se houver itens faltantes, mostrar snippets
+    // Se houver itens faltantes, mostrar snippets (baseado nos números DETECTADOS)
     if (expectedCount > items.length) {
-      const missingCount = expectedCount - items.length;
-      console.warn(`⚠️ ${missingCount} itens ainda não foram extraídos`);
-      
-      // Tentar encontrar snippets dos primeiros 3 itens faltantes
       const extractedNumbers = new Set(items.map(i => i.itemNumber));
-      const allPossibleNumbers = Array.from({ length: expectedCount }, (_, i) => String(i + 1).padStart(2, '0'));
-      const missing = allPossibleNumbers.filter(num => !extractedNumbers.has(num)).slice(0, 3);
+      const missingNumbers = Array.from(detectedItemNumbers)
+        .filter(num => !extractedNumbers.has(num))
+        .sort()
+        .slice(0, 3);
       
-      missing.forEach(num => {
-        // Tentar em ambos os textos (raw e sanitized)
-        const regexRaw = new RegExp(`(?:Item\\s+)?${num}[\\s\\S]{0,200}`, 'i');
-        const snippetRaw = tableTextRaw.match(regexRaw);
-        const regex = new RegExp(`(?:Item\\s+)?${num}[\\s\\S]{0,200}`, 'i');
-        const snippet = tableText.match(regex);
+      if (missingNumbers.length > 0) {
+        console.warn(`⚠️ ${expectedCount - items.length} itens detectados mas não extraídos`);
         
-        if (snippetRaw) {
-          console.warn(`   Snippet item ${num} (raw):`, snippetRaw[0].substring(0, 150).replace(/\n/g, ' '));
-        } else if (snippet) {
-          console.warn(`   Snippet item ${num}:`, snippet[0].substring(0, 150).replace(/\n/g, ' '));
-        }
-      });
+        missingNumbers.forEach(num => {
+          // Tentar em ambos os textos (raw e sanitized)
+          const regexRaw = new RegExp(`\\|\\s*${num}\\s*\\|[\\s\\S]{0,200}`, 'i');
+          const snippetRaw = tableTextRaw.match(regexRaw);
+          
+          if (snippetRaw) {
+            console.warn(`   Item ${num} snippet:`, snippetRaw[0].substring(0, 150).replace(/\n/g, ' '));
+          }
+        });
+      }
     }
     
     console.log(`════════════════════════════\n`);
@@ -1132,7 +1151,9 @@ function extractItemsTable(text: string): { items: ParsedOrderData['items']; met
     items,
     metrics: {
       expectedCount,
-      markdownRowsCount: markdownRowCandidatesCount,
+      markdownRowsCount,
+      detectedItemNumbers: Array.from(detectedItemNumbers).sort(),
+      unitDistribution,
       tableTextRaw: tableTextRaw.substring(0, 3000) // Limitar tamanho
     }
   };
