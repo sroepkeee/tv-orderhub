@@ -40,7 +40,7 @@ export const ImportOrderDialog = ({
   const [parseProgress, setParseProgress] = useState(0);
   const [parseStatus, setParseStatus] = useState('');
   const [canAnalyzeComplete, setCanAnalyzeComplete] = useState(false);
-  const [pdfWorker, setPdfWorker] = useState<Worker | null>(null);
+  const [abortController, setAbortController] = useState<AbortController | null>(null);
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
     if (!selectedFile) return;
@@ -62,8 +62,8 @@ export const ImportOrderDialog = ({
       const fileExtension = selectedFile.name.split('.').pop()?.toLowerCase();
       
       if (fileExtension === 'pdf') {
-        // Usar Web Worker para parsing de PDF
-        await handlePdfWithWorker(selectedFile);
+        // Parsing de PDF com progresso
+        await handlePdfParsing(selectedFile);
       } else {
         // Parse do Excel (mantém como está)
         setIsProcessing(true);
@@ -87,95 +87,20 @@ export const ImportOrderDialog = ({
     }
   };
 
-  const handlePdfWithWorker = async (file: File, analyzeComplete = false) => {
+  const handlePdfParsing = async (file: File, analyzeComplete = false) => {
     setIsParsing(true);
     setParseProgress(0);
     setParseStatus('Iniciando leitura do PDF...');
     setCanAnalyzeComplete(false);
 
-    try {
-      const arrayBuffer = await file.arrayBuffer();
-      
-      // Criar worker
-      const worker = new Worker(
-        new URL('../workers/pdfParseWorker.ts', import.meta.url),
-        { type: 'module' }
-      );
-      
-      setPdfWorker(worker);
-
-      // Escutar mensagens do worker
-      worker.onmessage = (e) => {
-        if (e.data.type === 'progress') {
-          const { page, total, totalPages } = e.data;
-          setParseProgress(Math.round((page / total) * 100));
-          setParseStatus(`Lendo página ${page}/${total}${totalPages > total ? ` (${totalPages} no total)` : ''}...`);
-        }
-        
-        if (e.data.type === 'result') {
-          setIsParsing(false);
-          setParsedData(e.data.data);
-          
-          const validation = validatePdfOrder(e.data.data);
-          setValidation(validation);
-          
-          // Se não analisou completo e não tem itens, oferecer análise completa
-          if (!analyzeComplete && e.data.data.items.length === 0) {
-            setCanAnalyzeComplete(true);
-            toast.warning('Nenhum item encontrado nas primeiras páginas. Deseja analisar o PDF completo?');
-          }
-          
-          setStep('preview');
-          worker.terminate();
-          setPdfWorker(null);
-        }
-        
-        if (e.data.type === 'error') {
-          setIsParsing(false);
-          toast.error(e.data.message || 'Erro ao ler PDF');
-          worker.terminate();
-          setPdfWorker(null);
-          
-          // Fallback: tentar com o parser original
-          handlePdfFallback(file, analyzeComplete);
-        }
-      };
-
-      worker.onerror = (error) => {
-        console.error('Worker error:', error);
-        setIsParsing(false);
-        worker.terminate();
-        setPdfWorker(null);
-        
-        // Fallback
-        handlePdfFallback(file, analyzeComplete);
-      };
-
-      // Enviar arquivo para o worker
-      worker.postMessage({
-        type: 'start',
-        fileBuffer: arrayBuffer,
-        options: {
-          maxPages: analyzeComplete ? 'ALL' : 10,
-          earlyStop: !analyzeComplete,
-        },
-      }, [arrayBuffer]);
-
-    } catch (error: any) {
-      console.error('Erro ao iniciar worker:', error);
-      setIsParsing(false);
-      handlePdfFallback(file, analyzeComplete);
-    }
-  };
-
-  const handlePdfFallback = async (file: File, analyzeComplete = false) => {
-    setIsProcessing(true);
-    setParseStatus('Usando método alternativo...');
+    const controller = new AbortController();
+    setAbortController(controller);
     
     try {
       const data = await parsePdfOrder(file, {
         maxPages: analyzeComplete ? undefined : 10,
         earlyStop: !analyzeComplete,
+        signal: controller.signal,
         onProgress: (page: number, total: number) => {
           setParseProgress(Math.round((page / total) * 100));
           setParseStatus(`Lendo página ${page}/${total}...`);
@@ -188,33 +113,35 @@ export const ImportOrderDialog = ({
       
       if (!analyzeComplete && data.items.length === 0) {
         setCanAnalyzeComplete(true);
-        toast.warning('Nenhum item encontrado. Deseja analisar o PDF completo?');
+        toast.warning('Nenhum item encontrado nas primeiras páginas. Deseja analisar o PDF completo?');
       }
       
       setStep('preview');
     } catch (error: any) {
-      console.error('Erro no fallback:', error);
-      toast.error(`Erro ao processar PDF: ${error.message}`);
+      if (error.name === 'AbortError') {
+        toast.info('Leitura cancelada');
+      } else {
+        console.error('Erro ao processar PDF:', error);
+        toast.error(`Erro ao processar PDF: ${error.message}`);
+      }
     } finally {
-      setIsProcessing(false);
+      setIsParsing(false);
+      setAbortController(null);
     }
   };
 
   const handleCancelParsing = () => {
-    if (pdfWorker) {
-      pdfWorker.postMessage({ type: 'cancel' });
-      pdfWorker.terminate();
-      setPdfWorker(null);
+    if (abortController) {
+      abortController.abort();
     }
     setIsParsing(false);
     setParseProgress(0);
     setParseStatus('');
-    toast.info('Leitura cancelada');
   };
 
   const handleAnalyzeComplete = () => {
     if (file) {
-      handlePdfWithWorker(file, true);
+      handlePdfParsing(file, true);
     }
   };
   const handleImport = async () => {
@@ -453,10 +380,9 @@ export const ImportOrderDialog = ({
     }));
   };
   const handleReset = () => {
-    // Cancelar worker se estiver rodando
-    if (pdfWorker) {
-      pdfWorker.terminate();
-      setPdfWorker(null);
+    // Cancelar parsing se estiver rodando
+    if (abortController) {
+      abortController.abort();
     }
     
     setFile(null);
@@ -467,6 +393,7 @@ export const ImportOrderDialog = ({
     setParseProgress(0);
     setParseStatus('');
     setCanAnalyzeComplete(false);
+    setAbortController(null);
     setStep('upload');
   };
   return <Dialog open={open} onOpenChange={onOpenChange}>
