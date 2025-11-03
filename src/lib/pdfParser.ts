@@ -47,7 +47,17 @@ interface ExtractionQuality {
   extractedFields: number;
 }
 
-export async function parsePdfOrder(file: File): Promise<ParsedOrderData & { quality?: ExtractionQuality }> {
+export interface ParseOptions {
+  maxPages?: number;
+  earlyStop?: boolean;
+  onProgress?: (page: number, total: number) => void;
+  signal?: AbortSignal;
+}
+
+export async function parsePdfOrder(
+  file: File,
+  options?: ParseOptions
+): Promise<ParsedOrderData & { quality?: ExtractionQuality }> {
   console.log('📄 PDF parsing iniciado:', file.name);
   
   // Get pdfjs dynamically to avoid React conflicts
@@ -56,9 +66,10 @@ export async function parsePdfOrder(file: File): Promise<ParsedOrderData & { qua
   const arrayBuffer = await file.arrayBuffer();
   
   // Try to load PDF with worker; fallback to inline processing if worker fails
+  const loadingTask = pdfjs.getDocument({ data: arrayBuffer });
   let pdf;
   try {
-    pdf = await pdfjs.getDocument({ data: arrayBuffer }).promise;
+    pdf = await loadingTask.promise;
   } catch (e: any) {
     const errorMsg = String(e?.message || e);
     if (errorMsg.includes('Setting up fake worker failed') || errorMsg.includes('Failed to fetch') || errorMsg.includes('Invalid workerSrc type')) {
@@ -70,50 +81,94 @@ export async function parsePdfOrder(file: File): Promise<ParsedOrderData & { qua
     }
   }
   
-  let fullText = '';
+  const totalPages = pdf.numPages;
+  const maxPages = options?.maxPages ?? totalPages;
+  const pagesToRead = Math.min(maxPages, totalPages);
   
-  // Extrair texto de todas as páginas
-  for (let i = 1; i <= pdf.numPages; i++) {
+  let fullText = '';
+  let orderHeader: any = null;
+  let items: any[] = [];
+  
+  // Extrair texto com progresso e early-stop
+  for (let i = 1; i <= pagesToRead; i++) {
+    // Checar se foi cancelado
+    if (options?.signal?.aborted) {
+      throw new DOMException('Leitura cancelada', 'AbortError');
+    }
+
     const page = await pdf.getPage(i);
     const textContent = await page.getTextContent();
     const pageText = textContent.items
       .map((item: any) => item.str)
       .join(' ');
     fullText += pageText + '\n';
+    
+    // Reportar progresso
+    options?.onProgress?.(i, pagesToRead);
+    
+    // Tentar extrair dados incrementalmente
+    if (!orderHeader || !orderHeader.orderNumber) {
+      orderHeader = extractOrderHeader(fullText);
+    }
+    
+    if (items.length === 0) {
+      items = extractItemsTable(fullText);
+    }
+    
+    // Early stop: se já temos pedido + itens, parar
+    if (options?.earlyStop && orderHeader?.orderNumber && items.length > 0) {
+      if (import.meta.env.DEV) {
+        console.log(`✅ [pdfParser] Early stop na página ${i}/${pagesToRead}`);
+      }
+      break;
+    }
+    
+    // Yield para manter UI responsiva (fallback mode)
+    await new Promise(resolve => setTimeout(resolve, 0));
   }
   
-  console.log('📊 Texto extraído (primeiros 1000 chars):', fullText.substring(0, 1000));
+  // Logs apenas em DEV
+  if (import.meta.env.DEV) {
+    console.log('📊 Texto extraído (primeiros 1000 chars):', fullText.substring(0, 1000));
+  }
   
-  const orderInfo = extractOrderHeader(fullText);
-  const items = extractItemsTable(fullText);
+  // Se não extraímos ainda, tentar agora com texto completo
+  if (!orderHeader) {
+    orderHeader = extractOrderHeader(fullText);
+  }
+  if (items.length === 0) {
+    items = extractItemsTable(fullText);
+  }
   
-  console.log('✅ Pedido identificado:', orderInfo.orderNumber);
-  console.log('📦 Total de itens encontrados:', items.length);
+  if (import.meta.env.DEV) {
+    console.log('✅ Pedido identificado:', orderHeader?.orderNumber);
+    console.log('📦 Total de itens encontrados:', items.length);
+  }
   
   // Calcular qualidade da extração
   const quality: ExtractionQuality = {
-    orderNumber: !!orderInfo.orderNumber,
-    customerName: !!orderInfo.customerName,
+    orderNumber: !!orderHeader?.orderNumber,
+    customerName: !!orderHeader?.customerName,
     itemsCount: items.length,
-    itemsWithPrice: items.filter(i => i.unitPrice).length,
+    itemsWithPrice: items.filter((i: any) => i.unitPrice).length,
     totalFields: 11,
     extractedFields: [
-      orderInfo.orderNumber,
-      orderInfo.customerName,
-      orderInfo.deliveryAddress,
-      orderInfo.deliveryDate,
-      orderInfo.freightType,
-      orderInfo.carrier,
-      orderInfo.operationCode,
-      orderInfo.executiveName,
-      orderInfo.municipality,
-      orderInfo.freightValue,
-      orderInfo.customerDocument
+      orderHeader?.orderNumber,
+      orderHeader?.customerName,
+      orderHeader?.deliveryAddress,
+      orderHeader?.deliveryDate,
+      orderHeader?.freightType,
+      orderHeader?.carrier,
+      orderHeader?.operationCode,
+      orderHeader?.executiveName,
+      orderHeader?.municipality,
+      orderHeader?.freightValue,
+      orderHeader?.customerDocument
     ].filter(Boolean).length
   };
   
   return {
-    orderInfo,
+    orderInfo: orderHeader || {},
     items,
     quality
   };

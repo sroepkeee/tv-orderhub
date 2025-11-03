@@ -34,6 +34,13 @@ export const ImportOrderDialog = ({
     duplicateType: 'totvs' | 'internal' | 'combined' | null;
   }>({ show: false, existingOrder: null, parsedData: null, duplicateType: null });
   const { checkDuplicate, isChecking } = useDuplicateOrderCheck();
+  
+  // Estados para progresso de parsing de PDF
+  const [isParsing, setIsParsing] = useState(false);
+  const [parseProgress, setParseProgress] = useState(0);
+  const [parseStatus, setParseStatus] = useState('');
+  const [canAnalyzeComplete, setCanAnalyzeComplete] = useState(false);
+  const [pdfWorker, setPdfWorker] = useState<Worker | null>(null);
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
     if (!selectedFile) return;
@@ -50,39 +57,164 @@ export const ImportOrderDialog = ({
       return;
     }
     setFile(selectedFile);
-    setIsProcessing(true);
+    
     try {
       const fileExtension = selectedFile.name.split('.').pop()?.toLowerCase();
-      let parsed: any;
-      let validationResult: ValidationResult;
+      
       if (fileExtension === 'pdf') {
-        // Parse do PDF
-        parsed = await parsePdfOrder(selectedFile);
-        setParsedData(parsed);
-
-        // Validar dados do PDF
-        validationResult = validatePdfOrder(parsed);
-        setValidation(validationResult);
+        // Usar Web Worker para parsing de PDF
+        await handlePdfWithWorker(selectedFile);
       } else {
-        // Parse do Excel
-        parsed = await parseExcelOrder(selectedFile);
+        // Parse do Excel (mantém como está)
+        setIsProcessing(true);
+        const parsed = await parseExcelOrder(selectedFile);
         setParsedData(parsed);
-
-        // Validar dados
-        validationResult = validateOrder(parsed);
+        const validationResult = validateOrder(parsed);
         setValidation(validationResult);
-      }
-      setStep('preview');
-      if (validationResult.isValid) {
-        toast.success("Arquivo processado com sucesso!");
-      } else {
-        toast.warning("Arquivo processado, mas há erros a corrigir");
+        setStep('preview');
+        
+        if (validationResult.isValid) {
+          toast.success("Arquivo processado com sucesso!");
+        } else {
+          toast.warning("Arquivo processado, mas há erros a corrigir");
+        }
+        setIsProcessing(false);
       }
     } catch (error: any) {
       toast.error(`Erro ao processar arquivo: ${error.message}`);
       setFile(null);
+      setIsProcessing(false);
+    }
+  };
+
+  const handlePdfWithWorker = async (file: File, analyzeComplete = false) => {
+    setIsParsing(true);
+    setParseProgress(0);
+    setParseStatus('Iniciando leitura do PDF...');
+    setCanAnalyzeComplete(false);
+
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      
+      // Criar worker
+      const worker = new Worker(
+        new URL('../workers/pdfParseWorker.ts', import.meta.url),
+        { type: 'module' }
+      );
+      
+      setPdfWorker(worker);
+
+      // Escutar mensagens do worker
+      worker.onmessage = (e) => {
+        if (e.data.type === 'progress') {
+          const { page, total, totalPages } = e.data;
+          setParseProgress(Math.round((page / total) * 100));
+          setParseStatus(`Lendo página ${page}/${total}${totalPages > total ? ` (${totalPages} no total)` : ''}...`);
+        }
+        
+        if (e.data.type === 'result') {
+          setIsParsing(false);
+          setParsedData(e.data.data);
+          
+          const validation = validatePdfOrder(e.data.data);
+          setValidation(validation);
+          
+          // Se não analisou completo e não tem itens, oferecer análise completa
+          if (!analyzeComplete && e.data.data.items.length === 0) {
+            setCanAnalyzeComplete(true);
+            toast.warning('Nenhum item encontrado nas primeiras páginas. Deseja analisar o PDF completo?');
+          }
+          
+          setStep('preview');
+          worker.terminate();
+          setPdfWorker(null);
+        }
+        
+        if (e.data.type === 'error') {
+          setIsParsing(false);
+          toast.error(e.data.message || 'Erro ao ler PDF');
+          worker.terminate();
+          setPdfWorker(null);
+          
+          // Fallback: tentar com o parser original
+          handlePdfFallback(file, analyzeComplete);
+        }
+      };
+
+      worker.onerror = (error) => {
+        console.error('Worker error:', error);
+        setIsParsing(false);
+        worker.terminate();
+        setPdfWorker(null);
+        
+        // Fallback
+        handlePdfFallback(file, analyzeComplete);
+      };
+
+      // Enviar arquivo para o worker
+      worker.postMessage({
+        type: 'start',
+        fileBuffer: arrayBuffer,
+        options: {
+          maxPages: analyzeComplete ? 'ALL' : 10,
+          earlyStop: !analyzeComplete,
+        },
+      }, [arrayBuffer]);
+
+    } catch (error: any) {
+      console.error('Erro ao iniciar worker:', error);
+      setIsParsing(false);
+      handlePdfFallback(file, analyzeComplete);
+    }
+  };
+
+  const handlePdfFallback = async (file: File, analyzeComplete = false) => {
+    setIsProcessing(true);
+    setParseStatus('Usando método alternativo...');
+    
+    try {
+      const data = await parsePdfOrder(file, {
+        maxPages: analyzeComplete ? undefined : 10,
+        earlyStop: !analyzeComplete,
+        onProgress: (page: number, total: number) => {
+          setParseProgress(Math.round((page / total) * 100));
+          setParseStatus(`Lendo página ${page}/${total}...`);
+        },
+      });
+      
+      setParsedData(data);
+      const validation = validatePdfOrder(data);
+      setValidation(validation);
+      
+      if (!analyzeComplete && data.items.length === 0) {
+        setCanAnalyzeComplete(true);
+        toast.warning('Nenhum item encontrado. Deseja analisar o PDF completo?');
+      }
+      
+      setStep('preview');
+    } catch (error: any) {
+      console.error('Erro no fallback:', error);
+      toast.error(`Erro ao processar PDF: ${error.message}`);
     } finally {
       setIsProcessing(false);
+    }
+  };
+
+  const handleCancelParsing = () => {
+    if (pdfWorker) {
+      pdfWorker.postMessage({ type: 'cancel' });
+      pdfWorker.terminate();
+      setPdfWorker(null);
+    }
+    setIsParsing(false);
+    setParseProgress(0);
+    setParseStatus('');
+    toast.info('Leitura cancelada');
+  };
+
+  const handleAnalyzeComplete = () => {
+    if (file) {
+      handlePdfWithWorker(file, true);
     }
   };
   const handleImport = async () => {
@@ -321,10 +453,21 @@ export const ImportOrderDialog = ({
     }));
   };
   const handleReset = () => {
-    setStep('upload');
+    // Cancelar worker se estiver rodando
+    if (pdfWorker) {
+      pdfWorker.terminate();
+      setPdfWorker(null);
+    }
+    
     setFile(null);
     setParsedData(null);
     setValidation(null);
+    setIsProcessing(false);
+    setIsParsing(false);
+    setParseProgress(0);
+    setParseStatus('');
+    setCanAnalyzeComplete(false);
+    setStep('upload');
   };
   return <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
@@ -346,7 +489,13 @@ export const ImportOrderDialog = ({
                 <strong>PDF:</strong> Pedido exportado do TOTVS (recomendado)<br />
                 <strong>Excel:</strong> Arquivo com abas "PEDIDO" e "ITENS"
               </p>
-              <Input type="file" accept=".xlsx,.xls,.pdf" onChange={handleFileSelect} className="max-w-xs mx-auto" disabled={isProcessing} />
+              <Input 
+                type="file" 
+                accept=".xlsx,.xls,.pdf" 
+                onChange={handleFileSelect} 
+                className="max-w-xs mx-auto" 
+                disabled={isProcessing || isParsing} 
+              />
               
               <div className="mt-4 p-3 bg-muted rounded-md text-xs text-left max-w-md mx-auto">
                 <p className="font-medium mb-1">💡 Dica para PDFs:</p>
@@ -356,7 +505,44 @@ export const ImportOrderDialog = ({
               </div>
             </div>
 
-            
+            {isParsing && (
+              <div className="space-y-4 py-4">
+                <div className="text-center">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-3"></div>
+                  <p className="font-medium mb-1">Lendo PDF...</p>
+                  <p className="text-sm text-muted-foreground">{parseStatus}</p>
+                </div>
+                
+                <div className="space-y-2">
+                  <div className="w-full bg-muted rounded-full h-2">
+                    <div 
+                      className="bg-primary h-2 rounded-full transition-all" 
+                      style={{ width: `${parseProgress}%` }}
+                    />
+                  </div>
+                  <p className="text-xs text-center text-muted-foreground">{parseProgress}%</p>
+                </div>
+
+                <div className="flex justify-center">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleCancelParsing}
+                  >
+                    Cancelar Leitura
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {isProcessing && !isParsing && (
+              <div className="flex items-center justify-center py-8">
+                <div className="text-center">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-2"></div>
+                  <p className="text-sm text-muted-foreground">Processando arquivo...</p>
+                </div>
+              </div>
+            )}
           </div>}
 
         {/* STEP 2: PREVIEW */}
@@ -495,14 +681,28 @@ export const ImportOrderDialog = ({
             </div>
 
             {/* Ações */}
-            <div className="flex gap-2 justify-end pt-2">
-              <Button variant="outline" onClick={handleReset}>
-                Cancelar
-              </Button>
-              <Button onClick={handleImport} disabled={!validation.isValid || isProcessing || isChecking} className="gap-2">
-                <CheckCircle2 className="h-4 w-4" />
-                {isChecking ? "Verificando..." : "Importar Pedido"}
-              </Button>
+            <div className="flex items-center gap-2 justify-between pt-2">
+              <div>
+                {canAnalyzeComplete && (
+                  <Button 
+                    onClick={handleAnalyzeComplete}
+                    variant="secondary"
+                    size="sm"
+                  >
+                    📄 Analisar PDF Completo
+                  </Button>
+                )}
+              </div>
+              
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={handleReset}>
+                  Cancelar
+                </Button>
+                <Button onClick={handleImport} disabled={!validation.isValid || isProcessing || isChecking} className="gap-2">
+                  <CheckCircle2 className="h-4 w-4" />
+                  {isChecking ? "Verificando..." : "Importar Pedido"}
+                </Button>
+              </div>
             </div>
           </div>}
 
