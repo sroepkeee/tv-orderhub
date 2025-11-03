@@ -364,7 +364,8 @@ function extractItemsTable(text: string): ParsedOrderData['items'] {
   // 1. SANITIZAÇÃO: Normalizar espaços múltiplos e quebras de linha isoladas
   const sanitizedText = text
     .replace(/\s{2,}/g, ' ')  // Múltiplos espaços → 1 espaço
-    .replace(/([A-Za-z])\.\s*\n\s*([A-Za-z])/g, '$1. $2');  // Reunir quebras no meio de palavras
+    .replace(/([A-Za-z])\.\s*\n\s*([A-Za-z])/g, '$1. $2')  // Reunir quebras no meio de palavras
+    .replace(/(\d)\s*\n\s*(\d{4,})/g, '$1 $2');  // Juntar "número + quebra + código" (ex: "28 \n 023460" → "28 023460")
   
   // 2. Localizar cabeçalho da tabela
   const headerPatterns = [
@@ -401,7 +402,7 @@ function extractItemsTable(text: string): ParsedOrderData['items'] {
     console.log('📄 Texto da tabela (primeiros 1500 chars):', tableText.substring(0, 1500));
   }
 
-  // 4. CONTAGEM DE CANDIDATOS (linhas tabulares + âncoras)
+  // 4. CONTAGEM DE CANDIDATOS (âncoras + linhas tabulares + linhas compactas)
   // Detectar âncoras "Item N"
   const itemAnchorsRegex = /(?:^|\s)Item\s+(\d{1,3})(?=\s)/gi;
   const anchors: { itemNumber: string; start: number }[] = [];
@@ -414,18 +415,24 @@ function extractItemsTable(text: string): ParsedOrderData['items'] {
     });
   }
   
-  // Detectar linhas tabulares (candidatos a item)
-  const rowCandidateRegex = /(?:Item\s+)?\d{1,3}\s+C[óo]digo\s+\d{4,}\s+Qtde\s+[\d.,]+\s+(?:Uni(?:d|dade)?\.?\s+)?[A-ZÇ]{1,4}/gi;
+  // Detectar linhas tabulares com rótulos (candidatos a item)
+  const rowCandidateRegex = /(?:Item\s+)?\d{1,3}\s+C[óo]digo\s+\d{4,}\s+Qtde\s+[\d.,]+\s+(?:Uni(?:d|dade)?\.?\s+)?[A-ZÇÃÕ]{1,4}/gi;
   const rowCandidates = tableText.match(rowCandidateRegex) || [];
   const rowCandidatesCount = rowCandidates.length;
   
+  // Detectar linhas compactas SEM rótulos (formato: "número código qtde unidade")
+  const genericRowCandidateRegex = /(?:^|\s)(\d{1,3})\s+(\d{4,})\s+([\d.]*\d,\d{2})\s+([A-ZÇÃÕ]{1,4})(?=\s)/g;
+  const genericRowCandidates = tableText.match(genericRowCandidateRegex) || [];
+  const genericRowCandidatesCount = genericRowCandidates.length;
+  
   if (import.meta.env.DEV) {
     console.log(`📍 Âncoras "Item N" detectadas: ${anchors.length}`, anchors.map(a => a.itemNumber).join(', '));
-    console.log(`📋 Candidatos de linha (tabular): ${rowCandidatesCount}`);
+    console.log(`📋 Candidatos de linha (com rótulos): ${rowCandidatesCount}`);
+    console.log(`📋 Candidatos de linha (compactos, sem rótulos): ${genericRowCandidatesCount}`);
   }
   
-  // Usar a maior contagem como referência esperada
-  const expectedCount = Math.max(anchors.length, rowCandidatesCount);
+  // Usar a MAIOR contagem como referência esperada
+  const expectedCount = Math.max(anchors.length, rowCandidatesCount, genericRowCandidatesCount);
   
   // Se não encontrou nem âncoras nem candidatos, tentar fallback simples
   if (expectedCount === 0) {
@@ -446,7 +453,7 @@ function extractItemsTable(text: string): ParsedOrderData['items'] {
       
       try {
         // Extração campo a campo com regex tolerantes
-        const itemNumber = anchor.itemNumber;
+        const itemNumber = anchor.itemNumber.padStart(2, '0');
         
         // CÓDIGO
         const codigoMatch = blockText.match(/C[óo]digo\s+(\d{4,})/i);
@@ -568,13 +575,13 @@ function extractItemsTable(text: string): ParsedOrderData['items'] {
   }
   
   // 6. VARREDURA LINHA-POR-LINHA (TABULAR - sempre executada)
-  // Regex para capturar linhas tabulares (com ou sem "Item" prefix)
+  // Regex para capturar linhas tabulares COM rótulos (com ou sem "Item" prefix)
   const rowRegex = /(?:Item\s+)?(\d{1,3})\s+C[óo]digo\s+(\d{4,})\s+Qtde\s+([\d.,]+)\s+(?:Uni(?:d|dade)?\.?\s+)?([A-ZÇÃÕ]{1,4})/gi;
   
   let rowMatch;
   while ((rowMatch = rowRegex.exec(tableText)) !== null) {
     try {
-      const itemNumber = rowMatch[1].trim();
+      const itemNumber = rowMatch[1].trim().padStart(2, '0');
       const itemCode = rowMatch[2].trim();
       const quantityStr = rowMatch[3].replace(/\./g, '').replace(',', '.');
       const unit = rowMatch[4].trim();
@@ -665,28 +672,146 @@ function extractItemsTable(text: string): ParsedOrderData['items'] {
     }
   }
   
+  // 7. VARREDURA DE LINHAS COMPACTAS (SEM RÓTULOS - sempre executada)
+  // Regex para capturar linhas compactas: "número código qtde unidade" (sem "Código" ou "Qtde")
+  const rowRegexGeneric = /(?:^|\s)(\d{1,3})\s+(\d{4,})\s+([\d.,]+)\s+([A-ZÇÃÕ]{1,4})(?:\s+([\d.,]+))?(?:\s+([\d.,]+))?/gi;
+  
+  let genericMatch;
+  while ((genericMatch = rowRegexGeneric.exec(tableText)) !== null) {
+    try {
+      const itemNumber = genericMatch[1].trim().padStart(2, '0');
+      const itemCode = genericMatch[2].trim();
+      const quantityStr = genericMatch[3].replace(/\./g, '').replace(',', '.');
+      const unit = genericMatch[4].trim();
+      
+      const quantity = parseFloat(quantityStr);
+      if (isNaN(quantity) || quantity <= 0) continue;
+      
+      // Verificar se já foi extraído
+      const alreadyExtracted = items.some(
+        i => i.itemCode === itemCode && i.itemNumber === itemNumber
+      );
+      
+      if (alreadyExtracted) {
+        continue;
+      }
+      
+      // Abrir janela de contexto (+500 chars após o match)
+      const contextStart = genericMatch.index;
+      const contextEnd = Math.min(tableText.length, contextStart + 500);
+      const context = tableText.slice(contextStart, contextEnd);
+      
+      // VALOR UNITÁRIO (pode estar nos grupos 5 ou buscar no contexto)
+      let unitPrice = 0;
+      if (genericMatch[5]) {
+        const vUnit = genericMatch[5].replace(/\./g, '').replace(',', '.');
+        unitPrice = parseFloat(vUnit);
+      } else {
+        const vUnitMatch = context.match(/V\.?\s*Unit\.?\s+([\d.,]+)/i);
+        if (vUnitMatch) {
+          unitPrice = parseFloat(vUnitMatch[1].replace(/\./g, '').replace(',', '.'));
+        }
+      }
+      
+      // TOTAL (pode estar no grupo 6 ou buscar no contexto)
+      let totalValue = 0;
+      if (genericMatch[6]) {
+        const total = genericMatch[6].replace(/\./g, '').replace(',', '.');
+        totalValue = parseFloat(total);
+      } else {
+        const totalMatch = context.match(/Total\s+([\d.,]+)/i);
+        if (totalMatch) {
+          totalValue = parseFloat(totalMatch[1].replace(/\./g, '').replace(',', '.'));
+        }
+      }
+      
+      // DESCONTO
+      const descMatch = context.match(/Desc\s+([\d.,]+)/i);
+      const discount = descMatch 
+        ? parseFloat(descMatch[1].replace(/\./g, '').replace(',', '.'))
+        : 0;
+      
+      // ARMAZÉM
+      const armazemMatch = context.match(/Armaz[ée]m\s+(\d{1,3})/i);
+      const warehouse = armazemMatch ? armazemMatch[1] : 'PRINCIPAL';
+      
+      // DESCRIÇÃO (busca na janela estendida)
+      let description = 'Produto TOTVS';
+      const extendedContextEnd = Math.min(tableText.length, contextStart + 600);
+      const extendedContext = tableText.slice(contextStart, extendedContextEnd);
+      
+      const descPatterns = [
+        new RegExp(`Descri[çc][ãa]o[:\\s]+(.+?)(?=Item\\s+\\d+|C[óo]digo\\s+\\d+|Qtde|LGPD|$)`, 'is'),
+        new RegExp(`C[óo]digo\\s+${itemCode}[\\s\\S]{0,400}?Descri[çc][ãa]o[:\\s]+(.+?)(?=Item\\s+\\d+|C[óo]digo\\s+\\d+|$)`, 'is'),
+      ];
+      
+      for (const pattern of descPatterns) {
+        const descMatch = extendedContext.match(pattern);
+        if (descMatch && descMatch[1].trim().length > 3) {
+          description = descMatch[1]
+            .trim()
+            .replace(/\s+/g, ' ')
+            .replace(/^\d+\s*-?\s*/, '')
+            .substring(0, 200);
+          break;
+        }
+      }
+      
+      items.push({
+        itemNumber,
+        itemCode,
+        description,
+        quantity,
+        unit,
+        warehouse,
+        deliveryDate: '',
+        sourceType: 'in_stock',
+        unitPrice,
+        discount,
+        ipiPercent: 0,
+        icmsPercent: 0,
+        totalValue
+      });
+      
+      if (import.meta.env.DEV) {
+        console.log(`✅ [Compacto] Item ${itemNumber}: ${itemCode} | ${quantity} ${unit} | ${description.substring(0, 40)}...`);
+      }
+      
+    } catch (error) {
+      continue;
+    }
+  }
+  
   // 8. VERIFICAÇÃO DE COMPLETUDE E FALLBACK
   const extractedCount = items.length;
   const completeness = expectedCount > 0 ? (extractedCount / expectedCount) * 100 : 0;
   
   if (import.meta.env.DEV) {
-    console.log(`📊 Métricas de extração:`);
+    console.log(`\n📊 Métricas de extração:`);
     console.log(`   - Âncoras "Item N": ${anchors.length}`);
-    console.log(`   - Candidatos tabulares: ${rowCandidatesCount}`);
+    console.log(`   - Candidatos com rótulos: ${rowCandidatesCount}`);
+    console.log(`   - Candidatos compactos: ${genericRowCandidatesCount}`);
     console.log(`   - Itens extraídos: ${extractedCount}`);
     console.log(`   - Completude: ${completeness.toFixed(1)}%`);
   }
   
-  // Se menos de 80% foram extraídos, tentar fallback adicional
-  if (completeness < 80 && expectedCount > 0) {
+  // Se menos de 90% foram extraídos, tentar fallback adicional
+  if (completeness < 90 && expectedCount > 0) {
     console.warn(`⚠️ Apenas ${completeness.toFixed(1)}% dos itens foram extraídos. Executando fallback adicional...`);
     
-    // Determinar números faltantes baseado em âncoras (se existirem)
+    // Determinar números faltantes baseado em âncoras OU candidatos genéricos
     let missingNumbers: string[] = [];
     if (anchors.length > 0) {
       missingNumbers = anchors
-        .map(a => a.itemNumber)
+        .map(a => a.itemNumber.padStart(2, '0'))
         .filter(num => !items.some(i => i.itemNumber === num));
+    } else if (genericRowCandidatesCount > 0) {
+      // Extrair números dos candidatos genéricos
+      const genericNumbers = Array.from(genericRowCandidates, match => {
+        const m = match.match(/^\s*(\d{1,3})/);
+        return m ? m[1].padStart(2, '0') : null;
+      }).filter(Boolean) as string[];
+      missingNumbers = genericNumbers.filter(num => !items.some(i => i.itemNumber === num));
     }
     
     if (import.meta.env.DEV && missingNumbers.length > 0) {
@@ -741,8 +866,11 @@ function extractItemsTable(text: string): ParsedOrderData['items'] {
   if (import.meta.env.DEV) {
     console.log(`\n📦 ═══ EXTRAÇÃO CONCLUÍDA ═══`);
     console.log(`📊 Total de itens: ${items.length}`);
-    console.log(`📊 Âncoras → Extraídos: ${anchors.length} → ${items.length}`);
-    console.log(`📊 Candidatos tabulares: ${rowCandidatesCount}`);
+    console.log(`📊 Âncoras detectadas: ${anchors.length}`);
+    console.log(`📊 Candidatos com rótulos: ${rowCandidatesCount}`);
+    console.log(`📊 Candidatos compactos: ${genericRowCandidatesCount}`);
+    console.log(`📊 Expected count: ${expectedCount}`);
+    console.log(`📊 Completude final: ${completeness.toFixed(1)}%`);
     
     // Distribuição por unidade
     const unitDist = items.reduce((acc, item) => {
@@ -750,6 +878,26 @@ function extractItemsTable(text: string): ParsedOrderData['items'] {
       return acc;
     }, {} as Record<string, number>);
     console.log('📊 Distribuição por unidade:', unitDist);
+    
+    // Se houver itens faltantes, mostrar snippets
+    if (expectedCount > items.length) {
+      const missingCount = expectedCount - items.length;
+      console.warn(`⚠️ ${missingCount} itens ainda não foram extraídos`);
+      
+      // Tentar encontrar snippets dos primeiros 3 itens faltantes
+      const extractedNumbers = new Set(items.map(i => i.itemNumber));
+      const allPossibleNumbers = Array.from({ length: expectedCount }, (_, i) => String(i + 1).padStart(2, '0'));
+      const missing = allPossibleNumbers.filter(num => !extractedNumbers.has(num)).slice(0, 3);
+      
+      missing.forEach(num => {
+        const regex = new RegExp(`(?:Item\\s+)?${num}\\s+[\\s\\S]{0,150}`, 'i');
+        const snippet = tableText.match(regex);
+        if (snippet) {
+          console.warn(`   Snippet item ${num}:`, snippet[0].substring(0, 120).replace(/\n/g, ' '));
+        }
+      });
+    }
+    
     console.log(`════════════════════════════\n`);
   }
   
@@ -785,7 +933,7 @@ function extractItemsFallback(
   
   while ((match = simpleRegex.exec(tableText)) !== null) {
     try {
-      const itemNum = match[1].trim();
+      const itemNum = match[1].trim().padStart(2, '0');
       const codigo = match[2].trim();
       const qtd = match[3];
       const unidade = match[4].trim();
