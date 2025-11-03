@@ -361,11 +361,17 @@ function findItemDescription(text: string, itemCode: string, itemNumber: string)
 function extractItemsTable(text: string): ParsedOrderData['items'] {
   const items: ParsedOrderData['items'] = [];
   
-  // 1. SANITIZAÇÃO: Normalizar espaços múltiplos e quebras de linha isoladas
-  const sanitizedText = text
+  // 1. SANITIZAÇÃO ROBUSTA: Normalizar espaços, quebras e remover separadores de tabela
+  // Primeiro, preservar uma cópia antes de remover pipes (para detectar tabelas markdown)
+  const textBeforePipeRemoval = text
     .replace(/\s{2,}/g, ' ')  // Múltiplos espaços → 1 espaço
     .replace(/([A-Za-z])\.\s*\n\s*([A-Za-z])/g, '$1. $2')  // Reunir quebras no meio de palavras
     .replace(/(\d)\s*\n\s*(\d{4,})/g, '$1 $2');  // Juntar "número + quebra + código" (ex: "28 \n 023460" → "28 023460")
+  
+  // Agora remover pipes e normalizar
+  const sanitizedText = textBeforePipeRemoval
+    .replace(/\|/g, ' ')  // Remover pipes (separadores de tabela)
+    .replace(/\s{2,}/g, ' ');  // Normalizar múltiplos espaços novamente
   
   // 2. Localizar cabeçalho da tabela
   const headerPatterns = [
@@ -396,13 +402,14 @@ function extractItemsTable(text: string): ParsedOrderData['items'] {
   }
 
   const tableText = sanitizedText.slice(tableStart, tableEnd);
+  const tableTextRaw = textBeforePipeRemoval.slice(tableStart, tableEnd);
   
   if (import.meta.env.DEV) {
     console.log('🔍 [Parser] Iniciando extração de itens...');
     console.log('📄 Texto da tabela (primeiros 1500 chars):', tableText.substring(0, 1500));
   }
 
-  // 4. CONTAGEM DE CANDIDATOS (âncoras + linhas tabulares + linhas compactas)
+  // 4. CONTAGEM DE CANDIDATOS (âncoras + linhas tabulares + linhas compactas + markdown tables)
   // Detectar âncoras "Item N"
   const itemAnchorsRegex = /(?:^|\s)Item\s+(\d{1,3})(?=\s)/gi;
   const anchors: { itemNumber: string; start: number }[] = [];
@@ -430,15 +437,21 @@ function extractItemsTable(text: string): ParsedOrderData['items'] {
   const codeOnlyCandidates = tableText.match(codeOnlyRegex) || [];
   const codeOnlyCount = codeOnlyCandidates.length;
   
+  // Detectar tabelas markdown/pipe-separated (antes de remover pipes)
+  const markdownRowRegex = /\|\s*(\d{1,3})\s*\|\s*(\d{4,})\s*\|\s*([\d.,]+)\s*\|\s*([A-ZÇÃÕ]{1,4})\s*\|/g;
+  const markdownRowCandidates = tableTextRaw.match(markdownRowRegex) || [];
+  const markdownRowCandidatesCount = markdownRowCandidates.length;
+  
   if (import.meta.env.DEV) {
     console.log(`📍 Âncoras "Item N" detectadas: ${anchors.length}`, anchors.map(a => a.itemNumber).join(', '));
     console.log(`📋 Candidatos de linha (com rótulos): ${rowCandidatesCount}`);
     console.log(`📋 Candidatos de linha (compactos, sem rótulos): ${genericRowCandidatesCount}`);
     console.log(`📋 Candidatos apenas por Código: ${codeOnlyCount}`);
+    console.log(`📋 Candidatos de tabela markdown (com pipes): ${markdownRowCandidatesCount}`);
   }
   
   // Usar a MAIOR contagem como referência esperada
-  const expectedCount = Math.max(anchors.length, rowCandidatesCount, genericRowCandidatesCount, codeOnlyCount);
+  const expectedCount = Math.max(anchors.length, rowCandidatesCount, genericRowCandidatesCount, codeOnlyCount, markdownRowCandidatesCount);
   
   // Se não encontrou nem âncoras nem candidatos, tentar fallback simples
   if (expectedCount === 0) {
@@ -678,8 +691,89 @@ function extractItemsTable(text: string): ParsedOrderData['items'] {
     }
   }
   
-  // 7. VARREDURA DE LINHAS COMPACTAS (SEM RÓTULOS - sempre executada)
+  // 7. VARREDURA DE TABELAS MARKDOWN/PIPE (antes da remoção de pipes)
+  // Processar primeiro as linhas com pipes explícitos na versão raw
+  const markdownLineRegex = /\|\s*(\d{1,3})\s*\|\s*(\d{4,})\s*\|\s*([\d.,]+)\s*\|\s*([A-ZÇÃÕ]{1,4})\s*\|/gi;
+  
+  let markdownMatch;
+  while ((markdownMatch = markdownLineRegex.exec(tableTextRaw)) !== null) {
+    try {
+      const itemNumber = markdownMatch[1].trim().padStart(2, '0');
+      const itemCode = markdownMatch[2].trim();
+      const quantityStr = markdownMatch[3].replace(/\./g, '').replace(',', '.');
+      const unit = markdownMatch[4].trim();
+      
+      const quantity = parseFloat(quantityStr);
+      if (isNaN(quantity) || quantity <= 0) continue;
+      
+      // Verificar se já foi extraído
+      const alreadyExtracted = items.some(
+        i => i.itemCode === itemCode && i.itemNumber === itemNumber
+      );
+      
+      if (alreadyExtracted) continue;
+      
+      // Abrir janela de contexto (+600 chars após o match)
+      const contextStart = markdownMatch.index;
+      const contextEnd = Math.min(tableTextRaw.length, contextStart + 600);
+      const context = tableTextRaw.slice(contextStart, contextEnd);
+      
+      // Extrair valores do contexto
+      const vUnitMatch = context.match(/V\.?\s*Unit\.?\s+([\d.,]+)/i);
+      const unitPrice = vUnitMatch ? parseFloat(vUnitMatch[1].replace(/\./g, '').replace(',', '.')) : 0;
+      
+      const totalMatch = context.match(/Total\s+([\d.,]+)/i);
+      const totalValue = totalMatch ? parseFloat(totalMatch[1].replace(/\./g, '').replace(',', '.')) : 0;
+      
+      const descMatch = context.match(/Desc\s+([\d.,]+)/i);
+      const discount = descMatch ? parseFloat(descMatch[1].replace(/\./g, '').replace(',', '.')) : 0;
+      
+      const armazemMatch = context.match(/Armaz[ée]m\s+(\d{1,3})/i);
+      const warehouse = armazemMatch ? armazemMatch[1] : 'PRINCIPAL';
+      
+      // Buscar descrição
+      let description = 'Produto TOTVS';
+      const descPatterns = [
+        new RegExp(`Descri[çc][ãa]o[:\\s]+(.+?)(?=Item\\s+\\d+|C[óo]digo\\s+\\d+|Qtde|\\||LGPD|$)`, 'is'),
+        new RegExp(`C[óo]digo\\s+${itemCode}[\\s\\S]{0,400}?Descri[çc][ãa]o[:\\s]+(.+?)(?=Item\\s+\\d+|C[óo]digo\\s+\\d+|\\||$)`, 'is'),
+      ];
+      
+      for (const pattern of descPatterns) {
+        const dm = context.match(pattern);
+        if (dm && dm[1].trim().length > 3) {
+          description = dm[1].trim().replace(/\s+/g, ' ').replace(/^\d+\s*-?\s*/, '').substring(0, 200);
+          break;
+        }
+      }
+      
+      items.push({
+        itemNumber,
+        itemCode,
+        description,
+        quantity,
+        unit,
+        warehouse,
+        deliveryDate: '',
+        sourceType: 'in_stock',
+        unitPrice,
+        discount,
+        ipiPercent: 0,
+        icmsPercent: 0,
+        totalValue
+      });
+      
+      if (import.meta.env.DEV) {
+        console.log(`✅ [Markdown] Item ${itemNumber}: ${itemCode} | ${quantity} ${unit} | ${description.substring(0, 40)}...`);
+      }
+      
+    } catch (error) {
+      continue;
+    }
+  }
+  
+  // 7b. VARREDURA DE LINHAS COMPACTAS (SEM RÓTULOS - sempre executada)
   // Regex para capturar linhas compactas: "número código qtde unidade" (sem "Código" ou "Qtde")
+  // Tolerante a espaços múltiplos e pipes já removidos
   const rowRegexGeneric = /(?:^|\s)(\d{1,3})\s+(\d{4,})\s+([\d.,]+)\s+([A-ZÇÃÕ]{1,4})(?:\s+([\d.,]+))?(?:\s+([\d.,]+))?/gi;
   
   let genericMatch;
@@ -789,7 +883,7 @@ function extractItemsTable(text: string): ParsedOrderData['items'] {
   }
   
   // 7c. VARREDURA POR 'CÓDIGO' QUANDO NÚMERO DO ITEM AUSENTE
-  const codeFirstRegex = /C[óo]digo\s+(\d{4,})[\s\S]{0,120}?Qtde\s+([\d.,]+)\s+(?:Uni(?:d|dade)?\.?\s+)?([A-ZÇÃÕ]{1,4})/gi;
+  const codeFirstRegex = /C[óo]digo\s+(\d{4,})[\s\S]{0,150}?Qtde\s+([\d.,]+)\s+(?:Uni(?:d|dade)?\.?\s+)?([A-ZÇÃÕ]{1,4})/gi;
 
   let codeMatch;
   // Último número já atribuído
@@ -858,22 +952,40 @@ function extractItemsTable(text: string): ParsedOrderData['items'] {
   const extractedCount = items.length;
   const completeness = expectedCount > 0 ? (extractedCount / expectedCount) * 100 : 0;
   
+  // Calcular distribuição por unidade
+  const unitDistribution = items.reduce((acc, item) => {
+    acc[item.unit] = (acc[item.unit] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+  
   if (import.meta.env.DEV) {
     console.log(`\n📊 Métricas de extração:`);
     console.log(`   - Âncoras "Item N": ${anchors.length}`);
     console.log(`   - Candidatos com rótulos: ${rowCandidatesCount}`);
     console.log(`   - Candidatos compactos: ${genericRowCandidatesCount}`);
+    console.log(`   - Candidatos markdown (pipes): ${markdownRowCandidatesCount}`);
+    console.log(`   - Candidatos apenas por Código: ${codeOnlyCount}`);
+    console.log(`   - Expected Count (max): ${expectedCount}`);
     console.log(`   - Itens extraídos: ${extractedCount}`);
     console.log(`   - Completude: ${completeness.toFixed(1)}%`);
+    console.log(`   - Distribuição por unidade:`, unitDistribution);
   }
   
   // Se menos de 90% foram extraídos, tentar fallback adicional
   if (completeness < 90 && expectedCount > 0) {
     console.warn(`⚠️ Apenas ${completeness.toFixed(1)}% dos itens foram extraídos. Executando fallback adicional...`);
     
-    // Determinar números faltantes baseado em âncoras OU candidatos genéricos
+    // Determinar números faltantes baseado na lista mais abrangente de candidatos
     let missingNumbers: string[] = [];
-    if (anchors.length > 0) {
+    
+    // Preferir markdown candidates (mais específico para tabelas com pipes)
+    if (markdownRowCandidatesCount > 0) {
+      const markdownNumbers = Array.from(markdownRowCandidates, match => {
+        const m = match.match(/\|\s*(\d{1,3})\s*\|/);
+        return m ? m[1].padStart(2, '0') : null;
+      }).filter(Boolean) as string[];
+      missingNumbers = markdownNumbers.filter(num => !items.some(i => i.itemNumber === num));
+    } else if (anchors.length > 0) {
       missingNumbers = anchors
         .map(a => a.itemNumber.padStart(2, '0'))
         .filter(num => !items.some(i => i.itemNumber === num));
@@ -887,11 +999,11 @@ function extractItemsTable(text: string): ParsedOrderData['items'] {
     }
     
     if (import.meta.env.DEV && missingNumbers.length > 0) {
-      console.log(`📋 Itens faltantes: ${missingNumbers.join(', ')}`);
+      console.log(`📋 Itens faltantes detectados: ${missingNumbers.join(', ')}`);
     }
     
-    // Tentar extração simplificada
-    const fallbackItems = extractItemsFallback(tableText, missingNumbers.length > 0 ? missingNumbers : undefined);
+    // Tentar extração simplificada (usando tableTextRaw para capturar também linhas com pipes)
+    const fallbackItems = extractItemsFallback(tableTextRaw, missingNumbers.length > 0 ? missingNumbers : undefined);
     
     fallbackItems.forEach(item => {
       const isDuplicate = items.some(
@@ -941,15 +1053,11 @@ function extractItemsTable(text: string): ParsedOrderData['items'] {
     console.log(`📊 Âncoras detectadas: ${anchors.length}`);
     console.log(`📊 Candidatos com rótulos: ${rowCandidatesCount}`);
     console.log(`📊 Candidatos compactos: ${genericRowCandidatesCount}`);
-    console.log(`📊 Expected count: ${expectedCount}`);
-    console.log(`📊 Completude final: ${completeness.toFixed(1)}%`);
-    
-    // Distribuição por unidade
-    const unitDist = items.reduce((acc, item) => {
-      acc[item.unit] = (acc[item.unit] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
-    console.log('📊 Distribuição por unidade:', unitDist);
+    console.log(`📊 Candidatos markdown (pipes): ${markdownRowCandidatesCount}`);
+    console.log(`📊 Candidatos apenas por Código: ${codeOnlyCount}`);
+    console.log(`📊 Expected count (max): ${expectedCount}`);
+    console.log(`📊 Completude final: ${((items.length / expectedCount) * 100).toFixed(1)}%`);
+    console.log('📊 Distribuição por unidade:', unitDistribution);
     
     // Se houver itens faltantes, mostrar snippets
     if (expectedCount > items.length) {
@@ -962,10 +1070,16 @@ function extractItemsTable(text: string): ParsedOrderData['items'] {
       const missing = allPossibleNumbers.filter(num => !extractedNumbers.has(num)).slice(0, 3);
       
       missing.forEach(num => {
-        const regex = new RegExp(`(?:Item\\s+)?${num}\\s+[\\s\\S]{0,150}`, 'i');
+        // Tentar em ambos os textos (raw e sanitized)
+        const regexRaw = new RegExp(`(?:Item\\s+)?${num}[\\s\\S]{0,200}`, 'i');
+        const snippetRaw = tableTextRaw.match(regexRaw);
+        const regex = new RegExp(`(?:Item\\s+)?${num}[\\s\\S]{0,200}`, 'i');
         const snippet = tableText.match(regex);
-        if (snippet) {
-          console.warn(`   Snippet item ${num}:`, snippet[0].substring(0, 120).replace(/\n/g, ' '));
+        
+        if (snippetRaw) {
+          console.warn(`   Snippet item ${num} (raw):`, snippetRaw[0].substring(0, 150).replace(/\n/g, ' '));
+        } else if (snippet) {
+          console.warn(`   Snippet item ${num}:`, snippet[0].substring(0, 150).replace(/\n/g, ' '));
         }
       });
     }
