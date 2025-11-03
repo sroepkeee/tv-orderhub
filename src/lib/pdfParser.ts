@@ -425,14 +425,20 @@ function extractItemsTable(text: string): ParsedOrderData['items'] {
   const genericRowCandidates = tableText.match(genericRowCandidateRegex) || [];
   const genericRowCandidatesCount = genericRowCandidates.length;
   
+  // Detectar ocorrências apenas de "Código XXXXX" como estimativa mínima de linhas
+  const codeOnlyRegex = /(?:^|\s)C[óo]digo\s+(\d{4,})\b/gi;
+  const codeOnlyCandidates = tableText.match(codeOnlyRegex) || [];
+  const codeOnlyCount = codeOnlyCandidates.length;
+  
   if (import.meta.env.DEV) {
     console.log(`📍 Âncoras "Item N" detectadas: ${anchors.length}`, anchors.map(a => a.itemNumber).join(', '));
     console.log(`📋 Candidatos de linha (com rótulos): ${rowCandidatesCount}`);
     console.log(`📋 Candidatos de linha (compactos, sem rótulos): ${genericRowCandidatesCount}`);
+    console.log(`📋 Candidatos apenas por Código: ${codeOnlyCount}`);
   }
   
   // Usar a MAIOR contagem como referência esperada
-  const expectedCount = Math.max(anchors.length, rowCandidatesCount, genericRowCandidatesCount);
+  const expectedCount = Math.max(anchors.length, rowCandidatesCount, genericRowCandidatesCount, codeOnlyCount);
   
   // Se não encontrou nem âncoras nem candidatos, tentar fallback simples
   if (expectedCount === 0) {
@@ -782,6 +788,72 @@ function extractItemsTable(text: string): ParsedOrderData['items'] {
     }
   }
   
+  // 7c. VARREDURA POR 'CÓDIGO' QUANDO NÚMERO DO ITEM AUSENTE
+  const codeFirstRegex = /C[óo]digo\s+(\d{4,})[\s\S]{0,120}?Qtde\s+([\d.,]+)\s+(?:Uni(?:d|dade)?\.?\s+)?([A-ZÇÃÕ]{1,4})/gi;
+
+  let codeMatch;
+  // Último número já atribuído
+  let lastAssigned = items.reduce((max, it) => Math.max(max, parseInt(it.itemNumber || '0', 10) || 0), 0);
+
+  while ((codeMatch = codeFirstRegex.exec(tableText)) !== null) {
+    try {
+      const itemCode = codeMatch[1].trim();
+      const quantityStr = codeMatch[2].replace(/\./g, '').replace(',', '.');
+      const unit = codeMatch[3].trim();
+      const quantity = parseFloat(quantityStr);
+      if (isNaN(quantity) || quantity <= 0) continue;
+
+      // Tentar capturar número do item olhando antes
+      const prevWinStart = Math.max(0, codeMatch.index - 100);
+      const prevWindow = tableText.slice(prevWinStart, codeMatch.index);
+      const numBefore = prevWindow.match(/Item\s+(\d{1,3})/i);
+      let itemNumber = numBefore ? numBefore[1].trim().padStart(2, '0') : String(++lastAssigned).padStart(2, '0');
+
+      // Evitar duplicatas
+      const alreadyExtracted = items.some(i => i.itemCode === itemCode && i.itemNumber === itemNumber);
+      if (alreadyExtracted) continue;
+
+      // Contexto à direita
+      const contextStart = codeMatch.index;
+      const contextEnd = Math.min(tableText.length, contextStart + 600);
+      const context = tableText.slice(contextStart, contextEnd);
+
+      // Valores
+      const vUnitMatch = context.match(/V\.?\s*Unit\.?\s+([\d.,]+)/i);
+      const unitPrice = vUnitMatch ? parseFloat(vUnitMatch[1].replace(/\./g, '').replace(',', '.')) : 0;
+
+      const totalMatch = context.match(/Total\s+([\d.,]+)/i);
+      const totalValue = totalMatch ? parseFloat(totalMatch[1].replace(/\./g, '').replace(',', '.')) : 0;
+
+      const descMatch = context.match(/Desc\s+([\d.,]+)/i);
+      const discount = descMatch ? parseFloat(descMatch[1].replace(/\./g, '').replace(',', '.')) : 0;
+
+      const armazemMatch = context.match(/Armaz[ée]m\s+(\d{1,3})/i);
+      const warehouse = armazemMatch ? armazemMatch[1] : 'PRINCIPAL';
+
+      // Descrição
+      let description = 'Produto TOTVS';
+      const descPatterns = [
+        new RegExp(`Descri[çc][ãa]o[:\\s]+(.+?)(?=Item\\s+\\d+|C[óo]digo\\s+\\d+|Qtde|LGPD|$)`, 'is'),
+        new RegExp(`C[óo]digo\\s+${itemCode}[\\s\\S]{0,400}?Descri[çc][ãa]o[:\\s]+(.+?)(?=Item\\s+\\d+|C[óo]digo\\s+\\d+|$)`, 'is'),
+      ];
+      for (const pattern of descPatterns) {
+        const dm = context.match(pattern);
+        if (dm && dm[1].trim().length > 3) {
+          description = dm[1].trim().replace(/\s+/g, ' ').replace(/^\d+\s*-?\s*/, '').substring(0, 200);
+          break;
+        }
+      }
+
+      items.push({ itemNumber, itemCode, description, quantity, unit, warehouse, deliveryDate: '', sourceType: 'in_stock', unitPrice, discount, ipiPercent: 0, icmsPercent: 0, totalValue });
+
+      if (import.meta.env.DEV) {
+        console.log(`✅ [Código] Item ${itemNumber}: ${itemCode} | ${quantity} ${unit} | ${description.substring(0, 40)}...`);
+      }
+
+    } catch (_) { continue; }
+  }
+
   // 8. VERIFICAÇÃO DE COMPLETUDE E FALLBACK
   const extractedCount = items.length;
   const completeness = expectedCount > 0 ? (extractedCount / expectedCount) * 100 : 0;
