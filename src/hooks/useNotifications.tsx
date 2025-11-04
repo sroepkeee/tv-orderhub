@@ -107,17 +107,10 @@ export const useNotifications = () => {
         setIsRetrying(true);
       }
 
-      // Query otimizada com LEFT JOIN para buscar notificações e perfis de uma vez
+      // Query simples de notificações (usa metadata.author_name para exibição)
       const { data: notificationsData, error: notifError } = await supabase
         .from('notifications')
-        .select(`
-          *,
-          mentioned_by_profile:profiles!notifications_mentioned_by_fkey(
-            id,
-            full_name,
-            email
-          )
-        `)
+        .select('*')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false })
         .limit(50);
@@ -157,10 +150,10 @@ export const useNotifications = () => {
       console.log('🔔 [useNotifications] Notificações carregadas:', {
         total: notificationsData.length,
         unread: notificationsData.filter((n: any) => !n.is_read).length,
-        withAuthor: notificationsData.filter((n: any) => n.mentioned_by_profile).length
+        withMetadata: notificationsData.filter((n: any) => n.metadata?.author_name).length
       });
 
-      // Transformar dados
+      // Transformar dados (usa metadata.author_name preenchido pelo trigger)
       const enrichedNotifications: Notification[] = notificationsData.map((notif: any) => ({
         id: notif.id,
         type: notif.type,
@@ -170,9 +163,9 @@ export const useNotifications = () => {
         is_read: notif.is_read,
         created_at: notif.created_at,
         metadata: notif.metadata || {},
-        mentioned_by: notif.mentioned_by_profile ? {
-          full_name: notif.mentioned_by_profile.full_name,
-          email: notif.mentioned_by_profile.email
+        mentioned_by: notif.metadata?.author_name ? {
+          full_name: notif.metadata.author_name,
+          email: notif.metadata.author_email || ''
         } : undefined
       }));
 
