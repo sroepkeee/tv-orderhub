@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
-import { Bell, Check, CheckCheck, Trash2, Settings, AlertCircle } from 'lucide-react';
+import { Bell, Check, CheckCheck, Trash2, Settings, AlertCircle, RefreshCw } from 'lucide-react';
 import { useNotifications } from '@/hooks/useNotifications';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -22,6 +22,8 @@ export const NotificationCenter = () => {
     unreadCount,
     loading,
     error,
+    isRetrying,
+    retryCount,
     markAsRead,
     markAllAsRead,
     deleteNotification,
@@ -115,8 +117,13 @@ export const NotificationCenter = () => {
         {/* Lista de notificações */}
         <ScrollArea className="h-[400px]">
           {loading ? (
-            <div className="p-8 text-center text-muted-foreground">
-              Carregando...
+            <div className="p-8 text-center">
+              <div className="flex flex-col items-center gap-3">
+                <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary" />
+                <p className="text-sm text-muted-foreground">
+                  {isRetrying ? `Reconectando... (tentativa ${retryCount}/3)` : 'Carregando...'}
+                </p>
+              </div>
             </div>
           ) : error ? (
             <div className="p-8 text-center">
@@ -128,6 +135,7 @@ export const NotificationCenter = () => {
                 size="sm"
                 onClick={refreshNotifications}
               >
+                <RefreshCw className="h-4 w-4 mr-2" />
                 Tentar novamente
               </Button>
             </div>
