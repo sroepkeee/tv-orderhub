@@ -20,6 +20,7 @@ import { DateRangeFilter } from "./DateRangeFilter";
 import { UserMenu } from "./UserMenu";
 import { NotificationCenter } from "./NotificationCenter";
 import { ImportOrderDialog } from "./ImportOrderDialog";
+import { RealtimeIndicator } from "./RealtimeIndicator";
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -207,6 +208,8 @@ export const Dashboard = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [isBatchImporting, setIsBatchImporting] = useState(false);
+  const [realtimeStatus, setRealtimeStatus] = useState<'synced' | 'updating' | 'disconnected'>('synced');
+  const [lastUpdateTime, setLastUpdateTime] = useState<Date | null>(null);
   const isUpdatingRef = useRef(false);
   const loadingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isLoadingRef = useRef(false);
@@ -275,7 +278,9 @@ export const Dashboard = () => {
     }
   }, [orders, selectedOrder]);
 
-  // Fila de Refresh com Throttle Inteligente
+  // Fila de Refresh com Smart Throttle (500ms)
+  const lastEventTimeRef = useRef(0);
+  
   const queueRefresh = () => {
     // ✅ Ignorar eventos durante batch import
     if (isBatchImportingRef.current) {
@@ -283,7 +288,21 @@ export const Dashboard = () => {
       return;
     }
     
-    if (pendingRefreshRef.current) return; // Já tem refresh agendado
+    const now = Date.now();
+    const timeSinceLastEvent = now - lastEventTimeRef.current;
+    lastEventTimeRef.current = now;
+    
+    // ⚡ Se evento isolado (>2s desde último), reload imediato
+    if (timeSinceLastEvent > 2000 && !pendingRefreshRef.current) {
+      console.log('⚡ [queueRefresh] Evento isolado - reload imediato');
+      if (!isLoadingRef.current && !isUpdatingRef.current) {
+        loadOrders();
+      }
+      return;
+    }
+    
+    // 📦 Caso contrário, agrupar eventos com delay curto (500ms)
+    if (pendingRefreshRef.current) return;
     
     pendingRefreshRef.current = true;
     
@@ -294,23 +313,62 @@ export const Dashboard = () => {
     refreshQueueRef.current = setTimeout(() => {
       pendingRefreshRef.current = false;
       if (!isLoadingRef.current && !isUpdatingRef.current) {
+        console.log('🔄 [queueRefresh] Executando reload agrupado');
         loadOrders();
       }
-    }, 2000); // Coalescer em 2 segundos
+    }, 500); // Reduzido de 2000ms para 500ms
   };
 
-  // Realtime subscription for orders - unified with throttle
+  // 📡 Realtime subscriptions expandidas (orders + order_items + order_history)
   useEffect(() => {
     if (!user) return;
-    const channel = supabase.channel('orders-changes').on('postgres_changes', {
-      event: '*',
-      schema: 'public',
-      table: 'orders'
-    }, () => {
-      console.log('📡 [Realtime] Evento detectado, adicionando à fila...');
-      queueRefresh();
-    }).subscribe();
+    
+    console.log('📡 [Realtime] Iniciando subscriptions expandidas...');
+    
+    const channel = supabase
+      .channel('orders-realtime')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'orders'
+      }, (payload) => {
+        console.log('📡 [Realtime] Evento em orders:', {
+          type: payload.eventType,
+          table: payload.table,
+          timestamp: new Date().toISOString()
+        });
+        queueRefresh();
+      })
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'order_items'
+      }, (payload) => {
+        console.log('📡 [Realtime] Evento em order_items:', {
+          type: payload.eventType,
+          table: payload.table,
+          timestamp: new Date().toISOString()
+        });
+        queueRefresh();
+      })
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'order_history'
+      }, (payload) => {
+        console.log('📡 [Realtime] Evento em order_history:', {
+          type: payload.eventType,
+          table: payload.table,
+          timestamp: new Date().toISOString()
+        });
+        queueRefresh();
+      })
+      .subscribe((status) => {
+        console.log('📡 [Realtime] Status da conexão:', status);
+      });
+    
     return () => {
+      console.log('📡 [Realtime] Limpando subscriptions...');
       if (refreshQueueRef.current) clearTimeout(refreshQueueRef.current);
       supabase.removeChannel(channel);
     };
@@ -383,6 +441,7 @@ export const Dashboard = () => {
     const currentRequestId = ++requestIdRef.current;
     
     isLoadingRef.current = true;
+    setRealtimeStatus('updating'); // 🔄 Indicar que está atualizando
     const startTime = performance.now();
     console.log('🔄 [loadOrders] Iniciando carregamento...', { userId: user.id, requestId: currentRequestId });
     
@@ -399,6 +458,7 @@ export const Dashboard = () => {
       setLoading(false);
       setRefreshing(false);
       isLoadingRef.current = false;
+      setRealtimeStatus('disconnected'); // ❌ Indicar desconexão
       showLimitedToast(
         "Carregamento lento",
         "A conexão está demorando. Tente novamente.",
@@ -865,6 +925,10 @@ export const Dashboard = () => {
       setLoading(false);
       setRefreshing(false);
       isLoadingRef.current = false;
+      
+      // ✅ Indicar sincronização bem-sucedida
+      setRealtimeStatus('synced');
+      setLastUpdateTime(new Date());
     }
   };
   const handleDeleteOrder = async () => {
@@ -1505,6 +1569,7 @@ export const Dashboard = () => {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+          <RealtimeIndicator status={realtimeStatus} lastUpdateTime={lastUpdateTime} />
           <NotificationCenter />
           <UserMenu />
           {isBatchImporting && (

@@ -36,6 +36,12 @@ interface KanbanViewProps {
 
 export const KanbanView = ({ orders, onEdit, onStatusChange }: KanbanViewProps) => {
   const [activeId, setActiveId] = React.useState<string | null>(null);
+  const [optimisticOrders, setOptimisticOrders] = React.useState<Order[]>(orders);
+
+  // Sincronizar com orders recebidos (atualização real do servidor)
+  React.useEffect(() => {
+    setOptimisticOrders(orders);
+  }, [orders]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -194,7 +200,7 @@ export const KanbanView = ({ orders, onEdit, onStatusChange }: KanbanViewProps) 
   ];
 
   const getOrdersByPhase = (phase: Phase) => {
-    return orders.filter((order) => getPhaseFromStatus(order.status) === phase);
+    return optimisticOrders.filter((order) => getPhaseFromStatus(order.status) === phase);
   };
 
   const getDefaultStatusForPhase = (phase: Phase): Order["status"] => {
@@ -238,7 +244,7 @@ export const KanbanView = ({ orders, onEdit, onStatusChange }: KanbanViewProps) 
 
     const orderId = active.id as string;
     const targetPhase = over.id as Phase;
-    const order = orders.find((o) => o.id === orderId);
+    const order = optimisticOrders.find((o) => o.id === orderId);
 
     if (!order) return;
 
@@ -248,6 +254,13 @@ export const KanbanView = ({ orders, onEdit, onStatusChange }: KanbanViewProps) 
     if (currentPhase === targetPhase) return;
 
     const newStatus = getDefaultStatusForPhase(targetPhase);
+    
+    // 🚀 Optimistic update: atualizar UI imediatamente
+    setOptimisticOrders(prev => 
+      prev.map(o => o.id === orderId ? { ...o, status: newStatus } : o)
+    );
+    
+    // Enviar para servidor (se falhar, o useEffect vai reverter com data real)
     onStatusChange(orderId, newStatus);
   };
 
@@ -255,7 +268,7 @@ export const KanbanView = ({ orders, onEdit, onStatusChange }: KanbanViewProps) 
     setActiveId(null);
   };
 
-  const activeOrder = activeId ? orders.find((o) => o.id === activeId) : null;
+  const activeOrder = activeId ? optimisticOrders.find((o) => o.id === activeId) : null;
 
   return (
     <DndContext
