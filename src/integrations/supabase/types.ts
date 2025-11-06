@@ -347,6 +347,164 @@ export type Database = {
           },
         ]
       }
+      item_consumption_metrics: {
+        Row: {
+          average_daily_consumption: number | null
+          consumption_30_days: number | null
+          consumption_60_days: number | null
+          consumption_90_days: number | null
+          id: string
+          item_code: string
+          last_calculated_at: string | null
+        }
+        Insert: {
+          average_daily_consumption?: number | null
+          consumption_30_days?: number | null
+          consumption_60_days?: number | null
+          consumption_90_days?: number | null
+          id?: string
+          item_code: string
+          last_calculated_at?: string | null
+        }
+        Update: {
+          average_daily_consumption?: number | null
+          consumption_30_days?: number | null
+          consumption_60_days?: number | null
+          consumption_90_days?: number | null
+          id?: string
+          item_code?: string
+          last_calculated_at?: string | null
+        }
+        Relationships: []
+      }
+      item_cost_allocation: {
+        Row: {
+          accounting_item: string | null
+          allocated_quantity: number | null
+          allocated_value: number | null
+          allocation_percentage: number
+          business_unit: string
+          cost_center: string
+          created_at: string | null
+          id: string
+          notes: string | null
+          purchase_request_item_id: string
+          warehouse: string
+        }
+        Insert: {
+          accounting_item?: string | null
+          allocated_quantity?: number | null
+          allocated_value?: number | null
+          allocation_percentage: number
+          business_unit: string
+          cost_center: string
+          created_at?: string | null
+          id?: string
+          notes?: string | null
+          purchase_request_item_id: string
+          warehouse: string
+        }
+        Update: {
+          accounting_item?: string | null
+          allocated_quantity?: number | null
+          allocated_value?: number | null
+          allocation_percentage?: number
+          business_unit?: string
+          cost_center?: string
+          created_at?: string | null
+          id?: string
+          notes?: string | null
+          purchase_request_item_id?: string
+          warehouse?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "item_cost_allocation_purchase_request_item_id_fkey"
+            columns: ["purchase_request_item_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_request_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      item_purchase_history: {
+        Row: {
+          created_at: string | null
+          id: string
+          item_code: string
+          notes: string | null
+          purchase_date: string
+          purchase_order_number: string | null
+          quantity: number
+          supplier: string | null
+          unit_price: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          item_code: string
+          notes?: string | null
+          purchase_date: string
+          purchase_order_number?: string | null
+          quantity: number
+          supplier?: string | null
+          unit_price?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          item_code?: string
+          notes?: string | null
+          purchase_date?: string
+          purchase_order_number?: string | null
+          quantity?: number
+          supplier?: string | null
+          unit_price?: number | null
+        }
+        Relationships: []
+      }
+      item_stock_info: {
+        Row: {
+          current_stock_quantity: number | null
+          id: string
+          item_code: string
+          last_purchase_date: string | null
+          last_purchase_price: number | null
+          last_purchase_quantity: number | null
+          last_updated: string | null
+          maximum_stock_level: number | null
+          minimum_stock_level: number | null
+          updated_by: string | null
+          warehouse: string | null
+        }
+        Insert: {
+          current_stock_quantity?: number | null
+          id?: string
+          item_code: string
+          last_purchase_date?: string | null
+          last_purchase_price?: number | null
+          last_purchase_quantity?: number | null
+          last_updated?: string | null
+          maximum_stock_level?: number | null
+          minimum_stock_level?: number | null
+          updated_by?: string | null
+          warehouse?: string | null
+        }
+        Update: {
+          current_stock_quantity?: number | null
+          id?: string
+          item_code?: string
+          last_purchase_date?: string | null
+          last_purchase_price?: number | null
+          last_purchase_quantity?: number | null
+          last_updated?: string | null
+          maximum_stock_level?: number | null
+          minimum_stock_level?: number | null
+          updated_by?: string | null
+          warehouse?: string | null
+        }
+        Relationships: []
+      }
       lab_item_work: {
         Row: {
           assigned_to: string | null
@@ -1272,6 +1430,126 @@ export type Database = {
         }
         Relationships: []
       }
+      purchase_request_items: {
+        Row: {
+          approved_quantity: number | null
+          created_at: string | null
+          id: string
+          item_code: string
+          item_description: string
+          item_status: string | null
+          notes: string | null
+          order_item_id: string | null
+          purchase_request_id: string
+          rejection_reason: string | null
+          requested_quantity: number
+          total_price: number | null
+          unit: string
+          unit_price: number | null
+          updated_at: string | null
+          warehouse: string
+        }
+        Insert: {
+          approved_quantity?: number | null
+          created_at?: string | null
+          id?: string
+          item_code: string
+          item_description: string
+          item_status?: string | null
+          notes?: string | null
+          order_item_id?: string | null
+          purchase_request_id: string
+          rejection_reason?: string | null
+          requested_quantity: number
+          total_price?: number | null
+          unit?: string
+          unit_price?: number | null
+          updated_at?: string | null
+          warehouse: string
+        }
+        Update: {
+          approved_quantity?: number | null
+          created_at?: string | null
+          id?: string
+          item_code?: string
+          item_description?: string
+          item_status?: string | null
+          notes?: string | null
+          order_item_id?: string | null
+          purchase_request_id?: string
+          rejection_reason?: string | null
+          requested_quantity?: number
+          total_price?: number | null
+          unit?: string
+          unit_price?: number | null
+          updated_at?: string | null
+          warehouse?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "purchase_request_items_order_item_id_fkey"
+            columns: ["order_item_id"]
+            isOneToOne: false
+            referencedRelation: "order_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_request_items_purchase_request_id_fkey"
+            columns: ["purchase_request_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      purchase_requests: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          created_at: string | null
+          expected_delivery_date: string | null
+          id: string
+          notes: string | null
+          purchase_order_number: string
+          rejection_reason: string | null
+          request_type: string
+          requested_by: string
+          status: string
+          total_estimated_value: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string | null
+          expected_delivery_date?: string | null
+          id?: string
+          notes?: string | null
+          purchase_order_number: string
+          rejection_reason?: string | null
+          request_type?: string
+          requested_by: string
+          status?: string
+          total_estimated_value?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string | null
+          expected_delivery_date?: string | null
+          id?: string
+          notes?: string | null
+          purchase_order_number?: string
+          rejection_reason?: string | null
+          request_type?: string
+          requested_by?: string
+          status?: string
+          total_estimated_value?: number | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       stock_movements: {
         Row: {
           created_at: string | null
@@ -1399,6 +1677,7 @@ export type Database = {
         Args: { _phase_key: string; _user_id: string }
         Returns: boolean
       }
+      generate_purchase_order_number: { Args: never; Returns: string }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
