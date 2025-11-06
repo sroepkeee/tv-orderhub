@@ -10,12 +10,16 @@ import Metrics from "./pages/Metrics";
 import Production from "./pages/Production";
 import CarriersChat from "./pages/CarriersChat";
 import Carriers from "./pages/Carriers";
+import Admin from "./pages/Admin";
 import { useAuth } from "./hooks/useAuth";
+import { usePhaseAuthorization } from "./hooks/usePhaseAuthorization";
+import { PendingApprovalScreen } from "./components/PendingApprovalScreen";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
+  const { isApproved, loading: authLoading } = usePhaseAuthorization();
   
-  if (loading) {
+  if (loading || authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
@@ -28,6 +32,10 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   
   if (!user) {
     return <Navigate to="/auth" replace />;
+  }
+
+  if (!isApproved) {
+    return <PendingApprovalScreen />;
   }
   
   return <>{children}</>;
@@ -74,6 +82,11 @@ const App = () => {
             <Route path="/transportadoras" element={
               <ProtectedRoute>
                 <Carriers />
+              </ProtectedRoute>
+            } />
+            <Route path="/admin/users" element={
+              <ProtectedRoute>
+                <Admin />
               </ProtectedRoute>
             } />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

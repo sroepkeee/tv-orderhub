@@ -216,6 +216,27 @@ export type Database = {
           },
         ]
       }
+      department_role_mapping: {
+        Row: {
+          created_at: string | null
+          default_role: Database["public"]["Enums"]["app_role"]
+          department: string
+          id: string
+        }
+        Insert: {
+          created_at?: string | null
+          default_role: Database["public"]["Enums"]["app_role"]
+          department: string
+          id?: string
+        }
+        Update: {
+          created_at?: string | null
+          default_role?: Database["public"]["Enums"]["app_role"]
+          department?: string
+          id?: string
+        }
+        Relationships: []
+      }
       freight_quote_responses: {
         Row: {
           additional_info: Json | null
@@ -1122,6 +1143,33 @@ export type Database = {
         }
         Relationships: []
       }
+      permission_audit_log: {
+        Row: {
+          action_type: string
+          created_at: string | null
+          details: Json | null
+          id: string
+          performed_by: string
+          target_user_id: string | null
+        }
+        Insert: {
+          action_type: string
+          created_at?: string | null
+          details?: Json | null
+          id?: string
+          performed_by: string
+          target_user_id?: string | null
+        }
+        Update: {
+          action_type?: string
+          created_at?: string | null
+          details?: Json | null
+          id?: string
+          performed_by?: string
+          target_user_id?: string | null
+        }
+        Relationships: []
+      }
       phase_config: {
         Row: {
           color: string | null
@@ -1158,6 +1206,39 @@ export type Database = {
         }
         Relationships: []
       }
+      phase_permissions: {
+        Row: {
+          can_delete: boolean | null
+          can_edit: boolean | null
+          can_view: boolean | null
+          created_at: string | null
+          id: string
+          phase_key: string
+          role: Database["public"]["Enums"]["app_role"]
+          updated_at: string | null
+        }
+        Insert: {
+          can_delete?: boolean | null
+          can_edit?: boolean | null
+          can_view?: boolean | null
+          created_at?: string | null
+          id?: string
+          phase_key: string
+          role: Database["public"]["Enums"]["app_role"]
+          updated_at?: string | null
+        }
+        Update: {
+          can_delete?: boolean | null
+          can_edit?: boolean | null
+          can_view?: boolean | null
+          created_at?: string | null
+          id?: string
+          phase_key?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string
@@ -1165,6 +1246,8 @@ export type Database = {
           email: string | null
           full_name: string | null
           id: string
+          is_active: boolean | null
+          last_login: string | null
           updated_at: string
         }
         Insert: {
@@ -1173,6 +1256,8 @@ export type Database = {
           email?: string | null
           full_name?: string | null
           id: string
+          is_active?: boolean | null
+          last_login?: string | null
           updated_at?: string
         }
         Update: {
@@ -1181,6 +1266,8 @@ export type Database = {
           email?: string | null
           full_name?: string | null
           id?: string
+          is_active?: boolean | null
+          last_login?: string | null
           updated_at?: string
         }
         Relationships: []
@@ -1245,6 +1332,39 @@ export type Database = {
           },
         ]
       }
+      user_approval_status: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          created_at: string | null
+          id: string
+          rejection_reason: string | null
+          status: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string | null
+          id?: string
+          rejection_reason?: string | null
+          status?: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string | null
+          id?: string
+          rejection_reason?: string | null
+          status?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string | null
@@ -1275,6 +1395,10 @@ export type Database = {
         Args: { _phase: string; _user_id: string }
         Returns: boolean
       }
+      can_view_phase: {
+        Args: { _phase_key: string; _user_id: string }
+        Returns: boolean
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -1282,6 +1406,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_user_approved: { Args: { _user_id: string }; Returns: boolean }
       subtract_business_days: {
         Args: { business_days: number; start_date: string }
         Returns: string
