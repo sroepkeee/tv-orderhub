@@ -36,6 +36,28 @@ export const UserManagementTable = () => {
 
   useEffect(() => {
     loadUsers();
+    
+    // Subscribe to changes
+    const approvalChannel = supabase
+      .channel('user-approvals-changes')
+      .on('postgres_changes', 
+        { event: '*', schema: 'public', table: 'user_approval_status' },
+        () => loadUsers()
+      )
+      .subscribe();
+    
+    const rolesChannel = supabase
+      .channel('user-roles-changes')
+      .on('postgres_changes', 
+        { event: '*', schema: 'public', table: 'user_roles' },
+        () => loadUsers()
+      )
+      .subscribe();
+    
+    return () => {
+      approvalChannel.unsubscribe();
+      rolesChannel.unsubscribe();
+    };
   }, []);
 
   useEffect(() => {
@@ -46,31 +68,48 @@ export const UserManagementTable = () => {
     try {
       setLoading(true);
       
-      // Buscar perfis com status de aprovação
-      const { data: profilesData, error: profilesError } = await supabase
+      // Buscar profiles
+      const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
-        .select(`
-          id,
-          email,
-          full_name,
-          department,
-          created_at,
-          user_approval_status (status),
-          user_roles (role)
-        `);
-
+        .select('id, email, full_name, department, created_at')
+        .order('created_at', { ascending: false });
+      
       if (profilesError) throw profilesError;
-
-      const usersData: UserData[] = profilesData.map((profile: any) => ({
-        id: profile.id,
-        email: profile.email || '',
-        full_name: profile.full_name || 'Sem nome',
-        department: profile.department || 'Não definido',
-        approval_status: profile.user_approval_status?.[0]?.status || 'pending',
-        roles: profile.user_roles?.map((r: any) => r.role) || [],
-        created_at: profile.created_at,
-      }));
-
+      if (!profiles) {
+        setUsers([]);
+        return;
+      }
+      
+      // Buscar status de aprovação
+      const { data: approvalStatuses, error: approvalError } = await supabase
+        .from('user_approval_status')
+        .select('user_id, status');
+      
+      if (approvalError) throw approvalError;
+      
+      // Buscar roles
+      const { data: userRoles, error: rolesError } = await supabase
+        .from('user_roles')
+        .select('user_id, role');
+      
+      if (rolesError) throw rolesError;
+      
+      // Combinar dados
+      const usersData: UserData[] = profiles.map(profile => {
+        const approval = approvalStatuses?.find(a => a.user_id === profile.id);
+        const roles = userRoles?.filter(r => r.user_id === profile.id).map(r => r.role) || [];
+        
+        return {
+          id: profile.id,
+          email: profile.email || '',
+          full_name: profile.full_name || 'Sem nome',
+          department: profile.department || 'Não definido',
+          approval_status: approval?.status || 'pending',
+          roles: roles,
+          created_at: profile.created_at,
+        };
+      });
+      
       setUsers(usersData);
     } catch (error) {
       console.error('Error loading users:', error);
