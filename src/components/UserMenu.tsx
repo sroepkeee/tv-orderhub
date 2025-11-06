@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   DropdownMenu,
@@ -9,16 +9,48 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
-import { User, Sun, Moon, LogOut, KeyRound } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { User, Sun, Moon, LogOut, KeyRound, Shield } from "lucide-react";
 import { useTheme } from "next-themes";
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
+import { useAdminAuth } from "@/hooks/useAdminAuth";
+import { supabase } from "@/integrations/supabase/client";
 import { ChangePasswordDialog } from "@/components/ChangePasswordDialog";
 
 export const UserMenu = () => {
   const { theme, setTheme } = useTheme();
   const { user, signOut } = useAuth();
+  const { isAdmin } = useAdminAuth();
   const navigate = useNavigate();
+  const [pendingCount, setPendingCount] = useState(0);
+  
+  useEffect(() => {
+    if (!isAdmin) return;
+    
+    const loadCount = async () => {
+      const { count } = await supabase
+        .from('user_approval_status')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'pending');
+      
+      setPendingCount(count || 0);
+    };
+    
+    loadCount();
+    
+    const channel = supabase
+      .channel('user-menu-approvals')
+      .on('postgres_changes', 
+        { event: '*', schema: 'public', table: 'user_approval_status' },
+        loadCount
+      )
+      .subscribe();
+    
+    return () => { 
+      supabase.removeChannel(channel);
+    };
+  }, [isAdmin]);
 
   const handleThemeToggle = () => {
     setTheme(theme === "dark" ? "light" : "dark");
@@ -80,6 +112,21 @@ export const UserMenu = () => {
               </DropdownMenuItem>
             }
           />
+
+          {isAdmin && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => navigate('/admin/users')} className="relative">
+                <Shield className="mr-2 h-4 w-4" />
+                <span>Gerenciar Usuários</span>
+                {pendingCount > 0 && (
+                  <Badge variant="destructive" className="ml-auto h-5 w-5 p-0 flex items-center justify-center text-xs">
+                    {pendingCount}
+                  </Badge>
+                )}
+              </DropdownMenuItem>
+            </>
+          )}
 
           <DropdownMenuSeparator />
           

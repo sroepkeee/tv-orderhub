@@ -8,7 +8,7 @@ import { Search, Calendar, BarChart3, FileSpreadsheet, Plus, ChevronDown, Messag
 import { Progress } from "@/components/ui/progress";
 import { cleanItemDescription } from "@/lib/utils";
 import { getStatusLabel } from "@/lib/statusLabels";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { useNavigate } from "react-router-dom";
 import { AddOrderDialog } from "./AddOrderDialog";
 import { EditOrderDialog } from "./EditOrderDialog";
@@ -23,7 +23,9 @@ import { ImportOrderDialog } from "./ImportOrderDialog";
 import { RealtimeIndicator } from "./RealtimeIndicator";
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
+import { useAdminAuth } from "@/hooks/useAdminAuth";
 import { supabase } from "@/integrations/supabase/client";
+import { Shield } from "lucide-react";
 
 // Types
 type Priority = "high" | "medium" | "low";
@@ -198,6 +200,7 @@ export const Dashboard = () => {
   const {
     user
   } = useAuth();
+  const { isAdmin } = useAdminAuth();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
@@ -212,6 +215,7 @@ export const Dashboard = () => {
   const [isBatchImporting, setIsBatchImporting] = useState(false);
   const [realtimeStatus, setRealtimeStatus] = useState<'synced' | 'updating' | 'disconnected'>('synced');
   const [lastUpdateTime, setLastUpdateTime] = useState<Date | null>(null);
+  const [pendingApprovalsCount, setPendingApprovalsCount] = useState(0);
   const isUpdatingRef = useRef(false);
   const loadingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isLoadingRef = useRef(false);
@@ -271,6 +275,35 @@ export const Dashboard = () => {
       console.error('Erro ao carregar contador de conversas:', error);
     }
   };
+
+  // Load pending approvals count for admin
+  useEffect(() => {
+    if (!isAdmin) return;
+    
+    const loadPendingCount = async () => {
+      const { count } = await supabase
+        .from('user_approval_status')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'pending');
+      
+      setPendingApprovalsCount(count || 0);
+    };
+    
+    loadPendingCount();
+    
+    // Realtime subscription
+    const channel = supabase
+      .channel('pending-approvals')
+      .on('postgres_changes', 
+        { event: '*', schema: 'public', table: 'user_approval_status' },
+        loadPendingCount
+      )
+      .subscribe();
+    
+    return () => { 
+      supabase.removeChannel(channel);
+    };
+  }, [isAdmin]);
 
   // Limpar dialog se o pedido selecionado não existir mais
   useEffect(() => {
@@ -1571,8 +1604,36 @@ export const Dashboard = () => {
                     ({unreadConversationsCount})
                   </span>}
               </DropdownMenuItem>
+              {isAdmin && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => navigate('/admin/users')} className="relative">
+                    <Shield className="h-4 w-4 mr-2" />
+                    Gerenciar Usuários
+                    {pendingApprovalsCount > 0 && (
+                      <span className="ml-auto pl-2 text-xs font-semibold text-destructive">
+                        ({pendingApprovalsCount})
+                      </span>
+                    )}
+                  </DropdownMenuItem>
+                </>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
+          {isAdmin && pendingApprovalsCount > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => navigate('/admin/users')}
+              className="gap-2 h-8 px-2 relative animate-pulse"
+            >
+              <Shield className="h-3.5 w-3.5" />
+              <span className="hidden lg:inline text-xs">Aprovações</span>
+              <Badge variant="destructive" className="h-5 min-w-5 px-1 flex items-center justify-center text-xs">
+                {pendingApprovalsCount}
+              </Badge>
+            </Button>
+          )}
           <RealtimeIndicator status={realtimeStatus} lastUpdateTime={lastUpdateTime} />
           <NotificationCenter />
           <UserMenu />
