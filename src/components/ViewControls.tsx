@@ -108,7 +108,7 @@ export const ViewControls = ({
         ["in_quality_check", "in_packaging", "ready_for_shipping"].includes(o.status)
       ).length,
       invoicing: activeOrders.filter(o => 
-        ["awaiting_invoice", "invoice_requested", "invoice_issued", "invoice_sent"].includes(o.status)
+        ["ready_to_invoice", "pending_invoice_request", "awaiting_invoice", "invoice_requested", "invoice_issued", "invoice_sent"].includes(o.status)
       ).length,
       shipping: activeOrders.filter(o => 
         ["released_for_shipping", "in_expedition", "in_transit", "awaiting_pickup", "collected"].includes(o.status)
@@ -299,7 +299,7 @@ export const ViewControls = ({
                   statusFilter === "invoicing" ? "bg-primary/10 border-primary" : "bg-muted/50"
                 }`}
               >
-                <span className="text-xs text-muted-foreground font-medium">Faturamento:</span>
+                <span className="text-xs text-muted-foreground font-medium">Faturamento (Total):</span>
                 <span className="text-xs font-bold text-primary">{statusCounts.invoicing}</span>
               </Button>
               

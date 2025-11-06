@@ -148,6 +148,8 @@ export default {
           "packaging-bg": "hsl(var(--phase-packaging-bg))",
           freight: "hsl(var(--phase-freight))",
           "freight-bg": "hsl(var(--phase-freight-bg))",
+          "ready-invoice": "hsl(var(--phase-ready-invoice))",
+          "ready-invoice-bg": "hsl(var(--phase-ready-invoice-bg))",
           invoicing: "hsl(var(--phase-invoicing))",
           "invoicing-bg": "hsl(var(--phase-invoicing-bg))",
           logistics: "hsl(var(--phase-logistics))",

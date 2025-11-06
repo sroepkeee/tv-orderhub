@@ -22,7 +22,7 @@ export function DepartmentLeaderboard({ orders }: DepartmentLeaderboardProps) {
     { dept: 'Planejamento', role: 'planejamento', statuses: ['order_generation_pending', 'order_in_creation', 'order_generated'] },
     { dept: 'Almox Geral', role: 'almox_geral', statuses: ['almox_general_received', 'almox_general_separating', 'almox_general_ready'] },
     { dept: 'Produção', role: 'producao', statuses: ['separation_started', 'in_production', 'production_completed'] },
-    { dept: 'Faturamento', role: 'faturamento', statuses: ['balance_calculation', 'balance_review', 'balance_approved', 'awaiting_invoice', 'invoice_issued', 'invoice_sent'] },
+    { dept: 'Faturamento', role: 'faturamento', statuses: ['balance_calculation', 'balance_review', 'balance_approved', 'ready_to_invoice', 'pending_invoice_request', 'invoice_requested', 'awaiting_invoice', 'invoice_issued', 'invoice_sent'] },
     { dept: 'Laboratório', role: 'laboratorio', statuses: ['awaiting_lab', 'in_lab_analysis', 'lab_completed'] },
     { dept: 'Logística', role: 'logistica', statuses: ['in_packaging', 'ready_for_shipping', 'released_for_shipping', 'in_expedition', 'in_transit', 'collected'] },
     { dept: 'Comercial', role: 'comercial', statuses: ['freight_quote_requested', 'freight_quote_received', 'freight_approved'] },

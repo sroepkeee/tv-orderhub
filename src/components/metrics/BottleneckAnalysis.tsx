@@ -26,7 +26,8 @@ export function BottleneckAnalysis({ orders }: BottleneckAnalysisProps) {
     { key: 'laboratory', name: 'Laboratório', statuses: ['awaiting_lab', 'in_lab_analysis', 'lab_completed'], threshold: 3 },
     { key: 'packaging', name: 'Embalagem', statuses: ['in_quality_check', 'in_packaging', 'ready_for_shipping'], threshold: 2 },
     { key: 'freight_quote', name: 'Cotação Frete', statuses: ['freight_quote_requested', 'freight_quote_received', 'freight_approved'], threshold: 2 },
-    { key: 'invoicing', name: 'Faturamento', statuses: ['awaiting_invoice', 'invoice_issued', 'invoice_sent'], threshold: 2 },
+    { key: 'ready_to_invoice', name: 'À Faturar', statuses: ['ready_to_invoice', 'pending_invoice_request'], threshold: 1 },
+    { key: 'invoicing', name: 'Solicitado Faturamento', statuses: ['invoice_requested', 'awaiting_invoice', 'invoice_issued', 'invoice_sent'], threshold: 2 },
     { key: 'logistics', name: 'Expedição', statuses: ['released_for_shipping', 'in_expedition', 'in_transit', 'pickup_scheduled', 'awaiting_pickup', 'collected'], threshold: 3 },
   ];
 

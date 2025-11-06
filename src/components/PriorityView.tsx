@@ -118,7 +118,7 @@ export const PriorityView = ({
         );
       case "invoicing":
         return orders.filter(o => 
-          ["awaiting_invoice", "invoice_requested", "invoice_issued", "invoice_sent"].includes(o.status)
+          ["ready_to_invoice", "pending_invoice_request", "awaiting_invoice", "invoice_requested", "invoice_issued", "invoice_sent"].includes(o.status)
         );
       case "shipping":
         return orders.filter(o => 

@@ -14,6 +14,7 @@ import {
   CheckCircle2,
   AlertCircle,
   Check,
+  ClipboardCheck,
 } from "lucide-react";
 import { Order } from "./Dashboard";
 import {
@@ -128,13 +129,23 @@ export const PhaseButtons = ({ order, onStatusChange }: PhaseButtonsProps) => {
       ]
     },
     {
+      id: "ready_to_invoice",
+      label: "À Faturar",
+      icon: ClipboardCheck,
+      color: "text-teal-600",
+      statuses: [
+        { value: "ready_to_invoice", label: "Pronto para Faturar" },
+        { value: "pending_invoice_request", label: "Aguardando Solicitação" },
+      ]
+    },
+    {
       id: "invoicing",
-      label: "Faturamento",
+      label: "Solicitado Faturamento",
       icon: FileText,
       color: "text-emerald-600",
       statuses: [
-        { value: "invoice_requested", label: "Solicitado Faturamento" },
-        { value: "awaiting_invoice", label: "Aguardando Faturamento" },
+        { value: "invoice_requested", label: "Faturamento Solicitado" },
+        { value: "awaiting_invoice", label: "Processando Faturamento" },
         { value: "invoice_issued", label: "Nota Fiscal Emitida" },
         { value: "invoice_sent", label: "NF Enviada ao Cliente" },
       ]

@@ -13,6 +13,7 @@ import {
   FileEdit,
   Warehouse,
   Receipt,
+  ClipboardCheck,
 } from "lucide-react";
 import {
   DndContext,
@@ -26,7 +27,7 @@ import {
 } from "@dnd-kit/core";
 import { KanbanCard } from "./KanbanCard";
 
-export type Phase = "almox_ssm" | "order_generation" | "almox_general" | "production" | "balance_generation" | "laboratory" | "packaging" | "freight_quote" | "invoicing" | "logistics" | "in_transit" | "completion";
+export type Phase = "almox_ssm" | "order_generation" | "almox_general" | "production" | "balance_generation" | "laboratory" | "packaging" | "freight_quote" | "ready_to_invoice" | "invoicing" | "logistics" | "in_transit" | "completion";
 
 interface KanbanViewProps {
   orders: Order[];
@@ -89,11 +90,11 @@ export const KanbanView = ({ orders, onEdit, onStatusChange }: KanbanViewProps) 
       case "freight_quote_received":
       case "freight_approved":
         return "freight_quote";
-      // Status de Faturamento (Invoicing Phase):
-      // - invoice_requested: Solicitação de geração de NF
-      // - awaiting_invoice: Aguardando emissão da NF
-      // - invoice_issued: NF emitida, aguardando envio
-      // - invoice_sent: NF enviada ao cliente
+      // Fase: À Faturar
+      case "ready_to_invoice":
+      case "pending_invoice_request":
+        return "ready_to_invoice";
+      // Fase: Solicitado Faturamento
       case "invoice_requested":
       case "awaiting_invoice":
       case "invoice_issued":
@@ -174,8 +175,14 @@ export const KanbanView = ({ orders, onEdit, onStatusChange }: KanbanViewProps) 
       colorClass: "bg-phase-freight-bg text-phase-freight border-b-4 border-phase-border",
     },
     {
+      id: "ready_to_invoice" as Phase,
+      title: "À Faturar",
+      icon: ClipboardCheck,
+      colorClass: "bg-phase-ready-invoice-bg text-phase-ready-invoice border-b-4 border-phase-border",
+    },
+    {
       id: "invoicing" as Phase,
-      title: "Faturamento",
+      title: "Solicitado Faturamento",
       icon: FileText,
       colorClass: "bg-phase-invoicing-bg text-phase-invoicing border-b-4 border-phase-border",
     },
@@ -221,8 +228,10 @@ export const KanbanView = ({ orders, onEdit, onStatusChange }: KanbanViewProps) 
         return "in_packaging";
       case "freight_quote":
         return "freight_quote_requested";
+      case "ready_to_invoice":
+        return "ready_to_invoice";
       case "invoicing":
-        return "awaiting_invoice";
+        return "invoice_requested";
       case "logistics":
         return "in_expedition";
       case "in_transit":

@@ -143,6 +143,8 @@ All colors MUST be HSL.
     --phase-packaging-bg: 220 15% 94%;
     --phase-freight: 220 40% 35%;
     --phase-freight-bg: 220 15% 94%;
+    --phase-ready-invoice: 220 40% 35%;
+    --phase-ready-invoice-bg: 220 15% 94%;
     --phase-invoicing: 220 40% 35%;
     --phase-invoicing-bg: 220 15% 94%;
     --phase-logistics: 220 40% 35%;
@@ -313,6 +315,8 @@ All colors MUST be HSL.
     --phase-packaging-bg: 220 20% 16%;
     --phase-freight: 220 30% 85%;
     --phase-freight-bg: 220 20% 16%;
+    --phase-ready-invoice: 220 30% 85%;
+    --phase-ready-invoice-bg: 220 20% 16%;
     --phase-invoicing: 220 30% 85%;
     --phase-invoicing-bg: 220 20% 16%;
     --phase-logistics: 220 30% 85%;

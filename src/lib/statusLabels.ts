@@ -31,9 +31,12 @@ export const STATUS_LABELS: Record<string, string> = {
   "pickup_scheduled": "Retirada Agendada",
   "awaiting_pickup": "Aguardando Retirada",
   "collected": "Coletado",
-  // Faturamento
-  "invoice_requested": "Solicitado Faturamento",
-  "awaiting_invoice": "Aguardando Faturamento",
+  // À Faturar (Nova Fase)
+  "ready_to_invoice": "Pronto para Faturar",
+  "pending_invoice_request": "Aguardando Solicitação",
+  // Faturamento Solicitado
+  "invoice_requested": "Faturamento Solicitado",
+  "awaiting_invoice": "Processando Faturamento",
   "invoice_issued": "Nota Fiscal Emitida",
   "invoice_sent": "NF Enviada ao Cliente",
   // Conclusão
@@ -99,6 +102,9 @@ export function getStatusColor(status: string): string {
     // Roxo - Aprovado/Especial
     "freight_approved": "bg-purple-500",
     "ready_for_shipping": "bg-purple-500",
+    // Teal - À Faturar
+    "ready_to_invoice": "bg-teal-500",
+    "pending_invoice_request": "bg-teal-400",
     // Vermelho - Cancelado/Problema
     "cancelled": "bg-red-500",
     "returned": "bg-red-500",

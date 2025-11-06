@@ -44,7 +44,9 @@ type OrderStatus =
 | "in_quality_check" | "in_packaging" | "ready_for_shipping"
 // Fase: Cotação de Frete
 | "freight_quote_requested" | "freight_quote_received" | "freight_approved"
-// Fase: Faturamento
+// Fase: À Faturar
+| "ready_to_invoice" | "pending_invoice_request"
+// Fase: Solicitado Faturamento
 | "invoice_requested" | "awaiting_invoice" | "invoice_issued" | "invoice_sent"
 // Fase: Expedição
 | "released_for_shipping" | "in_expedition" | "in_transit" | "pickup_scheduled" | "awaiting_pickup" | "collected"
@@ -1451,6 +1453,8 @@ export const Dashboard = () => {
       "separation_completed": "bg-status-sep-complete-bg text-status-sep-complete",
       "production_completed": "bg-status-prod-complete-bg text-status-prod-complete",
       // Faturamento
+      "ready_to_invoice": "bg-teal-100 text-teal-700",
+      "pending_invoice_request": "bg-teal-100 text-teal-700",
       "invoice_requested": "bg-blue-100 text-blue-700",
       "awaiting_invoice": "bg-blue-100 text-blue-700",
       "invoice_issued": "bg-blue-200 text-blue-800",

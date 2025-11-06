@@ -25,7 +25,8 @@ export function PhasePerformanceMetrics({ orders }: PhasePerformanceMetricsProps
     { key: 'laboratory', name: 'Laboratório', statuses: ['awaiting_lab', 'in_lab_analysis', 'lab_completed'] },
     { key: 'packaging', name: 'Embalagem', statuses: ['in_quality_check', 'in_packaging', 'ready_for_shipping'] },
     { key: 'freight_quote', name: 'Cotação Frete', statuses: ['freight_quote_requested', 'freight_quote_received', 'freight_approved'] },
-    { key: 'invoicing', name: 'Faturamento', statuses: ['awaiting_invoice', 'invoice_issued', 'invoice_sent'] },
+    { key: 'ready_to_invoice', name: 'À Faturar', statuses: ['ready_to_invoice', 'pending_invoice_request'] },
+    { key: 'invoicing', name: 'Solicitado Faturamento', statuses: ['invoice_requested', 'awaiting_invoice', 'invoice_issued', 'invoice_sent'] },
     { key: 'logistics', name: 'Expedição', statuses: ['released_for_shipping', 'in_expedition', 'in_transit', 'pickup_scheduled', 'awaiting_pickup', 'collected'] },
   ];
 
