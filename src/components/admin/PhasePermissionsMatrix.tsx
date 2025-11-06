@@ -30,12 +30,15 @@ const PHASES = [
 ];
 
 const ROLES = [
-  { value: 'admin', label: 'Admin' },
+  { value: 'admin', label: 'Administrador' },
   { value: 'almox_ssm', label: 'Almox SSM' },
   { value: 'almox_geral', label: 'Almox Geral' },
+  { value: 'almox_filial', label: 'Almox Filial' },
+  { value: 'almox_m16', label: 'Almox M16' },
   { value: 'planejamento', label: 'Planejamento' },
   { value: 'producao', label: 'Produção' },
   { value: 'laboratorio', label: 'Laboratório' },
+  { value: 'laboratorio_filial', label: 'Laboratório Filial' },
   { value: 'logistica', label: 'Logística' },
   { value: 'comercial', label: 'Comercial' },
   { value: 'faturamento', label: 'Faturamento' },
@@ -147,10 +150,18 @@ export const PhasePermissionsMatrix = () => {
 
       if (deleteError) throw deleteError;
 
-      // Inserir novas permissões
+      // Inserir novas permissões (removendo campo id para evitar erro de constraint)
+      const permissionsToInsert = permissions.map(({ role, phase_key, can_view, can_edit, can_delete }) => ({
+        role,
+        phase_key,
+        can_view,
+        can_edit,
+        can_delete
+      }));
+      
       const { error: insertError } = await supabase
         .from('phase_permissions')
-        .insert(permissions as any);
+        .insert(permissionsToInsert as any);
 
       if (insertError) throw insertError;
 
