@@ -5,7 +5,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Save } from "lucide-react";
+import { Save, CheckSquare, X } from "lucide-react";
 
 interface Permission {
   role: string;
@@ -98,6 +98,43 @@ export const PhasePermissionsMatrix = () => {
     });
   };
 
+  const selectAllForRole = (role: string) => {
+    setPermissions(prev => {
+      const newPermissions = [...prev];
+      
+      PHASES.forEach(phase => {
+        const existingIndex = newPermissions.findIndex(
+          p => p.role === role && p.phase_key === phase.key
+        );
+        
+        if (existingIndex >= 0) {
+          newPermissions[existingIndex] = {
+            ...newPermissions[existingIndex],
+            can_view: true,
+            can_edit: true,
+            can_delete: true,
+          };
+        } else {
+          newPermissions.push({
+            role,
+            phase_key: phase.key,
+            can_view: true,
+            can_edit: true,
+            can_delete: true,
+          });
+        }
+      });
+      
+      return newPermissions;
+    });
+  };
+
+  const clearAllForRole = (role: string) => {
+    setPermissions(prev => 
+      prev.filter(p => p.role !== role)
+    );
+  };
+
   const handleSave = async () => {
     try {
       setSaving(true);
@@ -157,6 +194,7 @@ export const PhasePermissionsMatrix = () => {
             <TableHeader>
               <TableRow>
                 <TableHead className="w-[150px]">Role</TableHead>
+                <TableHead className="w-[180px] text-center">Ações Rápidas</TableHead>
                 {PHASES.map(phase => (
                   <TableHead key={phase.key} className="text-center">
                     <div className="text-xs">{phase.label}</div>
@@ -168,6 +206,28 @@ export const PhasePermissionsMatrix = () => {
               {ROLES.map(role => (
                 <TableRow key={role.value}>
                   <TableCell className="font-medium">{role.label}</TableCell>
+                  <TableCell className="text-center">
+                    <div className="flex gap-2 justify-center">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => selectAllForRole(role.value)}
+                        title="Selecionar todas as permissões desta role"
+                      >
+                        <CheckSquare className="h-4 w-4 mr-1" />
+                        Todos
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => clearAllForRole(role.value)}
+                        title="Limpar todas as permissões desta role"
+                      >
+                        <X className="h-4 w-4 mr-1" />
+                        Limpar
+                      </Button>
+                    </div>
+                  </TableCell>
                   {PHASES.map(phase => {
                     const perm = getPermission(role.value, phase.key);
                     return (
@@ -203,8 +263,9 @@ export const PhasePermissionsMatrix = () => {
             </TableBody>
           </Table>
         </div>
-        <div className="mt-4 text-sm text-muted-foreground">
-          <p>Legenda: 1ª checkbox = Visualizar | 2ª checkbox = Editar | 3ª checkbox = Deletar</p>
+        <div className="mt-4 text-sm text-muted-foreground space-y-1">
+          <p><strong>Legenda:</strong> 1ª checkbox = Visualizar | 2ª checkbox = Editar | 3ª checkbox = Deletar</p>
+          <p><strong>Ações Rápidas:</strong> "Todos" seleciona todas as permissões da role | "Limpar" remove todas as permissões da role</p>
         </div>
       </CardContent>
     </Card>
