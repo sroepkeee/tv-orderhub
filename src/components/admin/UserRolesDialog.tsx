@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
+import { useAvailableRoles } from "@/hooks/useAvailableRoles";
 
 interface UserRolesDialogProps {
   open: boolean;
@@ -19,26 +20,20 @@ interface UserRolesDialogProps {
   onSuccess: () => void;
 }
 
-const AVAILABLE_ROLES = [
-  { value: 'admin', label: 'Administrador' },
-  { value: 'almox_ssm', label: 'Almox SSM' },
-  { value: 'almox_geral', label: 'Almox Geral' },
-  { value: 'almox_filial', label: 'Almox Filial' },
-  { value: 'almox_m16', label: 'Almox M16' },
-  { value: 'planejamento', label: 'Planejamento' },
-  { value: 'producao', label: 'Produção' },
-  { value: 'laboratorio', label: 'Laboratório' },
-  { value: 'laboratorio_filial', label: 'Laboratório Filial' },
-  { value: 'logistica', label: 'Logística' },
-  { value: 'comercial', label: 'Comercial' },
-  { value: 'faturamento', label: 'Faturamento' },
-];
-
 export const UserRolesDialog = ({ open, onOpenChange, user, onSuccess }: UserRolesDialogProps) => {
   const [loading, setLoading] = useState(false);
   const [selectedRoles, setSelectedRoles] = useState<string[]>(user.roles);
   const { toast } = useToast();
   const { user: currentUser } = useAuth();
+  const { roles: availableRoles, loading: loadingRoles } = useAvailableRoles();
+
+  // Agrupar roles por área
+  const rolesByArea = availableRoles.reduce((acc, role) => {
+    const area = role.area;
+    if (!acc[area]) acc[area] = [];
+    acc[area].push(role);
+    return acc;
+  }, {} as Record<string, typeof availableRoles>);
 
   useEffect(() => {
     setSelectedRoles(user.roles);
@@ -140,34 +135,50 @@ export const UserRolesDialog = ({ open, onOpenChange, user, onSuccess }: UserRol
             <p className="text-sm text-muted-foreground mb-2">Roles atuais:</p>
             <div className="flex gap-2 flex-wrap">
               {user.roles.length > 0 ? (
-                user.roles.map(role => (
-                  <Badge key={role} variant="secondary">
-                    {AVAILABLE_ROLES.find(r => r.value === role)?.label || role}
-                  </Badge>
-                ))
+                user.roles.map(role => {
+                  const roleLabel = availableRoles.find(r => r.value === role);
+                  return (
+                    <Badge key={role} variant="secondary">
+                      {roleLabel?.label || role}
+                    </Badge>
+                  );
+                })
               ) : (
                 <span className="text-sm text-muted-foreground">Nenhuma role atribuída</span>
               )}
             </div>
           </div>
 
-          <div className="space-y-3">
-            {AVAILABLE_ROLES.map((role) => (
-              <div key={role.value} className="flex items-center space-x-2">
-                <Checkbox
-                  id={role.value}
-                  checked={selectedRoles.includes(role.value)}
-                  onCheckedChange={() => toggleRole(role.value)}
-                />
-                <Label
-                  htmlFor={role.value}
-                  className="text-sm font-normal cursor-pointer"
-                >
-                  {role.label}
-                </Label>
-              </div>
-            ))}
-          </div>
+          {loadingRoles ? (
+            <div className="text-sm text-muted-foreground">Carregando roles...</div>
+          ) : (
+            <div className="space-y-4">
+              {Object.entries(rolesByArea).map(([area, roles]) => (
+                <div key={area} className="border rounded-lg p-3 bg-muted/30">
+                  <h4 className="font-semibold text-sm mb-2 text-primary">
+                    {area}
+                  </h4>
+                  <div className="space-y-2">
+                    {roles.map((role) => (
+                      <div key={role.value} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={role.value}
+                          checked={selectedRoles.includes(role.value)}
+                          onCheckedChange={() => toggleRole(role.value)}
+                        />
+                        <Label
+                          htmlFor={role.value}
+                          className="text-sm font-normal cursor-pointer"
+                        >
+                          {role.label}
+                        </Label>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         <DialogFooter>

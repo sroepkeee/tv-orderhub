@@ -1678,6 +1678,12 @@ export type Database = {
         Returns: boolean
       }
       generate_purchase_order_number: { Args: never; Returns: string }
+      get_app_roles: {
+        Args: never
+        Returns: {
+          role: string
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]

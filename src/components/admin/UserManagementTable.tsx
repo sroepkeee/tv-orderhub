@@ -9,6 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { UserCheck, UserX, UserCog, Search, CheckCircle, XCircle, Clock } from "lucide-react";
 import { UserApprovalDialog } from "./UserApprovalDialog";
 import { UserRolesDialog } from "./UserRolesDialog";
+import { DepartmentSelect } from "./DepartmentSelect";
 import { useToast } from "@/hooks/use-toast";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -248,7 +249,13 @@ export const UserManagementTable = () => {
                     <TableRow key={user.id}>
                       <TableCell className="font-medium">{user.full_name}</TableCell>
                       <TableCell className="text-muted-foreground">{user.email}</TableCell>
-                      <TableCell>{user.department}</TableCell>
+                      <TableCell>
+                        <DepartmentSelect
+                          userId={user.id}
+                          currentDepartment={user.department}
+                          onUpdate={loadUsers}
+                        />
+                      </TableCell>
                       <TableCell>
                         <div className="flex gap-1 flex-wrap">
                           {user.roles.length > 0 ? (
