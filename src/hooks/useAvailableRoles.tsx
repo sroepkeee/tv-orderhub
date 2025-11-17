@@ -23,11 +23,28 @@ export const useAvailableRoles = () => {
       
       if (error) throw error;
 
-      const roleOptions: RoleOption[] = data.map((r: { role: string }) => ({
-        value: r.role,
-        label: ROLE_LABELS[r.role]?.name || r.role,
-        area: ROLE_LABELS[r.role]?.area || 'Outros'
-      }));
+      // Filtrar apenas roles válidos (fases atuais + admin)
+      const validRoles = [
+        'admin',
+        'almox_ssm',
+        'order_generation',
+        'almox_general',
+        'production',
+        'balance_generation',
+        'laboratory',
+        'packaging',
+        'freight_quote',
+        'invoicing',
+        'logistics'
+      ];
+
+      const roleOptions: RoleOption[] = data
+        .filter((r: { role: string }) => validRoles.includes(r.role))
+        .map((r: { role: string }) => ({
+          value: r.role,
+          label: ROLE_LABELS[r.role]?.name || r.role,
+          area: ROLE_LABELS[r.role]?.area || 'Outros'
+        }));
 
       setRoles(roleOptions);
     } catch (error) {
