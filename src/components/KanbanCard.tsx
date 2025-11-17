@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Clock, AlertCircle, GripVertical } from "lucide-react";
+import { Clock, AlertCircle, GripVertical, Info } from "lucide-react";
 import { Order } from "@/components/Dashboard";
 import { OrderItem } from "@/components/AddOrderDialog";
 import { useDraggable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { usePhaseInfo } from "@/hooks/usePhaseInfo";
+import { ROLE_LABELS } from "@/lib/roleLabels";
 interface KanbanCardProps {
   order: Order;
   onEdit: (order: Order) => void;
@@ -17,6 +20,9 @@ export const KanbanCard = ({
   onStatusChange
 }: KanbanCardProps) => {
   const [clickStart, setClickStart] = useState<number>(0);
+  const { getPhaseInfo } = usePhaseInfo();
+  const phaseInfo = getPhaseInfo(order.status);
+  
   const {
     attributes,
     listeners,
@@ -140,6 +146,36 @@ export const KanbanCard = ({
           <span className="font-bold text-xs flex items-center gap-1">
             {isEcommerce && <span className="text-base animate-pulse">🛒</span>}
             #{order.orderNumber}
+            
+            {/* Ícone de informação com tooltip */}
+            {phaseInfo && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="h-3 w-3 text-muted-foreground hover:text-primary cursor-help transition-colors" />
+                  </TooltipTrigger>
+                  <TooltipContent side="right" className="max-w-xs">
+                    <div className="space-y-1">
+                      <p className="font-semibold text-xs">{phaseInfo.displayName}</p>
+                      <p className="text-xs text-muted-foreground">
+                        <span className="font-medium">Área:</span>{' '}
+                        {ROLE_LABELS[phaseInfo.responsibleRole]?.area || 'N/A'}
+                      </p>
+                      {phaseInfo.responsibleUsers.length > 0 && (
+                        <div className="text-xs text-muted-foreground">
+                          <span className="font-medium">Responsáveis:</span>
+                          <div className="mt-0.5 space-y-0.5">
+                            {phaseInfo.responsibleUsers.map(user => (
+                              <div key={user.id}>• {user.full_name}</div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
           </span>
           <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-muted-foreground/30 text-muted-foreground">
             {getTypeLabel(order.type)}
