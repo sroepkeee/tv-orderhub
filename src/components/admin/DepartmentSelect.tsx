@@ -10,18 +10,15 @@ interface DepartmentSelectProps {
 }
 
 const DEPARTMENTS = [
-  'Administrativo',
   'Almoxarifado',
-  'Comercial',
+  'Compras',
+  'Expedição',
   'Financeiro',
-  'Laboratório',
-  'Logística',
-  'Planejamento',
+  'Outros',
   'Produção',
   'Projetos',
   'SSM',
-  'TI',
-  'Outros'
+  'TI'
 ];
 
 export const DepartmentSelect = ({ userId, currentDepartment, onUpdate }: DepartmentSelectProps) => {

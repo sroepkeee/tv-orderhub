@@ -1712,6 +1712,15 @@ export type Database = {
         | "almox_filial"
         | "almox_m16"
         | "laboratorio_filial"
+        | "order_generation"
+        | "almox_general"
+        | "production"
+        | "balance_generation"
+        | "laboratory"
+        | "packaging"
+        | "freight_quote"
+        | "invoicing"
+        | "logistics"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1852,6 +1861,15 @@ export const Constants = {
         "almox_filial",
         "almox_m16",
         "laboratorio_filial",
+        "order_generation",
+        "almox_general",
+        "production",
+        "balance_generation",
+        "laboratory",
+        "packaging",
+        "freight_quote",
+        "invoicing",
+        "logistics",
       ],
     },
   },
