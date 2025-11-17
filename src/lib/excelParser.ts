@@ -108,10 +108,23 @@ function extractOrderInfo(data: any[][]): ParsedOrderData['orderInfo'] {
 function extractItems(data: any[][]): ParsedOrderData['items'] {
   // Pular cabeçalho (linha 0)
   return data.slice(1)
-    .map((row, index) => ({
+    .map((row, index) => {
+      // Logs de debug para identificar embaralhamento (Solução 2B)
+      const itemCode = String(row[1] || '').trim();
+      const description = String(row[2] || '').trim();
+      
+      console.log(`🔍 [Excel Import] Item ${index + 1}:`, {
+        itemCode,
+        description,
+        itemCodeLength: itemCode.length,
+        descriptionLength: description.length,
+        possibleSwap: itemCode.length > 50 && description.length < 20
+      });
+      
+      return {
       itemNumber: String(row[0] || index + 1),
-      itemCode: String(row[1] || '').trim(),
-      description: String(row[2] || '').trim(),
+      itemCode,
+      description,
       quantity: parseFloat(String(row[3] || '0').replace(',', '.')) || 0,
       unit: String(row[4] || 'PC').trim(),
       warehouse: String(row[5] || '11').trim(),
@@ -122,6 +135,7 @@ function extractItems(data: any[][]): ParsedOrderData['items'] {
       ipiPercent: parseFloat(String(row[10] || '0').replace(',', '.')) || 0,
       icmsPercent: parseFloat(String(row[11] || '0').replace(',', '.')) || 0,
       totalValue: parseFloat(String(row[12] || '0').replace(',', '.')) || 0
-    }))
+    };
+    })
     .filter(item => item.itemCode); // Remover linhas vazias
 }

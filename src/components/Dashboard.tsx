@@ -563,7 +563,7 @@ export const Dashboard = () => {
             user_id
           )
         `)
-        .range(0, 99)
+        .range(0, 499)
         .order('created_at', { ascending: false })
         .abortSignal(abortControllerRef.current.signal)
         .returns<any[]>();
@@ -1052,7 +1052,11 @@ export const Dashboard = () => {
     } else if (activeTab === "materials") {
       matchesTab = order.type === "materials";
     }
-    const matchesSearch = order.orderNumber.toLowerCase().includes(searchQuery.toLowerCase()) || order.item.toLowerCase().includes(searchQuery.toLowerCase()) || order.client.toLowerCase().includes(searchQuery.toLowerCase()) || order.deskTicket.toLowerCase().includes(searchQuery.toLowerCase());
+    // Busca direta por número de pedido (solução 1C)
+    const isNumericSearch = /^\d+$/.test(searchQuery.trim());
+    const matchesSearch = isNumericSearch 
+      ? order.orderNumber.includes(searchQuery.trim()) || order.totvsOrderNumber?.includes(searchQuery.trim())
+      : order.orderNumber.toLowerCase().includes(searchQuery.toLowerCase()) || order.item.toLowerCase().includes(searchQuery.toLowerCase()) || order.client.toLowerCase().includes(searchQuery.toLowerCase()) || order.deskTicket.toLowerCase().includes(searchQuery.toLowerCase());
 
     // Date range filter
     let matchesDate = true;
