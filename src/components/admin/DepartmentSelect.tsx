@@ -12,12 +12,14 @@ interface DepartmentSelectProps {
 const DEPARTMENTS = [
   'Administrativo',
   'Almoxarifado',
-  'Planejamento',
-  'Produção',
-  'Laboratório',
-  'Logística',
   'Comercial',
   'Financeiro',
+  'Laboratório',
+  'Logística',
+  'Planejamento',
+  'Produção',
+  'Projetos',
+  'SSM',
   'TI',
   'Outros'
 ];
