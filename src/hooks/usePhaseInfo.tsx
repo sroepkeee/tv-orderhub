@@ -78,22 +78,50 @@ export const usePhaseInfo = () => {
   };
 
   const getPhaseFromStatus = (status: Order['status']): string => {
-    // Mapear status para phase_key usando os 15 status reais do banco
+    // Mapear status para phase_key - todos os status do banco
     const statusPhaseMap: Record<string, string> = {
+      // Almox SSM
+      'almox_ssm_pending': 'almox_ssm',
       'almox_ssm_received': 'almox_ssm',
       'almox_ssm_processing': 'almox_ssm',
+      
+      // Gerar Ordem
       'order_generation_pending': 'order_generation',
       'order_generation_processing': 'order_generation',
+      
+      // Almox Geral
       'almox_general_pending': 'almox_general',
+      'almox_general_received': 'almox_general',
       'almox_general_processing': 'almox_general',
+      
+      // Produção
       'in_production': 'production',
+      
+      // Gerar Saldo
+      'balance_calculation': 'balance_generation',
+      
+      // Laboratório
       'ready_for_laboratory': 'laboratory',
       'in_laboratory': 'laboratory',
+      
+      // Embalagem
       'ready_for_packaging': 'packaging',
       'in_packaging': 'packaging',
+      
+      // Cotação de Frete
       'ready_for_freight_quote': 'freight_quote',
+      'freight_quote_requested': 'freight_quote',
+      
+      // Faturamento
       'ready_to_invoice': 'invoicing',
+      'invoice_requested': 'invoicing',
+      'invoice_issued': 'invoicing',
+      
+      // Expedição/Logística
       'in_expedition': 'logistics',
+      'ready_for_shipping': 'logistics',
+      'in_transit': 'logistics',
+      'delivered': 'logistics',
       'completed': 'logistics'
     };
 
