@@ -9,6 +9,7 @@ const getItemStatusLabel = (status: string): string => {
     'in_stock': 'Disponível em Estoque',
     'awaiting_production': 'Aguardando Produção',
     'purchase_required': 'Solicitar Compra',
+    'purchase_requested': 'Solicitado Compra',
     'completed': 'Concluído',
   };
   return labels[status] || status;

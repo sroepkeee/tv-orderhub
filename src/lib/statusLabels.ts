@@ -53,7 +53,8 @@ export const STATUS_LABELS: Record<string, string> = {
   "almox_general_received": "Recebido no Almox (Geral)",
   // Status de itens (item_status)
   "awaiting_production": "Aguardando Produção",
-  "purchase_required": "Solicitar Compra"
+  "purchase_required": "Solicitar Compra",
+  "purchase_requested": "Solicitado Compra"
 };
 
 /**
@@ -99,9 +100,11 @@ export function getStatusColor(status: string): string {
     "on_hold": "bg-orange-500",
     "delayed": "bg-orange-500",
     "freight_quote_received": "bg-orange-400",
+    "purchase_required": "bg-orange-500",
     // Roxo - Aprovado/Especial
     "freight_approved": "bg-purple-500",
     "ready_for_shipping": "bg-purple-500",
+    "purchase_requested": "bg-purple-500",
     // Teal - À Faturar
     "ready_to_invoice": "bg-teal-500",
     "pending_invoice_request": "bg-teal-400",
