@@ -2087,7 +2087,8 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                                               .update({
                                                 purchase_action_started: isChecked,
                                                 purchase_action_started_at: isChecked ? new Date().toISOString() : null,
-                                                purchase_action_started_by: isChecked ? user.id : null
+                                                purchase_action_started_by: isChecked ? user.id : null,
+                                                item_status: isChecked ? 'purchase_requested' : item.item_status
                                               })
                                               .eq('id', item.id);
 
@@ -2104,6 +2105,9 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
 
                                             // Atualizar estado local
                                             updateItem(index, "purchase_action_started", isChecked);
+                                            if (isChecked) {
+                                              updateItem(index, "item_status", 'purchase_requested');
+                                            }
 
                                             toast({
                                               title: isChecked ? "✅ Compra confirmada" : "❌ Compra desmarcada",

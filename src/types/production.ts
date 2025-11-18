@@ -9,7 +9,7 @@ export interface ProductionItem {
   deliveredQuantity: number;
   warehouse: string;
   deliveryDate: string;
-  item_status: 'pending' | 'in_stock' | 'awaiting_production' | 'purchase_required' | 'completed';
+  item_status: 'pending' | 'in_stock' | 'awaiting_production' | 'purchase_required' | 'purchase_requested' | 'completed';
   item_source_type?: 'in_stock' | 'production' | 'out_of_stock';
   sla_days?: number;
   sla_deadline?: string;
@@ -28,6 +28,7 @@ export interface ProductionStats {
   awaiting_production: number;
   pending: number;
   purchase_required: number;
+  purchase_requested: number;
   completed: number;
   in_stock: number;
   critical: number; // Prazo < 3 dias
@@ -35,7 +36,7 @@ export interface ProductionStats {
 
 export interface ProductionFilters {
   orderNumber?: string;
-  itemStatus?: 'all' | 'pending' | 'in_stock' | 'awaiting_production' | 'purchase_required' | 'completed';
+  itemStatus?: 'all' | 'pending' | 'in_stock' | 'awaiting_production' | 'purchase_required' | 'purchase_requested' | 'completed';
   warehouse?: string;
   dateFrom?: string;
   dateTo?: string;

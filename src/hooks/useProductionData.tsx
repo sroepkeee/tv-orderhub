@@ -60,6 +60,7 @@ export const useProductionData = () => {
       awaiting_production: items.filter(i => i.item_status === 'awaiting_production').length,
       pending: items.filter(i => i.item_status === 'pending').length,
       purchase_required: items.filter(i => i.item_status === 'purchase_required').length,
+      purchase_requested: items.filter(i => i.item_status === 'purchase_requested').length,
       completed: items.filter(i => i.item_status === 'completed').length,
       in_stock: items.filter(i => i.item_status === 'in_stock').length,
       critical: items.filter(i => {
