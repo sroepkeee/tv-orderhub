@@ -26,6 +26,8 @@ import {
   DragOverlay,
 } from "@dnd-kit/core";
 import { KanbanCard } from "./KanbanCard";
+import { usePhaseInfo } from "@/hooks/usePhaseInfo";
+import { ROLE_LABELS } from "@/lib/roleLabels";
 
 export type Phase = "almox_ssm" | "order_generation" | "almox_general" | "production" | "balance_generation" | "laboratory" | "packaging" | "freight_quote" | "ready_to_invoice" | "invoicing" | "logistics" | "in_transit" | "completion";
 
@@ -38,6 +40,7 @@ interface KanbanViewProps {
 export const KanbanView = ({ orders, onEdit, onStatusChange }: KanbanViewProps) => {
   const [activeId, setActiveId] = React.useState<string | null>(null);
   const [optimisticOrders, setOptimisticOrders] = React.useState<Order[]>(orders);
+  const { getPhaseInfo, loading: phaseInfoLoading } = usePhaseInfo();
 
   // Sincronizar com orders recebidos (atualização real do servidor)
   React.useEffect(() => {
@@ -210,6 +213,35 @@ export const KanbanView = ({ orders, onEdit, onStatusChange }: KanbanViewProps) 
     return optimisticOrders.filter((order) => getPhaseFromStatus(order.status) === phase);
   };
 
+  const getPhaseDetails = (phaseKey: string) => {
+    const roleInfo = ROLE_LABELS[phaseKey];
+    
+    const sampleStatusMap: Record<Phase, Order["status"]> = {
+      almox_ssm: "almox_ssm_pending",
+      order_generation: "order_generation_pending",
+      almox_general: "almox_general_received",
+      production: "in_production",
+      balance_generation: "balance_calculation",
+      laboratory: "awaiting_lab",
+      packaging: "in_packaging",
+      freight_quote: "freight_quote_requested",
+      ready_to_invoice: "ready_to_invoice",
+      invoicing: "invoice_requested",
+      logistics: "in_expedition",
+      in_transit: "in_transit",
+      completion: "completed",
+    };
+    
+    const sampleStatus = sampleStatusMap[phaseKey as Phase];
+    const phaseInfo = sampleStatus ? getPhaseInfo(sampleStatus) : null;
+    
+    return {
+      area: roleInfo?.area,
+      responsibleRole: roleInfo?.name,
+      responsibleUsers: phaseInfo?.responsibleUsers || [],
+    };
+  };
+
   const getDefaultStatusForPhase = (phase: Phase): Order["status"] => {
     switch (phase) {
       case "almox_ssm":
@@ -289,18 +321,26 @@ export const KanbanView = ({ orders, onEdit, onStatusChange }: KanbanViewProps) 
     >
       <div className="kanban-view">
         <div className="kanban-container flex gap-2 lg:gap-3 overflow-x-auto pb-4 min-h-[calc(100vh-200px)]">
-          {columns.map((column) => (
-            <KanbanColumn
-              key={column.id}
-              id={column.id}
-              title={column.title}
-              icon={column.icon}
-              orders={getOrdersByPhase(column.id)}
-              colorClass={column.colorClass}
-              onEdit={onEdit}
-              onStatusChange={onStatusChange}
-            />
-          ))}
+          {columns.map((column) => {
+            const phaseDetails = getPhaseDetails(column.id);
+            
+            return (
+              <KanbanColumn
+                key={column.id}
+                id={column.id}
+                title={column.title}
+                icon={column.icon}
+                orders={getOrdersByPhase(column.id)}
+                colorClass={column.colorClass}
+                onEdit={onEdit}
+                onStatusChange={onStatusChange}
+                phaseKey={column.id}
+                area={phaseDetails.area}
+                responsibleRole={phaseDetails.responsibleRole}
+                responsibleUsers={phaseDetails.responsibleUsers}
+              />
+            );
+          })}
         </div>
       </div>
       <DragOverlay>
