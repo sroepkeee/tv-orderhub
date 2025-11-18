@@ -14,6 +14,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Calendar, User, FileText, CheckCircle, XCircle, Clock, History, Edit, Plus, Trash2, Loader2, MessageSquare, Download, Package, AlertCircle, BarChart3, Settings, Image as ImageIcon, File, FileSpreadsheet, ChevronDown, Send, Truck } from "lucide-react";
 import { useForm, Controller } from "react-hook-form";
+import { useQueryClient } from "@tanstack/react-query";
 import { Order } from "./Dashboard";
 import { OrderItem } from "./AddOrderDialog";
 import { supabase } from "@/integrations/supabase/client";
@@ -82,6 +83,7 @@ export const EditOrderDialog = ({
   const {
     toast
   } = useToast();
+  const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState("edit");
   const [items, setItems] = useState<OrderItem[]>([]);
   const [historyEvents, setHistoryEvents] = useState<HistoryEvent[]>([]);
@@ -2088,7 +2090,7 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                                                 purchase_action_started: isChecked,
                                                 purchase_action_started_at: isChecked ? new Date().toISOString() : null,
                                                 purchase_action_started_by: isChecked ? user.id : null,
-                                                item_status: isChecked ? 'purchase_requested' : item.item_status
+                                                item_status: isChecked ? 'purchase_requested' : 'purchase_required'
                                               })
                                               .eq('id', item.id);
 
@@ -2105,32 +2107,36 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
 
                                             // Atualizar estado local
                                             updateItem(index, "purchase_action_started", isChecked);
-                                            if (isChecked) {
-                                              updateItem(index, "item_status", 'purchase_requested');
-                                            }
+                                            updateItem(index, "item_status", isChecked ? 'purchase_requested' : 'purchase_required');
+
+                                            // Invalidar cache do React Query para atualizar a página de Produção
+                                            await queryClient.invalidateQueries({ queryKey: ['production-items'] });
 
                                             toast({
-                                              title: isChecked ? "✅ Compra confirmada" : "❌ Compra desmarcada",
+                                              title: isChecked ? "Compra iniciada" : "Compra desmarcada",
                                               description: isChecked 
-                                                ? "Andamento na compra registrado com sucesso" 
-                                                : "Compra desmarcada",
+                                                ? "Status atualizado para 'Solicitado Compra'" 
+                                                : "Status voltou para 'Solicitar Compra'",
                                               duration: 3000
                                             });
 
                                             // Recarregar itens e histórico
-                                            loadItems();
+                                            await loadItems();
                                             loadHistory();
                                           } catch (error: any) {
                                             console.error('Erro ao atualizar compra:', error);
+                                            // Reverter estado local em caso de erro
+                                            updateItem(index, "purchase_action_started", !isChecked);
                                             toast({
                                               title: "Erro ao atualizar",
-                                              description: error.message,
+                                              description: error.message || "Não foi possível atualizar o status da compra",
                                               variant: "destructive"
                                             });
                                           }
                                         } else {
                                           // Se item não foi salvo ainda, apenas atualiza localmente
                                           updateItem(index, "purchase_action_started", isChecked);
+                                          updateItem(index, "item_status", isChecked ? 'purchase_requested' : 'purchase_required');
                                         }
                                       }}
                                       className="h-4 w-4"
