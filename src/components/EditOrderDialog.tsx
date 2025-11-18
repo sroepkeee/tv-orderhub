@@ -870,12 +870,13 @@ export const EditOrderDialog = ({
         return;
       }
       await recordItemChange(oldItem.id, 'item_status', oldItem.item_status || 'in_stock', value, `Situação alterada`);
-      const statusLabels = {
-        in_stock: '✅ Disponível em Estoque',
-        awaiting_production: '🏭 Aguardando Produção',
-        purchase_required: '🛒 Solicitar Compra',
-        completed: '✓ Concluído'
-      };
+        const statusLabels = {
+          in_stock: '✅ Disponível em Estoque',
+          awaiting_production: '🏭 Aguardando Produção',
+          purchase_required: '🛒 Solicitar Compra',
+          purchase_requested: '🛒 Solicitado Compra',
+          completed: '✓ Concluído'
+        };
       toast({
         title: "Situação atualizada",
         description: `Item alterado para: ${statusLabels[value as keyof typeof statusLabels]}`
@@ -896,7 +897,7 @@ export const EditOrderDialog = ({
           deliveryDate: dbItem.delivery_date,
           deliveredQuantity: dbItem.delivered_quantity,
           received_status: dbItem.received_status as 'pending' | 'partial' | 'completed',
-          item_status: dbItem.item_status as 'pending' | 'in_stock' | 'awaiting_production' | 'purchase_required' | 'completed',
+          item_status: dbItem.item_status as 'pending' | 'in_stock' | 'awaiting_production' | 'purchase_required' | 'purchase_requested' | 'completed',
           item_source_type: dbItem.item_source_type as 'in_stock' | 'production' | 'out_of_stock',
           production_estimated_date: dbItem.production_estimated_date,
           unit_price: dbItem.unit_price,
@@ -2054,7 +2055,7 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                                 <Input type="date" value={item.deliveryDate} onChange={e => updateItem(index, "deliveryDate", e.target.value)} className="h-8 text-sm" />
                               </TableCell>
                               <TableCell>
-                                <Select value={item.item_status || 'in_stock'} onValueChange={(value: 'pending' | 'in_stock' | 'awaiting_production' | 'purchase_required' | 'completed') => updateItem(index, "item_status", value)}>
+                                <Select value={item.item_status || 'in_stock'} onValueChange={(value: 'pending' | 'in_stock' | 'awaiting_production' | 'purchase_required' | 'purchase_requested' | 'completed') => updateItem(index, "item_status", value)}>
                                   <SelectTrigger className="h-8 text-sm">
                                     <SelectValue />
                                   </SelectTrigger>
@@ -2063,6 +2064,7 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                                     <SelectItem value="in_stock">✅ Disponível em Estoque</SelectItem>
                                     <SelectItem value="awaiting_production">🏭 Aguardando Produção</SelectItem>
                                     <SelectItem value="purchase_required">🛒 Solicitar Compra</SelectItem>
+                                    <SelectItem value="purchase_requested">🛒 Solicitado Compra</SelectItem>
                                     <SelectItem value="completed">✓ Concluído</SelectItem>
                                   </SelectContent>
                                 </Select>
