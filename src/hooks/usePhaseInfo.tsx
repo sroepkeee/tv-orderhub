@@ -37,8 +37,11 @@ export const usePhaseInfo = () => {
         .select('phase_key, display_name, responsible_role')
         .order('order_index');
 
+      console.log('🔍 [usePhaseInfo] Query phase_config:', { phaseData, phaseError });
+
       if (phaseError) throw phaseError;
       setPhaseConfigs(phaseData || []);
+      console.log('✅ [usePhaseInfo] Phase configs carregadas:', phaseData?.length || 0);
 
       // Buscar roles de usuários
       const { data: userRolesData, error: userRolesError } = await supabase
@@ -136,11 +139,38 @@ export const usePhaseInfo = () => {
 
   const getPhaseInfo = (status: Order['status']): PhaseInfo | null => {
     const phaseKey = getPhaseFromStatus(status);
+    
+    console.log('🔍 [usePhaseInfo] getPhaseInfo chamado:', {
+      status,
+      phaseKey,
+      phaseConfigsCount: phaseConfigs.length,
+      phaseKeys: phaseConfigs.map(pc => pc.phase_key)
+    });
+    
     const phaseConfig = phaseConfigs.find(pc => pc.phase_key === phaseKey);
     
-    if (!phaseConfig) return null;
+    if (!phaseConfig) {
+      console.warn('⚠️ [usePhaseInfo] Nenhuma phase_config encontrada para:', {
+        status,
+        phaseKey,
+        availablePhaseKeys: phaseConfigs.map(pc => pc.phase_key)
+      });
+      
+      // Fallback: retornar info básica mesmo sem config
+      return {
+        displayName: phaseKey.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+        responsibleRole: 'admin',
+        responsibleUsers: []
+      };
+    }
 
     const responsibleUsers = usersByRole.get(phaseConfig.responsible_role) || [];
+
+    console.log('✅ [usePhaseInfo] Phase info encontrada:', {
+      displayName: phaseConfig.display_name,
+      responsibleRole: phaseConfig.responsible_role,
+      usersCount: responsibleUsers.length
+    });
 
     return {
       displayName: phaseConfig.display_name,
