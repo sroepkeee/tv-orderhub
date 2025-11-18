@@ -40,31 +40,38 @@ export const usePhaseInfo = () => {
       if (phaseError) throw phaseError;
       setPhaseConfigs(phaseData || []);
 
-      // Buscar usuários de todas as roles
-      const { data: usersData, error: usersError } = await supabase
+      // Buscar roles de usuários
+      const { data: userRolesData, error: userRolesError } = await supabase
         .from('user_roles')
-        .select(`
-          role,
-          user_id,
-          profiles:user_id (
-            id,
-            full_name,
-            email
-          )
-        `);
+        .select('role, user_id');
 
-      if (usersError) throw usersError;
+      if (userRolesError) throw userRolesError;
+
+      // Buscar perfis dos usuários
+      const { data: profilesData, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, full_name, email');
+
+      if (profilesError) throw profilesError;
+
+      // Mapear perfis por id
+      const profilesById = new Map<string, UserProfile>();
+      profilesData?.forEach((p) => {
+        if (!p) return;
+        profilesById.set(p.id, {
+          id: p.id,
+          full_name: p.full_name || p.email || 'Usuário',
+          email: p.email,
+        });
+      });
 
       // Agrupar usuários por role
       const roleMap = new Map<string, UserProfile[]>();
-      usersData?.forEach((ur: any) => {
-        if (ur.profiles) {
+      userRolesData?.forEach((ur) => {
+        const profile = profilesById.get(ur.user_id);
+        if (profile) {
           const users = roleMap.get(ur.role) || [];
-          users.push({
-            id: ur.profiles.id,
-            full_name: ur.profiles.full_name || ur.profiles.email || 'Usuário',
-            email: ur.profiles.email
-          });
+          users.push(profile);
           roleMap.set(ur.role, users);
         }
       });
@@ -76,7 +83,6 @@ export const usePhaseInfo = () => {
       setLoading(false);
     }
   };
-
   const getPhaseFromStatus = (status: Order['status']): string => {
     // Mapear status para phase_key - todos os status do banco
     const statusPhaseMap: Record<string, string> = {
