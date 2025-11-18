@@ -135,8 +135,8 @@ export async function parsePdfOrder(
       }
     }
     
-    // Early stop apenas quando detectar fim do documento
-    const hasEndMarker = fullText.includes('TOTAL DO PEDIDO') || fullText.includes('LGPD:');
+    // Early stop apenas quando detectar TOTAL DO PEDIDO (fim real do pedido)
+    const hasEndMarker = fullText.includes('TOTAL DO PEDIDO');
     if (options?.earlyStop && orderHeader?.orderNumber && items.length > 0 && hasEndMarker) {
       if (import.meta.env.DEV) {
         console.log(`✅ [pdfParser] Early stop na página ${i}/${pagesToRead} - Fim do documento detectado`);
@@ -426,16 +426,25 @@ function extractItemsTable(text: string): {
     };
   }
 
-  // 3. Encontrar o fim da tabela
-  const endPatterns = [
-    /TOTAL\s+DO\s+PEDIDO/i,
-    /LGPD:/i,
-    /Observa[çc][õo]es\s+Gerais/i
-  ];
+  // 3. Encontrar o fim da tabela - priorizar TOTAL DO PEDIDO
   let tableEnd = sanitizedText.length;
-  for (const pat of endPatterns) {
-    const m = sanitizedText.slice(tableStart).search(pat);
-    if (m !== -1) { tableEnd = tableStart + m; break; }
+  
+  // Primeiro tentar TOTAL DO PEDIDO (marcador mais confiável)
+  const totalMatchIndex = sanitizedText.slice(tableStart).search(/TOTAL\s+DO\s+PEDIDO/i);
+  if (totalMatchIndex !== -1) {
+    tableEnd = tableStart + totalMatchIndex;
+  } else {
+    // Fallback: Observações Gerais apenas se TOTAL DO PEDIDO não existir
+    const fallbackPatterns = [
+      /Observa[çc][õo]es\s+Gerais/i
+    ];
+    for (const pat of fallbackPatterns) {
+      const m = sanitizedText.slice(tableStart).search(pat);
+      if (m !== -1) {
+        tableEnd = tableStart + m;
+        break;
+      }
+    }
   }
 
   const tableText = sanitizedText.slice(tableStart, tableEnd);
