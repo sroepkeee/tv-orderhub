@@ -111,6 +111,14 @@ export const ImportOrderDialog = ({
       const validation = validatePdfOrder(data);
       setValidation(validation);
       
+      // Aviso se parece ter itens faltando
+      if (data.quality?.expectedCount && data.quality.expectedCount > data.quality.itemsCount) {
+        toast.warning(
+          `Foram encontrados ${data.quality.itemsCount} itens, mas o PDF indica cerca de ${data.quality.expectedCount}. ` +
+          `Revise o pedido importado, pode haver itens faltando.`
+        );
+      }
+      
       if (!analyzeComplete && data.items.length === 0) {
         setCanAnalyzeComplete(true);
         toast.warning('Nenhum item encontrado nas primeiras páginas. Deseja analisar o PDF completo?');
