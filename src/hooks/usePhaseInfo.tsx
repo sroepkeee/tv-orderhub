@@ -78,18 +78,23 @@ export const usePhaseInfo = () => {
   };
 
   const getPhaseFromStatus = (status: Order['status']): string => {
-    // Mapear status para phase_key (sincronizado com novos phase_keys)
+    // Mapear status para phase_key usando os 15 status reais do banco
     const statusPhaseMap: Record<string, string> = {
-      'pendente': 'almox_ssm',
-      'em_triagem': 'almox_ssm',
-      'aguardando_aprovacao': 'order_generation',
-      'em_compra': 'order_generation',
-      'em_producao': 'production',
-      'em_laboratorio': 'laboratory',
-      'aguardando_expedicao': 'logistics',
-      'em_expedicao': 'logistics',
-      'enviado': 'logistics',
-      'concluido': 'invoicing'
+      'almox_ssm_received': 'almox_ssm',
+      'almox_ssm_processing': 'almox_ssm',
+      'order_generation_pending': 'order_generation',
+      'order_generation_processing': 'order_generation',
+      'almox_general_pending': 'almox_general',
+      'almox_general_processing': 'almox_general',
+      'in_production': 'production',
+      'ready_for_laboratory': 'laboratory',
+      'in_laboratory': 'laboratory',
+      'ready_for_packaging': 'packaging',
+      'in_packaging': 'packaging',
+      'ready_for_freight_quote': 'freight_quote',
+      'ready_to_invoice': 'invoicing',
+      'in_expedition': 'logistics',
+      'completed': 'logistics'
     };
 
     return statusPhaseMap[status] || 'almox_ssm';
