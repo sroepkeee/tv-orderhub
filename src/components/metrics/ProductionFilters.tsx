@@ -63,6 +63,7 @@ export const ProductionFilters = ({ filters, onFiltersChange, warehouses }: Prod
             <SelectItem value="in_stock">Disponível em Estoque</SelectItem>
             <SelectItem value="awaiting_production">Aguardando Produção</SelectItem>
             <SelectItem value="purchase_required">Solicitar Compra</SelectItem>
+            <SelectItem value="purchase_requested">Solicitado Compra</SelectItem>
             <SelectItem value="completed">Concluído</SelectItem>
           </SelectContent>
         </Select>

@@ -216,13 +216,13 @@ export default function Production() {
 
       {/* Métricas */}
       {isLoading ? (
-        <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-6 xl:grid-cols-6">
-          {Array.from({ length: 6 }).map((_, i) => (
+        <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-7 xl:grid-cols-7">
+          {Array.from({ length: 7 }).map((_, i) => (
             <Skeleton key={i} className="h-32" />
           ))}
         </div>
       ) : (
-        <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-6 xl:grid-cols-6">
+        <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-7 xl:grid-cols-7">
           <MetricCard
             title="Em Produção"
             value={stats.awaiting_production}
@@ -287,6 +287,15 @@ export default function Production() {
             percentage={(stats.purchase_required / stats.total) * 100}
             trend={trends.purchase_required.change > 0 ? 'up' : trends.purchase_required.change < 0 ? 'down' : 'neutral'}
             trendValue={`${trends.purchase_required.change >= 0 ? '+' : ''}${trends.purchase_required.change} itens`}
+          />
+          <MetricCard
+            title="Solicitado Compra"
+            value={stats.purchase_requested}
+            icon={ShoppingCart}
+            percentage={(stats.purchase_requested / stats.total) * 100}
+            additionalMetrics={[
+              { label: "Em andamento", value: stats.purchase_requested }
+            ]}
           />
           <MetricCard
             title="Concluídos"

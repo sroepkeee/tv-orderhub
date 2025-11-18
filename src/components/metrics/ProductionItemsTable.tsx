@@ -21,6 +21,7 @@ const getItemStatusBadge = (status: string) => {
     'in_stock': { label: 'Em Estoque', className: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' },
     'awaiting_production': { label: 'Aguardando Produção', className: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' },
     'purchase_required': { label: 'Solicitar Compra', className: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200' },
+    'purchase_requested': { label: 'Solicitado Compra', className: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200' },
     'completed': { label: 'Concluído', className: 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200' },
   };
   
