@@ -1,10 +1,17 @@
 import React from "react";
 import { KanbanCard } from "./KanbanCard";
 import { Order } from "@/components/Dashboard";
-import { LucideIcon } from "lucide-react";
+import { LucideIcon, Info } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useDroppable } from "@dnd-kit/core";
 import { Phase } from "./KanbanView";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+
 interface KanbanColumnProps {
   id: Phase;
   title: string;
@@ -13,6 +20,10 @@ interface KanbanColumnProps {
   colorClass: string;
   onEdit: (order: Order) => void;
   onStatusChange: (orderId: string, newStatus: Order["status"]) => void;
+  phaseKey: string;
+  area?: string;
+  responsibleRole?: string;
+  responsibleUsers?: Array<{ full_name: string; email: string }>;
 }
 export const KanbanColumn = ({
   id,
@@ -21,7 +32,11 @@ export const KanbanColumn = ({
   orders,
   colorClass,
   onEdit,
-  onStatusChange
+  onStatusChange,
+  phaseKey,
+  area,
+  responsibleRole,
+  responsibleUsers
 }: KanbanColumnProps) => {
   const highCount = orders.filter(o => o.priority === "high").length;
   const {
@@ -37,6 +52,39 @@ export const KanbanColumn = ({
           <div className="flex items-center gap-1.5">
             <Icon className="h-4 w-4" />
             <h3 className="font-semibold text-sm">{title}</h3>
+            
+            {/* Ícone de Informação com Tooltip */}
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Info className="h-3.5 w-3.5 cursor-help opacity-70 hover:opacity-100 transition-opacity" />
+                </TooltipTrigger>
+                <TooltipContent side="right" className="max-w-xs">
+                  <div className="space-y-1 text-sm">
+                    {area && (
+                      <p className="font-semibold text-primary">{area}</p>
+                    )}
+                    {responsibleRole && (
+                      <p className="text-muted-foreground">
+                        Responsável: <span className="font-medium text-foreground">{responsibleRole}</span>
+                      </p>
+                    )}
+                    {responsibleUsers && responsibleUsers.length > 0 && (
+                      <div className="mt-2 pt-2 border-t border-border">
+                        <p className="text-xs text-muted-foreground mb-1">Usuários:</p>
+                        <ul className="space-y-0.5">
+                          {responsibleUsers.map((user) => (
+                            <li key={user.email} className="text-xs">
+                              • {user.full_name}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </div>
           <Badge variant="secondary" className="bg-card/80 text-card-foreground border-border/50 text-xs h-5 px-2">
             {orders.length}
