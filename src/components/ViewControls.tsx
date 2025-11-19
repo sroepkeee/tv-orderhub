@@ -14,7 +14,6 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { Switch } from "@/components/ui/switch";
 import { ArrowUpDown, Filter, Layers, LayoutGrid, List } from "lucide-react";
 import { Order } from "./Dashboard";
 
@@ -33,14 +32,12 @@ interface ViewControlsProps {
   categoryFilter?: CategoryFilter;
   statusFilter?: StatusFilter;
   orders?: Order[];
-  showOnlyMyPhases?: boolean;
   onSortChange: (sort: SortOption) => void;
   onGroupChange: (group: GroupOption) => void;
   onPhaseFilterChange: (phase: PhaseFilter) => void;
   onViewModeChange: (mode: ViewMode) => void;
   onCategoryFilterChange?: (category: CategoryFilter) => void;
   onStatusFilterChange?: (status: StatusFilter) => void;
-  onShowOnlyMyPhasesChange?: (value: boolean) => void;
 }
 
 export const ViewControls = ({
@@ -51,14 +48,12 @@ export const ViewControls = ({
   categoryFilter = "all",
   statusFilter = "all",
   orders = [],
-  showOnlyMyPhases = false,
   onSortChange,
   onGroupChange,
   onPhaseFilterChange,
   onViewModeChange,
   onCategoryFilterChange,
   onStatusFilterChange,
-  onShowOnlyMyPhasesChange,
 }: ViewControlsProps) => {
   const sortOptions = [
     { value: "priority" as SortOption, label: "Prioridade" },
@@ -587,24 +582,6 @@ export const ViewControls = ({
           </DropdownMenu>
           <TooltipContent>Filtrar por Fase</TooltipContent>
         </Tooltip>
-
-        {/* 🆕 Toggle "Mostrar apenas minhas fases" */}
-        {onShowOnlyMyPhasesChange && (
-          <div className="flex items-center gap-2 ml-auto border-l pl-3">
-            <Switch 
-              id="my-phases-toggle" 
-              checked={showOnlyMyPhases}
-              onCheckedChange={onShowOnlyMyPhasesChange}
-              className="h-5 w-9"
-            />
-            <label 
-              htmlFor="my-phases-toggle" 
-              className="text-xs text-muted-foreground cursor-pointer hover:text-foreground transition-colors"
-            >
-              Apenas minhas fases
-            </label>
-          </div>
-        )}
       </div>
     </TooltipProvider>
   );

@@ -16,8 +16,6 @@ interface PriorityViewProps {
   onCancel: (orderId: string) => void;
   onRowClick?: (order: Order) => void;
   onStatusChange: (orderId: string, newStatus: Order["status"]) => void;
-  showOnlyMyPhases?: boolean;
-  onShowOnlyMyPhasesChange?: (value: boolean) => void;
 }
 
 export const PriorityView = ({ 
@@ -27,9 +25,7 @@ export const PriorityView = ({
   onApprove, 
   onCancel,
   onRowClick,
-  onStatusChange,
-  showOnlyMyPhases = false,
-  onShowOnlyMyPhasesChange
+  onStatusChange
 }: PriorityViewProps) => {
   const [sortBy, setSortBy] = React.useState<SortOption>("priority");
   const [groupBy, setGroupBy] = React.useState<GroupOption>("priority");
@@ -436,13 +432,11 @@ export const PriorityView = ({
         statusFilter={statusFilter}
         viewMode={viewMode}
         orders={sortedOrders}
-        showOnlyMyPhases={showOnlyMyPhases}
         onSortChange={setSortBy}
         onGroupChange={setGroupBy}
         onPhaseFilterChange={setPhaseFilter}
         onStatusFilterChange={setStatusFilter}
         onViewModeChange={handleViewModeChange}
-        onShowOnlyMyPhasesChange={onShowOnlyMyPhasesChange}
       />
       
       {/* Orders Display */}
