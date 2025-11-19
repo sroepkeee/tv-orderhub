@@ -28,6 +28,7 @@ import { usePhaseAuthorization } from "@/hooks/usePhaseAuthorization";
 import { supabase } from "@/integrations/supabase/client";
 import { Shield, Edit } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ROLE_LABELS } from "@/lib/roleLabels";
 
 // Types
@@ -220,6 +221,12 @@ export const Dashboard = () => {
   const [realtimeStatus, setRealtimeStatus] = useState<'synced' | 'updating' | 'disconnected'>('synced');
   const [lastUpdateTime, setLastUpdateTime] = useState<Date | null>(null);
   const [pendingApprovalsCount, setPendingApprovalsCount] = useState(0);
+  
+  // 🆕 State para filtro de fases permitidas
+  const [showOnlyMyPhases, setShowOnlyMyPhases] = useState(() => {
+    return localStorage.getItem('showOnlyMyPhases') === 'true';
+  });
+  
   const isUpdatingRef = useRef(false);
   const loadingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isLoadingRef = useRef(false);
@@ -258,6 +265,14 @@ export const Dashboard = () => {
       localStorage.setItem(`columnVisibility_${user.id}`, JSON.stringify(columnVisibility));
     }
   }, [columnVisibility, user]);
+
+  // 🆕 Recarregar pedidos quando filtro de fases mudar
+  useEffect(() => {
+    if (user && hasLoadedOnceRef.current) {
+      console.log('🔄 [Dashboard] Filtro de fases mudou, recarregando pedidos...');
+      loadOrders();
+    }
+  }, [showOnlyMyPhases]);
 
   // Load orders from Supabase
   useEffect(() => {
@@ -460,6 +475,37 @@ export const Dashboard = () => {
     toast({ title, description, variant });
   };
 
+  // 🆕 Helper para mapear phase_key → statuses
+  const getStatusesFromPhase = (phaseKey: string): OrderStatus[] => {
+    const phaseToStatuses: Record<string, OrderStatus[]> = {
+      'almox_ssm': ['almox_ssm_pending', 'almox_ssm_received', 'almox_ssm_in_review', 'almox_ssm_approved'],
+      'order_generation': ['order_generation_pending', 'order_in_creation', 'order_generated'],
+      'almox_general': ['almox_general_received', 'almox_general_separating', 'almox_general_ready'],
+      'production': ['separation_started', 'in_production', 'awaiting_material', 'separation_completed', 'production_completed'],
+      'balance_generation': ['balance_calculation', 'balance_review', 'balance_approved'],
+      'laboratory': ['awaiting_lab', 'in_lab_analysis', 'lab_completed'],
+      'packaging': ['in_quality_check', 'in_packaging', 'ready_for_shipping'],
+      'freight_quote': ['freight_quote_requested', 'freight_quote_received', 'freight_approved'],
+      'invoicing': ['ready_to_invoice', 'pending_invoice_request', 'invoice_requested', 'awaiting_invoice', 'invoice_issued', 'invoice_sent'],
+      'logistics': ['released_for_shipping', 'in_expedition', 'in_transit', 'pickup_scheduled', 'awaiting_pickup', 'collected', 'delivered', 'completed', 'cancelled', 'on_hold', 'delayed', 'returned', 'pending', 'in_analysis', 'awaiting_approval', 'planned']
+    };
+    return phaseToStatuses[phaseKey] || [];
+  };
+
+  // 🆕 Helper para obter phase a partir do status
+  const getPhaseFromStatus = (status: OrderStatus): string => {
+    if (['almox_ssm_pending', 'almox_ssm_received', 'almox_ssm_in_review', 'almox_ssm_approved'].includes(status)) return 'almox_ssm';
+    if (['order_generation_pending', 'order_in_creation', 'order_generated'].includes(status)) return 'order_generation';
+    if (['almox_general_received', 'almox_general_separating', 'almox_general_ready'].includes(status)) return 'almox_general';
+    if (['separation_started', 'in_production', 'awaiting_material', 'separation_completed', 'production_completed'].includes(status)) return 'production';
+    if (['balance_calculation', 'balance_review', 'balance_approved'].includes(status)) return 'balance_generation';
+    if (['awaiting_lab', 'in_lab_analysis', 'lab_completed'].includes(status)) return 'laboratory';
+    if (['in_quality_check', 'in_packaging', 'ready_for_shipping'].includes(status)) return 'packaging';
+    if (['freight_quote_requested', 'freight_quote_received', 'freight_approved'].includes(status)) return 'freight_quote';
+    if (['ready_to_invoice', 'pending_invoice_request', 'invoice_requested', 'awaiting_invoice', 'invoice_issued', 'invoice_sent'].includes(status)) return 'invoicing';
+    return 'logistics';
+  };
+
   const loadOrders = async () => {
     if (!user) return;
     
@@ -482,7 +528,22 @@ export const Dashboard = () => {
     isLoadingRef.current = true;
     setRealtimeStatus('updating'); // 🔄 Indicar que está atualizando
     const startTime = performance.now();
-    console.log('🔄 [loadOrders] Iniciando carregamento...', { userId: user.id, requestId: currentRequestId });
+    
+    // 🆕 Buscar fases permitidas do usuário
+    const { data: userPhases } = await supabase.rpc('get_user_phases', {
+      _user_id: user.id
+    });
+    
+    const allowedPhases = userPhases?.map(p => p.phase_key) || [];
+    const isAdminUser = userRoles.includes('admin');
+    
+    console.log('🔄 [loadOrders] Iniciando carregamento...', { 
+      userId: user.id, 
+      requestId: currentRequestId,
+      isAdmin: isAdminUser,
+      allowedPhases,
+      filterActive: showOnlyMyPhases
+    });
     
     // Loading state bifurcado
     if (!hasLoadedOnceRef.current) {
@@ -507,7 +568,9 @@ export const Dashboard = () => {
     
     try {
       console.log('📡 [loadOrders] Executando query otimizada...');
-      const { data, error } = await supabase
+      
+      // 🆕 Query base com filtro condicional de fases
+      let query = supabase
         .from('orders')
         .select(`
           id,
@@ -566,7 +629,16 @@ export const Dashboard = () => {
             phase_started_at,
             user_id
           )
-        `)
+        `);
+      
+      // 🆕 Se não for admin E filtro ativo, aplicar filtro de fases
+      if (!isAdminUser && showOnlyMyPhases && allowedPhases.length > 0) {
+        const allowedStatuses = allowedPhases.flatMap(getStatusesFromPhase);
+        console.log('🔒 [loadOrders] Aplicando filtro de fases:', { allowedStatuses });
+        query = query.in('status', allowedStatuses);
+      }
+      
+      const { data, error } = await query
         .range(0, 499)
         .order('created_at', { ascending: false })
         .abortSignal(abortControllerRef.current.signal)
@@ -1568,26 +1640,65 @@ export const Dashboard = () => {
     setShowEditDialog(true);
   };
   return <div className="min-h-screen bg-background p-4 lg:p-6">
-      {/* Card de Permissões do Usuário */}
+      {/* 🆕 Card de Permissões do Usuário MELHORADO */}
       {!userRoles.includes('admin') && phasePermissions.length > 0 && (
         <Card className="mb-4">
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm">Suas Fases Permitidas</CardTitle>
+            <CardTitle className="text-sm flex items-center justify-between">
+              <span>Suas Fases Permitidas</span>
+              <Badge variant="secondary" className="text-xs">
+                {phasePermissions.filter(p => p.can_view).length} fases
+              </Badge>
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="flex gap-2 flex-wrap">
-              {phasePermissions
-                .filter(p => p.can_view)
-                .map(p => (
-                  <Badge key={p.phase_key} variant="secondary" className="text-xs">
-                    {ROLE_LABELS[p.phase_key]?.name || p.phase_key}
-                    {p.can_edit && <Edit className="ml-1 h-3 w-3" />}
-                  </Badge>
-                ))
-              }
+            <div className="space-y-3">
+              {/* Badges de fases */}
+              <div className="flex gap-2 flex-wrap">
+                {phasePermissions
+                  .filter(p => p.can_view)
+                  .map(p => (
+                    <Badge key={p.phase_key} variant={p.can_edit ? "default" : "secondary"} className="text-xs">
+                      {ROLE_LABELS[p.phase_key]?.name || p.phase_key}
+                      {p.can_edit && <Edit className="ml-1 h-3 w-3" />}
+                    </Badge>
+                  ))
+                }
+              </div>
+              
+              {/* 🆕 Estatísticas de pedidos por fase */}
+              <div className="pt-2 border-t">
+                <p className="text-xs text-muted-foreground mb-2">Pedidos nas suas fases:</p>
+                {phasePermissions
+                  .filter(p => p.can_view)
+                  .map(p => {
+                    const ordersInPhase = orders.filter(
+                      o => getPhaseFromStatus(o.status) === p.phase_key
+                    ).length;
+                    
+                    return (
+                      <div key={p.phase_key} className="flex justify-between text-xs py-1">
+                        <span>{ROLE_LABELS[p.phase_key]?.name}</span>
+                        <Badge variant="outline" className="text-xs">{ordersInPhase}</Badge>
+                      </div>
+                    );
+                  })
+                }
+              </div>
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {/* 🆕 Alerta para usuários sem permissões */}
+      {phasePermissions.length === 0 && !isAdmin && (
+        <Alert variant="destructive" className="mb-4">
+          <Shield className="h-4 w-4" />
+          <AlertTitle>Sem Permissões Configuradas</AlertTitle>
+          <AlertDescription>
+            Você não tem permissões para visualizar nenhuma fase. Entre em contato com o administrador para solicitar acesso.
+          </AlertDescription>
+        </Alert>
       )}
 
       {/* Compact Header */}
@@ -1711,10 +1822,23 @@ export const Dashboard = () => {
             <p className="text-muted-foreground">Carregando pedidos...</p>
             <p className="text-xs text-muted-foreground mt-1">Primeira carga - aguarde...</p>
           </div>
-        </div> : activeTab === "all" ? <PriorityView orders={filteredOrders} onEdit={handleEditOrder} onDuplicate={handleDuplicateOrder} onApprove={handleApproveOrder} onCancel={handleCancelOrder} onStatusChange={handleStatusChange} onRowClick={order => {
-      setSelectedOrder(order);
-      setShowEditDialog(true);
-    }} /> : <div className="bg-card rounded-lg border overflow-hidden">
+        </div> : activeTab === "all" ? <PriorityView 
+          orders={filteredOrders} 
+          onEdit={handleEditOrder} 
+          onDuplicate={handleDuplicateOrder} 
+          onApprove={handleApproveOrder} 
+          onCancel={handleCancelOrder} 
+          onStatusChange={handleStatusChange} 
+          showOnlyMyPhases={showOnlyMyPhases}
+          onShowOnlyMyPhasesChange={(value) => {
+            setShowOnlyMyPhases(value);
+            localStorage.setItem('showOnlyMyPhases', value.toString());
+          }}
+          onRowClick={order => {
+            setSelectedOrder(order);
+            setShowEditDialog(true);
+          }} 
+        /> : <div className="bg-card rounded-lg border overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full">
                <thead className="dashboard-header">
