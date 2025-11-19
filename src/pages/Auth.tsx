@@ -18,6 +18,7 @@ export default function Auth() {
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
   const [department, setDepartment] = useState("");
+  const [location, setLocation] = useState("");
 
   // Redirecionar se já estiver autenticado
   useEffect(() => {
@@ -61,6 +62,11 @@ export default function Auth() {
       return;
     }
     
+    if (!location) {
+      toast.error("Por favor, selecione sua localização");
+      return;
+    }
+    
     setLoading(true);
 
     try {
@@ -72,6 +78,7 @@ export default function Auth() {
           data: {
             full_name: fullName,
             department: department,
+            location: location,
           },
         },
       });
@@ -195,6 +202,20 @@ export default function Auth() {
                     </SelectContent>
                   </Select>
                 </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="signup-location">Localização</Label>
+                  <Select value={location} onValueChange={setLocation} required>
+                    <SelectTrigger id="signup-location">
+                      <SelectValue placeholder="Selecione a localização" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Matriz">Matriz</SelectItem>
+                      <SelectItem value="Filial">Filial</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
                 <Button type="submit" className="w-full" disabled={loading}>
                   {loading ? "Criando conta..." : "Criar conta"}
                 </Button>

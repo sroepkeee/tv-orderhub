@@ -19,6 +19,7 @@ interface UserData {
   email: string;
   full_name: string;
   department: string;
+  location: string | null;
   approval_status: string;
   roles: string[];
   created_at: string;
@@ -72,7 +73,7 @@ export const UserManagementTable = () => {
       // Buscar profiles
       const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
-        .select('id, email, full_name, department, created_at')
+        .select('id, email, full_name, department, location, created_at')
         .order('created_at', { ascending: false });
       
       if (profilesError) throw profilesError;
@@ -105,6 +106,7 @@ export const UserManagementTable = () => {
           email: profile.email || '',
           full_name: profile.full_name || 'Sem nome',
           department: profile.department || 'Não definido',
+          location: profile.location || null,
           approval_status: approval?.status || 'pending',
           roles: roles,
           created_at: profile.created_at,
@@ -140,6 +142,27 @@ export const UserManagementTable = () => {
     }
 
     setFilteredUsers(filtered);
+  };
+
+  const updateUserLocation = async (userId: string, newLocation: string) => {
+    const { error } = await supabase
+      .from('profiles')
+      .update({ location: newLocation })
+      .eq('id', userId);
+
+    if (error) {
+      toast({
+        title: "Erro",
+        description: "Não foi possível atualizar localização",
+        variant: "destructive",
+      });
+    } else {
+      toast({
+        title: "Sucesso",
+        description: "Localização atualizada com sucesso!",
+      });
+      loadUsers();
+    }
   };
 
   const getStatusBadge = (status: string) => {
@@ -225,6 +248,7 @@ export const UserManagementTable = () => {
                   <TableHead>Nome</TableHead>
                   <TableHead>Email</TableHead>
                   <TableHead>Departamento</TableHead>
+                  <TableHead>Localização</TableHead>
                   <TableHead>Roles</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Cadastro</TableHead>
@@ -234,13 +258,13 @@ export const UserManagementTable = () => {
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8">
+                    <TableCell colSpan={8} className="text-center py-8">
                       Carregando usuários...
                     </TableCell>
                   </TableRow>
                 ) : filteredUsers.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                       Nenhum usuário encontrado
                     </TableCell>
                   </TableRow>
@@ -255,6 +279,20 @@ export const UserManagementTable = () => {
                           currentDepartment={user.department}
                           onUpdate={loadUsers}
                         />
+                      </TableCell>
+                      <TableCell>
+                        <Select 
+                          value={user.location || ''} 
+                          onValueChange={(v) => updateUserLocation(user.id, v)}
+                        >
+                          <SelectTrigger className="w-32">
+                            <SelectValue placeholder="Não definido" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Matriz">Matriz</SelectItem>
+                            <SelectItem value="Filial">Filial</SelectItem>
+                          </SelectContent>
+                        </Select>
                       </TableCell>
                       <TableCell>
                         <div className="flex gap-1 flex-wrap">
