@@ -41,6 +41,22 @@ export const KanbanColumn = ({
   canDrag = true,
 }: KanbanColumnProps) => {
   const highCount = orders.filter(o => o.priority === "high").length;
+  const hasHighPriority = highCount > 0;
+  
+  // Estilos condicionais baseados em canDrag
+  const headerStyles = canDrag 
+    ? `${colorClass} border-l-4 shadow-lg` 
+    : `bg-muted/20 text-muted-foreground border-l-2 border-muted shadow-sm`;
+  
+  const iconSize = canDrag ? "h-5 w-5" : "h-4 w-4";
+  const iconOpacity = canDrag ? "opacity-100" : "opacity-60";
+  const titleOpacity = canDrag ? "opacity-100" : "opacity-70";
+  const badgeVariant = canDrag ? "default" : "secondary";
+  const pulseClass = canDrag && hasHighPriority ? "animate-pulse-slow" : "";
+  
+  const containerBg = canDrag ? "bg-muted/30" : "bg-muted/10";
+  const containerBorder = canDrag ? "border-l-4 border-l-primary/20" : "";
+  
   const {
     setNodeRef,
     isOver
@@ -49,11 +65,21 @@ export const KanbanColumn = ({
   });
   return <div ref={setNodeRef} className={`kanban-column transition-all duration-300 flex flex-col ${isOver ? "drop-target" : ""}`}>
       {/* Column Header */}
-      <div className={`${colorClass} rounded-t-lg p-2 sticky top-0 z-10 shadow-sm h-12 flex items-center`}>
+      <div className={`${headerStyles} ${pulseClass} rounded-t-lg p-3 sticky top-0 z-10 h-12 flex items-center transition-all duration-200`}>
         <div className="flex items-center justify-between w-full">
-          <div className="flex items-center gap-1.5">
-            <Icon className="h-4 w-4" />
-            <h3 className="font-semibold text-sm">{title}</h3>
+          <div className="flex items-center gap-2">
+            <Icon className={`${iconSize} ${iconOpacity} transition-all`} />
+            <h3 className={`font-semibold text-sm ${titleOpacity}`}>{title}</h3>
+            
+            {/* Badge "Sua fase" - destaca responsabilidade */}
+            {canDrag && (
+              <Badge 
+                variant="outline" 
+                className="text-[10px] h-4 px-1.5 bg-primary/10 border-primary/40 text-primary font-medium animate-fade-in"
+              >
+                Sua fase
+              </Badge>
+            )}
             
             {/* Ícone de Informação com Tooltip */}
             <TooltipProvider>
@@ -95,14 +121,14 @@ export const KanbanColumn = ({
               </Tooltip>
             </TooltipProvider>
           </div>
-          <Badge variant="secondary" className="bg-card/80 text-card-foreground border-border/50 text-xs h-5 px-2">
+          <Badge variant={badgeVariant} className="text-xs h-5 px-2">
             {orders.length}
           </Badge>
         </div>
       </div>
 
       {/* Cards Container */}
-      <div className="kanban-cards-container flex-1 bg-muted/30 rounded-b-lg p-2 overflow-y-auto space-y-2 animate-fade-in">
+      <div className={`kanban-cards-container flex-1 ${containerBg} ${containerBorder} rounded-b-lg p-2 overflow-y-auto space-y-2 animate-fade-in transition-all duration-200`}>
         {orders.length === 0 ? <div className="text-center text-muted-foreground text-sm py-8">
             Nenhum pedido nesta fase
           </div> : orders.map(order => <KanbanCard key={order.id} order={order} onEdit={onEdit} onStatusChange={onStatusChange} canDrag={canDrag} />)}
