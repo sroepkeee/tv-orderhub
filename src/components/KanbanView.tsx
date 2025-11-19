@@ -349,7 +349,7 @@ export const KanbanView = ({ orders, onEdit, onStatusChange }: KanbanViewProps) 
     setActiveId(event.active.id as string);
   };
 
-  const handleDragEnd = (event: DragEndEvent) => {
+  const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
     setActiveId(null);
 
@@ -377,6 +377,30 @@ export const KanbanView = ({ orders, onEdit, onStatusChange }: KanbanViewProps) 
     }
 
     const newStatus = getDefaultStatusForPhase(targetPhase);
+    
+    // 🆕 REGISTRAR LOG MANUAL DE MUDANÇA DE FASE
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        await supabase.from('user_activity_log').insert({
+          user_id: user.id,
+          action_type: 'update',
+          table_name: 'orders',
+          record_id: orderId,
+          description: `Moveu pedido ${order.orderNumber} de ${currentPhase} para ${targetPhase}`,
+          metadata: {
+            order_number: order.orderNumber,
+            old_phase: currentPhase,
+            new_phase: targetPhase,
+            old_status: order.status,
+            new_status: newStatus,
+            action_source: 'kanban_drag_drop'
+          }
+        });
+      }
+    } catch (error) {
+      console.error('Erro ao registrar log de atividade:', error);
+    }
     
     // 🚀 Optimistic update: atualizar UI imediatamente
     setOptimisticOrders(prev => 
