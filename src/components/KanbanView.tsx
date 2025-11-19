@@ -27,7 +27,13 @@ import {
 } from "@dnd-kit/core";
 import { KanbanCard } from "./KanbanCard";
 import { usePhaseInfo } from "@/hooks/usePhaseInfo";
+import { usePhaseAuthorization } from "@/hooks/usePhaseAuthorization";
 import { ROLE_LABELS } from "@/lib/roleLabels";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "@/hooks/use-toast";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { AlertCircle } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export type Phase = "almox_ssm" | "order_generation" | "almox_general" | "production" | "balance_generation" | "laboratory" | "packaging" | "freight_quote" | "ready_to_invoice" | "invoicing" | "logistics" | "in_transit" | "completion";
 
@@ -40,12 +46,30 @@ interface KanbanViewProps {
 export const KanbanView = ({ orders, onEdit, onStatusChange }: KanbanViewProps) => {
   const [activeId, setActiveId] = React.useState<string | null>(null);
   const [optimisticOrders, setOptimisticOrders] = React.useState<Order[]>(orders);
+  const [phaseOrder, setPhaseOrder] = React.useState<Map<Phase, number>>(new Map());
   const { getPhaseInfo, loading: phaseInfoLoading } = usePhaseInfo();
+  const { canViewPhase, canEditPhase, userRoles, loading: authLoading } = usePhaseAuthorization();
 
   // Sincronizar com orders recebidos (atualização real do servidor)
   React.useEffect(() => {
     setOptimisticOrders(orders);
   }, [orders]);
+
+  // Carregar order_index das fases
+  React.useEffect(() => {
+    const loadPhaseOrder = async () => {
+      const { data } = await supabase
+        .from('phase_config')
+        .select('phase_key, order_index');
+      
+      if (data) {
+        const orderMap = new Map<Phase, number>();
+        data.forEach(p => orderMap.set(p.phase_key as Phase, p.order_index || 0));
+        setPhaseOrder(orderMap);
+      }
+    };
+    loadPhaseOrder();
+  }, []);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -209,6 +233,54 @@ export const KanbanView = ({ orders, onEdit, onStatusChange }: KanbanViewProps) 
     },
   ];
 
+  // Função para verificar se uma fase é a "próxima fase" no fluxo
+  const isNextPhaseForUser = (phase: Phase): boolean => {
+    if (userRoles.includes('admin')) return false;
+    
+    // Fases onde o usuário pode editar
+    const userEditablePhases = columns
+      .filter(col => canViewPhase(col.id) && canEditPhase(col.id))
+      .map(col => phaseOrder.get(col.id))
+      .filter((idx): idx is number => idx !== undefined);
+
+    const phaseIndex = phaseOrder.get(phase);
+    return userEditablePhases.some(idx => phaseIndex === idx + 1);
+  };
+
+  // Função para obter colunas visíveis (permissão + próxima fase)
+  const getVisibleColumns = () => {
+    // Admin vê tudo
+    if (userRoles.includes('admin')) {
+      return columns;
+    }
+
+    const visiblePhases = new Set<Phase>();
+
+    // 1. Adicionar fases onde o usuário tem permissão de visualização
+    columns.forEach(col => {
+      if (canViewPhase(col.id)) {
+        visiblePhases.add(col.id);
+        
+        // 2. Adicionar "próxima fase" no fluxo
+        const currentIndex = phaseOrder.get(col.id);
+        if (currentIndex !== undefined) {
+          // Encontrar fase seguinte
+          const nextPhase = Array.from(phaseOrder.entries())
+            .find(([_, index]) => index === currentIndex + 1)?.[0];
+          
+          if (nextPhase) {
+            visiblePhases.add(nextPhase);
+          }
+        }
+      }
+    });
+
+    // Filtrar colunas visíveis mantendo ordem original
+    return columns.filter(col => visiblePhases.has(col.id));
+  };
+
+  const visibleColumns = getVisibleColumns();
+
   const getOrdersByPhase = (phase: Phase) => {
     return optimisticOrders.filter((order) => getPhaseFromStatus(order.status) === phase);
   };
@@ -294,6 +366,16 @@ export const KanbanView = ({ orders, onEdit, onStatusChange }: KanbanViewProps) 
     // Se soltar na mesma coluna, não faz nada
     if (currentPhase === targetPhase) return;
 
+    // ❌ VALIDAR: Usuário pode editar a fase de destino?
+    if (!canEditPhase(targetPhase) && !userRoles.includes('admin')) {
+      toast({
+        title: "Sem permissão",
+        description: `Você não tem permissão para mover pedidos para ${targetPhase}`,
+        variant: "destructive",
+      });
+      return;
+    }
+
     const newStatus = getDefaultStatusForPhase(targetPhase);
     
     // 🚀 Optimistic update: atualizar UI imediatamente
@@ -311,6 +393,35 @@ export const KanbanView = ({ orders, onEdit, onStatusChange }: KanbanViewProps) 
 
   const activeOrder = activeId ? optimisticOrders.find((o) => o.id === activeId) : null;
 
+  // Loading state
+  if (authLoading || phaseInfoLoading) {
+    return (
+      <div className="kanban-view">
+        <div className="kanban-container flex gap-2 lg:gap-3 overflow-x-auto pb-4 min-h-[calc(100vh-200px)]">
+          {[1, 2, 3, 4, 5].map(i => (
+            <Skeleton key={i} className="h-[600px] min-w-[280px]" />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // Sem permissões
+  if (visibleColumns.length === 0) {
+    return (
+      <div className="kanban-view p-8">
+        <Alert>
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Nenhuma fase disponível</AlertTitle>
+          <AlertDescription>
+            Você ainda não tem permissões configuradas. 
+            Entre em contato com o administrador para solicitar acesso às fases do sistema.
+          </AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
+
   return (
     <DndContext
       sensors={sensors}
@@ -321,8 +432,10 @@ export const KanbanView = ({ orders, onEdit, onStatusChange }: KanbanViewProps) 
     >
       <div className="kanban-view">
         <div className="kanban-container flex gap-2 lg:gap-3 overflow-x-auto pb-4 min-h-[calc(100vh-200px)]">
-          {columns.map((column) => {
+          {visibleColumns.map((column) => {
             const phaseDetails = getPhaseDetails(column.id);
+            const canDrag = canEditPhase(column.id) || userRoles.includes('admin');
+            const isNextPhase = isNextPhaseForUser(column.id);
             
             return (
               <KanbanColumn
@@ -338,6 +451,8 @@ export const KanbanView = ({ orders, onEdit, onStatusChange }: KanbanViewProps) 
                 area={phaseDetails.area}
                 responsibleRole={phaseDetails.responsibleRole}
                 responsibleUsers={phaseDetails.responsibleUsers}
+                canDrag={canDrag}
+                isNextPhase={isNextPhase}
               />
             );
           })}

@@ -1726,6 +1726,15 @@ export type Database = {
           role: string
         }[]
       }
+      get_phase_from_status: { Args: { _status: string }; Returns: string }
+      get_user_phases: {
+        Args: { _user_id: string }
+        Returns: {
+          can_edit: boolean
+          order_index: number
+          phase_key: string
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
