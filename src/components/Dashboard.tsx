@@ -219,11 +219,6 @@ export const Dashboard = () => {
   const [lastUpdateTime, setLastUpdateTime] = useState<Date | null>(null);
   const [pendingApprovalsCount, setPendingApprovalsCount] = useState(0);
   
-  // 🆕 State para filtro de fases permitidas
-  const [showOnlyMyPhases, setShowOnlyMyPhases] = useState(() => {
-    return localStorage.getItem('showOnlyMyPhases') === 'true';
-  });
-  
   const isUpdatingRef = useRef(false);
   const loadingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isLoadingRef = useRef(false);
@@ -262,14 +257,6 @@ export const Dashboard = () => {
       localStorage.setItem(`columnVisibility_${user.id}`, JSON.stringify(columnVisibility));
     }
   }, [columnVisibility, user]);
-
-  // 🆕 Recarregar pedidos quando filtro de fases mudar
-  useEffect(() => {
-    if (user && hasLoadedOnceRef.current) {
-      console.log('🔄 [Dashboard] Filtro de fases mudou, recarregando pedidos...');
-      loadOrders();
-    }
-  }, [showOnlyMyPhases]);
 
   // Load orders from Supabase
   useEffect(() => {
@@ -627,8 +614,7 @@ export const Dashboard = () => {
       userId: user.id, 
       requestId: currentRequestId,
       isAdmin: isAdminUser,
-      allowedPhases,
-      filterActive: showOnlyMyPhases
+      allowedPhases
     });
     
     // Loading state bifurcado
@@ -716,13 +702,6 @@ export const Dashboard = () => {
             user_id
           )
         `);
-      
-      // 🆕 Se não for admin E filtro ativo, aplicar filtro de fases
-      if (!isAdminUser && showOnlyMyPhases && allowedPhases.length > 0) {
-        const allowedStatuses = allowedPhases.flatMap(getStatusesFromPhase);
-        console.log('🔒 [loadOrders] Aplicando filtro de fases:', { allowedStatuses });
-        query = query.in('status', allowedStatuses);
-      }
       
       const { data, error } = await query
         .range(0, 499)
@@ -1854,11 +1833,6 @@ export const Dashboard = () => {
           onApprove={handleApproveOrder} 
           onCancel={handleCancelOrder} 
           onStatusChange={handleStatusChange} 
-          showOnlyMyPhases={showOnlyMyPhases}
-          onShowOnlyMyPhasesChange={(value) => {
-            setShowOnlyMyPhases(value);
-            localStorage.setItem('showOnlyMyPhases', value.toString());
-          }}
           onRowClick={order => {
             setSelectedOrder(order);
             setShowEditDialog(true);
