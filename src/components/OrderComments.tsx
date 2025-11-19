@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -48,6 +48,7 @@ export const OrderComments = ({ orderId }: OrderCommentsProps) => {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const commentRefs = useRef<Map<string, HTMLDivElement>>(new Map());
 
   useEffect(() => {
     loadComments();
@@ -73,6 +74,37 @@ export const OrderComments = ({ orderId }: OrderCommentsProps) => {
       supabase.removeChannel(channel);
     };
   }, [orderId]);
+
+  // Scroll automático para comentário destacado
+  useEffect(() => {
+    const scrollToCommentId = sessionStorage.getItem('scrollToComment');
+    
+    if (scrollToCommentId && commentRefs.current.has(scrollToCommentId)) {
+      // Aguardar renderização completa
+      setTimeout(() => {
+        const commentElement = commentRefs.current.get(scrollToCommentId);
+        
+        if (commentElement) {
+          // Scroll suave até o elemento
+          commentElement.scrollIntoView({ 
+            behavior: 'smooth', 
+            block: 'center' 
+          });
+          
+          // Adicionar highlight temporário
+          commentElement.classList.add('bg-primary/10', 'ring-2', 'ring-primary/30');
+          
+          // Remover highlight após 3 segundos
+          setTimeout(() => {
+            commentElement.classList.remove('bg-primary/10', 'ring-2', 'ring-primary/30');
+          }, 3000);
+          
+          // Limpar sessionStorage
+          sessionStorage.removeItem('scrollToComment');
+        }
+      }, 300);
+    }
+  }, [comments]);
 
   const loadComments = async () => {
     try {
@@ -289,8 +321,15 @@ export const OrderComments = ({ orderId }: OrderCommentsProps) => {
             // Lista de comentários
             comments.map((comment) => (
               <div 
-                key={comment.id} 
-                className={`flex gap-3 pb-4 border-b last:border-0 ${
+                key={comment.id}
+                ref={(el) => {
+                  if (el) {
+                    commentRefs.current.set(comment.id, el);
+                  } else {
+                    commentRefs.current.delete(comment.id);
+                  }
+                }}
+                className={`flex gap-3 pb-4 border-b last:border-0 transition-all duration-300 rounded ${
                   comment.isOptimistic ? 'opacity-60' : ''
                 }`}
               >

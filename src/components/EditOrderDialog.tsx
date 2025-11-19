@@ -84,7 +84,14 @@ export const EditOrderDialog = ({
     toast
   } = useToast();
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState("edit");
+  const [activeTab, setActiveTab] = useState(() => {
+    const savedTab = sessionStorage.getItem('activeTab');
+    if (savedTab) {
+      sessionStorage.removeItem('activeTab');
+      return savedTab;
+    }
+    return "edit";
+  });
   const [items, setItems] = useState<OrderItem[]>([]);
   const [historyEvents, setHistoryEvents] = useState<HistoryEvent[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
@@ -726,6 +733,15 @@ export const EditOrderDialog = ({
       supabase.removeChannel(itemsChannel);
     };
   }, [open, order?.id]);
+
+  // Limpar sessionStorage ao fechar diálogo
+  useEffect(() => {
+    if (!open) {
+      sessionStorage.removeItem('activeTab');
+      sessionStorage.removeItem('scrollToComment');
+    }
+  }, [open]);
+  
   const addItem = () => {
     setItems([...items, {
       itemCode: "",

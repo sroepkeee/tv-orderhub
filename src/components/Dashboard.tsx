@@ -278,6 +278,95 @@ export const Dashboard = () => {
       loadUnreadCount();
     }
   }, [user]);
+
+  // Listener para evento openOrder (notificações)
+  useEffect(() => {
+    const handleOpenOrder = (event: CustomEvent) => {
+      const { orderId, commentId } = event.detail;
+      
+      console.log('🔔 Evento openOrder recebido:', { orderId, commentId });
+      
+      // Buscar o pedido completo
+      const order = orders.find(o => o.id === orderId);
+      
+      if (order) {
+        setSelectedOrder(order);
+        setShowEditDialog(true);
+        
+        // Se tem commentId, armazenar para scroll posterior
+        if (commentId) {
+          sessionStorage.setItem('scrollToComment', commentId);
+          sessionStorage.setItem('activeTab', 'comments');
+        }
+      } else {
+        // Pedido não está na lista atual, fazer busca direta
+        supabase
+          .from('orders')
+          .select('*')
+          .eq('id', orderId)
+          .single()
+          .then(({ data, error }) => {
+            if (error || !data) {
+              toast({
+                title: 'Pedido não encontrado',
+                description: 'Não foi possível abrir o pedido.',
+                variant: 'destructive'
+              });
+              return;
+            }
+            
+            // Converter para formato Order e abrir
+            const formattedOrder: Order = {
+              id: data.id,
+              orderNumber: data.order_number,
+              type: data.order_type as OrderType,
+              priority: data.priority as Priority,
+              status: data.status as OrderStatus,
+              client: data.customer_name,
+              deliveryDeadline: data.delivery_date,
+              delivery_address: data.delivery_address,
+              createdDate: data.created_at,
+              issueDate: data.issue_date || undefined,
+              item: '',
+              description: '',
+              quantity: 0,
+              deskTicket: '',
+              totvsOrderNumber: data.totvs_order_number || undefined,
+              order_category: data.order_category || undefined,
+              requires_firmware: data.requires_firmware || false,
+              firmware_project_name: data.firmware_project_name || undefined,
+              requires_image: data.requires_image || false,
+              image_project_name: data.image_project_name || undefined,
+              freight_type: data.freight_type || undefined,
+              freight_value: data.freight_value || undefined,
+              freight_modality: data.freight_modality || undefined,
+              carrier_name: data.carrier_name || undefined,
+              tracking_code: data.tracking_code || undefined,
+              package_volumes: data.package_volumes || undefined,
+              package_weight_kg: data.package_weight_kg || undefined,
+              package_height_m: data.package_height_m || undefined,
+              package_width_m: data.package_width_m || undefined,
+              package_length_m: data.package_length_m || undefined,
+            };
+            
+            setSelectedOrder(formattedOrder);
+            setShowEditDialog(true);
+            
+            if (commentId) {
+              sessionStorage.setItem('scrollToComment', commentId);
+              sessionStorage.setItem('activeTab', 'comments');
+            }
+          });
+      }
+    };
+    
+    window.addEventListener('openOrder', handleOpenOrder as EventListener);
+    
+    return () => {
+      window.removeEventListener('openOrder', handleOpenOrder as EventListener);
+    };
+  }, [orders]);
+  
   const loadUnreadCount = async () => {
     try {
       const {

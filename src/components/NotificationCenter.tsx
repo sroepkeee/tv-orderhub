@@ -42,11 +42,14 @@ export const NotificationCenter = () => {
     setOpen(false);
     navigate('/');
     
-    // Dispatch custom event para abrir pedido
+    // Dispatch custom event para abrir pedido COM comment_id
     setTimeout(() => {
       window.dispatchEvent(
         new CustomEvent('openOrder', {
-          detail: { orderId: notification.order_id }
+          detail: { 
+            orderId: notification.order_id,
+            commentId: notification.comment_id
+          }
         })
       );
     }, 100);
