@@ -1702,16 +1702,6 @@ export type Database = {
       app_role:
         | "admin"
         | "almox_ssm"
-        | "planejamento"
-        | "almox_geral"
-        | "producao"
-        | "laboratorio"
-        | "logistica"
-        | "comercial"
-        | "faturamento"
-        | "almox_filial"
-        | "almox_m16"
-        | "laboratorio_filial"
         | "order_generation"
         | "almox_general"
         | "production"
@@ -1851,16 +1841,6 @@ export const Constants = {
       app_role: [
         "admin",
         "almox_ssm",
-        "planejamento",
-        "almox_geral",
-        "producao",
-        "laboratorio",
-        "logistica",
-        "comercial",
-        "faturamento",
-        "almox_filial",
-        "almox_m16",
-        "laboratorio_filial",
         "order_generation",
         "almox_general",
         "production",
