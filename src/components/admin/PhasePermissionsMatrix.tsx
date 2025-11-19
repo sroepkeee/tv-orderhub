@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Save, CheckSquare, X } from "lucide-react";
+import { useAvailableRoles } from "@/hooks/useAvailableRoles";
 
 interface Permission {
   role: string;
@@ -24,24 +25,8 @@ const PHASES = [
   { key: 'laboratory', label: 'Laboratório' },
   { key: 'packaging', label: 'Embalagem' },
   { key: 'freight_quote', label: 'Cotação Frete' },
-  { key: 'ready_to_invoice', label: 'À Faturar' },
-  { key: 'invoicing', label: 'Solicitado Faturamento' },
+  { key: 'invoicing', label: 'Faturamento' },
   { key: 'logistics', label: 'Expedição' },
-];
-
-const ROLES = [
-  { value: 'admin', label: 'Administrador' },
-  { value: 'almox_ssm', label: 'Almox SSM' },
-  { value: 'almox_geral', label: 'Almox Geral' },
-  { value: 'almox_filial', label: 'Almox Filial' },
-  { value: 'almox_m16', label: 'Almox M16' },
-  { value: 'planejamento', label: 'Planejamento' },
-  { value: 'producao', label: 'Produção' },
-  { value: 'laboratorio', label: 'Laboratório' },
-  { value: 'laboratorio_filial', label: 'Laboratório Filial' },
-  { value: 'logistica', label: 'Logística' },
-  { value: 'comercial', label: 'Comercial' },
-  { value: 'faturamento', label: 'Faturamento' },
 ];
 
 export const PhasePermissionsMatrix = () => {
@@ -49,6 +34,7 @@ export const PhasePermissionsMatrix = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const { toast } = useToast();
+  const { roles: ROLES, loading: loadingRoles } = useAvailableRoles();
 
   useEffect(() => {
     loadPermissions();
@@ -181,8 +167,14 @@ export const PhasePermissionsMatrix = () => {
     }
   };
 
-  if (loading) {
-    return <div className="text-center py-8">Carregando permissões...</div>;
+  if (loading || loadingRoles) {
+    return (
+      <Card>
+        <CardContent className="py-8">
+          <div className="text-center text-muted-foreground">Carregando...</div>
+        </CardContent>
+      </Card>
+    );
   }
 
   return (
