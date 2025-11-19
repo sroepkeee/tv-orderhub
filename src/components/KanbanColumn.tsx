@@ -25,7 +25,6 @@ interface KanbanColumnProps {
   responsibleRole?: string;
   responsibleUsers?: Array<{ full_name: string; email: string }>;
   canDrag?: boolean;
-  isNextPhase?: boolean;
 }
 export const KanbanColumn = ({
   id,
@@ -40,7 +39,6 @@ export const KanbanColumn = ({
   responsibleRole,
   responsibleUsers,
   canDrag = true,
-  isNextPhase = false,
 }: KanbanColumnProps) => {
   const highCount = orders.filter(o => o.priority === "high").length;
   const {
@@ -56,13 +54,6 @@ export const KanbanColumn = ({
           <div className="flex items-center gap-1.5">
             <Icon className="h-4 w-4" />
             <h3 className="font-semibold text-sm">{title}</h3>
-            
-            {/* Badge de "Próxima Fase" */}
-            {isNextPhase && (
-              <Badge variant="outline" className="ml-2 text-xs bg-blue-100 text-blue-700 border-blue-200">
-                Próxima fase
-              </Badge>
-            )}
             
             {/* Ícone de Informação com Tooltip */}
             <TooltipProvider>
@@ -84,7 +75,7 @@ export const KanbanColumn = ({
                     <p className="text-xs text-muted-foreground mt-2 pt-2 border-t">
                       {canDrag 
                         ? "✓ Você pode editar pedidos nesta fase"
-                        : "👁️ Você pode apenas visualizar (próxima fase no fluxo)"
+                        : "👁️ Você pode apenas visualizar esta fase"
                       }
                     </p>
                     {responsibleUsers && responsibleUsers.length > 0 && (

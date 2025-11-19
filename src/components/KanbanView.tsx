@@ -233,21 +233,7 @@ export const KanbanView = ({ orders, onEdit, onStatusChange }: KanbanViewProps) 
     },
   ];
 
-  // Função para verificar se uma fase é a "próxima fase" no fluxo
-  const isNextPhaseForUser = (phase: Phase): boolean => {
-    if (userRoles.includes('admin')) return false;
-    
-    // Fases onde o usuário pode editar
-    const userEditablePhases = columns
-      .filter(col => canViewPhase(col.id) && canEditPhase(col.id))
-      .map(col => phaseOrder.get(col.id))
-      .filter((idx): idx is number => idx !== undefined);
-
-    const phaseIndex = phaseOrder.get(phase);
-    return userEditablePhases.some(idx => phaseIndex === idx + 1);
-  };
-
-  // Função para obter colunas visíveis (permissão + próxima fase)
+  // Função para obter colunas visíveis (apenas com permissão explícita)
   const getVisibleColumns = () => {
     // Admin vê tudo
     if (userRoles.includes('admin')) {
@@ -256,22 +242,10 @@ export const KanbanView = ({ orders, onEdit, onStatusChange }: KanbanViewProps) 
 
     const visiblePhases = new Set<Phase>();
 
-    // 1. Adicionar fases onde o usuário tem permissão de visualização
+    // Adicionar apenas fases onde o usuário tem permissão de visualização
     columns.forEach(col => {
       if (canViewPhase(col.id)) {
         visiblePhases.add(col.id);
-        
-        // 2. Adicionar "próxima fase" no fluxo
-        const currentIndex = phaseOrder.get(col.id);
-        if (currentIndex !== undefined) {
-          // Encontrar fase seguinte
-          const nextPhase = Array.from(phaseOrder.entries())
-            .find(([_, index]) => index === currentIndex + 1)?.[0];
-          
-          if (nextPhase) {
-            visiblePhases.add(nextPhase);
-          }
-        }
       }
     });
 
@@ -459,7 +433,6 @@ export const KanbanView = ({ orders, onEdit, onStatusChange }: KanbanViewProps) 
           {visibleColumns.map((column) => {
             const phaseDetails = getPhaseDetails(column.id);
             const canDrag = canEditPhase(column.id) || userRoles.includes('admin');
-            const isNextPhase = isNextPhaseForUser(column.id);
             
             return (
               <KanbanColumn
@@ -476,7 +449,6 @@ export const KanbanView = ({ orders, onEdit, onStatusChange }: KanbanViewProps) 
                 responsibleRole={phaseDetails.responsibleRole}
                 responsibleUsers={phaseDetails.responsibleUsers}
                 canDrag={canDrag}
-                isNextPhase={isNextPhase}
               />
             );
           })}
