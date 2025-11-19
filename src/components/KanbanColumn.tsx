@@ -75,7 +75,7 @@ export const KanbanColumn = ({
             {canDrag && (
               <Badge 
                 variant="outline" 
-                className="text-[10px] h-4 px-1.5 bg-primary/10 border-primary/40 text-primary font-medium animate-fade-in"
+                className="text-[10px] h-4 px-1.5 bg-emerald-50 border-emerald-500 text-emerald-700 font-medium animate-fade-in"
               >
                 Sua fase
               </Badge>
