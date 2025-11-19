@@ -26,10 +26,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useAdminAuth } from "@/hooks/useAdminAuth";
 import { usePhaseAuthorization } from "@/hooks/usePhaseAuthorization";
 import { supabase } from "@/integrations/supabase/client";
-import { Shield, Edit } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { ROLE_LABELS } from "@/lib/roleLabels";
+import { Shield } from "lucide-react";
 
 // Types
 type Priority = "high" | "medium" | "low";
@@ -1640,67 +1637,6 @@ export const Dashboard = () => {
     setShowEditDialog(true);
   };
   return <div className="min-h-screen bg-background p-4 lg:p-6">
-      {/* 🆕 Card de Permissões do Usuário MELHORADO */}
-      {!userRoles.includes('admin') && phasePermissions.length > 0 && (
-        <Card className="mb-4">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm flex items-center justify-between">
-              <span>Suas Fases Permitidas</span>
-              <Badge variant="secondary" className="text-xs">
-                {phasePermissions.filter(p => p.can_view).length} fases
-              </Badge>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {/* Badges de fases */}
-              <div className="flex gap-2 flex-wrap">
-                {phasePermissions
-                  .filter(p => p.can_view)
-                  .map(p => (
-                    <Badge key={p.phase_key} variant={p.can_edit ? "default" : "secondary"} className="text-xs">
-                      {ROLE_LABELS[p.phase_key]?.name || p.phase_key}
-                      {p.can_edit && <Edit className="ml-1 h-3 w-3" />}
-                    </Badge>
-                  ))
-                }
-              </div>
-              
-              {/* 🆕 Estatísticas de pedidos por fase */}
-              <div className="pt-2 border-t">
-                <p className="text-xs text-muted-foreground mb-2">Pedidos nas suas fases:</p>
-                {phasePermissions
-                  .filter(p => p.can_view)
-                  .map(p => {
-                    const ordersInPhase = orders.filter(
-                      o => getPhaseFromStatus(o.status) === p.phase_key
-                    ).length;
-                    
-                    return (
-                      <div key={p.phase_key} className="flex justify-between text-xs py-1">
-                        <span>{ROLE_LABELS[p.phase_key]?.name}</span>
-                        <Badge variant="outline" className="text-xs">{ordersInPhase}</Badge>
-                      </div>
-                    );
-                  })
-                }
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* 🆕 Alerta para usuários sem permissões */}
-      {phasePermissions.length === 0 && !isAdmin && (
-        <Alert variant="destructive" className="mb-4">
-          <Shield className="h-4 w-4" />
-          <AlertTitle>Sem Permissões Configuradas</AlertTitle>
-          <AlertDescription>
-            Você não tem permissões para visualizar nenhuma fase. Entre em contato com o administrador para solicitar acesso.
-          </AlertDescription>
-        </Alert>
-      )}
-
       {/* Compact Header */}
       <div className="flex items-center justify-between mb-4 lg:mb-6">
         <div className="flex items-center gap-2 lg:gap-4">
