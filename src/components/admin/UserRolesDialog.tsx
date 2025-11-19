@@ -77,6 +77,7 @@ export const UserRolesDialog = ({ open, onOpenChange, user, onSuccess }: UserRol
       const rolesRemoved = user.roles.filter(r => !selectedRoles.includes(r));
 
       if (rolesAdded.length > 0 || rolesRemoved.length > 0) {
+        // Log no permission_audit_log
         const { error: logError } = await supabase
           .from('permission_audit_log')
           .insert({
@@ -91,6 +92,26 @@ export const UserRolesDialog = ({ open, onOpenChange, user, onSuccess }: UserRol
           });
 
         if (logError) throw logError;
+
+        // Log no user_activity_log
+        const description = rolesAdded.length > 0 && rolesRemoved.length > 0
+          ? `Atualizou roles do usuário ${user.full_name}`
+          : rolesAdded.length > 0
+          ? `Concedeu roles ${rolesAdded.join(', ')} para ${user.full_name}`
+          : `Removeu roles ${rolesRemoved.join(', ')} de ${user.full_name}`;
+
+        await supabase.from('user_activity_log').insert({
+          user_id: currentUser?.id,
+          action_type: 'update',
+          table_name: 'user_roles',
+          record_id: user.id,
+          description,
+          metadata: {
+            target_user: user.full_name,
+            roles_added: rolesAdded,
+            roles_removed: rolesRemoved,
+          }
+        });
       }
 
       toast({

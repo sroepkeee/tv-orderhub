@@ -77,6 +77,20 @@ export const UserApprovalDialog = ({ open, onOpenChange, user, onSuccess }: User
 
       if (logError) throw logError;
 
+      // Log no user_activity_log
+      await supabase.from('user_activity_log').insert({
+        user_id: currentUser?.id,
+        action_type: action === 'approve' ? 'approve' : 'reject',
+        table_name: 'user_approval_status',
+        record_id: user.id,
+        description: `${action === 'approve' ? 'Aprovou' : 'Rejeitou'} usuário ${user.full_name}`,
+        metadata: {
+          target_user: user.full_name,
+          target_email: user.email,
+          rejection_reason: action === 'reject' ? reason : null,
+        }
+      });
+
       toast({
         title: action === 'approve' ? "Usuário aprovado" : "Usuário rejeitado",
         description: `${user.full_name} foi ${action === 'approve' ? 'aprovado' : 'rejeitado'} com sucesso`,

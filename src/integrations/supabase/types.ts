@@ -1613,6 +1613,45 @@ export type Database = {
           },
         ]
       }
+      user_activity_log: {
+        Row: {
+          action_type: string
+          created_at: string
+          description: string
+          id: string
+          ip_address: unknown
+          metadata: Json | null
+          record_id: string | null
+          table_name: string | null
+          user_agent: string | null
+          user_id: string | null
+        }
+        Insert: {
+          action_type: string
+          created_at?: string
+          description: string
+          id?: string
+          ip_address?: unknown
+          metadata?: Json | null
+          record_id?: string | null
+          table_name?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          action_type?: string
+          created_at?: string
+          description?: string
+          id?: string
+          ip_address?: unknown
+          metadata?: Json | null
+          record_id?: string | null
+          table_name?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       user_approval_status: {
         Row: {
           approved_at: string | null
@@ -1695,6 +1734,17 @@ export type Database = {
         Returns: boolean
       }
       is_user_approved: { Args: { _user_id: string }; Returns: boolean }
+      log_user_activity: {
+        Args: {
+          _action_type: string
+          _description: string
+          _metadata?: Json
+          _record_id: string
+          _table_name: string
+          _user_id: string
+        }
+        Returns: undefined
+      }
       subtract_business_days: {
         Args: { business_days: number; start_date: string }
         Returns: string
