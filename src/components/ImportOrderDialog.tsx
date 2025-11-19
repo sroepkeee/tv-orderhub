@@ -12,6 +12,7 @@ import { Upload, FileSpreadsheet, CheckCircle2, XCircle, AlertTriangle, Download
 import { cleanItemDescription } from "@/lib/utils";
 import { useDuplicateOrderCheck } from "@/hooks/useDuplicateOrderCheck";
 import { DuplicateOrderWarningDialog } from "@/components/DuplicateOrderWarningDialog";
+import { OrderItemsReviewTable } from "@/components/OrderItemsReviewTable";
 interface ImportOrderDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -594,46 +595,37 @@ export const ImportOrderDialog = ({
                 </div>}
             </div>
 
-            {/* Lista de itens */}
-            <div className="border rounded-lg overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead className="bg-muted">
-                    <tr>
-                      <th className="p-2 text-left">#</th>
-                      <th className="p-2 text-left">Código</th>
-                      <th className="p-2 text-left">Descrição</th>
-                      <th className="p-2 text-right">Qtde</th>
-                      <th className="p-2 text-left">Un</th>
-                      <th className="p-2 text-left">Arm</th>
-                      <th className="p-2 text-right">Vlr Unit</th>
-                      <th className="p-2 text-right">Total</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {parsedData.items.slice(0, 10).map((item, i) => <tr key={i} className="border-t hover:bg-muted/50">
-                        <td className="p-2 text-muted-foreground">{item.itemNumber}</td>
-                        <td className="p-2 font-mono text-xs">{item.itemCode}</td>
-                        <td className="p-2 truncate max-w-[200px]" title={item.description}>
-                          {item.description}
-                        </td>
-                        <td className="p-2 text-right font-medium">{item.quantity}</td>
-                        <td className="p-2">{item.unit}</td>
-                        <td className="p-2">{item.warehouse}</td>
-                        <td className="p-2 text-right">
-                          {item.unitPrice ? `R$ ${item.unitPrice.toFixed(2)}` : '-'}
-                        </td>
-                        <td className="p-2 text-right font-medium">
-                          {item.totalValue ? `R$ ${item.totalValue.toFixed(2)}` : '-'}
-                        </td>
-                      </tr>)}
-                  </tbody>
-                </table>
-              </div>
-              {parsedData.items.length > 10 && <div className="p-3 bg-muted/50 text-center text-sm text-muted-foreground border-t">
-                  + {parsedData.items.length - 10} itens adicionais
-                </div>}
-            </div>
+            {/* Tabela de revisão e edição de itens */}
+            <OrderItemsReviewTable
+              items={parsedData.items.map(item => ({
+                itemCode: item.itemCode,
+                itemDescription: item.description,
+                requestedQuantity: item.quantity,
+                unit: item.unit,
+                unitPrice: item.unitPrice || 0,
+                totalValue: item.totalValue || 0,
+                discount: item.discount || 0,
+                warehouse: item.warehouse,
+                deliveryDate: item.deliveryDate || parsedData.orderInfo.deliveryDate
+              }))}
+              onChange={(updatedItems) => {
+                setParsedData({
+                  ...parsedData,
+                  items: updatedItems.map((item, index) => ({
+                    ...parsedData.items[index],
+                    itemCode: item.itemCode,
+                    description: item.itemDescription,
+                    quantity: item.requestedQuantity,
+                    unit: item.unit,
+                    unitPrice: item.unitPrice,
+                    totalValue: item.totalValue,
+                    discount: item.discount,
+                    warehouse: item.warehouse,
+                    deliveryDate: item.deliveryDate
+                  }))
+                });
+              }}
+            />
 
             {/* Ações */}
             <div className="flex items-center gap-2 justify-between pt-2">
