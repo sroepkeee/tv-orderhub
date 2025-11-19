@@ -763,7 +763,9 @@ function extractItemsTable(text: string): {
   // 7. VARREDURA DE TABELAS MARKDOWN/PIPE (antes da remoção de pipes)
   // Processar primeiro as linhas com pipes explícitos na versão raw
   // MELHORADO: tolerância a unidades de 2-4 letras
-  const markdownLineRegex = /\|\s*(\d{1,3})\s*\|\s*(\d{4,})\s*\|\s*([\d.,]+)\s*\|\s*([A-ZÇÃÕ]{2,4})\s*\|/gi;
+  // REGEX EXPANDIDO: captura Item|Código|Qtde|Uni|V.Unit|Desc|V.C/Desc|NCM|%IPI|Val.IPI|%ICMS|ICMS|Total|Total c/IPI|Armazém
+  // Grupos: 1=Item, 2=Código, 3=Qtde, 4=Uni, 5=V.Unit, 6=Desconto, 7=Total, 8=Armazém
+  const markdownLineRegex = /\|\s*(\d{1,3})\s*\|\s*(\d{4,})\s*\|\s*([\d.,]+)\s*\|\s*([A-ZÇÃÕ]{2,4})\s*\|\s*([\d.,]+)\s*\|\s*([\d.,]+)\s*\|.*?\|\s*([\d.,]+)\s*\|.*?\|\s*(\d{1,3})\s*\|/gi;
   
   let markdownMatch;
   while ((markdownMatch = markdownLineRegex.exec(tableTextRaw)) !== null) {
@@ -783,45 +785,75 @@ function extractItemsTable(text: string): {
       
       if (alreadyExtracted) continue;
       
-      // Abrir janela de contexto (+600 chars após o match)
+      // MUDANÇA CRÍTICA: Usar valores JÁ extraídos da regex markdown (mais confiável!)
+      const unitPrice = markdownMatch[5] 
+        ? parseFloat(markdownMatch[5].replace(/\./g, '').replace(',', '.')) 
+        : 0;
+      
+      const discount = markdownMatch[6]
+        ? parseFloat(markdownMatch[6].replace(/\./g, '').replace(',', '.'))
+        : 0;
+      
+      const totalValue = markdownMatch[7]
+        ? parseFloat(markdownMatch[7].replace(/\./g, '').replace(',', '.'))
+        : 0;
+      
+      const warehouse = markdownMatch[8] || 'PRINCIPAL';
+      
+      // MUDANÇA CRÍTICA: Buscar descrição APENAS nas próximas 150 chars (2-3 linhas após o item)
       const contextStart = markdownMatch.index;
-      const contextEnd = Math.min(tableTextRaw.length, contextStart + 600);
-      const context = tableTextRaw.slice(contextStart, contextEnd);
+      let contextEnd = Math.min(tableTextRaw.length, contextStart + 150);
       
-      // Extrair valores do contexto
-      const vUnitMatch = context.match(/V\.?\s*Unit\.?\s+([\d.,]+)/i);
-      const unitPrice = vUnitMatch ? parseFloat(vUnitMatch[1].replace(/\./g, '').replace(',', '.')) : 0;
+      // Detectar próximo "Item N" para delimitar fim do bloco atual
+      const nextItemMatch = tableTextRaw.slice(contextStart + 1).search(/\|\s*\d{1,3}\s*\|\s*\d{4,}/);
+      if (nextItemMatch !== -1 && nextItemMatch < 150) {
+        contextEnd = contextStart + nextItemMatch;
+      }
       
-      const totalMatch = context.match(/Total\s+([\d.,]+)/i);
-      const totalValue = totalMatch ? parseFloat(totalMatch[1].replace(/\./g, '').replace(',', '.')) : 0;
+      const descriptionSearchArea = tableTextRaw.slice(contextStart, contextEnd);
       
-      const descMatch = context.match(/Desc\s+([\d.,]+)/i);
-      const discount = descMatch ? parseFloat(descMatch[1].replace(/\./g, '').replace(',', '.')) : 0;
-      
-      const armazemMatch = context.match(/Armaz[ée]m\s+(\d{1,3})/i);
-      const warehouse = armazemMatch ? armazemMatch[1] : 'PRINCIPAL';
-      
-      // Buscar descrição - MELHORADO: suportar "| Descrição:" em linha separada
+      // Buscar descrição na área delimitada
       let description = 'Produto TOTVS';
       
-      // Verificar se a próxima linha é "| Descrição: ..."
-      const nextLineMatch = context.match(/\|\s*Descri[çc][ãa]o:\s*([^|]+?)\s*\|/i);
-      if (nextLineMatch && nextLineMatch[1].trim().length > 3) {
-        description = nextLineMatch[1].trim().replace(/\s+/g, ' ').substring(0, 200);
-      } else {
-        // Padrões de descrição padrão
-        const descPatterns = [
-          new RegExp(`Descri[çc][ãa]o[:\\s]+(.+?)(?=Item\\s+\\d+|C[óo]digo\\s+\\d+|Qtde|\\||LGPD|$)`, 'is'),
-          new RegExp(`C[óo]digo\\s+${itemCode}[\\s\\S]{0,400}?Descri[çc][ãa]o[:\\s]+(.+?)(?=Item\\s+\\d+|C[óo]digo\\s+\\d+|\\||$)`, 'is'),
-        ];
+      // Padrão 1: "Descrição:" seguido de texto (linha inteira ou em pipe)
+      const descMatch1 = descriptionSearchArea.match(/Descri[çc][ãa]o:\s*(.+?)(?:\n|$)/is);
+      if (descMatch1) {
+        const rawDesc = descMatch1[1].trim();
+        // Pular código de operação (ex: "501VENDA DE PRODUCAO")
+        const lines = rawDesc.split('\n');
+        // Primeira linha geralmente é código de operação, segunda é a descrição real
+        const descLine = lines.length > 1 ? lines[1].trim() : lines[0].trim();
         
-        for (const pattern of descPatterns) {
-          const dm = context.match(pattern);
-          if (dm && dm[1].trim().length > 3) {
-            description = dm[1].trim().replace(/\s+/g, ' ').replace(/^\d+\s*-?\s*/, '').substring(0, 200);
+        if (descLine && descLine.length > 5 && !/^Item\s+\d+/.test(descLine)) {
+          description = descLine
+            .replace(/\s+/g, ' ')
+            .replace(/^\d+\s*-?\s*/, '') // Remove código numérico inicial
+            .substring(0, 200);
+        }
+      }
+      
+      // Fallback: se não encontrou, usar primeira linha após match que não seja cabeçalho
+      if (description === 'Produto TOTVS') {
+        const textAfterMatch = descriptionSearchArea.slice(markdownMatch[0].length);
+        const lines = textAfterMatch.split('\n').map(l => l.trim()).filter(l => l.length > 5);
+        
+        for (const line of lines) {
+          if (!/^(Observa[çc][ãa]o|Descri[çc][ãa]o|Item\s+\d+|\|)/.test(line)) {
+            description = line.replace(/\s+/g, ' ').substring(0, 200);
             break;
           }
         }
+      }
+      
+      // VALIDAÇÃO DE CONSISTÊNCIA: quantidade * preço ≈ total (margem 5% para descontos)
+      const expectedTotal = quantity * unitPrice - discount;
+      const totalDiff = Math.abs(expectedTotal - totalValue);
+      const isConsistent = totalValue === 0 || totalDiff < (expectedTotal * 0.05); // 5% margem
+      
+      if (!isConsistent && import.meta.env.DEV) {
+        console.warn(`⚠️ [Markdown] Item ${itemNumber} (${itemCode}): Valores inconsistentes! ` +
+          `Qtde(${quantity}) * Preço(${unitPrice.toFixed(2)}) = R$ ${expectedTotal.toFixed(2)} ` +
+          `mas Total extraído = R$ ${totalValue.toFixed(2)}`);
       }
       
       items.push({
@@ -841,7 +873,14 @@ function extractItemsTable(text: string): {
       });
       
       if (import.meta.env.DEV) {
-        console.log(`✅ [Markdown] Item ${itemNumber}: ${itemCode} | ${quantity} ${unit} | ${description.substring(0, 40)}...`);
+        console.log(`\n📦 [Markdown] Item ${itemNumber} extraído:`);
+        console.log(`   Código: ${itemCode}`);
+        console.log(`   Qtde: ${quantity} ${unit}`);
+        console.log(`   Preço: R$ ${unitPrice.toFixed(2)}`);
+        console.log(`   Total: R$ ${totalValue.toFixed(2)}`);
+        console.log(`   Armazém: ${warehouse}`);
+        console.log(`   Descrição: ${description.substring(0, 50)}...`);
+        console.log(`   Consistente: ${isConsistent ? '✅' : '❌'}`);
       }
       
     } catch (error) {
