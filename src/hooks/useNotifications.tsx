@@ -9,6 +9,7 @@ interface Notification {
   title: string;
   message: string;
   order_id: string;
+  comment_id?: string;
   is_read: boolean;
   created_at: string;
   metadata: any;
@@ -110,7 +111,7 @@ export const useNotifications = () => {
       // Query simples de notificações (usa metadata.author_name para exibição)
       const { data: notificationsData, error: notifError } = await supabase
         .from('notifications')
-        .select('*')
+        .select('*, comment_id')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false })
         .limit(50);

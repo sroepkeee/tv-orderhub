@@ -614,6 +614,22 @@ All colors MUST be HSL.
     animation: pulse-slow 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
   }
 
+  /* Highlight para comentário focado via notificação */
+  @keyframes highlight-comment {
+    0%, 100% { 
+      background-color: transparent;
+      box-shadow: none;
+    }
+    50% { 
+      background-color: hsl(var(--primary) / 0.08);
+      box-shadow: 0 0 0 2px hsl(var(--primary) / 0.2);
+    }
+  }
+
+  .animate-highlight-comment {
+    animation: highlight-comment 2s ease-in-out 3;
+  }
+
   /* Compact form field utility classes */
   .form-field-compact {
     @apply space-y-1;
