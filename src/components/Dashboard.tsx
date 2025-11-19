@@ -24,8 +24,11 @@ import { RealtimeIndicator } from "./RealtimeIndicator";
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { useAdminAuth } from "@/hooks/useAdminAuth";
+import { usePhaseAuthorization } from "@/hooks/usePhaseAuthorization";
 import { supabase } from "@/integrations/supabase/client";
-import { Shield } from "lucide-react";
+import { Shield, Edit } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ROLE_LABELS } from "@/lib/roleLabels";
 
 // Types
 type Priority = "high" | "medium" | "low";
@@ -201,6 +204,7 @@ export const Dashboard = () => {
     user
   } = useAuth();
   const { isAdmin } = useAdminAuth();
+  const { phasePermissions, userRoles } = usePhaseAuthorization();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
@@ -1564,6 +1568,28 @@ export const Dashboard = () => {
     setShowEditDialog(true);
   };
   return <div className="min-h-screen bg-background p-4 lg:p-6">
+      {/* Card de Permissões do Usuário */}
+      {!userRoles.includes('admin') && phasePermissions.length > 0 && (
+        <Card className="mb-4">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm">Suas Fases Permitidas</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex gap-2 flex-wrap">
+              {phasePermissions
+                .filter(p => p.can_view)
+                .map(p => (
+                  <Badge key={p.phase_key} variant="secondary" className="text-xs">
+                    {ROLE_LABELS[p.phase_key]?.name || p.phase_key}
+                    {p.can_edit && <Edit className="ml-1 h-3 w-3" />}
+                  </Badge>
+                ))
+              }
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Compact Header */}
       <div className="flex items-center justify-between mb-4 lg:mb-6">
         <div className="flex items-center gap-2 lg:gap-4">

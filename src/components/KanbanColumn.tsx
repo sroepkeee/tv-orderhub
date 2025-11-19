@@ -24,6 +24,8 @@ interface KanbanColumnProps {
   area?: string;
   responsibleRole?: string;
   responsibleUsers?: Array<{ full_name: string; email: string }>;
+  canDrag?: boolean;
+  isNextPhase?: boolean;
 }
 export const KanbanColumn = ({
   id,
@@ -36,7 +38,9 @@ export const KanbanColumn = ({
   phaseKey,
   area,
   responsibleRole,
-  responsibleUsers
+  responsibleUsers,
+  canDrag = true,
+  isNextPhase = false,
 }: KanbanColumnProps) => {
   const highCount = orders.filter(o => o.priority === "high").length;
   const {
@@ -52,6 +56,13 @@ export const KanbanColumn = ({
           <div className="flex items-center gap-1.5">
             <Icon className="h-4 w-4" />
             <h3 className="font-semibold text-sm">{title}</h3>
+            
+            {/* Badge de "Próxima Fase" */}
+            {isNextPhase && (
+              <Badge variant="outline" className="ml-2 text-xs bg-blue-100 text-blue-700 border-blue-200">
+                Próxima fase
+              </Badge>
+            )}
             
             {/* Ícone de Informação com Tooltip */}
             <TooltipProvider>
@@ -69,6 +80,13 @@ export const KanbanColumn = ({
                         Responsável: <span className="font-medium text-foreground">{responsibleRole}</span>
                       </p>
                     )}
+                    {/* Indicar permissão */}
+                    <p className="text-xs text-muted-foreground mt-2 pt-2 border-t">
+                      {canDrag 
+                        ? "✓ Você pode editar pedidos nesta fase"
+                        : "👁️ Você pode apenas visualizar (próxima fase no fluxo)"
+                      }
+                    </p>
                     {responsibleUsers && responsibleUsers.length > 0 && (
                       <div className="mt-2 pt-2 border-t border-border">
                         <p className="text-xs text-muted-foreground mb-1">Usuários:</p>
@@ -96,7 +114,7 @@ export const KanbanColumn = ({
       <div className="kanban-cards-container flex-1 bg-muted/30 rounded-b-lg p-2 overflow-y-auto space-y-2 animate-fade-in">
         {orders.length === 0 ? <div className="text-center text-muted-foreground text-sm py-8">
             Nenhum pedido nesta fase
-          </div> : orders.map(order => <KanbanCard key={order.id} order={order} onEdit={onEdit} onStatusChange={onStatusChange} />)}
+          </div> : orders.map(order => <KanbanCard key={order.id} order={order} onEdit={onEdit} onStatusChange={onStatusChange} canDrag={canDrag} />)}
       </div>
     </div>;
 };

@@ -13,11 +13,13 @@ interface KanbanCardProps {
   order: Order;
   onEdit: (order: Order) => void;
   onStatusChange: (orderId: string, newStatus: Order["status"]) => void;
+  canDrag?: boolean;
 }
 export const KanbanCard = ({
   order,
   onEdit,
-  onStatusChange
+  onStatusChange,
+  canDrag = true
 }: KanbanCardProps) => {
   const [clickStart, setClickStart] = useState<number>(0);
   const { getPhaseInfo } = usePhaseInfo();
@@ -30,7 +32,8 @@ export const KanbanCard = ({
     transform,
     isDragging
   } = useDraggable({
-    id: order.id
+    id: order.id,
+    disabled: !canDrag,
   });
   const style = {
     transform: CSS.Translate.toString(transform)
