@@ -10,6 +10,7 @@ import { UserCheck, UserX, UserCog, Search, CheckCircle, XCircle, Clock } from "
 import { UserApprovalDialog } from "./UserApprovalDialog";
 import { UserRolesDialog } from "./UserRolesDialog";
 import { DepartmentSelect } from "./DepartmentSelect";
+import { UserActivityHistoryDialog } from "./UserActivityHistoryDialog";
 import { useToast } from "@/hooks/use-toast";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -23,6 +24,7 @@ interface UserData {
   approval_status: string;
   roles: string[];
   created_at: string;
+  is_active: boolean;
 }
 
 export const UserManagementTable = () => {
@@ -34,6 +36,7 @@ export const UserManagementTable = () => {
   const [selectedUser, setSelectedUser] = useState<UserData | null>(null);
   const [showApprovalDialog, setShowApprovalDialog] = useState(false);
   const [showRolesDialog, setShowRolesDialog] = useState(false);
+  const [showHistoryDialog, setShowHistoryDialog] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -71,10 +74,10 @@ export const UserManagementTable = () => {
       setLoading(true);
       
       // Buscar profiles
-      const { data: profiles, error: profilesError } = await supabase
-        .from('profiles')
-        .select('id, email, full_name, department, location, created_at')
-        .order('created_at', { ascending: false });
+    const { data: profiles, error: profilesError } = await supabase
+      .from('profiles')
+      .select('id, email, full_name, department, location, created_at, is_active')
+      .order('created_at', { ascending: false });
       
       if (profilesError) throw profilesError;
       if (!profiles) {
@@ -101,16 +104,17 @@ export const UserManagementTable = () => {
         const approval = approvalStatuses?.find(a => a.user_id === profile.id);
         const roles = userRoles?.filter(r => r.user_id === profile.id).map(r => r.role) || [];
         
-        return {
-          id: profile.id,
-          email: profile.email || '',
-          full_name: profile.full_name || 'Sem nome',
-          department: profile.department || 'Não definido',
-          location: profile.location || null,
-          approval_status: approval?.status || 'pending',
-          roles: roles,
-          created_at: profile.created_at,
-        };
+      return {
+        id: profile.id,
+        email: profile.email || '',
+        full_name: profile.full_name || 'Sem nome',
+        department: profile.department || 'Não definido',
+        location: profile.location || null,
+        approval_status: approval?.status || 'pending',
+        roles: roles,
+        created_at: profile.created_at,
+        is_active: profile.is_active ?? false,
+      };
       });
       
       setUsers(usersData);
@@ -137,7 +141,11 @@ export const UserManagementTable = () => {
       );
     }
 
-    if (statusFilter !== "all") {
+    if (statusFilter === "active") {
+      filtered = filtered.filter(user => user.is_active);
+    } else if (statusFilter === "inactive") {
+      filtered = filtered.filter(user => !user.is_active);
+    } else if (statusFilter !== "all") {
       filtered = filtered.filter(user => user.approval_status === statusFilter);
     }
 
@@ -160,6 +168,28 @@ export const UserManagementTable = () => {
       toast({
         title: "Sucesso",
         description: "Localização atualizada com sucesso!",
+      });
+      loadUsers();
+    }
+  };
+
+  const toggleUserStatus = async (userId: string, currentStatus: boolean) => {
+    const newStatus = !currentStatus;
+    const { error } = await supabase
+      .from('profiles')
+      .update({ is_active: newStatus })
+      .eq('id', userId);
+
+    if (error) {
+      toast({
+        title: "Erro",
+        description: "Não foi possível alterar status do usuário",
+        variant: "destructive",
+      });
+    } else {
+      toast({
+        title: "Sucesso",
+        description: `Usuário ${newStatus ? 'ativado' : 'inativado'} com sucesso!`,
       });
       loadUsers();
     }
@@ -233,10 +263,12 @@ export const UserManagementTable = () => {
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Todos</SelectItem>
-                <SelectItem value="pending">Pendentes</SelectItem>
-                <SelectItem value="approved">Aprovados</SelectItem>
-                <SelectItem value="rejected">Rejeitados</SelectItem>
+            <SelectItem value="all">Todos</SelectItem>
+            <SelectItem value="pending">Pendentes</SelectItem>
+            <SelectItem value="approved">Aprovados</SelectItem>
+            <SelectItem value="rejected">Rejeitados</SelectItem>
+            <SelectItem value="active">Ativos</SelectItem>
+            <SelectItem value="inactive">Inativos</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -245,33 +277,46 @@ export const UserManagementTable = () => {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Nome</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Departamento</TableHead>
-                  <TableHead>Localização</TableHead>
-                  <TableHead>Roles</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Cadastro</TableHead>
-                  <TableHead className="text-right">Ações</TableHead>
+              <TableHead>Nome</TableHead>
+              <TableHead>Email</TableHead>
+              <TableHead>Departamento</TableHead>
+              <TableHead>Localização</TableHead>
+              <TableHead>Status Ativo</TableHead>
+              <TableHead>Roles</TableHead>
+              <TableHead>Status Aprovação</TableHead>
+              <TableHead>Cadastro</TableHead>
+              <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center py-8">
+                    <TableCell colSpan={9} className="text-center py-8">
                       Carregando usuários...
                     </TableCell>
                   </TableRow>
                 ) : filteredUsers.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                       Nenhum usuário encontrado
                     </TableCell>
                   </TableRow>
                 ) : (
                   filteredUsers.map((user) => (
                     <TableRow key={user.id}>
-                      <TableCell className="font-medium">{user.full_name}</TableCell>
+                      <TableCell>
+                        <button
+                          onClick={() => {
+                            setSelectedUser(user);
+                            setShowHistoryDialog(true);
+                          }}
+                          className="flex items-center gap-2 hover:text-primary transition-colors text-left"
+                        >
+                          <span className="font-medium underline decoration-dotted">
+                            {user.full_name}
+                          </span>
+                        </button>
+                      </TableCell>
                       <TableCell className="text-muted-foreground">{user.email}</TableCell>
                       <TableCell>
                         <DepartmentSelect
@@ -293,6 +338,17 @@ export const UserManagementTable = () => {
                             <SelectItem value="Filial">Filial</SelectItem>
                           </SelectContent>
                         </Select>
+                      </TableCell>
+                      <TableCell>
+                        {user.is_active ? (
+                          <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-900">
+                            Ativo
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="bg-gray-50 text-gray-600 border-gray-200 dark:bg-gray-900/20 dark:text-gray-400 dark:border-gray-800">
+                            Inativo
+                          </Badge>
+                        )}
                       </TableCell>
                       <TableCell>
                         <div className="flex gap-1 flex-wrap">
@@ -350,6 +406,23 @@ export const UserManagementTable = () => {
                             <UserCog className="h-4 w-4 mr-1" />
                             Roles
                           </Button>
+                          <Button
+                            size="sm"
+                            variant={user.is_active ? "ghost" : "default"}
+                            onClick={() => toggleUserStatus(user.id, user.is_active)}
+                          >
+                            {user.is_active ? (
+                              <>
+                                <UserX className="h-4 w-4 mr-1" />
+                                Inativar
+                              </>
+                            ) : (
+                              <>
+                                <UserCheck className="h-4 w-4 mr-1" />
+                                Reativar
+                              </>
+                            )}
+                          </Button>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -374,6 +447,12 @@ export const UserManagementTable = () => {
             onOpenChange={setShowRolesDialog}
             user={selectedUser}
             onSuccess={loadUsers}
+          />
+          <UserActivityHistoryDialog
+            open={showHistoryDialog}
+            onOpenChange={setShowHistoryDialog}
+            userId={selectedUser.id}
+            userName={selectedUser.full_name}
           />
         </>
       )}

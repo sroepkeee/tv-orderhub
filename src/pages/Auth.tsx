@@ -43,6 +43,18 @@ export default function Auth() {
 
       if (error) throw error;
 
+      // Registrar login no activity log
+      if (data.user) {
+        await supabase.from('user_activity_log').insert({
+          user_id: data.user.id,
+          action_type: 'login',
+          description: 'Fez login no sistema',
+          metadata: {
+            timestamp: new Date().toISOString()
+          }
+        });
+      }
+
       if (data.user) {
         toast.success("Login realizado com sucesso!");
         navigate("/");
