@@ -130,8 +130,18 @@ export const usePhaseInfo = () => {
       'in_expedition': 'logistics',
       'ready_for_shipping': 'logistics',
       'in_transit': 'logistics',
-      'delivered': 'logistics',
-      'completed': 'logistics'
+      
+      // Conclusão
+      'delivered': 'completion',
+      'completed': 'completion',
+      'cancelled': 'completion',
+      'delayed': 'completion',
+      'returned': 'completion',
+      'pending': 'completion',
+      'in_analysis': 'completion',
+      'awaiting_approval': 'completion',
+      'planned': 'completion',
+      'on_hold': 'completion'
     };
 
     return statusPhaseMap[status] || 'almox_ssm';

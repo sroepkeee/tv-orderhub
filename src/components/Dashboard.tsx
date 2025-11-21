@@ -561,7 +561,8 @@ export const Dashboard = () => {
       'packaging': ['in_quality_check', 'in_packaging', 'ready_for_shipping'],
       'freight_quote': ['freight_quote_requested', 'freight_quote_received', 'freight_approved'],
       'invoicing': ['ready_to_invoice', 'pending_invoice_request', 'invoice_requested', 'awaiting_invoice', 'invoice_issued', 'invoice_sent'],
-      'logistics': ['released_for_shipping', 'in_expedition', 'in_transit', 'pickup_scheduled', 'awaiting_pickup', 'collected', 'delivered', 'completed', 'cancelled', 'on_hold', 'delayed', 'returned', 'pending', 'in_analysis', 'awaiting_approval', 'planned']
+      'logistics': ['released_for_shipping', 'in_expedition', 'in_transit', 'pickup_scheduled', 'awaiting_pickup', 'collected'],
+      'completion': ['delivered', 'completed', 'cancelled', 'on_hold', 'delayed', 'returned', 'pending', 'in_analysis', 'awaiting_approval', 'planned']
     };
     return phaseToStatuses[phaseKey] || [];
   };
@@ -577,7 +578,8 @@ export const Dashboard = () => {
     if (['in_quality_check', 'in_packaging', 'ready_for_shipping'].includes(status)) return 'packaging';
     if (['freight_quote_requested', 'freight_quote_received', 'freight_approved'].includes(status)) return 'freight_quote';
     if (['ready_to_invoice', 'pending_invoice_request', 'invoice_requested', 'awaiting_invoice', 'invoice_issued', 'invoice_sent'].includes(status)) return 'invoicing';
-    return 'logistics';
+    if (['released_for_shipping', 'in_expedition', 'in_transit', 'pickup_scheduled', 'awaiting_pickup', 'collected'].includes(status)) return 'logistics';
+    return 'completion';
   };
 
   const loadOrders = async () => {
