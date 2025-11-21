@@ -10,8 +10,9 @@ import { useAuth } from "@/hooks/useAuth";
 import { useAvailableRoles } from "@/hooks/useAvailableRoles";
 import { ROLE_LABELS } from "@/lib/roleLabels";
 import { ROLE_PHASE_MAPPING } from "@/lib/rolePhaseMapping";
-import { Info } from "lucide-react";
+import { Info, CheckCircle2, AlertCircle } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface UserRolesDialogProps {
   open: boolean;
@@ -35,12 +36,33 @@ export const UserRolesDialog = ({ open, onOpenChange, user, onSuccess }: UserRol
     setSelectedRoles(user.roles);
   }, [user.roles]);
 
+  // Roles operacionais (todos exceto admin)
+  const operationalRoles = availableRoles.filter(r => r.value !== 'admin').map(r => r.value);
+  
+  // Verificar se o perfil está incompleto
+  const missingRoles = operationalRoles.filter(r => !selectedRoles.includes(r));
+  const isProfileIncomplete = missingRoles.length > 0 && missingRoles.length <= 3 && selectedRoles.length > 0;
+  
   const toggleRole = (role: string) => {
     setSelectedRoles(prev => 
       prev.includes(role) 
         ? prev.filter(r => r !== role)
         : [...prev, role]
     );
+  };
+
+  const selectAllRoles = () => {
+    setSelectedRoles(operationalRoles);
+  };
+
+  // Tooltips para roles importantes
+  const roleTooltips: Record<string, string> = {
+    'completion': 'Permite visualizar e gerenciar pedidos finalizados (entregues, cancelados, concluídos)',
+    'laboratory': 'Acesso ao laboratório para instalação de firmware e imagens',
+    'freight_quote': 'Cotação e seleção de transportadoras',
+    'invoicing': 'Faturamento e preparação de notas fiscais',
+    'logistics': 'Expedição e gestão de envios',
+    'admin': 'Acesso total ao sistema, incluindo gerenciamento de usuários'
   };
 
   const handleSubmit = async () => {
@@ -148,42 +170,91 @@ export const UserRolesDialog = ({ open, onOpenChange, user, onSuccess }: UserRol
         </DialogHeader>
 
         <div className="py-4">
-          {user.roles.length > 0 && (
-            <div className="mb-3">
-              <p className="text-xs text-muted-foreground mb-1.5">Roles atuais:</p>
-              <div className="flex gap-1.5 flex-wrap">
-                {user.roles.map(role => {
-                  const roleLabel = availableRoles.find(r => r.value === role);
-                  return (
-                    <Badge key={role} variant="secondary" className="text-xs">
-                      {roleLabel?.label || role}
-                    </Badge>
-                  );
-                })}
-              </div>
+          <div className="flex items-start justify-between gap-4 mb-4">
+            <div className="flex-1">
+              {user.roles.length > 0 && (
+                <div className="mb-3">
+                  <p className="text-xs text-muted-foreground mb-1.5">Roles atuais:</p>
+                  <div className="flex gap-1.5 flex-wrap">
+                    {user.roles.map(role => {
+                      const roleLabel = availableRoles.find(r => r.value === role);
+                      return (
+                        <Badge key={role} variant="secondary" className="text-xs">
+                          {roleLabel?.label || role}
+                        </Badge>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+              
+              {isProfileIncomplete && (
+                <Alert variant="default" className="border-amber-500/50 bg-amber-500/10">
+                  <AlertCircle className="h-4 w-4 text-amber-600" />
+                  <AlertDescription className="text-xs">
+                    <span className="font-medium">Perfil Incompleto</span> ({selectedRoles.length}/{operationalRoles.length} roles)
+                    <br />
+                    Faltam: {missingRoles.map(r => {
+                      const label = availableRoles.find(role => role.value === r);
+                      return label?.label || r;
+                    }).join(', ')}
+                  </AlertDescription>
+                </Alert>
+              )}
             </div>
-          )}
+            
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={selectAllRoles}
+              className="shrink-0"
+            >
+              <CheckCircle2 className="h-4 w-4 mr-2" />
+              Perfil Completo
+            </Button>
+          </div>
 
           {loadingRoles ? (
             <div className="text-sm text-muted-foreground">Carregando roles...</div>
           ) : (
-            <div className="space-y-2 max-h-[400px] overflow-y-auto pr-2">
-              {availableRoles.map((role) => (
-                <div key={role.value} className="flex items-center space-x-2">
-                  <Checkbox
-                    id={role.value}
-                    checked={selectedRoles.includes(role.value)}
-                    onCheckedChange={() => toggleRole(role.value)}
-                  />
-                  <Label
-                    htmlFor={role.value}
-                    className="text-sm font-normal cursor-pointer flex-1"
-                  >
-                    {role.label}
-                  </Label>
-                </div>
-              ))}
-            </div>
+            <TooltipProvider>
+              <div className="space-y-2 max-h-[400px] overflow-y-auto pr-2">
+                {availableRoles.map((role) => {
+                  const hasTooltip = roleTooltips[role.value];
+                  const checkboxElement = (
+                    <div key={role.value} className="flex items-center space-x-2">
+                      <Checkbox
+                        id={role.value}
+                        checked={selectedRoles.includes(role.value)}
+                        onCheckedChange={() => toggleRole(role.value)}
+                      />
+                      <Label
+                        htmlFor={role.value}
+                        className="text-sm font-normal cursor-pointer flex-1"
+                      >
+                        {role.label}
+                        {hasTooltip && (
+                          <Info className="inline h-3 w-3 ml-1 text-muted-foreground" />
+                        )}
+                      </Label>
+                    </div>
+                  );
+
+                  return hasTooltip ? (
+                    <Tooltip key={role.value}>
+                      <TooltipTrigger asChild>
+                        {checkboxElement}
+                      </TooltipTrigger>
+                      <TooltipContent side="right" className="max-w-xs">
+                        <p className="text-xs">{roleTooltips[role.value]}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  ) : (
+                    checkboxElement
+                  );
+                })}
+              </div>
+            </TooltipProvider>
           )}
 
           {selectedRoles.length > 0 && (
