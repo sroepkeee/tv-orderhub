@@ -5,12 +5,53 @@ import type { Order } from "@/components/Dashboard";
 import { TrendingUp } from "lucide-react";
 import { startOfDay, endOfDay, eachDayOfInterval, format, subDays, isWithinInterval } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
 
 interface ComparativeMetricsProps {
   orders: Order[];
 }
 
+interface OrderChange {
+  order_id: string;
+  field_name: string;
+  old_value: string | null;
+  new_value: string | null;
+  changed_at: string;
+}
+
+// Status da fase almox_ssm
+const ALMOX_SSM_STATUSES = ['almox_ssm_pending', 'almox_ssm_received', 'almox_ssm_in_review', 'almox_ssm_approved'];
+
+// Status da fase completion
+const COMPLETION_STATUSES = ['delivered', 'completed', 'cancelled', 'delayed', 'returned', 'pending', 'in_analysis', 'awaiting_approval', 'planned', 'on_hold'];
+
 export function ComparativeMetrics({ orders }: ComparativeMetricsProps) {
+  const [orderChanges, setOrderChanges] = useState<OrderChange[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchOrderChanges = async () => {
+      const thirtyDaysAgo = subDays(new Date(), 30);
+      
+      const { data, error } = await supabase
+        .from('order_changes')
+        .select('order_id, field_name, old_value, new_value, changed_at')
+        .eq('field_name', 'status')
+        .gte('changed_at', thirtyDaysAgo.toISOString())
+        .order('changed_at', { ascending: true });
+
+      if (error) {
+        console.error('Erro ao buscar mudanças de status:', error);
+      } else {
+        setOrderChanges(data || []);
+      }
+      setLoading(false);
+    };
+
+    fetchOrderChanges();
+  }, []);
+
   const now = new Date();
   const daysAgo30 = subDays(now, 30);
   
@@ -31,31 +72,30 @@ export function ComparativeMetrics({ orders }: ComparativeMetricsProps) {
       return isWithinInterval(orderDate, { start: dayStart, end: dayEnd });
     }).length;
 
-    // Pedidos CONCLUÍDOS neste dia (mudaram para completed/delivered)
-    const completedOrders = orders.filter(order => {
-      if (!order.updatedAt) return false;
-      const hasCompletedStatus = order.status === 'completed' || order.status === 'delivered';
-      if (!hasCompletedStatus) return false;
-      
-      const updatedDate = new Date(order.updatedAt);
-      return isWithinInterval(updatedDate, { start: dayStart, end: dayEnd });
+    // Pedidos CONCLUÍDOS neste dia (mudaram para status de completion)
+    const completedOrders = orderChanges.filter(change => {
+      if (!change.new_value || !COMPLETION_STATUSES.includes(change.new_value)) return false;
+      const changeDate = new Date(change.changed_at);
+      return isWithinInterval(changeDate, { start: dayStart, end: dayEnd });
     }).length;
 
-    // Pedidos que INICIARAM PRODUÇÃO neste dia
-    const startedProductionOrders = orders.filter(order => {
-      if (!order.updatedAt) return false;
-      const hasProductionStatus = order.status === 'in_production' || order.status === 'separation_started';
-      if (!hasProductionStatus) return false;
+    // Pedidos que INICIARAM (saíram da fase almox_ssm)
+    const startedOrders = orderChanges.filter(change => {
+      if (!change.old_value || !change.new_value) return false;
+      // Saiu de almox_ssm para qualquer outro status
+      const leftAlmoxSsm = ALMOX_SSM_STATUSES.includes(change.old_value) && 
+                          !ALMOX_SSM_STATUSES.includes(change.new_value);
+      if (!leftAlmoxSsm) return false;
       
-      const updatedDate = new Date(order.updatedAt);
-      return isWithinInterval(updatedDate, { start: dayStart, end: dayEnd });
+      const changeDate = new Date(change.changed_at);
+      return isWithinInterval(changeDate, { start: dayStart, end: dayEnd });
     }).length;
 
     return {
       day: format(day, 'dd/MM', { locale: ptBR }),
       emitidos: emittedOrders,
       concluidos: completedOrders,
-      iniciados: startedProductionOrders
+      iniciados: startedOrders
     };
   });
 
@@ -74,6 +114,24 @@ export function ComparativeMetrics({ orders }: ComparativeMetricsProps) {
     },
   };
 
+  if (loading) {
+    return (
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <TrendingUp className="h-5 w-5 text-primary" />
+            <CardTitle>Evolução Diária de Pedidos</CardTitle>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="h-[350px] w-full flex items-center justify-center text-muted-foreground">
+            Carregando dados...
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <Card>
       <CardHeader>
@@ -82,7 +140,7 @@ export function ComparativeMetrics({ orders }: ComparativeMetricsProps) {
           <CardTitle>Evolução Diária de Pedidos</CardTitle>
         </div>
         <CardDescription>
-          Emitidos: pedidos criados | Concluídos: finalizados/entregues | Iniciados: entraram em produção
+          Emitidos: data de emissão | Concluídos: movidos para fase de conclusão | Iniciados: saíram da fase Almox SSM
         </CardDescription>
       </CardHeader>
       <CardContent>

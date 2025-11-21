@@ -28,7 +28,7 @@ import {
   getOrdersStartedToday,
   getOrdersEndingToday
 } from "@/lib/metricsV2";
-import { CompletedOrdersTable } from "@/components/metrics/CompletedOrdersTable";
+
 import { PhasePerformanceMetrics } from "@/components/metrics/PhasePerformanceMetrics";
 import { DepartmentLeaderboard } from "@/components/metrics/DepartmentLeaderboard";
 import { BottleneckAnalysis } from "@/components/metrics/BottleneckAnalysis";
@@ -287,27 +287,6 @@ export default function Metrics() {
             setShowEditDialog(true);
           }}
         />
-      </div>
-
-      {/* Tabela de Pedidos Concluídos Recentemente */}
-      <div className="mb-6">
-        <div className="bg-card rounded-lg border p-6">
-          <div className="mb-4">
-            <h2 className="text-xl font-bold flex items-center gap-2">
-              ✅ Pedidos Concluídos Recentemente
-            </h2>
-            <p className="text-sm text-muted-foreground mt-1">
-              Pedidos finalizados nos últimos 30 dias com análise de conformidade de prazo
-            </p>
-          </div>
-          <CompletedOrdersTable 
-            orders={orders}
-            onOrderClick={(order) => {
-              setSelectedOrder(order);
-              setShowEditDialog(true);
-            }}
-          />
-        </div>
       </div>
 
       {/* Histórico de Mudanças de Prazos (Últimas 10) */}
