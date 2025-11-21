@@ -332,8 +332,16 @@ export const usePurchaseRequests = () => {
           const originalItem = items.find(i => i.item_code === createdItem.item_code);
           if (originalItem && costAllocations[originalItem.id]) {
             const allocations = costAllocations[originalItem.id].map((alloc: any) => ({
-              ...alloc,
               purchase_request_item_id: createdItem.id,
+              business_unit: alloc.business_unit,
+              accounting_item: alloc.accounting_item || null,
+              cost_center: alloc.cost_center,
+              warehouse: alloc.warehouse,
+              project: alloc.project || null,
+              allocation_percentage: alloc.allocation_percentage,
+              allocated_quantity: alloc.allocated_quantity || null,
+              allocated_value: alloc.allocated_value || null,
+              notes: alloc.notes || null,
             }));
 
             await supabase
