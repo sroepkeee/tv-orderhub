@@ -14,6 +14,7 @@ import { ItemAllocationBadge } from "./ItemAllocationBadge";
 import { AddItemDialog } from "./AddItemDialog";
 import { ItemMetricsBadges } from "./ItemMetricsBadges";
 import { ItemMetricsEditDialog } from "./ItemMetricsEditDialog";
+import { BulkAllocationDialog } from "./BulkAllocationDialog";
 import { ItemPurchaseHistory, ItemConsumptionMetrics } from "@/types/purchases";
 
 interface PurchaseRequestDialogProps {
@@ -41,6 +42,8 @@ export function PurchaseRequestDialog({
   const [items, setItems] = useState<EnrichedPurchaseItem[]>([]);
   const [selectedItem, setSelectedItem] = useState<EnrichedPurchaseItem | null>(null);
   const [allocationDialogOpen, setAllocationDialogOpen] = useState(false);
+  const [bulkAllocationOpen, setBulkAllocationOpen] = useState(false);
+  const [costAllocations, setCostAllocations] = useState<{ [itemId: string]: ItemCostAllocation[] }>({});
   const [addItemDialogOpen, setAddItemDialogOpen] = useState(false);
   const [metricsEditDialogOpen, setMetricsEditDialogOpen] = useState(false);
   const [selectedItemForMetrics, setSelectedItemForMetrics] = useState<EnrichedPurchaseItem | null>(null);
@@ -64,6 +67,15 @@ export function PurchaseRequestDialog({
         });
       }
       setItems(initialItems);
+      
+      // Carregar alocações existentes
+      const existingAllocations: { [itemId: string]: ItemCostAllocation[] } = {};
+      initialItems.forEach(item => {
+        if (item.cost_allocations && item.cost_allocations.length > 0) {
+          existingAllocations[item.id] = item.cost_allocations;
+        }
+      });
+      setCostAllocations(existingAllocations);
     }
   }, [open, request, initialItems]);
 
@@ -81,6 +93,24 @@ export function PurchaseRequestDialog({
         ? { ...item, cost_allocations: allocations as ItemCostAllocation[] }
         : item
     ));
+    
+    // Atualizar também no state de costAllocations
+    setCostAllocations({
+      ...costAllocations,
+      [selectedItem.id]: allocations as ItemCostAllocation[]
+    });
+  };
+
+  const handleSaveBulkAllocations = (allocations: { [itemId: string]: ItemCostAllocation[] }) => {
+    // Atualizar items com as novas alocações
+    setItems(items.map(item => ({
+      ...item,
+      cost_allocations: allocations[item.id] || item.cost_allocations || []
+    })));
+    
+    // Atualizar state de alocações
+    setCostAllocations(allocations);
+    setBulkAllocationOpen(false);
   };
 
   const handleAddItem = (newItem: any) => {
@@ -352,9 +382,20 @@ export function PurchaseRequestDialog({
                 </Table>
               )}
 
-              <div className="border-t pt-4 flex justify-between items-center font-semibold">
-                <span>💰 Valor Total Estimado:</span>
-                <span className="text-xl">R$ {getTotalValue().toFixed(2)}</span>
+              <div className="border-t pt-4 flex justify-between items-center">
+                <div className="flex items-center gap-4">
+                  <span className="font-semibold">💰 Valor Total Estimado:</span>
+                  <span className="text-xl font-bold">R$ {getTotalValue().toFixed(2)}</span>
+                </div>
+                <Button
+                  variant="outline"
+                  onClick={() => setBulkAllocationOpen(true)}
+                  disabled={items.length === 0}
+                  className="gap-2"
+                >
+                  <PieChart className="h-4 w-4" />
+                  Gerenciar Todos os Rateios ({items.length} itens)
+                </Button>
               </div>
             </div>
           </div>
@@ -397,6 +438,14 @@ export function PurchaseRequestDialog({
           onSave={handleSaveMetrics}
         />
       )}
+
+      <BulkAllocationDialog
+        open={bulkAllocationOpen}
+        onOpenChange={setBulkAllocationOpen}
+        items={items}
+        currentAllocations={costAllocations}
+        onSave={handleSaveBulkAllocations}
+      />
     </>
   );
 }
