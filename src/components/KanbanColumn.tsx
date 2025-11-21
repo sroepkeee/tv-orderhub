@@ -5,13 +5,7 @@ import { LucideIcon, Info } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useDroppable } from "@dnd-kit/core";
 import { Phase } from "./KanbanView";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 interface KanbanColumnProps {
   id: Phase;
   title: string;
@@ -23,7 +17,10 @@ interface KanbanColumnProps {
   phaseKey: string;
   area?: string;
   responsibleRole?: string;
-  responsibleUsers?: Array<{ full_name: string; email: string }>;
+  responsibleUsers?: Array<{
+    full_name: string;
+    email: string;
+  }>;
   canDrag?: boolean;
 }
 export const KanbanColumn = ({
@@ -38,25 +35,20 @@ export const KanbanColumn = ({
   area,
   responsibleRole,
   responsibleUsers,
-  canDrag = true,
+  canDrag = true
 }: KanbanColumnProps) => {
   const highCount = orders.filter(o => o.priority === "high").length;
   const hasHighPriority = highCount > 0;
-  
+
   // Estilos condicionais baseados em canDrag
-  const headerStyles = canDrag 
-    ? `${colorClass} border-l-4 shadow-lg` 
-    : `bg-muted/20 text-muted-foreground border-l-2 border-muted shadow-sm`;
-  
+  const headerStyles = canDrag ? `${colorClass} border-l-4 shadow-lg` : `bg-muted/20 text-muted-foreground border-l-2 border-muted shadow-sm`;
   const iconSize = canDrag ? "h-5 w-5" : "h-4 w-4";
   const iconOpacity = canDrag ? "opacity-100" : "opacity-60";
   const titleOpacity = canDrag ? "opacity-100" : "opacity-70";
   const badgeVariant = canDrag ? "default" : "secondary";
   const pulseClass = canDrag && hasHighPriority ? "animate-pulse-slow" : "";
-  
   const containerBg = canDrag ? "bg-muted/30" : "bg-muted/10";
   const containerBorder = canDrag ? "border-l-4 border-l-primary/20" : "";
-  
   const {
     setNodeRef,
     isOver
@@ -72,14 +64,7 @@ export const KanbanColumn = ({
             <h3 className={`font-semibold text-sm ${titleOpacity}`}>{title}</h3>
             
             {/* Badge "Sua fase" - destaca responsabilidade */}
-            {canDrag && (
-              <Badge 
-                variant="outline" 
-                className="text-[10px] h-4 px-1.5 bg-emerald-50 border-emerald-500 text-emerald-700 font-medium animate-fade-in"
-              >
-                Sua fase
-              </Badge>
-            )}
+            {canDrag}
             
             {/* Ícone de Informação com Tooltip */}
             <TooltipProvider>
@@ -89,33 +74,22 @@ export const KanbanColumn = ({
                 </TooltipTrigger>
                 <TooltipContent side="right" className="max-w-xs">
                   <div className="space-y-1 text-sm">
-                    {area && (
-                      <p className="font-semibold text-primary">{area}</p>
-                    )}
-                    {responsibleRole && (
-                      <p className="text-muted-foreground">
+                    {area && <p className="font-semibold text-primary">{area}</p>}
+                    {responsibleRole && <p className="text-muted-foreground">
                         Responsável: <span className="font-medium text-foreground">{responsibleRole}</span>
-                      </p>
-                    )}
+                      </p>}
                     {/* Indicar permissão */}
                     <p className="text-xs text-muted-foreground mt-2 pt-2 border-t">
-                      {canDrag 
-                        ? "✓ Você pode editar pedidos nesta fase"
-                        : "👁️ Você pode apenas visualizar esta fase"
-                      }
+                      {canDrag ? "✓ Você pode editar pedidos nesta fase" : "👁️ Você pode apenas visualizar esta fase"}
                     </p>
-                    {responsibleUsers && responsibleUsers.length > 0 && (
-                      <div className="mt-2 pt-2 border-t border-border">
+                    {responsibleUsers && responsibleUsers.length > 0 && <div className="mt-2 pt-2 border-t border-border">
                         <p className="text-xs text-muted-foreground mb-1">Usuários:</p>
                         <ul className="space-y-0.5">
-                          {responsibleUsers.map((user) => (
-                            <li key={user.email} className="text-xs">
+                          {responsibleUsers.map(user => <li key={user.email} className="text-xs">
                               • {user.full_name}
-                            </li>
-                          ))}
+                            </li>)}
                         </ul>
-                      </div>
-                    )}
+                      </div>}
                   </div>
                 </TooltipContent>
               </Tooltip>
