@@ -86,6 +86,13 @@ export const ROLE_PHASE_MAPPING: Record<string, PhaseAccess> = {
     canView: true,
     canEdit: true,
     canDelete: false
+  },
+  
+  completion: {
+    phases: ['completion'],
+    canView: true,
+    canEdit: true,
+    canDelete: false
   }
 };
 
