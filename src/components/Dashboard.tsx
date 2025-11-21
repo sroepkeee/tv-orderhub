@@ -94,6 +94,7 @@ export interface Order {
   package_height_m?: number;
   package_width_m?: number;
   package_length_m?: number;
+  updatedAt?: string;
 }
 
 // Mock data
@@ -857,7 +858,8 @@ export const Dashboard = () => {
               requires_image: dbOrder.requires_image || false,
               shipping_date: dbOrder.shipping_date || null,
               vehicle_plate: dbOrder.vehicle_plate || null,
-              driver_name: dbOrder.driver_name || null
+              driver_name: dbOrder.driver_name || null,
+              updatedAt: dbOrder.updated_at || undefined
             };
           })
         );
@@ -946,7 +948,8 @@ export const Dashboard = () => {
           requires_image: dbOrder.requires_image || false,
           shipping_date: dbOrder.shipping_date || null,
           vehicle_plate: dbOrder.vehicle_plate || null,
-          driver_name: dbOrder.driver_name || null
+          driver_name: dbOrder.driver_name || null,
+          updatedAt: dbOrder.updated_at || undefined
         };
       });
 
