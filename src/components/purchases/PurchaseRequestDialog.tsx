@@ -199,7 +199,7 @@ export function PurchaseRequestDialog({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="w-[98vw] max-w-[98vw] h-[98vh] max-h-[98vh] overflow-y-auto p-6">
           <DialogHeader>
             <DialogTitle>
               🛒 {request ? 'Editar' : 'Nova'} Solicitação de Compra
