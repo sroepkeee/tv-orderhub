@@ -13,6 +13,8 @@ import { ItemCostAllocationDialog } from "./ItemCostAllocationDialog";
 import { ItemAllocationBadge } from "./ItemAllocationBadge";
 import { AddItemDialog } from "./AddItemDialog";
 import { ItemMetricsBadges } from "./ItemMetricsBadges";
+import { ItemMetricsEditDialog } from "./ItemMetricsEditDialog";
+import { ItemPurchaseHistory, ItemConsumptionMetrics } from "@/types/purchases";
 
 interface PurchaseRequestDialogProps {
   open: boolean;
@@ -40,6 +42,8 @@ export function PurchaseRequestDialog({
   const [selectedItem, setSelectedItem] = useState<EnrichedPurchaseItem | null>(null);
   const [allocationDialogOpen, setAllocationDialogOpen] = useState(false);
   const [addItemDialogOpen, setAddItemDialogOpen] = useState(false);
+  const [metricsEditDialogOpen, setMetricsEditDialogOpen] = useState(false);
+  const [selectedItemForMetrics, setSelectedItemForMetrics] = useState<EnrichedPurchaseItem | null>(null);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -105,6 +109,27 @@ export function PurchaseRequestDialog({
             ...item,
             unit_price: unitPrice,
             total_price: unitPrice * item.requested_quantity
+          }
+        : item
+    ));
+  };
+
+  const handleOpenMetricsDialog = (item: EnrichedPurchaseItem) => {
+    setSelectedItemForMetrics(item);
+    setMetricsEditDialogOpen(true);
+  };
+
+  const handleSaveMetrics = (
+    itemId: string,
+    purchaseHistory: ItemPurchaseHistory[],
+    consumptionMetrics: ItemConsumptionMetrics
+  ) => {
+    setItems(items.map(item =>
+      item.id === itemId
+        ? {
+            ...item,
+            purchase_history: purchaseHistory,
+            consumption_metrics: consumptionMetrics
           }
         : item
     ));
@@ -262,7 +287,8 @@ export function PurchaseRequestDialog({
                     <TableRow>
                       <TableHead>Código</TableHead>
                       <TableHead>Descrição</TableHead>
-                      <TableHead>Qtd</TableHead>
+                      <TableHead>Quantidade</TableHead>
+                      <TableHead>Unidade</TableHead>
                       <TableHead>Últ. Compras / Consumo 4m</TableHead>
                       <TableHead>Preço Unit.</TableHead>
                       <TableHead>Total</TableHead>
@@ -275,11 +301,14 @@ export function PurchaseRequestDialog({
                       <TableRow key={item.id}>
                         <TableCell className="font-mono">{item.item_code}</TableCell>
                         <TableCell>{item.item_description}</TableCell>
-                        <TableCell>{item.requested_quantity} {item.unit}</TableCell>
+                        <TableCell>{item.requested_quantity}</TableCell>
+                        <TableCell>{item.unit}</TableCell>
                         <TableCell>
                           <ItemMetricsBadges
                             purchaseHistory={item.purchase_history}
                             consumptionMetrics={item.consumption_metrics}
+                            editable={true}
+                            onEdit={() => handleOpenMetricsDialog(item)}
                           />
                         </TableCell>
                         <TableCell>
@@ -359,6 +388,15 @@ export function PurchaseRequestDialog({
         onOpenChange={setAddItemDialogOpen}
         onAdd={handleAddItem}
       />
+
+      {selectedItemForMetrics && (
+        <ItemMetricsEditDialog
+          open={metricsEditDialogOpen}
+          onOpenChange={setMetricsEditDialogOpen}
+          item={selectedItemForMetrics}
+          onSave={handleSaveMetrics}
+        />
+      )}
     </>
   );
 }
