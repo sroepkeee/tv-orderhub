@@ -201,19 +201,32 @@ export const UserRolesDialog = ({ open, onOpenChange, user, onSuccess }: UserRol
                     </p>
                   </div>
                 ) : (
-                  <div>
-                    <div className="flex flex-wrap gap-1 mb-2">
-                      {getPhasesForRoles(selectedRoles).map(phase => {
-                        const phaseLabel = ROLE_LABELS[phase];
-                        return phaseLabel ? (
-                          <Badge key={phase} variant="outline" className="text-xs">
-                            {phaseLabel.name}
-                          </Badge>
-                        ) : null;
-                      })}
-                    </div>
-                    <p className="text-muted-foreground">
-                      O usuário poderá visualizar e editar apenas as fases correspondentes às suas roles.
+                  <div className="space-y-2">
+                    {selectedRoles.filter(r => r !== 'admin').map(role => {
+                      const roleLabel = ROLE_LABELS[role];
+                      const roleMapping = require('@/lib/rolePhaseMapping').ROLE_PHASE_MAPPING[role];
+                      const rolePhases = roleMapping?.phases || [];
+                      
+                      return (
+                        <div key={role} className="border-l-2 border-primary/30 pl-2">
+                          <div className="font-medium text-xs mb-1">
+                            ✅ {roleLabel?.name || role}
+                          </div>
+                          <div className="flex flex-wrap gap-1">
+                            {rolePhases.map((phase: string) => {
+                              const phaseLabel = ROLE_LABELS[phase];
+                              return phaseLabel ? (
+                                <Badge key={phase} variant="outline" className="text-xs">
+                                  → {phaseLabel.name}
+                                </Badge>
+                              ) : null;
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })}
+                    <p className="text-muted-foreground pt-2">
+                      ⚠️ Importante: O usuário deve fazer logout/login para ver as atualizações.
                     </p>
                   </div>
                 )}
