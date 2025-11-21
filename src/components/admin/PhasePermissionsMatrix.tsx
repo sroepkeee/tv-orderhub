@@ -5,8 +5,9 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Save, CheckSquare, X } from "lucide-react";
+import { Save, CheckSquare, X, Info } from "lucide-react";
 import { useAvailableRoles } from "@/hooks/useAvailableRoles";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface Permission {
   role: string;
@@ -192,6 +193,15 @@ export const PhasePermissionsMatrix = () => {
         </div>
       </CardHeader>
       <CardContent>
+        <Alert className="mb-4">
+          <Info className="h-4 w-4" />
+          <AlertDescription className="text-sm">
+            <strong>Configuração Padrão:</strong> Cada role tem acesso de visualização e edição apenas à sua fase correspondente, 
+            mais visualização (somente leitura) das fases anteriores para contexto. Admins têm acesso total a todas as fases.
+            Alterações aqui permitem customizações avançadas.
+          </AlertDescription>
+        </Alert>
+        
         <div className="overflow-x-auto">
           <Table>
             <TableHeader>

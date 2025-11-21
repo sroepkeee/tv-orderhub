@@ -8,6 +8,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { useAvailableRoles } from "@/hooks/useAvailableRoles";
+import { ROLE_LABELS } from "@/lib/roleLabels";
+import { Info } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface UserRolesDialogProps {
   open: boolean;
@@ -115,8 +118,8 @@ export const UserRolesDialog = ({ open, onOpenChange, user, onSuccess }: UserRol
       }
 
       toast({
-        title: "Roles atualizadas",
-        description: `Roles de ${user.full_name} foram atualizadas com sucesso`,
+        title: "Roles atualizadas com sucesso",
+        description: `As permissões de ${user.full_name} foram atualizadas. O usuário deve atualizar a página para ver as mudanças.`,
       });
 
       onSuccess();
@@ -180,6 +183,38 @@ export const UserRolesDialog = ({ open, onOpenChange, user, onSuccess }: UserRol
                 </div>
               ))}
             </div>
+          )}
+
+          {selectedRoles.length > 0 && (
+            <Alert className="mt-4">
+              <Info className="h-4 w-4" />
+              <AlertDescription className="text-xs">
+                <div className="font-medium mb-1">Permissões de Visualização:</div>
+                <div className="flex flex-wrap gap-1 mb-2">
+                  {selectedRoles
+                    .filter(role => role !== 'admin')
+                    .map(role => {
+                      const roleLabel = ROLE_LABELS[role];
+                      return roleLabel ? (
+                        <Badge key={role} variant="outline" className="text-xs">
+                          {roleLabel.name}
+                        </Badge>
+                      ) : null;
+                    })}
+                  {selectedRoles.includes('admin') && (
+                    <Badge variant="default" className="text-xs">
+                      Todas as Fases (Admin)
+                    </Badge>
+                  )}
+                </div>
+                <div className="text-muted-foreground">
+                  {selectedRoles.includes('admin') 
+                    ? 'Administradores têm acesso total a todas as fases do sistema.'
+                    : 'Cada role permite visualizar e editar apenas sua fase correspondente, mais visualização de fases anteriores para contexto.'
+                  }
+                </div>
+              </AlertDescription>
+            </Alert>
           )}
         </div>
 
