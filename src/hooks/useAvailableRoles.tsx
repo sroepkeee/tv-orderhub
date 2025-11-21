@@ -35,7 +35,8 @@ export const useAvailableRoles = () => {
         'packaging',
         'freight_quote',
         'invoicing',
-        'logistics'
+        'logistics',
+        'completion'
       ];
 
       const roleOptions: RoleOption[] = data
