@@ -9,7 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { useAvailableRoles } from "@/hooks/useAvailableRoles";
 import { ROLE_LABELS } from "@/lib/roleLabels";
-import { getPhasesForRoles } from "@/lib/rolePhaseMapping";
+import { ROLE_PHASE_MAPPING } from "@/lib/rolePhaseMapping";
 import { Info } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
@@ -204,7 +204,7 @@ export const UserRolesDialog = ({ open, onOpenChange, user, onSuccess }: UserRol
                   <div className="space-y-2">
                     {selectedRoles.filter(r => r !== 'admin').map(role => {
                       const roleLabel = ROLE_LABELS[role];
-                      const roleMapping = require('@/lib/rolePhaseMapping').ROLE_PHASE_MAPPING[role];
+                      const roleMapping = ROLE_PHASE_MAPPING[role];
                       const rolePhases = roleMapping?.phases || [];
                       
                       return (
