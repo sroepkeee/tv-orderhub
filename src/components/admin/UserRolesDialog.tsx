@@ -9,6 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { useAvailableRoles } from "@/hooks/useAvailableRoles";
 import { ROLE_LABELS } from "@/lib/roleLabels";
+import { getPhasesForRoles } from "@/lib/rolePhaseMapping";
 import { Info } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
@@ -189,30 +190,33 @@ export const UserRolesDialog = ({ open, onOpenChange, user, onSuccess }: UserRol
             <Alert className="mt-4">
               <Info className="h-4 w-4" />
               <AlertDescription className="text-xs">
-                <div className="font-medium mb-1">Permissões de Visualização:</div>
-                <div className="flex flex-wrap gap-1 mb-2">
-                  {selectedRoles
-                    .filter(role => role !== 'admin')
-                    .map(role => {
-                      const roleLabel = ROLE_LABELS[role];
-                      return roleLabel ? (
-                        <Badge key={role} variant="outline" className="text-xs">
-                          {roleLabel.name}
-                        </Badge>
-                      ) : null;
-                    })}
-                  {selectedRoles.includes('admin') && (
-                    <Badge variant="default" className="text-xs">
+                <div className="font-medium mb-2">Fases Visíveis no Kanban:</div>
+                {selectedRoles.includes('admin') ? (
+                  <div>
+                    <Badge variant="default" className="text-xs mb-2">
                       Todas as Fases (Admin)
                     </Badge>
-                  )}
-                </div>
-                <div className="text-muted-foreground">
-                  {selectedRoles.includes('admin') 
-                    ? 'Administradores têm acesso total a todas as fases do sistema.'
-                    : 'Cada role permite visualizar e editar apenas sua fase correspondente, mais visualização de fases anteriores para contexto.'
-                  }
-                </div>
+                    <p className="text-muted-foreground">
+                      Administradores têm acesso total para visualizar, editar e deletar em todas as fases do sistema.
+                    </p>
+                  </div>
+                ) : (
+                  <div>
+                    <div className="flex flex-wrap gap-1 mb-2">
+                      {getPhasesForRoles(selectedRoles).map(phase => {
+                        const phaseLabel = ROLE_LABELS[phase];
+                        return phaseLabel ? (
+                          <Badge key={phase} variant="outline" className="text-xs">
+                            {phaseLabel.name}
+                          </Badge>
+                        ) : null;
+                      })}
+                    </div>
+                    <p className="text-muted-foreground">
+                      O usuário poderá visualizar e editar apenas as fases correspondentes às suas roles.
+                    </p>
+                  </div>
+                )}
               </AlertDescription>
             </Alert>
           )}
