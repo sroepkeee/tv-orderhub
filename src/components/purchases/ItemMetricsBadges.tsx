@@ -1,6 +1,7 @@
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
-import { TrendingDown, ShoppingCart, Info } from "lucide-react";
+import { TrendingDown, ShoppingCart, Edit } from "lucide-react";
 import { ItemPurchaseHistory, ItemConsumptionMetrics } from "@/types/purchases";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -8,9 +9,11 @@ import { ptBR } from "date-fns/locale";
 interface ItemMetricsBadgesProps {
   purchaseHistory?: ItemPurchaseHistory[];
   consumptionMetrics?: ItemConsumptionMetrics;
+  onEdit?: () => void;
+  editable?: boolean;
 }
 
-export function ItemMetricsBadges({ purchaseHistory, consumptionMetrics }: ItemMetricsBadgesProps) {
+export function ItemMetricsBadges({ purchaseHistory, consumptionMetrics, onEdit, editable = false }: ItemMetricsBadgesProps) {
   // Pegar as últimas 3 compras
   const lastThreePurchases = purchaseHistory?.slice(0, 3) || [];
 
@@ -20,8 +23,9 @@ export function ItemMetricsBadges({ purchaseHistory, consumptionMetrics }: ItemM
     : null;
 
   return (
-    <div className="flex items-center gap-4">
-      {/* Últimas Compras */}
+    <div className="flex items-center gap-2">
+      <div className="flex items-center gap-4">
+        {/* Últimas Compras */}
       <div className="flex items-center gap-2 min-w-[140px]">
         {lastThreePurchases.length > 0 ? (
           <HoverCard>
@@ -122,6 +126,20 @@ export function ItemMetricsBadges({ purchaseHistory, consumptionMetrics }: ItemM
           <span className="text-xs text-muted-foreground">Sem dados</span>
         )}
       </div>
+      </div>
+
+      {/* Botão de Edição */}
+      {editable && (
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onEdit}
+          className="h-7 w-7 p-0"
+          title="Editar métricas"
+        >
+          <Edit className="h-3.5 w-3.5" />
+        </Button>
+      )}
     </div>
   );
 }
