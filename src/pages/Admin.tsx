@@ -11,7 +11,7 @@ const Admin = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="container mx-auto py-8 px-4">
+      <div className="w-full max-w-[98%] mx-auto py-8 px-6">
         <div className="mb-8">
           <Button
             variant="ghost"
