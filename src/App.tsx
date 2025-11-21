@@ -13,6 +13,7 @@ import Production from "./pages/Production";
 import CarriersChat from "./pages/CarriersChat";
 import Carriers from "./pages/Carriers";
 import Admin from "./pages/Admin";
+import Purchases from "./pages/Purchases";
 import { useAuth } from "./hooks/useAuth";
 import { useAdminAuth } from "./hooks/useAdminAuth";
 import { usePhaseAuthorization } from "./hooks/usePhaseAuthorization";
@@ -127,6 +128,11 @@ const App = () => {
                 <AdminRoute>
                   <Admin />
                 </AdminRoute>
+              </ProtectedRoute>
+            } />
+            <Route path="/compras" element={
+              <ProtectedRoute>
+                <Purchases />
               </ProtectedRoute>
             } />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

@@ -4,7 +4,7 @@ import { DateRange } from "react-day-picker";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Search, Calendar, BarChart3, FileSpreadsheet, Plus, ChevronDown, MessageSquare, Truck, Package } from "lucide-react";
+import { Search, Calendar, BarChart3, FileSpreadsheet, Plus, ChevronDown, MessageSquare, Truck, Package, ShoppingCart } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { cleanItemDescription } from "@/lib/utils";
 import { getStatusLabel } from "@/lib/statusLabels";
@@ -1746,6 +1746,10 @@ export const Dashboard = () => {
               <DropdownMenuItem onClick={() => navigate('/transportadoras')}>
                 <Truck className="h-4 w-4 mr-2" />
                 Transportadoras
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => navigate('/compras')}>
+                <ShoppingCart className="h-4 w-4 mr-2" />
+                Compras
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => navigate('/carriers-chat')} className="relative">
                 <MessageSquare className="h-4 w-4 mr-2" />
