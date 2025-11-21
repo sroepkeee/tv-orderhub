@@ -35,6 +35,8 @@ export const usePhaseAuthorization = () => {
 
       if (rolesError) throw rolesError;
       const roles = rolesData?.map((r: any) => r.role) || [];
+      
+      console.log('🔐 [Phase Authorization] User Roles:', roles);
       setUserRoles(roles);
 
       // Carregar status de aprovação
@@ -50,8 +52,12 @@ export const usePhaseAuthorization = () => {
       // Calcular permissões baseado no mapeamento estático
       const mergedPermissions = new Map<string, PhasePermission>();
       
+      console.log('📊 [Phase Authorization] Calculating permissions for roles:', roles);
+      
       roles.forEach(role => {
         const mapping = ROLE_PHASE_MAPPING[role];
+        console.log(`   → Role "${role}":`, mapping?.phases || 'NOT FOUND IN MAPPING');
+        
         if (mapping) {
           mapping.phases.forEach(phase => {
             const existing = mergedPermissions.get(phase);
@@ -75,9 +81,16 @@ export const usePhaseAuthorization = () => {
         }
       });
 
-      setPhasePermissions(Array.from(mergedPermissions.values()));
+      const finalPermissions = Array.from(mergedPermissions.values());
+      console.log('✅ [Phase Authorization] Final Permissions:', finalPermissions);
+      console.log('👁️ [Phase Authorization] Can view "ready_to_invoice"?', 
+        finalPermissions.find(p => p.phase_key === 'ready_to_invoice')?.can_view ?? false);
+      console.log('👁️ [Phase Authorization] Can view "invoicing"?', 
+        finalPermissions.find(p => p.phase_key === 'invoicing')?.can_view ?? false);
+      
+      setPhasePermissions(finalPermissions);
     } catch (error) {
-      console.error('Error loading user data:', error);
+      console.error('❌ [Phase Authorization] Error loading user data:', error);
       setUserRoles([]);
       setPhasePermissions([]);
       setIsApproved(false);
