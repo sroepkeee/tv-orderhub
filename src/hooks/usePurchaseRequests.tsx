@@ -128,29 +128,81 @@ export const usePurchaseRequests = () => {
 
       if (requestError) throw requestError;
 
-      // Criar itens da solicitação
-      const requestItems = items.map(item => ({
-        purchase_request_id: request.id,
-        order_item_id: item.id,
-        item_code: item.item_code,
-        item_description: item.item_description,
-        requested_quantity: item.requested_quantity,
-        unit: item.unit,
-        unit_price: item.unit_price,
-        warehouse: item.warehouse,
-        item_status: 'pending',
-      }));
+      // Criar itens da solicitação com dados enriquecidos
+      const enrichedItems = await Promise.all(
+        items.map(async (item) => {
+          // Buscar histórico de compras (últimas 3)
+          const { data: history } = await supabase
+            .from('item_purchase_history')
+            .select('*')
+            .eq('item_code', item.item_code)
+            .order('purchase_date', { ascending: false })
+            .limit(3);
 
-      const { error: itemsInsertError } = await supabase
+          // Buscar métricas de consumo
+          const { data: consumption } = await supabase
+            .from('item_consumption_metrics')
+            .select('*')
+            .eq('item_code', item.item_code)
+            .maybeSingle();
+
+          // Buscar informações de estoque
+          const { data: stock } = await supabase
+            .from('item_stock_info')
+            .select('*')
+            .eq('item_code', item.item_code)
+            .eq('warehouse', item.warehouse)
+            .maybeSingle();
+
+          return {
+            purchase_request_id: request.id,
+            order_item_id: item.id,
+            item_code: item.item_code,
+            item_description: item.item_description,
+            requested_quantity: item.requested_quantity,
+            unit: item.unit,
+            unit_price: item.unit_price || stock?.last_purchase_price || 0,
+            total_price: (item.unit_price || stock?.last_purchase_price || 0) * item.requested_quantity,
+            warehouse: item.warehouse,
+            item_status: 'pending',
+            purchase_history: history || [],
+            consumption_metrics: consumption,
+            current_stock: stock?.current_stock_quantity || 0,
+          };
+        })
+      );
+
+      const { data: createdItems, error: itemsInsertError } = await supabase
         .from('purchase_request_items')
-        .insert(requestItems);
+        .insert(enrichedItems.map(item => ({
+          purchase_request_id: item.purchase_request_id,
+          order_item_id: item.order_item_id,
+          item_code: item.item_code,
+          item_description: item.item_description,
+          requested_quantity: item.requested_quantity,
+          unit: item.unit,
+          unit_price: item.unit_price,
+          total_price: item.total_price,
+          warehouse: item.warehouse,
+          item_status: item.item_status,
+        })))
+        .select();
 
       if (itemsInsertError) throw itemsInsertError;
 
-      toast.success(`Solicitação ${ocNumber} criada com ${items.length} itens`);
+      toast.success(`Solicitação ${ocNumber} criada com ${items.length} itens. Configure empresa e rateios!`);
       await loadRequests();
       await loadMetrics();
-      return request;
+      
+      return {
+        request,
+        enrichedItems: createdItems?.map((item, index) => ({
+          ...item,
+          purchase_history: enrichedItems[index].purchase_history,
+          consumption_metrics: enrichedItems[index].consumption_metrics,
+          current_stock: enrichedItems[index].current_stock,
+        }))
+      };
     } catch (error) {
       console.error('Error creating automatic request:', error);
       toast.error('Erro ao criar solicitação automática');
