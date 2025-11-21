@@ -29,6 +29,7 @@ export const usePurchaseRequests = () => {
           profiles:requested_by(full_name, email),
           approver:approved_by(full_name)
         `)
+        .in('status', ['draft', 'pending', 'approved', 'rejected'])
         .order('created_at', { ascending: false });
 
       if (error) throw error;
