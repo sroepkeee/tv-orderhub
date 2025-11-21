@@ -278,6 +278,11 @@ export default function Metrics() {
         />
       </div>
       
+      {/* Evolução e Comparativos */}
+      <div className="mb-6">
+        <ComparativeMetrics orders={orders} />
+      </div>
+
       {/* Tabela de Acompanhamento Detalhado */}
       <div className="mb-6">
         <OrdersTrackingTable 
@@ -292,11 +297,6 @@ export default function Metrics() {
       {/* Histórico de Mudanças de Prazos (Últimas 10) */}
       <div className="mb-6">
         <EnhancedDateChangeHistory limit={10} orders={orders} />
-      </div>
-
-      {/* Evolução e Comparativos */}
-      <div className="mb-6">
-        <ComparativeMetrics orders={orders} />
       </div>
 
       {/* Performance de SLA por Categoria */}
