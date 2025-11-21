@@ -24,39 +24,52 @@ export function ComparativeMetrics({ orders }: ComparativeMetricsProps) {
     const dayStart = startOfDay(day);
     const dayEnd = endOfDay(day);
     
-    const ordersInDay = orders.filter(order => {
+    // Pedidos EMITIDOS neste dia (criados)
+    const emittedOrders = orders.filter(order => {
       if (!order.issueDate) return false;
       const orderDate = new Date(order.issueDate);
       return isWithinInterval(orderDate, { start: dayStart, end: dayEnd });
-    });
+    }).length;
 
-    const completedOrders = ordersInDay.filter(o => 
-      o.status === 'completed' || o.status === 'delivered'
-    ).length;
+    // Pedidos CONCLUÍDOS neste dia (mudaram para completed/delivered)
+    const completedOrders = orders.filter(order => {
+      if (!order.updatedAt) return false;
+      const hasCompletedStatus = order.status === 'completed' || order.status === 'delivered';
+      if (!hasCompletedStatus) return false;
+      
+      const updatedDate = new Date(order.updatedAt);
+      return isWithinInterval(updatedDate, { start: dayStart, end: dayEnd });
+    }).length;
 
-    const inProductionOrders = ordersInDay.filter(o => 
-      o.status === 'in_production' || o.status === 'separation_started'
-    ).length;
+    // Pedidos que INICIARAM PRODUÇÃO neste dia
+    const startedProductionOrders = orders.filter(order => {
+      if (!order.updatedAt) return false;
+      const hasProductionStatus = order.status === 'in_production' || order.status === 'separation_started';
+      if (!hasProductionStatus) return false;
+      
+      const updatedDate = new Date(order.updatedAt);
+      return isWithinInterval(updatedDate, { start: dayStart, end: dayEnd });
+    }).length;
 
     return {
       day: format(day, 'dd/MM', { locale: ptBR }),
-      total: ordersInDay.length,
+      emitidos: emittedOrders,
       concluidos: completedOrders,
-      producao: inProductionOrders
+      iniciados: startedProductionOrders
     };
   });
 
   const chartConfig = {
-    total: {
-      label: "Total",
+    emitidos: {
+      label: "Emitidos",
       color: "hsl(var(--primary))",
     },
     concluidos: {
       label: "Concluídos",
       color: "hsl(var(--progress-good))",
     },
-    producao: {
-      label: "Em Produção",
+    iniciados: {
+      label: "Iniciados",
       color: "hsl(var(--status-production))",
     },
   };
@@ -69,7 +82,7 @@ export function ComparativeMetrics({ orders }: ComparativeMetricsProps) {
           <CardTitle>Evolução Diária de Pedidos</CardTitle>
         </div>
         <CardDescription>
-          Comparativo dos últimos 30 dias - Total, Concluídos e Em Produção
+          Emitidos: pedidos criados | Concluídos: finalizados/entregues | Iniciados: entraram em produção
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -90,8 +103,8 @@ export function ComparativeMetrics({ orders }: ComparativeMetricsProps) {
               <Legend />
               <Line 
                 type="monotone" 
-                dataKey="total" 
-                stroke="var(--color-total)" 
+                dataKey="emitidos" 
+                stroke="var(--color-emitidos)" 
                 strokeWidth={2}
                 dot={{ r: 4 }}
                 activeDot={{ r: 6 }}
@@ -106,8 +119,8 @@ export function ComparativeMetrics({ orders }: ComparativeMetricsProps) {
               />
               <Line 
                 type="monotone" 
-                dataKey="producao" 
-                stroke="var(--color-producao)" 
+                dataKey="iniciados" 
+                stroke="var(--color-iniciados)" 
                 strokeWidth={2}
                 dot={{ r: 4 }}
                 activeDot={{ r: 6 }}
