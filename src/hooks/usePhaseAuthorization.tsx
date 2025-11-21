@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
+import { ROLE_PHASE_MAPPING } from '@/lib/rolePhaseMapping';
 
 interface PhasePermission {
   phase_key: string;
@@ -46,34 +47,35 @@ export const usePhaseAuthorization = () => {
       if (approvalError && approvalError.code !== 'PGRST116') throw approvalError;
       setIsApproved(approvalData?.status === 'approved');
 
-      // Carregar permissões de fases (merged de todas as roles do usuário)
-      if (roles.length > 0) {
-        const { data: permissionsData, error: permissionsError } = await supabase
-          .from('phase_permissions')
-          .select('phase_key, can_view, can_edit, can_delete')
-          .in('role', roles);
+      // Calcular permissões baseado no mapeamento estático
+      const mergedPermissions = new Map<string, PhasePermission>();
+      
+      roles.forEach(role => {
+        const mapping = ROLE_PHASE_MAPPING[role];
+        if (mapping) {
+          mapping.phases.forEach(phase => {
+            const existing = mergedPermissions.get(phase);
+            if (existing) {
+              // Merge: se qualquer role dá permissão, o usuário tem
+              mergedPermissions.set(phase, {
+                phase_key: phase,
+                can_view: existing.can_view || mapping.canView,
+                can_edit: existing.can_edit || mapping.canEdit,
+                can_delete: existing.can_delete || mapping.canDelete,
+              });
+            } else {
+              mergedPermissions.set(phase, {
+                phase_key: phase,
+                can_view: mapping.canView,
+                can_edit: mapping.canEdit,
+                can_delete: mapping.canDelete,
+              });
+            }
+          });
+        }
+      });
 
-        if (permissionsError) throw permissionsError;
-
-        // Merge permissions (se tem permissão em qualquer role, tem permissão)
-        const mergedPermissions = new Map<string, PhasePermission>();
-        
-        permissionsData?.forEach((perm: any) => {
-          const existing = mergedPermissions.get(perm.phase_key);
-          if (existing) {
-            mergedPermissions.set(perm.phase_key, {
-              phase_key: perm.phase_key,
-              can_view: existing.can_view || perm.can_view,
-              can_edit: existing.can_edit || perm.can_edit,
-              can_delete: existing.can_delete || perm.can_delete,
-            });
-          } else {
-            mergedPermissions.set(perm.phase_key, perm);
-          }
-        });
-
-        setPhasePermissions(Array.from(mergedPermissions.values()));
-      }
+      setPhasePermissions(Array.from(mergedPermissions.values()));
     } catch (error) {
       console.error('Error loading user data:', error);
       setUserRoles([]);

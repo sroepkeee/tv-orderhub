@@ -1,6 +1,5 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { UserManagementTable } from "@/components/admin/UserManagementTable";
-import { PhasePermissionsMatrix } from "@/components/admin/PhasePermissionsMatrix";
 import { PermissionAuditLog } from "@/components/admin/PermissionAuditLog";
 import { Shield, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -31,18 +30,13 @@ const Admin = () => {
         </div>
 
         <Tabs defaultValue="users" className="w-full">
-          <TabsList className="grid w-full grid-cols-3 mb-6">
+          <TabsList className="grid w-full grid-cols-2 mb-6">
             <TabsTrigger value="users">Usuários</TabsTrigger>
-            <TabsTrigger value="permissions">Permissões</TabsTrigger>
             <TabsTrigger value="audit">Auditoria</TabsTrigger>
           </TabsList>
 
           <TabsContent value="users" className="space-y-4">
             <UserManagementTable />
-          </TabsContent>
-
-          <TabsContent value="permissions" className="space-y-4">
-            <PhasePermissionsMatrix />
           </TabsContent>
 
           <TabsContent value="audit" className="space-y-4">
