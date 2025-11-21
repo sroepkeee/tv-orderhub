@@ -12,6 +12,7 @@ import { PurchaseRequest, EnrichedPurchaseItem, ItemCostAllocation } from "@/typ
 import { ItemCostAllocationDialog } from "./ItemCostAllocationDialog";
 import { ItemAllocationBadge } from "./ItemAllocationBadge";
 import { AddItemDialog } from "./AddItemDialog";
+import { ItemMetricsBadges } from "./ItemMetricsBadges";
 
 interface PurchaseRequestDialogProps {
   open: boolean;
@@ -262,6 +263,7 @@ export function PurchaseRequestDialog({
                       <TableHead>Código</TableHead>
                       <TableHead>Descrição</TableHead>
                       <TableHead>Qtd</TableHead>
+                      <TableHead>Últ. Compras / Consumo 4m</TableHead>
                       <TableHead>Preço Unit.</TableHead>
                       <TableHead>Total</TableHead>
                       <TableHead>Rateio</TableHead>
@@ -274,6 +276,12 @@ export function PurchaseRequestDialog({
                         <TableCell className="font-mono">{item.item_code}</TableCell>
                         <TableCell>{item.item_description}</TableCell>
                         <TableCell>{item.requested_quantity} {item.unit}</TableCell>
+                        <TableCell>
+                          <ItemMetricsBadges
+                            purchaseHistory={item.purchase_history}
+                            consumptionMetrics={item.consumption_metrics}
+                          />
+                        </TableCell>
                         <TableCell>
                           <Input
                             type="number"
