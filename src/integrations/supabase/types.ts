@@ -388,6 +388,7 @@ export type Database = {
           created_at: string | null
           id: string
           notes: string | null
+          project: string | null
           purchase_request_item_id: string
           warehouse: string
         }
@@ -401,6 +402,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           notes?: string | null
+          project?: string | null
           purchase_request_item_id: string
           warehouse: string
         }
@@ -414,6 +416,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           notes?: string | null
+          project?: string | null
           purchase_request_item_id?: string
           warehouse?: string
         }
@@ -1509,6 +1512,7 @@ export type Database = {
         Row: {
           approved_at: string | null
           approved_by: string | null
+          company: string | null
           created_at: string | null
           expected_delivery_date: string | null
           id: string
@@ -1524,6 +1528,7 @@ export type Database = {
         Insert: {
           approved_at?: string | null
           approved_by?: string | null
+          company?: string | null
           created_at?: string | null
           expected_delivery_date?: string | null
           id?: string
@@ -1539,6 +1544,7 @@ export type Database = {
         Update: {
           approved_at?: string | null
           approved_by?: string | null
+          company?: string | null
           created_at?: string | null
           expected_delivery_date?: string | null
           id?: string
