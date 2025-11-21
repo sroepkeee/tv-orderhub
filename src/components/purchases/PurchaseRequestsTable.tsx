@@ -48,6 +48,7 @@ export const PurchaseRequestsTable = ({
         <TableHeader>
           <TableRow>
             <TableHead>Número OC</TableHead>
+            <TableHead>Empresa</TableHead>
             <TableHead>Status</TableHead>
             <TableHead>Solicitante</TableHead>
             <TableHead>Tipo</TableHead>
@@ -59,7 +60,7 @@ export const PurchaseRequestsTable = ({
         <TableBody>
           {requests.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={7} className="text-center text-muted-foreground">
+              <TableCell colSpan={8} className="text-center text-muted-foreground">
                 Nenhuma solicitação encontrada
               </TableCell>
             </TableRow>
@@ -69,13 +70,24 @@ export const PurchaseRequestsTable = ({
                 <TableCell className="font-medium">
                   {request.purchase_order_number}
                 </TableCell>
+                <TableCell>
+                  {request.company ? (
+                    <Badge variant="outline" className="font-medium">
+                      {request.company}
+                    </Badge>
+                  ) : (
+                    <span className="text-muted-foreground text-sm">Não definida</span>
+                  )}
+                </TableCell>
                 <TableCell>{getStatusBadge(request.status)}</TableCell>
                 <TableCell>
                   {(request as any).profiles?.full_name || 'N/A'}
                 </TableCell>
                 <TableCell>
                   <Badge variant="outline">
-                    {request.request_type === 'auto_generated' ? '🤖 Automática' : '✏️ Manual'}
+                    {request.request_type === 'normal' && '📋 Normal'}
+                    {request.request_type === 'urgent' && '🚨 Urgente'}
+                    {request.request_type === 'auto_generated' && '🤖 Automática'}
                   </Badge>
                 </TableCell>
                 <TableCell>

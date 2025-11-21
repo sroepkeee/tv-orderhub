@@ -3,9 +3,10 @@ import { Button } from "@/components/ui/button";
 import { Plus, Sparkles, ArrowLeft } from "lucide-react";
 import { PurchaseMetricsCards } from "@/components/purchases/PurchaseMetricsCards";
 import { PurchaseRequestsTable } from "@/components/purchases/PurchaseRequestsTable";
+import { PurchaseRequestDialog } from "@/components/purchases/PurchaseRequestDialog";
 import { usePurchaseRequests } from "@/hooks/usePurchaseRequests";
 import { useAdminAuth } from "@/hooks/useAdminAuth";
-import { PurchaseRequest } from "@/types/purchases";
+import { PurchaseRequest, EnrichedPurchaseItem } from "@/types/purchases";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
@@ -22,25 +23,43 @@ const Purchases = () => {
   } = usePurchaseRequests();
 
   const [selectedRequest, setSelectedRequest] = useState<PurchaseRequest | null>(null);
+  const [selectedItems, setSelectedItems] = useState<EnrichedPurchaseItem[]>([]);
+  const [dialogOpen, setDialogOpen] = useState(false);
+
+  const {
+    saveRequest,
+    loadRequestItems,
+    saveCostAllocations
+  } = usePurchaseRequests();
 
   const handleCreateAutomatic = async () => {
     const request = await createAutomaticRequest();
     if (request) {
-      // TODO: Abrir dialog de edição
-      toast.info('Solicitação criada! Dialog de edição em desenvolvimento.');
+      const items = await loadRequestItems(request.id);
+      setSelectedRequest(request as PurchaseRequest);
+      setSelectedItems(items as EnrichedPurchaseItem[]);
+      setDialogOpen(true);
     }
   };
 
-  const handleView = (request: PurchaseRequest) => {
-    setSelectedRequest(request);
-    // TODO: Abrir dialog de visualização
-    toast.info('Dialog de visualização em desenvolvimento.');
+  const handleCreateManual = () => {
+    setSelectedRequest(null);
+    setSelectedItems([]);
+    setDialogOpen(true);
   };
 
-  const handleEdit = (request: PurchaseRequest) => {
+  const handleView = async (request: PurchaseRequest) => {
+    const items = await loadRequestItems(request.id);
     setSelectedRequest(request);
-    // TODO: Abrir dialog de edição
-    toast.info('Dialog de edição em desenvolvimento.');
+    setSelectedItems(items as EnrichedPurchaseItem[]);
+    setDialogOpen(true);
+  };
+
+  const handleEdit = async (request: PurchaseRequest) => {
+    const items = await loadRequestItems(request.id);
+    setSelectedRequest(request);
+    setSelectedItems(items as EnrichedPurchaseItem[]);
+    setDialogOpen(true);
   };
 
   const handleDelete = async (requestId: string) => {
@@ -49,10 +68,20 @@ const Purchases = () => {
     }
   };
 
-  const handleApprove = (request: PurchaseRequest) => {
-    setSelectedRequest(request);
-    // TODO: Abrir dialog de aprovação
-    toast.info('Dialog de aprovação em desenvolvimento.');
+  const handleApprove = async (request: PurchaseRequest) => {
+    await updateRequestStatus(request.id, 'approved');
+  };
+
+  const handleSaveRequest = async (requestData: Partial<PurchaseRequest>, items: any[]) => {
+    // Preparar cost allocations
+    const costAllocations: { [itemId: string]: any[] } = {};
+    items.forEach(item => {
+      if (item.cost_allocations && item.cost_allocations.length > 0) {
+        costAllocations[item.id] = item.cost_allocations;
+      }
+    });
+
+    await saveRequest(requestData, items, costAllocations);
   };
 
   return (
@@ -90,7 +119,7 @@ const Purchases = () => {
                 </span>
               )}
             </Button>
-            <Button variant="outline" className="gap-2">
+            <Button onClick={handleCreateManual} variant="outline" className="gap-2">
               <Plus className="h-4 w-4" />
               Nova Solicitação Manual
             </Button>
@@ -117,6 +146,14 @@ const Purchases = () => {
           />
         </div>
       </div>
+
+      <PurchaseRequestDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        request={selectedRequest || undefined}
+        items={selectedItems}
+        onSave={handleSaveRequest}
+      />
     </div>
   );
 };

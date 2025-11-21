@@ -223,6 +223,141 @@ export const usePurchaseRequests = () => {
     }
   };
 
+  const saveRequest = async (
+    requestData: Partial<PurchaseRequest>,
+    items: any[],
+    costAllocations: { [itemId: string]: any[] }
+  ) => {
+    try {
+      const { data: user } = await supabase.auth.getUser();
+      if (!user.user) throw new Error('Usuário não autenticado');
+
+      // Se não tem ID, criar nova solicitação
+      if (!requestData.id) {
+        const { data: ocNumber } = await supabase.rpc('generate_purchase_order_number');
+        
+        const { data: request, error: requestError } = await supabase
+          .from('purchase_requests')
+          .insert({
+            purchase_order_number: ocNumber,
+            requested_by: user.user.id,
+            company: requestData.company,
+            request_type: requestData.request_type || 'normal',
+            status: requestData.status || 'draft',
+            notes: requestData.notes,
+            expected_delivery_date: requestData.expected_delivery_date,
+            total_estimated_value: requestData.total_estimated_value,
+          })
+          .select()
+          .single();
+
+        if (requestError) throw requestError;
+
+        // Criar itens
+        const requestItems = items.map(item => ({
+          purchase_request_id: request.id,
+          order_item_id: item.order_item_id,
+          item_code: item.item_code,
+          item_description: item.item_description,
+          requested_quantity: item.requested_quantity,
+          unit: item.unit,
+          unit_price: item.unit_price,
+          total_price: item.total_price,
+          warehouse: item.warehouse,
+          item_status: 'pending',
+        }));
+
+        const { data: createdItems, error: itemsError } = await supabase
+          .from('purchase_request_items')
+          .insert(requestItems)
+          .select();
+
+        if (itemsError) throw itemsError;
+
+        // Criar cost allocations
+        for (const createdItem of createdItems || []) {
+          const originalItem = items.find(i => i.item_code === createdItem.item_code);
+          if (originalItem && costAllocations[originalItem.id]) {
+            const allocations = costAllocations[originalItem.id].map((alloc: any) => ({
+              ...alloc,
+              purchase_request_item_id: createdItem.id,
+            }));
+
+            await supabase
+              .from('item_cost_allocation')
+              .insert(allocations);
+          }
+        }
+      } else {
+        // Atualizar solicitação existente
+        const { error: updateError } = await supabase
+          .from('purchase_requests')
+          .update({
+            company: requestData.company,
+            request_type: requestData.request_type,
+            status: requestData.status,
+            notes: requestData.notes,
+            expected_delivery_date: requestData.expected_delivery_date,
+            total_estimated_value: requestData.total_estimated_value,
+          })
+          .eq('id', requestData.id);
+
+        if (updateError) throw updateError;
+      }
+
+      await loadRequests();
+      await loadMetrics();
+    } catch (error) {
+      console.error('Error saving request:', error);
+      throw error;
+    }
+  };
+
+  const loadRequestItems = async (requestId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('purchase_request_items')
+        .select(`
+          *,
+          item_cost_allocation(*)
+        `)
+        .eq('purchase_request_id', requestId);
+
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error('Error loading request items:', error);
+      return [];
+    }
+  };
+
+  const saveCostAllocations = async (itemId: string, allocations: any[]) => {
+    try {
+      // Validar que soma dos % = 100%
+      const totalPercentage = allocations.reduce((sum, a) => sum + a.allocation_percentage, 0);
+      
+      if (totalPercentage !== 100) {
+        throw new Error('A soma dos percentuais deve ser 100%');
+      }
+
+      // Deletar rateios existentes
+      await supabase
+        .from('item_cost_allocation')
+        .delete()
+        .eq('purchase_request_item_id', itemId);
+
+      // Inserir novos rateios
+      const { error } = await supabase
+        .from('item_cost_allocation')
+        .insert(allocations);
+
+      if (error) throw error;
+    } catch (error) {
+      console.error('Error saving cost allocations:', error);
+      throw error;
+    }
+  };
+
   return {
     requests,
     loading,
@@ -230,6 +365,9 @@ export const usePurchaseRequests = () => {
     createAutomaticRequest,
     updateRequestStatus,
     deleteRequest,
+    saveRequest,
+    loadRequestItems,
+    saveCostAllocations,
     refreshRequests: loadRequests,
     refreshMetrics: loadMetrics,
   };

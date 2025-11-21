@@ -4,6 +4,7 @@ export interface PurchaseRequest {
   requested_by: string;
   request_type: 'normal' | 'urgent' | 'auto_generated';
   status: 'draft' | 'pending' | 'approved' | 'rejected';
+  company?: 'IMPLY TEC' | 'IMPLY RENTAL' | 'IMPLY FILIAL';
   notes?: string;
   rejection_reason?: string;
   total_estimated_value: number;
@@ -69,11 +70,27 @@ export interface ItemStockInfo {
   updated_by?: string;
 }
 
+export interface ItemCostAllocation {
+  id: string;
+  purchase_request_item_id: string;
+  business_unit: 'Autoatendimento' | 'Bowling' | 'Painéis' | 'Controle de Acessos';
+  accounting_item?: string;
+  project?: string;
+  cost_center: string;
+  warehouse: string;
+  allocation_percentage: number;
+  allocated_quantity?: number;
+  allocated_value?: number;
+  notes?: string;
+  created_at: string;
+}
+
 export interface EnrichedPurchaseItem extends PurchaseRequestItem {
   current_stock?: number;
   purchase_history?: ItemPurchaseHistory[];
   consumption_metrics?: ItemConsumptionMetrics;
   criticality?: 'high' | 'medium' | 'low';
+  cost_allocations?: ItemCostAllocation[];
 }
 
 export interface PurchaseMetrics {
