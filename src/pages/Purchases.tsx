@@ -33,11 +33,10 @@ const Purchases = () => {
   } = usePurchaseRequests();
 
   const handleCreateAutomatic = async () => {
-    const request = await createAutomaticRequest();
-    if (request) {
-      const items = await loadRequestItems(request.id);
-      setSelectedRequest(request as PurchaseRequest);
-      setSelectedItems(items as EnrichedPurchaseItem[]);
+    const result = await createAutomaticRequest();
+    if (result) {
+      setSelectedRequest(result.request as PurchaseRequest);
+      setSelectedItems((result.enrichedItems || []) as EnrichedPurchaseItem[]);
       setDialogOpen(true);
     }
   };
