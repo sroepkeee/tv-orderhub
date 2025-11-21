@@ -119,7 +119,7 @@ export const usePurchaseRequests = () => {
         .insert({
           purchase_order_number: ocNumber,
           requested_by: user.user.id,
-          request_type: 'auto_generated',
+          request_type: 'normal',
           status: 'draft',
           notes: `Solicitação gerada automaticamente com ${items.length} itens`,
         })

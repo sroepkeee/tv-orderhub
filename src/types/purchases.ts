@@ -2,7 +2,7 @@ export interface PurchaseRequest {
   id: string;
   purchase_order_number: string;
   requested_by: string;
-  request_type: 'normal' | 'urgent' | 'auto_generated';
+  request_type: 'normal' | 'urgent' | 'emergency';
   status: 'draft' | 'pending' | 'approved' | 'rejected';
   company?: 'IMPLY TEC' | 'IMPLY RENTAL' | 'IMPLY FILIAL';
   notes?: string;

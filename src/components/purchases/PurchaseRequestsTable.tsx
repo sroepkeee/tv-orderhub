@@ -87,7 +87,7 @@ export const PurchaseRequestsTable = ({
                   <Badge variant="outline">
                     {request.request_type === 'normal' && '📋 Normal'}
                     {request.request_type === 'urgent' && '🚨 Urgente'}
-                    {request.request_type === 'auto_generated' && '🤖 Automática'}
+                    {request.request_type === 'emergency' && '⚡ Emergência'}
                   </Badge>
                 </TableCell>
                 <TableCell>
