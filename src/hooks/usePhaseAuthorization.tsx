@@ -17,11 +17,29 @@ export const usePhaseAuthorization = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (user) {
-      loadUserData();
-    } else {
+    if (!user) {
       setLoading(false);
+      return;
     }
+
+    loadUserData();
+
+    // Real-time subscription para mudanças de permissões
+    const subscription = supabase
+      .channel('phase-permissions-changes')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'phase_permissions'
+      }, () => {
+        console.log('🔄 [Phase Authorization] Permissions changed, reloading...');
+        loadUserData();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(subscription);
+    };
   }, [user]);
 
   const loadUserData = async () => {
@@ -93,24 +111,6 @@ export const usePhaseAuthorization = () => {
         finalPermissions.find(p => p.phase_key === 'invoicing')?.can_view ?? false);
       
       setPhasePermissions(finalPermissions);
-
-      // Real-time subscription para mudanças de permissões
-      const subscription = supabase
-        .channel('phase-permissions-changes')
-        .on('postgres_changes', {
-          event: '*',
-          schema: 'public',
-          table: 'phase_permissions',
-          filter: `role=in.(${roles.join(',')})`
-        }, () => {
-          console.log('🔄 [Phase Authorization] Permissions changed, reloading...');
-          loadUserData();
-        })
-        .subscribe();
-
-      return () => {
-        supabase.removeChannel(subscription);
-      };
     } catch (error) {
       console.error('❌ [Phase Authorization] Error loading user data:', error);
       setUserRoles([]);

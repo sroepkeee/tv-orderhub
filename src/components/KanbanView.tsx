@@ -229,8 +229,15 @@ export const KanbanView = ({ orders, onEdit, onStatusChange }: KanbanViewProps) 
 
   // Função para obter colunas visíveis (apenas com permissão explícita)
   const getVisibleColumns = () => {
+    console.log('🔍 [KanbanView] getVisibleColumns chamado:', {
+      userRoles,
+      totalColumns: columns.length,
+      isAdmin: userRoles.includes('admin')
+    });
+
     // Admin vê tudo
     if (userRoles.includes('admin')) {
+      console.log('✅ [KanbanView] Admin detectado, mostrando todas as colunas');
       return columns;
     }
 
@@ -238,13 +245,17 @@ export const KanbanView = ({ orders, onEdit, onStatusChange }: KanbanViewProps) 
 
     // Adicionar apenas fases onde o usuário tem permissão de visualização
     columns.forEach(col => {
-      if (canViewPhase(col.id)) {
+      const canView = canViewPhase(col.id);
+      console.log(`   → Verificando fase "${col.id}":`, canView ? '✅ pode ver' : '❌ não pode ver');
+      if (canView) {
         visiblePhases.add(col.id);
       }
     });
 
     // Filtrar colunas visíveis mantendo ordem original
-    return columns.filter(col => visiblePhases.has(col.id));
+    const visible = columns.filter(col => visiblePhases.has(col.id));
+    console.log('✅ [KanbanView] Colunas visíveis:', visible.map(c => c.id));
+    return visible;
   };
 
   const visibleColumns = getVisibleColumns();
