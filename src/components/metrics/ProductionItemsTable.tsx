@@ -34,6 +34,7 @@ export const ProductionItemsTable = ({ items, onOrderClick }: ProductionItemsTab
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 50;
+  const today = new Date();
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -88,7 +89,6 @@ export const ProductionItemsTable = ({ items, onOrderClick }: ProductionItemsTab
   }, [sortedItems, currentPage]);
 
   const totalPages = Math.ceil(sortedItems.length / itemsPerPage);
-  const today = new Date();
 
   const getDaysRemaining = (deliveryDate: string) => {
     const days = differenceInDays(new Date(deliveryDate), today);
