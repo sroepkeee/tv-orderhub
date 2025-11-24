@@ -13,6 +13,7 @@ import Production from "./pages/Production";
 import CarriersChat from "./pages/CarriersChat";
 import Carriers from "./pages/Carriers";
 import Admin from "./pages/Admin";
+import PermissionsManagement from "./pages/PermissionsManagement";
 import Purchases from "./pages/Purchases";
 import { useAuth } from "./hooks/useAuth";
 import { useAdminAuth } from "./hooks/useAdminAuth";
@@ -123,10 +124,17 @@ const App = () => {
                 <Carriers />
               </ProtectedRoute>
             } />
-            <Route path="/admin/users" element={
+            <Route path="/admin" element={
               <ProtectedRoute>
                 <AdminRoute>
                   <Admin />
+                </AdminRoute>
+              </ProtectedRoute>
+            } />
+            <Route path="/permissions" element={
+              <ProtectedRoute>
+                <AdminRoute>
+                  <PermissionsManagement />
                 </AdminRoute>
               </ProtectedRoute>
             } />
