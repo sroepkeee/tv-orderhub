@@ -36,7 +36,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 
-export type Phase = "almox_ssm" | "order_generation" | "almox_general" | "production" | "balance_generation" | "laboratory" | "packaging" | "freight_quote" | "invoicing" | "logistics" | "in_transit" | "completion";
+export type Phase = "almox_ssm" | "order_generation" | "almox_general" | "production" | "balance_generation" | "laboratory" | "packaging" | "freight_quote" | "ready_to_invoice" | "invoicing" | "logistics" | "in_transit" | "completion";
 
 interface KanbanViewProps {
   orders: Order[];
@@ -119,9 +119,11 @@ export const KanbanView = ({ orders, onEdit, onStatusChange }: KanbanViewProps) 
       case "freight_quote_received":
       case "freight_approved":
         return "freight_quote";
-      // Fase: Faturamento (consolidada)
+      // Fase: À Faturar
       case "ready_to_invoice":
       case "pending_invoice_request":
+        return "ready_to_invoice";
+      // Fase: Faturamento
       case "invoice_requested":
       case "awaiting_invoice":
       case "invoice_issued":
@@ -202,6 +204,12 @@ export const KanbanView = ({ orders, onEdit, onStatusChange }: KanbanViewProps) 
       colorClass: "bg-phase-freight-bg text-phase-freight border-b-4 border-phase-border",
     },
     {
+      id: "ready_to_invoice" as Phase,
+      title: "À Faturar",
+      icon: ClipboardCheck,
+      colorClass: "bg-purple-50 text-purple-700 border-b-4 border-purple-300",
+    },
+    {
       id: "invoicing" as Phase,
       title: "Faturamento",
       icon: FileText,
@@ -265,6 +273,7 @@ export const KanbanView = ({ orders, onEdit, onStatusChange }: KanbanViewProps) 
       laboratory: "awaiting_lab",
       packaging: "in_packaging",
       freight_quote: "freight_quote_requested",
+      ready_to_invoice: "ready_to_invoice",
       invoicing: "invoice_requested",
       logistics: "in_expedition",
       in_transit: "in_transit",
