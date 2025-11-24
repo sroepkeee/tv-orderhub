@@ -26,6 +26,7 @@ const PHASES = [
   { key: 'laboratory', label: 'Laboratório' },
   { key: 'packaging', label: 'Embalagem' },
   { key: 'freight_quote', label: 'Cotação Frete' },
+  { key: 'ready_to_invoice', label: 'À Faturar' },
   { key: 'invoicing', label: 'Faturamento' },
   { key: 'logistics', label: 'Expedição' },
   { key: 'in_transit', label: 'Em Trânsito' },
