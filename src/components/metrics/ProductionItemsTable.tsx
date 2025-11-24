@@ -12,7 +12,7 @@ interface ProductionItemsTableProps {
   onOrderClick?: (orderId: string) => void;
 }
 
-type SortField = 'orderNumber' | 'itemCode' | 'deliveryDate' | 'requestedQuantity' | 'item_status' | 'createdAt' | 'daysInSystem';
+type SortField = 'orderNumber' | 'itemCode' | 'deliveryDate' | 'requestedQuantity' | 'item_status' | 'createdAt' | 'daysInSystem' | 'productionOrderNumber';
 type SortDirection = 'asc' | 'desc';
 
 const getItemStatusBadge = (status: string) => {
@@ -76,6 +76,11 @@ export const ProductionItemsTable = ({ items, onOrderClick }: ProductionItemsTab
           const daysA = differenceInDays(today, refDateA);
           const daysB = differenceInDays(today, refDateB);
           comparison = daysA - daysB;
+          break;
+        case 'productionOrderNumber':
+          const opA = a.production_order_number || '';
+          const opB = b.production_order_number || '';
+          comparison = opA.localeCompare(opB);
           break;
       }
       
@@ -149,7 +154,9 @@ export const ProductionItemsTable = ({ items, onOrderClick }: ProductionItemsTab
               <TableHead className="w-[120px]">
                 <SortButton field="deliveryDate">Data Entrega</SortButton>
               </TableHead>
-              <TableHead className="w-[100px]">Nº OP</TableHead>
+              <TableHead className="w-[100px]">
+                <SortButton field="productionOrderNumber">Nº OP</SortButton>
+              </TableHead>
               <TableHead className="w-[130px]">Data Est. Produção</TableHead>
               <TableHead className="w-[80px]">Prazo</TableHead>
               <TableHead className="w-[100px]">Compra OK?</TableHead>

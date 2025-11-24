@@ -33,6 +33,7 @@ export default function Production() {
     itemStatus: 'all',
     warehouse: '',
     searchTerm: '',
+    productionOrderNumber: '',
   });
   
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
@@ -60,6 +61,16 @@ export default function Production() {
       // Filtro de armazém
       if (filters.warehouse && item.warehouse !== filters.warehouse) {
         return false;
+      }
+
+      // Filtro de número da OP
+      if (filters.productionOrderNumber) {
+        if (!item.production_order_number) {
+          return false;
+        }
+        if (!item.production_order_number.toLowerCase().includes(filters.productionOrderNumber.toLowerCase())) {
+          return false;
+        }
       }
 
       // Filtro de busca (código ou descrição)
@@ -138,6 +149,7 @@ export default function Production() {
           phase_started_at: item.phase_started_at,
           received_status: item.received_status as any,
           userId: item.user_id,
+          production_order_number: item.production_order_number,
         })),
         // Campos opcionais
         carrier_name: orderData.carrier_name,
