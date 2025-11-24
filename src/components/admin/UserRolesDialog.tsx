@@ -11,6 +11,8 @@ import { useAvailableRoles } from "@/hooks/useAvailableRoles";
 import { Info, CheckCircle2, AlertCircle } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
 
 interface PhaseConfig {
   phase_key: string;
@@ -173,123 +175,142 @@ export const UserRolesDialog = ({ open, onOpenChange, user, onSuccess }: UserRol
     }
   };
 
+  // Group roles by area
+  const rolesByArea = {
+    'Operações': availableRoles.filter(r => ['almox_ssm', 'order_generation', 'almox_general', 'production', 'balance_generation', 'laboratory'].includes(r.value)),
+    'Expedição': availableRoles.filter(r => ['packaging', 'logistics', 'in_transit'].includes(r.value)),
+    'Comercial': availableRoles.filter(r => r.value === 'freight_quote'),
+    'Financeiro': availableRoles.filter(r => ['ready_to_invoice', 'invoicing'].includes(r.value)),
+    'Finalização': availableRoles.filter(r => r.value === 'completion'),
+    'Administração': availableRoles.filter(r => r.value === 'admin'),
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Gerenciar Roles</DialogTitle>
+          <DialogTitle>Gerenciar Roles de {user.full_name}</DialogTitle>
           <DialogDescription>
-            Selecione as roles de {user.full_name}
+            Selecione as permissões de acesso para este usuário
           </DialogDescription>
         </DialogHeader>
 
-        <div className="py-4">
-          <div className="flex items-start justify-between gap-4 mb-4">
-            <div className="flex-1">
-              {user.roles.length > 0 && (
-                <div className="mb-3">
-                  <p className="text-xs text-muted-foreground mb-1.5">Roles atuais:</p>
-                  <div className="flex gap-1.5 flex-wrap">
-                    {user.roles.map(role => {
-                      const roleLabel = availableRoles.find(r => r.value === role);
-                      return (
-                        <Badge key={role} variant="secondary" className="text-xs">
-                          {roleLabel?.label || role}
-                        </Badge>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-              
-              {isProfileIncomplete && (
-                <Alert variant="default" className="border-amber-500/50 bg-amber-500/10">
-                  <AlertCircle className="h-4 w-4 text-amber-600" />
-                  <AlertDescription className="text-xs">
-                    <span className="font-medium">Perfil Incompleto</span> ({selectedRoles.length}/{operationalRoles.length} roles)
-                    <br />
-                    Faltam: {missingRoles.map(r => {
-                      const label = availableRoles.find(role => role.value === r);
-                      return label?.label || r;
-                    }).join(', ')}
-                  </AlertDescription>
-                </Alert>
-              )}
-            </div>
+        <div className="py-6 space-y-6">
+          {/* Alert de perfil incompleto + Botão de perfil completo */}
+          <div className="flex items-start gap-4">
+            {isProfileIncomplete ? (
+              <Alert variant="default" className="flex-1 border-amber-500/50 bg-amber-500/10">
+                <AlertCircle className="h-4 w-4 text-amber-600" />
+                <AlertDescription className="text-sm">
+                  <span className="font-medium">Perfil Incompleto</span> — {selectedRoles.length}/{operationalRoles.length} roles atribuídas
+                  <br />
+                  <span className="text-xs text-muted-foreground">
+                    Faltam: {missingRoles.map(r => availableRoles.find(role => role.value === r)?.label || r).join(', ')}
+                  </span>
+                </AlertDescription>
+              </Alert>
+            ) : selectedRoles.length > 0 ? (
+              <Alert variant="default" className="flex-1 border-green-500/50 bg-green-500/10">
+                <CheckCircle2 className="h-4 w-4 text-green-600" />
+                <AlertDescription className="text-sm">
+                  <span className="font-medium">Perfil Completo</span> — {selectedRoles.length} roles atribuídas
+                </AlertDescription>
+              </Alert>
+            ) : (
+              <div className="flex-1" />
+            )}
             
             <Button
               variant="outline"
-              size="sm"
+              size="default"
               onClick={selectAllRoles}
               className="shrink-0"
             >
               <CheckCircle2 className="h-4 w-4 mr-2" />
-              Perfil Completo
+              Atribuir Todas
             </Button>
           </div>
 
+          <Separator />
+
+          {/* Roles organizadas por área */}
           {loadingRoles ? (
             <div className="text-sm text-muted-foreground">Carregando roles...</div>
           ) : (
-            <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
-              {availableRoles.map((role) => {
-                const rolePhases = getPhasesByRole(role.value);
-                return (
-                  <div key={role.value} className="border rounded-lg p-3 hover:bg-accent/50 transition-colors">
-                    <div className="flex items-start space-x-3">
-                      <Checkbox
-                        id={role.value}
-                        checked={selectedRoles.includes(role.value)}
-                        onCheckedChange={() => toggleRole(role.value)}
-                        className="mt-1"
-                      />
-                      <div className="flex-1">
-                        <Label
-                          htmlFor={role.value}
-                          className="text-sm font-medium cursor-pointer block mb-1"
-                        >
-                          {role.label}
-                        </Label>
-                        {rolePhases.length > 0 && (
-                          <div className="flex flex-wrap gap-1 mt-1.5">
-                            {rolePhases.map(phase => (
-                              <Badge key={phase.phase_key} variant="outline" className="text-xs">
-                                {phase.display_name}
-                              </Badge>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+            <TooltipProvider>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {Object.entries(rolesByArea).map(([area, roles]) => {
+                  if (roles.length === 0) return null;
+                  
+                  return (
+                    <Card key={area} className="border-muted">
+                      <CardHeader className="pb-4">
+                        <CardTitle className="text-base font-semibold">{area}</CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-3">
+                        {roles.map((role) => {
+                          const rolePhases = getPhasesByRole(role.value);
+                          const phaseNames = rolePhases.map(p => p.display_name).join(', ');
+                          
+                          return (
+                            <Tooltip key={role.value}>
+                              <TooltipTrigger asChild>
+                                <div className="flex items-center space-x-3 p-2 rounded-md hover:bg-accent/50 transition-colors cursor-pointer">
+                                  <Checkbox
+                                    id={role.value}
+                                    checked={selectedRoles.includes(role.value)}
+                                    onCheckedChange={() => toggleRole(role.value)}
+                                  />
+                                  <Label
+                                    htmlFor={role.value}
+                                    className="text-sm font-medium cursor-pointer flex-1"
+                                  >
+                                    {role.label}
+                                  </Label>
+                                </div>
+                              </TooltipTrigger>
+                              {phaseNames && (
+                                <TooltipContent side="right" className="max-w-xs">
+                                  <p className="text-xs"><strong>Fase(s):</strong> {phaseNames}</p>
+                                </TooltipContent>
+                              )}
+                            </Tooltip>
+                          );
+                        })}
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            </TooltipProvider>
           )}
 
+          <Separator />
+
+          {/* Resumo de fases com acesso */}
           {selectedRoles.length > 0 && (
-            <Alert className="mt-4">
+            <Alert>
               <Info className="h-4 w-4" />
-              <AlertDescription className="text-xs">
+              <AlertDescription className="text-sm">
                 {selectedRoles.includes('admin') ? (
                   <div>
                     <div className="font-medium mb-1">Acesso Total (Admin)</div>
-                    <p className="text-muted-foreground">
-                      Administradores têm acesso completo a todas as fases do sistema.
+                    <p className="text-xs text-muted-foreground">
+                      Administradores têm acesso completo a todas as fases e funcionalidades do sistema.
                     </p>
                   </div>
                 ) : (
                   <div>
-                    <div className="font-medium mb-1">Fases com Acesso:</div>
-                    <div className="flex flex-wrap gap-1 mt-2">
-                      {selectedRoles.flatMap(role => getPhasesByRole(role)).map(phase => (
+                    <div className="font-medium mb-2">Fases com Acesso:</div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {Array.from(new Set(selectedRoles.flatMap(role => getPhasesByRole(role)))).map(phase => (
                         <Badge key={phase.phase_key} variant="secondary" className="text-xs">
                           {phase.display_name}
                         </Badge>
                       ))}
                     </div>
-                    <p className="text-muted-foreground mt-2">
-                      ⚠️ O usuário deve fazer logout/login para ver as atualizações.
+                    <p className="text-xs text-muted-foreground mt-3">
+                      ⚠️ O usuário deve fazer logout e login novamente para ver as atualizações.
                     </p>
                   </div>
                 )}
