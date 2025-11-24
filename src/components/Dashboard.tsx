@@ -442,7 +442,8 @@ export const Dashboard = () => {
             sla_deadline: item.sla_deadline,
             current_phase: item.current_phase,
             phase_started_at: item.phase_started_at,
-            userId: item.user_id
+            userId: item.user_id,
+            production_order_number: item.production_order_number
           }));
 
           const firstItem = items[0];
@@ -939,7 +940,8 @@ export const Dashboard = () => {
               sla_deadline: item.sla_deadline,
               current_phase: item.current_phase,
               phase_started_at: item.phase_started_at,
-              userId: item.user_id
+              userId: item.user_id,
+              production_order_number: item.production_order_number
             }));
 
             const totalRequested = items.reduce((sum, item) => sum + item.requestedQuantity, 0);
@@ -1145,7 +1147,8 @@ export const Dashboard = () => {
               sla_deadline: item.sla_deadline,
               current_phase: item.current_phase,
               phase_started_at: item.phase_started_at,
-              userId: item.user_id
+              userId: item.user_id,
+              production_order_number: item.production_order_number
             }));
 
             const totalRequested = items.reduce((sum, item) => sum + item.requestedQuantity, 0);
@@ -1526,7 +1529,8 @@ export const Dashboard = () => {
               production_estimated_date: item.production_estimated_date || null,
               sla_days: item.sla_days,
               is_imported: item.is_imported,
-              import_lead_time_days: item.import_lead_time_days
+              import_lead_time_days: item.import_lead_time_days,
+              production_order_number: item.production_order_number || null
             }).eq('id', item.id);
             if (updateError) throw updateError;
           } else {
@@ -1549,7 +1553,8 @@ export const Dashboard = () => {
               production_estimated_date: item.production_estimated_date || null,
               sla_days: item.sla_days,
               is_imported: item.is_imported,
-              import_lead_time_days: item.import_lead_time_days
+              import_lead_time_days: item.import_lead_time_days,
+              production_order_number: item.production_order_number || null
             });
             if (insertError) throw insertError;
           }

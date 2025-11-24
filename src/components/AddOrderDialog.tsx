@@ -39,6 +39,7 @@ export interface OrderItem {
   purchase_action_started?: boolean;
   purchase_action_started_at?: string;
   purchase_action_started_by?: string;
+  production_order_number?: string;
 }
 
 interface OrderFormData {
