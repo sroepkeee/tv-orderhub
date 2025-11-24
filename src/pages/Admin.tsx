@@ -14,27 +14,27 @@ const Admin = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="w-full max-w-[98%] mx-auto py-8 px-6">
-        <div className="mb-8">
+      <div className="w-full max-w-[99%] mx-auto py-6 px-4">
+        <div className="mb-6">
           <Button
             variant="ghost"
             onClick={() => navigate("/")}
-            className="mb-4"
+            className="mb-3"
           >
             <ArrowLeft className="mr-2 h-4 w-4" />
             Voltar
           </Button>
           <div className="flex items-center gap-3 mb-2">
-            <Shield className="h-8 w-8 text-primary" />
-            <h1 className="text-4xl font-bold">Gerenciamento de Usuários</h1>
+            <Shield className="h-7 w-7 text-primary" />
+            <h1 className="text-3xl font-bold">Gerenciamento de Usuários</h1>
           </div>
-          <p className="text-muted-foreground">
+          <p className="text-sm text-muted-foreground">
             Controle de acesso, aprovações e permissões do sistema
           </p>
         </div>
 
         <Tabs defaultValue="users" className="w-full">
-          <TabsList className="grid w-full grid-cols-3 mb-6">
+          <TabsList className="grid w-full grid-cols-3 mb-4">
             <TabsTrigger value="users">Usuários</TabsTrigger>
             <TabsTrigger value="monitoring">Monitoramento</TabsTrigger>
             <TabsTrigger value="audit">Auditoria</TabsTrigger>
@@ -44,9 +44,9 @@ const Admin = () => {
             <UserManagementTable />
           </TabsContent>
 
-          <TabsContent value="monitoring" className="space-y-6">
+          <TabsContent value="monitoring" className="space-y-4">
             <UserAccessMetrics />
-            <div className="grid md:grid-cols-2 gap-6">
+            <div className="grid md:grid-cols-2 gap-4">
               <UserPresenceDashboard />
               <RecentActivityFeed />
             </div>

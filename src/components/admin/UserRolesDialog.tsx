@@ -8,11 +8,15 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { useAvailableRoles } from "@/hooks/useAvailableRoles";
-import { ROLE_LABELS } from "@/lib/roleLabels";
-import { ROLE_PHASE_MAPPING } from "@/lib/rolePhaseMapping";
 import { Info, CheckCircle2, AlertCircle } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+
+interface PhaseConfig {
+  phase_key: string;
+  display_name: string;
+  responsible_role: string;
+}
 
 interface UserRolesDialogProps {
   open: boolean;
@@ -28,13 +32,29 @@ interface UserRolesDialogProps {
 export const UserRolesDialog = ({ open, onOpenChange, user, onSuccess }: UserRolesDialogProps) => {
   const [loading, setLoading] = useState(false);
   const [selectedRoles, setSelectedRoles] = useState<string[]>(user.roles);
+  const [phases, setPhases] = useState<PhaseConfig[]>([]);
   const { toast } = useToast();
   const { user: currentUser } = useAuth();
   const { roles: availableRoles, loading: loadingRoles } = useAvailableRoles();
 
   useEffect(() => {
     setSelectedRoles(user.roles);
+    loadPhases();
   }, [user.roles]);
+
+  const loadPhases = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('phase_config')
+        .select('phase_key, display_name, responsible_role')
+        .order('order_index');
+      
+      if (error) throw error;
+      setPhases(data || []);
+    } catch (error) {
+      console.error('Error loading phases:', error);
+    }
+  };
 
   // Roles operacionais (todos exceto admin)
   const operationalRoles = availableRoles.filter(r => r.value !== 'admin').map(r => r.value);
@@ -55,14 +75,8 @@ export const UserRolesDialog = ({ open, onOpenChange, user, onSuccess }: UserRol
     setSelectedRoles(operationalRoles);
   };
 
-  // Tooltips para roles importantes
-  const roleTooltips: Record<string, string> = {
-    'completion': 'Permite visualizar e gerenciar pedidos finalizados (entregues, cancelados, concluídos)',
-    'laboratory': 'Acesso ao laboratório para instalação de firmware e imagens',
-    'freight_quote': 'Cotação e seleção de transportadoras',
-    'invoicing': 'Faturamento e preparação de notas fiscais',
-    'logistics': 'Expedição e gestão de envios',
-    'admin': 'Acesso total ao sistema, incluindo gerenciamento de usuários'
+  const getPhasesByRole = (role: string) => {
+    return phases.filter(p => p.responsible_role === role);
   };
 
   const handleSubmit = async () => {
@@ -217,87 +231,65 @@ export const UserRolesDialog = ({ open, onOpenChange, user, onSuccess }: UserRol
           {loadingRoles ? (
             <div className="text-sm text-muted-foreground">Carregando roles...</div>
           ) : (
-            <TooltipProvider>
-              <div className="space-y-2 max-h-[400px] overflow-y-auto pr-2">
-                {availableRoles.map((role) => {
-                  const hasTooltip = roleTooltips[role.value];
-                  const checkboxElement = (
-                    <div key={role.value} className="flex items-center space-x-2">
+            <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
+              {availableRoles.map((role) => {
+                const rolePhases = getPhasesByRole(role.value);
+                return (
+                  <div key={role.value} className="border rounded-lg p-3 hover:bg-accent/50 transition-colors">
+                    <div className="flex items-start space-x-3">
                       <Checkbox
                         id={role.value}
                         checked={selectedRoles.includes(role.value)}
                         onCheckedChange={() => toggleRole(role.value)}
+                        className="mt-1"
                       />
-                      <Label
-                        htmlFor={role.value}
-                        className="text-sm font-normal cursor-pointer flex-1"
-                      >
-                        {role.label}
-                        {hasTooltip && (
-                          <Info className="inline h-3 w-3 ml-1 text-muted-foreground" />
+                      <div className="flex-1">
+                        <Label
+                          htmlFor={role.value}
+                          className="text-sm font-medium cursor-pointer block mb-1"
+                        >
+                          {role.label}
+                        </Label>
+                        {rolePhases.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-1.5">
+                            {rolePhases.map(phase => (
+                              <Badge key={phase.phase_key} variant="outline" className="text-xs">
+                                {phase.display_name}
+                              </Badge>
+                            ))}
+                          </div>
                         )}
-                      </Label>
+                      </div>
                     </div>
-                  );
-
-                  return hasTooltip ? (
-                    <Tooltip key={role.value}>
-                      <TooltipTrigger asChild>
-                        {checkboxElement}
-                      </TooltipTrigger>
-                      <TooltipContent side="right" className="max-w-xs">
-                        <p className="text-xs">{roleTooltips[role.value]}</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  ) : (
-                    checkboxElement
-                  );
-                })}
-              </div>
-            </TooltipProvider>
+                  </div>
+                );
+              })}
+            </div>
           )}
 
           {selectedRoles.length > 0 && (
             <Alert className="mt-4">
               <Info className="h-4 w-4" />
               <AlertDescription className="text-xs">
-                <div className="font-medium mb-2">Fases Visíveis no Kanban:</div>
                 {selectedRoles.includes('admin') ? (
                   <div>
-                    <Badge variant="default" className="text-xs mb-2">
-                      Todas as Fases (Admin)
-                    </Badge>
+                    <div className="font-medium mb-1">Acesso Total (Admin)</div>
                     <p className="text-muted-foreground">
-                      Administradores têm acesso total para visualizar, editar e deletar em todas as fases do sistema.
+                      Administradores têm acesso completo a todas as fases do sistema.
                     </p>
                   </div>
                 ) : (
-                  <div className="space-y-2">
-                    {selectedRoles.filter(r => r !== 'admin').map(role => {
-                      const roleLabel = ROLE_LABELS[role];
-                      const roleMapping = ROLE_PHASE_MAPPING[role];
-                      const rolePhases = roleMapping?.phases || [];
-                      
-                      return (
-                        <div key={role} className="border-l-2 border-primary/30 pl-2">
-                          <div className="font-medium text-xs mb-1">
-                            ✅ {roleLabel?.name || role}
-                          </div>
-                          <div className="flex flex-wrap gap-1">
-                            {rolePhases.map((phase: string) => {
-                              const phaseLabel = ROLE_LABELS[phase];
-                              return phaseLabel ? (
-                                <Badge key={phase} variant="outline" className="text-xs">
-                                  → {phaseLabel.name}
-                                </Badge>
-                              ) : null;
-                            })}
-                          </div>
-                        </div>
-                      );
-                    })}
-                    <p className="text-muted-foreground pt-2">
-                      ⚠️ Importante: O usuário deve fazer logout/login para ver as atualizações.
+                  <div>
+                    <div className="font-medium mb-1">Fases com Acesso:</div>
+                    <div className="flex flex-wrap gap-1 mt-2">
+                      {selectedRoles.flatMap(role => getPhasesByRole(role)).map(phase => (
+                        <Badge key={phase.phase_key} variant="secondary" className="text-xs">
+                          {phase.display_name}
+                        </Badge>
+                      ))}
+                    </div>
+                    <p className="text-muted-foreground mt-2">
+                      ⚠️ O usuário deve fazer logout/login para ver as atualizações.
                     </p>
                   </div>
                 )}

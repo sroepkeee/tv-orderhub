@@ -28,6 +28,8 @@ const PHASES = [
   { key: 'freight_quote', label: 'Cotação Frete' },
   { key: 'invoicing', label: 'Faturamento' },
   { key: 'logistics', label: 'Expedição' },
+  { key: 'in_transit', label: 'Em Trânsito' },
+  { key: 'completion', label: 'Conclusão' },
 ];
 
 export const PhasePermissionsMatrix = () => {
