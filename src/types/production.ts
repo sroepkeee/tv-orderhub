@@ -43,4 +43,5 @@ export interface ProductionFilters {
   dateFrom?: string;
   dateTo?: string;
   searchTerm?: string;
+  productionOrderNumber?: string;
 }

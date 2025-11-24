@@ -17,6 +17,7 @@ export const ProductionFilters = ({ filters, onFiltersChange, warehouses }: Prod
       itemStatus: 'all',
       warehouse: '',
       searchTerm: '',
+      productionOrderNumber: '',
     });
   };
 
@@ -30,7 +31,7 @@ export const ProductionFilters = ({ filters, onFiltersChange, warehouses }: Prod
         </Button>
       </div>
       
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
         {/* Busca geral */}
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -47,6 +48,14 @@ export const ProductionFilters = ({ filters, onFiltersChange, warehouses }: Prod
           placeholder="Nº do Pedido"
           value={filters.orderNumber || ''}
           onChange={(e) => onFiltersChange({ ...filters, orderNumber: e.target.value })}
+        />
+
+        {/* Número da OP */}
+        <Input
+          placeholder="Nº OP (ex: OP-001)"
+          value={filters.productionOrderNumber || ''}
+          onChange={(e) => onFiltersChange({ ...filters, productionOrderNumber: e.target.value })}
+          className="font-mono"
         />
 
         {/* Situação */}
