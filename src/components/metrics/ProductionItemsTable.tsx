@@ -149,6 +149,7 @@ export const ProductionItemsTable = ({ items, onOrderClick }: ProductionItemsTab
               <TableHead className="w-[120px]">
                 <SortButton field="deliveryDate">Data Entrega</SortButton>
               </TableHead>
+              <TableHead className="w-[100px]">Nº OP</TableHead>
               <TableHead className="w-[130px]">Data Est. Produção</TableHead>
               <TableHead className="w-[80px]">Prazo</TableHead>
               <TableHead className="w-[100px]">Compra OK?</TableHead>
@@ -207,6 +208,15 @@ export const ProductionItemsTable = ({ items, onOrderClick }: ProductionItemsTab
                   </TableCell>
                   <TableCell>
                     {format(new Date(item.deliveryDate), 'dd/MM/yyyy', { locale: ptBR })}
+                  </TableCell>
+                  <TableCell>
+                    {item.production_order_number ? (
+                      <span className="font-mono text-sm font-semibold text-blue-600 dark:text-blue-400">
+                        {item.production_order_number}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">-</span>
+                    )}
                   </TableCell>
                   <TableCell>
                     {item.production_estimated_date ? (

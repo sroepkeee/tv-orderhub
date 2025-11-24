@@ -49,6 +49,7 @@ export const useProductionData = () => {
         purchase_action_started: item.purchase_action_started,
         purchase_action_started_at: item.purchase_action_started_at,
         purchase_action_started_by: item.purchase_action_started_by,
+        production_order_number: item.production_order_number,
       })) as ProductionItem[];
     },
     staleTime: 30000, // 30 segundos

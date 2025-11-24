@@ -678,6 +678,7 @@ export const EditOrderDialog = ({
       userId: item.user_id,
       // Campos de controle de compra
       purchase_action_started: item.purchase_action_started,
+      production_order_number: item.production_order_number,
       purchase_action_started_at: item.purchase_action_started_at,
       purchase_action_started_by: item.purchase_action_started_by
     }));
@@ -2040,6 +2041,7 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                             <TableHead className="w-[100px]">Qtd. Sol.</TableHead>
                             <TableHead className="w-[100px]">Armazém</TableHead>
                               <TableHead className="w-[140px]">Data Entrega</TableHead>
+                              <TableHead className="w-[100px]">Nº OP</TableHead>
                               <TableHead className="w-[180px]">Situação</TableHead>
                               <TableHead className="w-[140px]">Compra/Import.</TableHead>
                               <TableHead className="w-[120px]">Qtd. Recebida</TableHead>
@@ -2069,6 +2071,14 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                               </TableCell>
                               <TableCell>
                                 <Input type="date" value={item.deliveryDate} onChange={e => updateItem(index, "deliveryDate", e.target.value)} className="h-8 text-sm" />
+                              </TableCell>
+                              <TableCell>
+                                <Input 
+                                  value={item.production_order_number || ''} 
+                                  onChange={e => updateItem(index, "production_order_number", e.target.value)} 
+                                  placeholder="OP-000" 
+                                  className="h-8 text-sm font-mono" 
+                                />
                               </TableCell>
                               <TableCell>
                                 <Select value={item.item_status || 'in_stock'} onValueChange={(value: 'pending' | 'in_stock' | 'awaiting_production' | 'purchase_required' | 'purchase_requested' | 'completed') => updateItem(index, "item_status", value)}>

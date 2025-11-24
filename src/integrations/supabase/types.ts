@@ -971,6 +971,7 @@ export type Database = {
           order_id: string
           phase_started_at: string | null
           production_estimated_date: string | null
+          production_order_number: string | null
           purchase_action_started: boolean | null
           purchase_action_started_at: string | null
           purchase_action_started_by: string | null
@@ -1003,6 +1004,7 @@ export type Database = {
           order_id: string
           phase_started_at?: string | null
           production_estimated_date?: string | null
+          production_order_number?: string | null
           purchase_action_started?: boolean | null
           purchase_action_started_at?: string | null
           purchase_action_started_by?: string | null
@@ -1035,6 +1037,7 @@ export type Database = {
           order_id?: string
           phase_started_at?: string | null
           production_estimated_date?: string | null
+          production_order_number?: string | null
           purchase_action_started?: boolean | null
           purchase_action_started_at?: string | null
           purchase_action_started_by?: string | null

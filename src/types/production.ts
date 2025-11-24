@@ -22,6 +22,7 @@ export interface ProductionItem {
   purchase_action_started?: boolean;
   purchase_action_started_at?: string;
   purchase_action_started_by?: string;
+  production_order_number?: string;
 }
 
 export interface ProductionStats {
