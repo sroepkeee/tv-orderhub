@@ -10,7 +10,7 @@ export const ROLE_PHASE_MAPPING: Record<string, PhaseAccess> = {
   admin: {
     phases: ['almox_ssm', 'order_generation', 'almox_general', 'production', 
              'balance_generation', 'laboratory', 'packaging', 
-             'freight_quote', 'ready_to_invoice', 'invoicing', 
+             'freight_quote', 'invoicing', 
              'logistics', 'in_transit', 'completion'],
     canView: true,
     canEdit: true,
@@ -75,7 +75,7 @@ export const ROLE_PHASE_MAPPING: Record<string, PhaseAccess> = {
   },
   
   invoicing: {
-    phases: ['ready_to_invoice', 'invoicing'],
+    phases: ['invoicing'],
     canView: true,
     canEdit: true,
     canDelete: false
