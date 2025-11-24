@@ -65,11 +65,15 @@ export const ProductionItemsTable = ({ items, onOrderClick }: ProductionItemsTab
           comparison = a.item_status.localeCompare(b.item_status);
           break;
         case 'createdAt':
-          comparison = new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+          const dateA = a.orderIssueDate ? new Date(a.orderIssueDate) : new Date(a.created_at);
+          const dateB = b.orderIssueDate ? new Date(b.orderIssueDate) : new Date(b.created_at);
+          comparison = dateA.getTime() - dateB.getTime();
           break;
         case 'daysInSystem':
-          const daysA = differenceInDays(today, new Date(a.created_at));
-          const daysB = differenceInDays(today, new Date(b.created_at));
+          const refDateA = a.orderIssueDate ? new Date(a.orderIssueDate) : new Date(a.created_at);
+          const refDateB = b.orderIssueDate ? new Date(b.orderIssueDate) : new Date(b.created_at);
+          const daysA = differenceInDays(today, refDateA);
+          const daysB = differenceInDays(today, refDateB);
           comparison = daysA - daysB;
           break;
       }
@@ -157,7 +161,8 @@ export const ProductionItemsTable = ({ items, onOrderClick }: ProductionItemsTab
               const isCritical = differenceInDays(new Date(item.deliveryDate), today) <= 3 && 
                                  differenceInDays(new Date(item.deliveryDate), today) >= 0 &&
                                  item.item_status !== 'completed';
-              const daysInSystem = differenceInDays(today, new Date(item.created_at));
+              const orderDate = item.orderIssueDate ? new Date(item.orderIssueDate) : new Date(item.created_at);
+              const daysInSystem = differenceInDays(today, orderDate);
               
               return (
                 <TableRow key={item.id} className={isCritical ? 'bg-red-50 dark:bg-red-950/20' : ''}>
@@ -185,7 +190,10 @@ export const ProductionItemsTable = ({ items, onOrderClick }: ProductionItemsTab
                   <TableCell>{getItemStatusBadge(item.item_status)}</TableCell>
                   <TableCell>
                     <span className="text-sm">
-                      {format(new Date(item.created_at), 'dd/MM/yyyy', { locale: ptBR })}
+                      {item.orderIssueDate 
+                        ? format(new Date(item.orderIssueDate), 'dd/MM/yyyy', { locale: ptBR })
+                        : format(new Date(item.created_at), 'dd/MM/yyyy', { locale: ptBR })
+                      }
                     </span>
                   </TableCell>
                   <TableCell>
