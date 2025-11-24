@@ -1800,6 +1800,8 @@ export type Database = {
         | "logistics"
         | "completion"
         | "ready_to_invoice"
+        | "production_client"
+        | "production_stock"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1941,6 +1943,8 @@ export const Constants = {
         "logistics",
         "completion",
         "ready_to_invoice",
+        "production_client",
+        "production_stock",
       ],
     },
   },

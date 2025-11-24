@@ -36,7 +36,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 
-export type Phase = "almox_ssm" | "order_generation" | "almox_general" | "production" | "balance_generation" | "laboratory" | "packaging" | "freight_quote" | "ready_to_invoice" | "invoicing" | "logistics" | "in_transit" | "completion";
+export type Phase = "almox_ssm" | "order_generation" | "almox_general" | "production_client" | "production_stock" | "balance_generation" | "laboratory" | "packaging" | "freight_quote" | "ready_to_invoice" | "invoicing" | "logistics" | "in_transit" | "completion";
 
 interface KanbanViewProps {
   orders: Order[];
@@ -82,7 +82,7 @@ export const KanbanView = ({ orders, onEdit, onStatusChange }: KanbanViewProps) 
     useSensor(KeyboardSensor)
   );
 
-  const getPhaseFromStatus = (status: Order["status"]): Phase => {
+  const getPhaseFromStatus = (status: Order["status"], orderCategory?: string): Phase => {
     switch (status) {
       case "almox_ssm_pending":
       case "almox_ssm_received":
@@ -102,7 +102,8 @@ export const KanbanView = ({ orders, onEdit, onStatusChange }: KanbanViewProps) 
       case "awaiting_material":
       case "separation_completed":
       case "production_completed":
-        return "production";
+        // Dividir produção por categoria de pedido
+        return orderCategory === 'vendas' ? "production_client" : "production_stock";
       case "balance_calculation":
       case "balance_review":
       case "balance_approved":
@@ -174,10 +175,16 @@ export const KanbanView = ({ orders, onEdit, onStatusChange }: KanbanViewProps) 
       colorClass: "bg-phase-order-gen-bg text-phase-order-gen border-b-4 border-phase-border",
     },
     {
-      id: "production" as Phase,
-      title: "Produção",
+      id: "production_client" as Phase,
+      title: "Produção Clientes",
       icon: PackageCheck,
       colorClass: "bg-phase-production-bg text-phase-production border-b-4 border-phase-border",
+    },
+    {
+      id: "production_stock" as Phase,
+      title: "Produção Estoque",
+      icon: PackageCheck,
+      colorClass: "bg-purple-50 text-purple-700 border-b-4 border-purple-300",
     },
     {
       id: "balance_generation" as Phase,
@@ -258,7 +265,7 @@ export const KanbanView = ({ orders, onEdit, onStatusChange }: KanbanViewProps) 
   const visibleColumns = getVisibleColumns();
 
   const getOrdersByPhase = (phase: Phase) => {
-    return optimisticOrders.filter((order) => getPhaseFromStatus(order.status) === phase);
+    return optimisticOrders.filter((order) => getPhaseFromStatus(order.status, order.order_category) === phase);
   };
 
   const getPhaseDetails = (phaseKey: string) => {
@@ -268,7 +275,8 @@ export const KanbanView = ({ orders, onEdit, onStatusChange }: KanbanViewProps) 
       almox_ssm: "almox_ssm_pending",
       order_generation: "order_generation_pending",
       almox_general: "almox_general_received",
-      production: "in_production",
+      production_client: "in_production",
+      production_stock: "in_production",
       balance_generation: "balance_calculation",
       laboratory: "awaiting_lab",
       packaging: "in_packaging",
@@ -298,7 +306,8 @@ export const KanbanView = ({ orders, onEdit, onStatusChange }: KanbanViewProps) 
         return "order_generation_pending";
       case "almox_general":
         return "almox_general_received";
-      case "production":
+      case "production_client":
+      case "production_stock":
         return "in_production";
       case "balance_generation":
         return "balance_calculation";
@@ -335,7 +344,7 @@ export const KanbanView = ({ orders, onEdit, onStatusChange }: KanbanViewProps) 
 
     if (!order) return;
 
-    const currentPhase = getPhaseFromStatus(order.status);
+    const currentPhase = getPhaseFromStatus(order.status, order.order_category);
 
     console.log('🎯 [Kanban] Drag & Drop:', {
       pedido: order.orderNumber,
