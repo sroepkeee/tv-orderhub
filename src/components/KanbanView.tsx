@@ -28,6 +28,7 @@ import {
 import { KanbanCard } from "./KanbanCard";
 import { usePhaseInfo } from "@/hooks/usePhaseInfo";
 import { usePhaseAuthorization } from "@/hooks/usePhaseAuthorization";
+import { useAuth } from "@/hooks/useAuth";
 import { ROLE_LABELS } from "@/lib/roleLabels";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
@@ -49,6 +50,7 @@ export const KanbanView = ({ orders, onEdit, onStatusChange }: KanbanViewProps) 
   const [phaseOrder, setPhaseOrder] = React.useState<Map<Phase, number>>(new Map());
   const { getPhaseInfo, loading: phaseInfoLoading } = usePhaseInfo();
   const { canViewPhase, canEditPhase, userRoles, loading: authLoading } = usePhaseAuthorization();
+  const { user } = useAuth();
 
   // Sincronizar com orders recebidos (atualização real do servidor)
   React.useEffect(() => {
@@ -325,6 +327,15 @@ export const KanbanView = ({ orders, onEdit, onStatusChange }: KanbanViewProps) 
     if (!order) return;
 
     const currentPhase = getPhaseFromStatus(order.status);
+
+    console.log('🎯 [Kanban] Drag & Drop:', {
+      pedido: order.orderNumber,
+      de: currentPhase,
+      para: targetPhase,
+      statusAtual: order.status,
+      usuario: user?.email,
+      timestamp: new Date().toISOString()
+    });
     
     // Se soltar na mesma coluna, não faz nada
     if (currentPhase === targetPhase) return;

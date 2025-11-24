@@ -406,7 +406,88 @@ export const Dashboard = () => {
     }
   }, [orders, selectedOrder]);
 
-  // Fila de Refresh com Smart Throttle (500ms)
+  // Update seletivo de pedido individual
+  const updateSingleOrder = async (orderId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('orders')
+        .select(`
+          *,
+          order_items(*)
+        `)
+        .eq('id', orderId)
+        .single();
+        
+      if (error) throw error;
+      
+      if (data) {
+        setOrders(prev => {
+          const index = prev.findIndex(o => o.id === orderId);
+          const items = (data.order_items || []).map((item: any) => ({
+            id: item.id,
+            itemCode: item.item_code,
+            itemDescription: item.item_description,
+            unit: item.unit,
+            requestedQuantity: item.requested_quantity,
+            warehouse: item.warehouse,
+            deliveryDate: item.delivery_date,
+            deliveredQuantity: item.delivered_quantity,
+            item_source_type: item.item_source_type,
+            item_status: item.item_status,
+            received_status: item.received_status,
+            production_estimated_date: item.production_estimated_date,
+            sla_days: item.sla_days,
+            is_imported: item.is_imported,
+            import_lead_time_days: item.import_lead_time_days,
+            sla_deadline: item.sla_deadline,
+            current_phase: item.current_phase,
+            phase_started_at: item.phase_started_at,
+            userId: item.user_id
+          }));
+
+          const firstItem = items[0];
+          const totalRequested = items.reduce((sum, item) => sum + item.requestedQuantity, 0);
+
+          const transformedOrder = {
+            id: data.id,
+            type: data.order_type,
+            priority: data.priority,
+            orderNumber: data.order_number,
+            item: firstItem ? `${firstItem.itemCode} (+${items.length - 1})` : data.customer_name,
+            description: firstItem?.itemDescription || data.notes || "",
+            quantity: totalRequested,
+            createdDate: new Date(data.created_at).toISOString().split('T')[0],
+            issueDate: data.issue_date || undefined,
+            status: data.status,
+            client: data.customer_name,
+            deliveryDeadline: data.delivery_date,
+            delivery_address: data.delivery_address || data.customer_name,
+            deskTicket: data.notes || data.order_number,
+            totvsOrderNumber: data.totvs_order_number || undefined,
+            items,
+            userId: data.user_id,
+            notes: data.notes,
+            createdAt: data.created_at
+          } as Order;
+          
+          if (index === -1) {
+            return [...prev, transformedOrder];
+          }
+          const updated = [...prev];
+          updated[index] = transformedOrder;
+          return updated;
+        });
+        
+        setRealtimeStatus('synced');
+        setLastUpdateTime(new Date());
+      }
+    } catch (error) {
+      console.error('❌ [Update] Erro ao atualizar pedido:', error);
+      queueRefresh();
+    }
+  };
+
+  // Fila de Refresh com Smart Throttle (150ms)
   const lastEventTimeRef = useRef(0);
   
   const queueRefresh = () => {
@@ -429,7 +510,7 @@ export const Dashboard = () => {
       return;
     }
     
-    // 📦 Caso contrário, agrupar eventos com delay curto (500ms)
+    // 📦 Caso contrário, agrupar eventos com delay curto (150ms)
     if (pendingRefreshRef.current) return;
     
     pendingRefreshRef.current = true;
@@ -444,14 +525,15 @@ export const Dashboard = () => {
         console.log('🔄 [queueRefresh] Executando reload agrupado');
         loadOrders();
       }
-    }, 500); // Reduzido de 2000ms para 500ms
+    }, 150); // Otimizado para sincronização rápida
   };
 
-  // 📡 Realtime subscriptions expandidas (orders + order_items + order_history)
+  // 📡 Realtime subscriptions com update seletivo
   useEffect(() => {
     if (!user) return;
     
     console.log('📡 [Realtime] Iniciando subscriptions expandidas...');
+    setRealtimeStatus('updating');
     
     const channel = supabase
       .channel('orders-realtime')
@@ -460,11 +542,16 @@ export const Dashboard = () => {
         schema: 'public',
         table: 'orders'
       }, (payload) => {
-        console.log('📡 [Realtime] Evento em orders:', {
-          type: payload.eventType,
-          table: payload.table,
-          timestamp: new Date().toISOString()
-        });
+        console.log('📡 [Realtime] Evento em orders:', payload.eventType);
+        
+        // Update seletivo para INSERT/UPDATE
+        if ((payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') && payload.new?.id) {
+          setRealtimeStatus('updating');
+          updateSingleOrder(payload.new.id as string);
+          return;
+        }
+        
+        // DELETE: reload completo
         queueRefresh();
       })
       .on('postgres_changes', {
@@ -472,33 +559,69 @@ export const Dashboard = () => {
         schema: 'public',
         table: 'order_items'
       }, (payload) => {
-        console.log('📡 [Realtime] Evento em order_items:', {
-          type: payload.eventType,
-          table: payload.table,
-          timestamp: new Date().toISOString()
-        });
-        queueRefresh();
+        console.log('📡 [Realtime] Evento em order_items:', payload.eventType);
+        if ((payload.new as any)?.order_id) {
+          updateSingleOrder((payload.new as any).order_id as string);
+        } else {
+          queueRefresh();
+        }
       })
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
         table: 'order_history'
       }, (payload) => {
-        console.log('📡 [Realtime] Evento em order_history:', {
-          type: payload.eventType,
-          table: payload.table,
-          timestamp: new Date().toISOString()
-        });
+        console.log('📡 [Realtime] Evento em order_history:', payload.eventType);
         queueRefresh();
       })
       .subscribe((status) => {
         console.log('📡 [Realtime] Status da conexão:', status);
+        if (status === 'SUBSCRIBED') {
+          setRealtimeStatus('synced');
+        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          setRealtimeStatus('disconnected');
+        }
       });
     
     return () => {
       console.log('📡 [Realtime] Limpando subscriptions...');
       if (refreshQueueRef.current) clearTimeout(refreshQueueRef.current);
       supabase.removeChannel(channel);
+    };
+  }, [user]);
+
+  // 📢 Broadcast channel para sincronização instantânea
+  useEffect(() => {
+    if (!user) return;
+
+    console.log('📢 [Broadcast] Configurando canal de broadcast');
+    
+    const broadcastChannel = supabase
+      .channel('order-status-broadcast')
+      .on('broadcast', { event: 'status_changed' }, (payload) => {
+        const { orderId, newStatus, changedBy, orderNumber } = payload.payload;
+        
+        // Ignorar se foi mudança do próprio usuário
+        if (changedBy === user.id) return;
+        
+        console.log('📢 [Broadcast] Status mudou:', { orderNumber, newStatus });
+        
+        // Update imediato na UI
+        setOrders(prev => prev.map(o => 
+          o.id === orderId ? { ...o, status: newStatus as OrderStatus } : o
+        ));
+        
+        // Feedback visual
+        setRealtimeStatus('updating');
+        setTimeout(() => setRealtimeStatus('synced'), 1000);
+      })
+      .subscribe((status) => {
+        console.log('📢 [Broadcast] Status:', status);
+      });
+      
+    return () => {
+      console.log('📢 [Broadcast] Cleanup: removendo canal');
+      supabase.removeChannel(broadcastChannel);
     };
   }, [user]);
 
@@ -1570,6 +1693,26 @@ export const Dashboard = () => {
         error
       } = await supabase.from('orders').update(updateData).eq('id', orderId);
       if (error) throw error;
+
+      // Update local state
+      setOrders(orders.map(o => 
+        o.id === orderId ? { ...o, status: newStatus } : o
+      ));
+
+      // 📢 Broadcast para todos os usuários conectados
+      await supabase
+        .channel('order-status-broadcast')
+        .send({
+          type: 'broadcast',
+          event: 'status_changed',
+          payload: {
+            orderId,
+            newStatus,
+            changedBy: user.id,
+            orderNumber: order?.orderNumber,
+            timestamp: new Date().toISOString()
+          }
+        });
 
       // Save to history
       if (order && previousStatus) {

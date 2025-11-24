@@ -1,9 +1,9 @@
 import React from "react";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Wifi, WifiOff, RefreshCw } from "lucide-react";
+import { Wifi, WifiOff, RefreshCw, Radio } from "lucide-react";
 
-type RealtimeStatus = 'synced' | 'updating' | 'disconnected';
+type RealtimeStatus = 'synced' | 'updating' | 'broadcasting' | 'disconnected';
 
 interface RealtimeIndicatorProps {
   status: RealtimeStatus;
@@ -24,8 +24,15 @@ export const RealtimeIndicator = ({ status, lastUpdateTime }: RealtimeIndicatorP
         return {
           icon: RefreshCw,
           label: 'Atualizando',
-          color: 'bg-yellow-500/10 text-yellow-600 border-yellow-500/20',
-          iconColor: 'text-yellow-600 animate-spin'
+          color: 'bg-blue-500/10 text-blue-600 border-blue-500/20',
+          iconColor: 'text-blue-600 animate-spin'
+        };
+      case 'broadcasting':
+        return {
+          icon: Radio,
+          label: 'Transmitindo',
+          color: 'bg-purple-500/10 text-purple-600 border-purple-500/20',
+          iconColor: 'text-purple-600 animate-pulse'
         };
       case 'disconnected':
         return {
