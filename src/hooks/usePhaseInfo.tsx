@@ -121,10 +121,15 @@ export const usePhaseInfo = () => {
       'ready_for_freight_quote': 'freight_quote',
       'freight_quote_requested': 'freight_quote',
       
-      // Faturamento
-      'ready_to_invoice': 'invoicing',
+      // À Faturar
+      'ready_to_invoice': 'ready_to_invoice',
+      'pending_invoice_request': 'ready_to_invoice',
+      
+      // Solicitado Faturamento
       'invoice_requested': 'invoicing',
+      'awaiting_invoice': 'invoicing',
       'invoice_issued': 'invoicing',
+      'invoice_sent': 'invoicing',
       
       // Expedição/Logística
       'in_expedition': 'logistics',

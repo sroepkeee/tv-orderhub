@@ -34,8 +34,10 @@ export const useAvailableRoles = () => {
         'laboratory',
         'packaging',
         'freight_quote',
+        'ready_to_invoice',
         'invoicing',
         'logistics',
+        'in_transit',
         'completion'
       ];
 

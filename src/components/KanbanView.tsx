@@ -211,7 +211,7 @@ export const KanbanView = ({ orders, onEdit, onStatusChange }: KanbanViewProps) 
     },
     {
       id: "invoicing" as Phase,
-      title: "Faturamento",
+      title: "Solicitado Faturamento",
       icon: FileText,
       colorClass: "bg-phase-invoicing-bg text-phase-invoicing border-b-4 border-phase-border",
     },
