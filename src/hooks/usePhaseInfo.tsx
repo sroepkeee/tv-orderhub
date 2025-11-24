@@ -103,8 +103,12 @@ export const usePhaseInfo = () => {
       'almox_general_received': 'almox_general',
       'almox_general_processing': 'almox_general',
       
-      // Produção
-      'in_production': 'production',
+      // Produção (será filtrado por categoria no frontend)
+      'in_production': 'production_client',
+      'separation_started': 'production_client',
+      'awaiting_material': 'production_client',
+      'separation_completed': 'production_client',
+      'production_completed': 'production_client',
       
       // Gerar Saldo
       'balance_calculation': 'balance_generation',
