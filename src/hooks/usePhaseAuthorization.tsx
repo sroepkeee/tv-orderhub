@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
-import { ROLE_PHASE_MAPPING } from '@/lib/rolePhaseMapping';
 
 interface PhasePermission {
   phase_key: string;
@@ -49,46 +48,69 @@ export const usePhaseAuthorization = () => {
       if (approvalError && approvalError.code !== 'PGRST116') throw approvalError;
       setIsApproved(approvalData?.status === 'approved');
 
-      // Calcular permissões baseado no mapeamento estático
+      // Buscar permissões da tabela phase_permissions
+      const { data: permissionsData, error: permissionsError } = await supabase
+        .from('phase_permissions')
+        .select('*')
+        .in('role', roles);
+
+      if (permissionsError) throw permissionsError;
+      
+      console.log('📊 [Phase Authorization] Calculating permissions from database for roles:', roles);
+      
+      // Merge de permissões de múltiplas roles
       const mergedPermissions = new Map<string, PhasePermission>();
       
-      console.log('📊 [Phase Authorization] Calculating permissions for roles:', roles);
-      
-      roles.forEach(role => {
-        const mapping = ROLE_PHASE_MAPPING[role];
-        console.log(`   → Role "${role}":`, mapping?.phases || 'NOT FOUND IN MAPPING');
+      permissionsData?.forEach(perm => {
+        console.log(`   → Role "${perm.role}" → Phase "${perm.phase_key}":`, {
+          view: perm.can_view,
+          edit: perm.can_edit,
+          delete: perm.can_delete
+        });
         
-        if (mapping) {
-          mapping.phases.forEach(phase => {
-            const existing = mergedPermissions.get(phase);
-            if (existing) {
-              // Merge: se qualquer role dá permissão, o usuário tem
-              mergedPermissions.set(phase, {
-                phase_key: phase,
-                can_view: existing.can_view || mapping.canView,
-                can_edit: existing.can_edit || mapping.canEdit,
-                can_delete: existing.can_delete || mapping.canDelete,
-              });
-            } else {
-              mergedPermissions.set(phase, {
-                phase_key: phase,
-                can_view: mapping.canView,
-                can_edit: mapping.canEdit,
-                can_delete: mapping.canDelete,
-              });
-            }
+        const existing = mergedPermissions.get(perm.phase_key);
+        if (existing) {
+          // Merge: se qualquer role dá permissão, o usuário tem
+          mergedPermissions.set(perm.phase_key, {
+            phase_key: perm.phase_key,
+            can_view: existing.can_view || perm.can_view,
+            can_edit: existing.can_edit || perm.can_edit,
+            can_delete: existing.can_delete || perm.can_delete,
+          });
+        } else {
+          mergedPermissions.set(perm.phase_key, {
+            phase_key: perm.phase_key,
+            can_view: perm.can_view,
+            can_edit: perm.can_edit,
+            can_delete: perm.can_delete,
           });
         }
       });
 
       const finalPermissions = Array.from(mergedPermissions.values());
       console.log('✅ [Phase Authorization] Final Permissions:', finalPermissions);
-      console.log('👁️ [Phase Authorization] Can view "ready_to_invoice"?', 
-        finalPermissions.find(p => p.phase_key === 'ready_to_invoice')?.can_view ?? false);
       console.log('👁️ [Phase Authorization] Can view "invoicing"?', 
         finalPermissions.find(p => p.phase_key === 'invoicing')?.can_view ?? false);
       
       setPhasePermissions(finalPermissions);
+
+      // Real-time subscription para mudanças de permissões
+      const subscription = supabase
+        .channel('phase-permissions-changes')
+        .on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: 'phase_permissions',
+          filter: `role=in.(${roles.join(',')})`
+        }, () => {
+          console.log('🔄 [Phase Authorization] Permissions changed, reloading...');
+          loadUserData();
+        })
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(subscription);
+      };
     } catch (error) {
       console.error('❌ [Phase Authorization] Error loading user data:', error);
       setUserRoles([]);

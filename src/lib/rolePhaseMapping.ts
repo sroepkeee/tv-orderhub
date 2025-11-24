@@ -1,3 +1,11 @@
+/**
+ * @deprecated Este arquivo não é mais usado no sistema.
+ * As permissões agora são gerenciadas pela tabela 'phase_permissions' no banco de dados.
+ * Use a interface Admin > Gerenciamento de Usuários > Permissões de Fases para configurar.
+ * 
+ * Este arquivo é mantido apenas para referência histórica.
+ */
+
 export interface PhaseAccess {
   phases: string[];
   canView: boolean;
