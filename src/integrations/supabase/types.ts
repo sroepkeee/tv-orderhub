@@ -1740,6 +1740,7 @@ export type Database = {
         Args: { _phase_key: string; _user_id: string }
         Returns: boolean
       }
+      cleanup_old_activity_logs: { Args: never; Returns: undefined }
       generate_purchase_order_number: { Args: never; Returns: string }
       get_app_roles: {
         Args: never
