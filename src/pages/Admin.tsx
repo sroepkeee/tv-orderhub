@@ -5,8 +5,9 @@ import { UserAccessMetrics } from "@/components/admin/UserAccessMetrics";
 import { UserPresenceDashboard } from "@/components/admin/UserPresenceDashboard";
 import { RecentActivityFeed } from "@/components/admin/RecentActivityFeed";
 import { UserSessionsTable } from "@/components/admin/UserSessionsTable";
-import { Shield, ArrowLeft } from "lucide-react";
+import { Shield, ArrowLeft, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useNavigate } from "react-router-dom";
 
 const Admin = () => {
@@ -41,6 +42,20 @@ const Admin = () => {
           </TabsList>
 
           <TabsContent value="users" className="space-y-4">
+            <Card className="mb-4">
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>Gerenciamento de Usuários</CardTitle>
+                    <CardDescription>Aprovar usuários, gerenciar roles e configurar permissões</CardDescription>
+                  </div>
+                  <Button onClick={() => navigate("/permissions")} variant="outline">
+                    <Settings className="h-4 w-4 mr-2" />
+                    Configurar Permissões
+                  </Button>
+                </div>
+              </CardHeader>
+            </Card>
             <UserManagementTable />
           </TabsContent>
 
