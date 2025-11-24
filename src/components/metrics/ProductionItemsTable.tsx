@@ -12,7 +12,7 @@ interface ProductionItemsTableProps {
   onOrderClick?: (orderId: string) => void;
 }
 
-type SortField = 'orderNumber' | 'itemCode' | 'deliveryDate' | 'requestedQuantity' | 'item_status';
+type SortField = 'orderNumber' | 'itemCode' | 'deliveryDate' | 'requestedQuantity' | 'item_status' | 'createdAt' | 'daysInSystem';
 type SortDirection = 'asc' | 'desc';
 
 const getItemStatusBadge = (status: string) => {
@@ -64,6 +64,14 @@ export const ProductionItemsTable = ({ items, onOrderClick }: ProductionItemsTab
         case 'item_status':
           comparison = a.item_status.localeCompare(b.item_status);
           break;
+        case 'createdAt':
+          comparison = new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+          break;
+        case 'daysInSystem':
+          const daysA = differenceInDays(today, new Date(a.created_at));
+          const daysB = differenceInDays(today, new Date(b.created_at));
+          comparison = daysA - daysB;
+          break;
       }
       
       return sortDirection === 'asc' ? comparison : -comparison;
@@ -109,7 +117,7 @@ export const ProductionItemsTable = ({ items, onOrderClick }: ProductionItemsTab
   return (
     <div className="space-y-4">
       <div className="rounded-md border overflow-x-auto">
-        <Table className="min-w-[1400px]">
+        <Table className="min-w-[1600px]">
           <TableHeader>
             <TableRow>
               <TableHead className="w-[90px]">
@@ -118,7 +126,7 @@ export const ProductionItemsTable = ({ items, onOrderClick }: ProductionItemsTab
               <TableHead className="w-[110px]">
                 <SortButton field="itemCode">Código</SortButton>
               </TableHead>
-              <TableHead className="min-w-[300px] w-[35%]">Descrição</TableHead>
+              <TableHead className="min-w-[250px] w-[30%]">Descrição</TableHead>
               <TableHead className="w-[70px]">Und</TableHead>
               <TableHead className="w-[90px] text-right">
                 <SortButton field="requestedQuantity">Qtd Solic.</SortButton>
@@ -127,6 +135,12 @@ export const ProductionItemsTable = ({ items, onOrderClick }: ProductionItemsTab
               <TableHead className="w-[80px] text-right">Saldo</TableHead>
               <TableHead className="w-[140px]">
                 <SortButton field="item_status">Situação</SortButton>
+              </TableHead>
+              <TableHead className="w-[120px]">
+                <SortButton field="createdAt">Data Pedido</SortButton>
+              </TableHead>
+              <TableHead className="w-[100px]">
+                <SortButton field="daysInSystem">Dias Sistema</SortButton>
               </TableHead>
               <TableHead className="w-[120px]">
                 <SortButton field="deliveryDate">Data Entrega</SortButton>
@@ -143,6 +157,7 @@ export const ProductionItemsTable = ({ items, onOrderClick }: ProductionItemsTab
               const isCritical = differenceInDays(new Date(item.deliveryDate), today) <= 3 && 
                                  differenceInDays(new Date(item.deliveryDate), today) >= 0 &&
                                  item.item_status !== 'completed';
+              const daysInSystem = differenceInDays(today, new Date(item.created_at));
               
               return (
                 <TableRow key={item.id} className={isCritical ? 'bg-red-50 dark:bg-red-950/20' : ''}>
@@ -158,7 +173,7 @@ export const ProductionItemsTable = ({ items, onOrderClick }: ProductionItemsTab
                     </Button>
                   </TableCell>
                   <TableCell className="font-mono text-sm">{item.itemCode}</TableCell>
-                  <TableCell className="max-w-[300px] truncate" title={item.itemDescription}>
+                  <TableCell className="max-w-[250px] truncate" title={item.itemDescription}>
                     {item.itemDescription}
                   </TableCell>
                   <TableCell>{item.unit}</TableCell>
@@ -168,6 +183,20 @@ export const ProductionItemsTable = ({ items, onOrderClick }: ProductionItemsTab
                     {balance > 0 ? balance : '-'}
                   </TableCell>
                   <TableCell>{getItemStatusBadge(item.item_status)}</TableCell>
+                  <TableCell>
+                    <span className="text-sm">
+                      {format(new Date(item.created_at), 'dd/MM/yyyy', { locale: ptBR })}
+                    </span>
+                  </TableCell>
+                  <TableCell>
+                    <span className={`font-semibold ${
+                      daysInSystem > 30 ? 'text-red-600' : 
+                      daysInSystem > 15 ? 'text-orange-600' : 
+                      'text-muted-foreground'
+                    }`}>
+                      {daysInSystem} dias
+                    </span>
+                  </TableCell>
                   <TableCell>
                     {format(new Date(item.deliveryDate), 'dd/MM/yyyy', { locale: ptBR })}
                   </TableCell>
