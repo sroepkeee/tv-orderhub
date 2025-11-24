@@ -15,7 +15,8 @@ export const useProductionData = () => {
             id,
             order_number,
             customer_name,
-            status
+            status,
+            issue_date
           )
         `)
         .not('orders.status', 'in', '(delivered,completed,cancelled)')
@@ -43,6 +44,7 @@ export const useProductionData = () => {
         created_at: item.created_at,
         customerName: item.orders.customer_name,
         orderStatus: item.orders.status,
+        orderIssueDate: item.orders.issue_date,
         production_estimated_date: item.production_estimated_date,
         purchase_action_started: item.purchase_action_started,
         purchase_action_started_at: item.purchase_action_started_at,

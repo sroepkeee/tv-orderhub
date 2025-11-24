@@ -17,6 +17,7 @@ export interface ProductionItem {
   created_at: string;
   customerName?: string;
   orderStatus?: string;
+  orderIssueDate?: string;
   production_estimated_date?: string;
   purchase_action_started?: boolean;
   purchase_action_started_at?: string;
