@@ -43,16 +43,21 @@ export default function Auth() {
 
       if (error) throw error;
 
-      // Registrar login no activity log
+      // Atualizar last_login e registrar no activity log
       if (data.user) {
-        await supabase.from('user_activity_log').insert({
-          user_id: data.user.id,
-          action_type: 'login',
-          description: 'Fez login no sistema',
-          metadata: {
-            timestamp: new Date().toISOString()
-          }
-        });
+        await Promise.all([
+          supabase.from('profiles').update({ 
+            last_login: new Date().toISOString() 
+          }).eq('id', data.user.id),
+          supabase.from('user_activity_log').insert({
+            user_id: data.user.id,
+            action_type: 'login',
+            description: 'Fez login no sistema',
+            metadata: {
+              timestamp: new Date().toISOString()
+            }
+          })
+        ]);
       }
 
       if (data.user) {

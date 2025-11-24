@@ -1,6 +1,10 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { UserManagementTable } from "@/components/admin/UserManagementTable";
 import { PermissionAuditLog } from "@/components/admin/PermissionAuditLog";
+import { UserAccessMetrics } from "@/components/admin/UserAccessMetrics";
+import { UserPresenceDashboard } from "@/components/admin/UserPresenceDashboard";
+import { RecentActivityFeed } from "@/components/admin/RecentActivityFeed";
+import { UserSessionsTable } from "@/components/admin/UserSessionsTable";
 import { Shield, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
@@ -30,13 +34,23 @@ const Admin = () => {
         </div>
 
         <Tabs defaultValue="users" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 mb-6">
+          <TabsList className="grid w-full grid-cols-3 mb-6">
             <TabsTrigger value="users">Usuários</TabsTrigger>
+            <TabsTrigger value="monitoring">Monitoramento</TabsTrigger>
             <TabsTrigger value="audit">Auditoria</TabsTrigger>
           </TabsList>
 
           <TabsContent value="users" className="space-y-4">
             <UserManagementTable />
+          </TabsContent>
+
+          <TabsContent value="monitoring" className="space-y-6">
+            <UserAccessMetrics />
+            <div className="grid md:grid-cols-2 gap-6">
+              <UserPresenceDashboard />
+              <RecentActivityFeed />
+            </div>
+            <UserSessionsTable />
           </TabsContent>
 
           <TabsContent value="audit" className="space-y-4">
