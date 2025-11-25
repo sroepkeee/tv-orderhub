@@ -655,7 +655,8 @@ export const EditOrderDialog = ({
     const { data: itemsData } = await supabase
       .from('order_items')
       .select('*')
-      .eq('order_id', order.id);
+      .eq('order_id', order.id)
+      .order('created_at', { ascending: true });
     
     const mappedItems = (itemsData || []).map(item => ({
       id: item.id,
@@ -768,7 +769,7 @@ export const EditOrderDialog = ({
   };
 
   // NOVO: Registrar mudança de item no histórico
-  const recordItemChange = async (itemId: string, field: 'received_status' | 'delivered_quantity' | 'item_source_type' | 'item_status' | 'warehouse' | 'purchase_action_started', oldValue: any, newValue: any, notes?: string) => {
+  const recordItemChange = async (itemId: string, field: 'received_status' | 'delivered_quantity' | 'item_source_type' | 'item_status' | 'warehouse' | 'purchase_action_started' | 'production_order_number', oldValue: any, newValue: any, notes?: string) => {
     try {
       const {
         data: {
@@ -855,6 +856,49 @@ export const EditOrderDialog = ({
       }
     }
 
+    // NOVO: Detectar mudança de Nº OP (production_order_number)
+    if (field === 'production_order_number' && oldItem.production_order_number !== value && oldItem.id) {
+      console.log(`🏭 Nº OP mudou: ${oldItem.production_order_number} → ${value}`);
+      
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error('Usuário não autenticado');
+
+        // Salvar no banco IMEDIATAMENTE
+        const { error } = await supabase
+          .from('order_items')
+          .update({ production_order_number: value || null })
+          .eq('id', oldItem.id);
+        
+        if (error) throw error;
+
+        // Registrar no histórico
+        await recordItemChange(oldItem.id, 'production_order_number', oldItem.production_order_number || '', value || '', 'Nº OP alterado');
+
+        // Atualizar estado local
+        setItems(newItems);
+
+        toast({
+          title: "Nº OP atualizado",
+          description: "Ordem de Produção salva com sucesso."
+        });
+
+        console.log(`✅ Nº OP atualizado no banco`);
+        
+        // Recarregar histórico
+        loadHistory();
+        return;
+      } catch (error: any) {
+        console.error('Erro ao atualizar Nº OP:', error);
+        toast({
+          title: "Erro ao atualizar Nº OP",
+          description: error?.message || "Não foi possível salvar a alteração.",
+          variant: "destructive"
+        });
+        return;
+      }
+    }
+
     // NOVO: Detectar mudança de deliveryDate em itens
     if (field === 'deliveryDate' && oldItem.deliveryDate !== value && oldItem.id) {
       setPendingItemDateChange({
@@ -902,7 +946,7 @@ export const EditOrderDialog = ({
       // Recarregar itens do banco para sincronizar UI
       const {
         data: reloadedItems
-      } = await supabase.from('order_items').select('*').eq('order_id', order.id);
+      } = await supabase.from('order_items').select('*').eq('order_id', order.id).order('created_at', { ascending: true });
       if (reloadedItems) {
         const mappedItems = reloadedItems.map(dbItem => ({
           id: dbItem.id,
@@ -913,6 +957,7 @@ export const EditOrderDialog = ({
           warehouse: dbItem.warehouse,
           deliveryDate: dbItem.delivery_date,
           deliveredQuantity: dbItem.delivered_quantity,
+          production_order_number: dbItem.production_order_number,
           received_status: dbItem.received_status as 'pending' | 'partial' | 'completed',
           item_status: dbItem.item_status as 'pending' | 'in_stock' | 'awaiting_production' | 'purchase_required' | 'purchase_requested' | 'completed',
           item_source_type: dbItem.item_source_type as 'in_stock' | 'production' | 'out_of_stock',
@@ -974,7 +1019,7 @@ export const EditOrderDialog = ({
       // Reload items from database
       const {
         data: updatedItems
-      } = await supabase.from('order_items').select('*').eq('order_id', order.id);
+      } = await supabase.from('order_items').select('*').eq('order_id', order.id).order('created_at', { ascending: true });
       if (updatedItems) {
         setItems(updatedItems.map(item => ({
           id: item.id,
@@ -985,6 +1030,7 @@ export const EditOrderDialog = ({
           warehouse: item.warehouse,
           deliveryDate: item.delivery_date,
           deliveredQuantity: item.delivered_quantity,
+          production_order_number: item.production_order_number,
           received_status: item.received_status as 'pending' | 'partial' | 'completed' || 'pending',
           item_source_type: item.item_source_type as 'in_stock' | 'production' | 'out_of_stock' || 'in_stock',
           item_status: item.item_status as 'pending' | 'in_stock' | 'awaiting_production' | 'purchase_required' | 'completed' || 'in_stock',
@@ -1034,7 +1080,7 @@ export const EditOrderDialog = ({
       // Recarregar items
       const {
         data: updatedItems
-      } = await supabase.from('order_items').select('*').eq('order_id', order.id);
+      } = await supabase.from('order_items').select('*').eq('order_id', order.id).order('created_at', { ascending: true });
       if (updatedItems) {
         setItems(updatedItems.map(item => ({
           id: item.id,
@@ -1045,6 +1091,7 @@ export const EditOrderDialog = ({
           warehouse: item.warehouse,
           deliveryDate: item.delivery_date,
           deliveredQuantity: item.delivered_quantity,
+          production_order_number: item.production_order_number,
           received_status: item.received_status as 'pending' | 'partial' | 'completed' || 'pending',
           item_source_type: item.item_source_type as 'in_stock' | 'production' | 'out_of_stock' || 'in_stock',
           item_status: item.item_status as 'pending' | 'in_stock' | 'awaiting_production' | 'purchase_required' | 'completed' || 'in_stock',
