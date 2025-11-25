@@ -644,6 +644,62 @@ All colors MUST be HSL.
     animation: highlight-comment 2s ease-in-out 3;
   }
 
+  /* Kanban board specific styles */
+  .kanban-column {
+    min-width: 280px;
+    max-width: 320px;
+    height: calc(100vh - 180px);
+    overflow-y: auto;
+  }
+
+  .kanban-card {
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .kanban-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  }
+
+  /* Animação de entrada suave quando card aparece em nova coluna */
+  @keyframes popIn {
+    0% {
+      opacity: 0;
+      transform: scale(0.9);
+    }
+    50% {
+      transform: scale(1.02);
+    }
+    100% {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
+  .kanban-card-enter {
+    animation: popIn 0.25s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  }
+
+  /* Card sendo arrastado - feedback visual aprimorado */
+  .kanban-card.dragging {
+    transform: rotate(3deg) scale(1.05);
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+    z-index: 1000;
+  }
+
+  /* Coluna recebendo card (drop target) */
+  .kanban-column.drop-target {
+    background-color: hsl(var(--primary) / 0.05);
+    border: 2px dashed hsl(var(--primary) / 0.3);
+    transform: scale(1.01);
+  }
+
+  /* Container dos cards com transição */
+  .kanban-cards-container {
+    transition: background-color 0.2s ease;
+  }
+
   /* Compact form field utility classes */
   .form-field-compact {
     @apply space-y-1;
