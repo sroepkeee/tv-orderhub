@@ -44,9 +44,8 @@ export const PhaseButtons = ({ order, onStatusChange }: PhaseButtonsProps) => {
       icon: PackageSearch,
       color: "text-blue-600",
       statuses: [
+        { value: "almox_ssm_pending", label: "Aguardando SSM" },
         { value: "almox_ssm_received", label: "Recebido SSM" },
-        { value: "almox_ssm_in_review", label: "Em Análise SSM" },
-        { value: "almox_ssm_approved", label: "Aprovado SSM" },
       ]
     },
     {
@@ -66,15 +65,28 @@ export const PhaseButtons = ({ order, onStatusChange }: PhaseButtonsProps) => {
       icon: Warehouse,
       color: "text-violet-600",
       statuses: [
-        { value: "almox_general_received", label: "Recebido Almox" },
+        { value: "almox_general_received", label: "Recebido Almox Geral" },
         { value: "almox_general_separating", label: "Separando" },
-        { value: "almox_general_ready", label: "Pronto Almox" },
+        { value: "almox_general_ready", label: "Pronto Almox Geral" },
       ]
     },
     {
-      id: "production",
-      label: "Produção",
+      id: "production_client",
+      label: "Produção Clientes",
       icon: PackageCheck,
+      color: "text-orange-600",
+      statuses: [
+        { value: "separation_started", label: "Iniciado Separação" },
+        { value: "in_production", label: "Em Produção" },
+        { value: "awaiting_material", label: "Aguardando Material" },
+        { value: "separation_completed", label: "Separação Concluída" },
+        { value: "production_completed", label: "Produção Concluída" },
+      ]
+    },
+    {
+      id: "production_stock",
+      label: "Produção Estoque",
+      icon: Boxes,
       color: "text-purple-600",
       statuses: [
         { value: "separation_started", label: "Iniciado Separação" },
@@ -109,10 +121,10 @@ export const PhaseButtons = ({ order, onStatusChange }: PhaseButtonsProps) => {
     {
       id: "packaging",
       label: "Embalagem",
-      icon: Boxes,
-      color: "text-orange-600",
+      icon: PackageCheck,
+      color: "text-orange-500",
       statuses: [
-        { value: "in_quality_check", label: "Em Conferência/Qualidade" },
+        { value: "in_quality_check", label: "Em Conferência" },
         { value: "in_packaging", label: "Em Embalagem" },
         { value: "ready_for_shipping", label: "Pronto para Envio" },
       ]
@@ -146,8 +158,8 @@ export const PhaseButtons = ({ order, onStatusChange }: PhaseButtonsProps) => {
       statuses: [
         { value: "invoice_requested", label: "Faturamento Solicitado" },
         { value: "awaiting_invoice", label: "Processando Faturamento" },
-        { value: "invoice_issued", label: "Nota Fiscal Emitida" },
-        { value: "invoice_sent", label: "NF Enviada ao Cliente" },
+        { value: "invoice_issued", label: "NF Emitida" },
+        { value: "invoice_sent", label: "NF Enviada" },
       ]
     },
     {
@@ -158,9 +170,17 @@ export const PhaseButtons = ({ order, onStatusChange }: PhaseButtonsProps) => {
       statuses: [
         { value: "released_for_shipping", label: "Liberado para Envio" },
         { value: "in_expedition", label: "Deixado na Expedição" },
-        { value: "in_transit", label: "Em Trânsito" },
         { value: "pickup_scheduled", label: "Retirada Agendada" },
         { value: "awaiting_pickup", label: "Aguardando Retirada" },
+      ]
+    },
+    {
+      id: "in_transit",
+      label: "Em Trânsito",
+      icon: Truck,
+      color: "text-blue-600",
+      statuses: [
+        { value: "in_transit", label: "Em Trânsito" },
         { value: "collected", label: "Coletado" },
       ]
     },
@@ -188,9 +208,20 @@ export const PhaseButtons = ({ order, onStatusChange }: PhaseButtonsProps) => {
     },
   ];
 
+  // Filtrar fases de produção baseado na categoria do pedido
+  const filteredPhases = phases.filter(phase => {
+    if (phase.id === "production_client") {
+      return order.order_category === "vendas";
+    }
+    if (phase.id === "production_stock") {
+      return order.order_category !== "vendas";
+    }
+    return true;
+  });
+
   return (
     <div className="flex gap-2 flex-wrap">
-      {phases.map((phase) => {
+      {filteredPhases.map((phase) => {
         const Icon = phase.icon;
         const isCurrentPhase = phase.statuses.some(s => s.value === currentStatus);
         const canEdit = canEditPhase(phase.id);
@@ -201,8 +232,8 @@ export const PhaseButtons = ({ order, onStatusChange }: PhaseButtonsProps) => {
               <Button
                 type="button"
                 variant={isCurrentPhase ? "default" : "outline"}
-                size="sm"
-                className={`gap-2 ${isCurrentPhase ? '' : phase.color}`}
+                size="default"
+                className={`gap-2 px-4 py-2 ${isCurrentPhase ? '' : phase.color}`}
                 disabled={!canEdit}
               >
                 <Icon className="h-4 w-4" />
