@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Activity, UserPlus, Trash2, Edit, LogIn, FileText } from "lucide-react";
+import { Activity, UserPlus, Trash2, Edit, LogIn, FileText, Shield, Mail } from "lucide-react";
 
 interface ActivityLog {
   id: string;
@@ -13,16 +13,27 @@ interface ActivityLog {
   action_type: string;
   description: string;
   created_at: string;
+  ip_address: string | null;
+  metadata: {
+    login_method?: string;
+    browser?: { name: string; version: string };
+    os?: { name: string; version: string };
+  };
   profiles: {
     full_name: string;
     email: string;
   };
 }
 
-const getActivityIcon = (actionType: string) => {
+const getActivityIcon = (actionType: string, loginMethod?: string) => {
+  if (actionType === 'login') {
+    if (loginMethod === 'azure') {
+      return <Shield className="h-4 w-4" />;
+    }
+    return <Mail className="h-4 w-4" />;
+  }
+  
   switch (actionType) {
-    case 'login':
-      return <LogIn className="h-4 w-4" />;
     case 'user_approved':
     case 'user_rejected':
       return <UserPlus className="h-4 w-4" />;
@@ -93,6 +104,15 @@ export function RecentActivityFeed() {
     };
   }, []);
 
+  const maskIP = (ip: string | null) => {
+    if (!ip) return null;
+    const parts = ip.split('.');
+    if (parts.length === 4) {
+      return `${parts[0]}.${parts[1]}.xxx.xxx`;
+    }
+    return ip;
+  };
+
   const loadActivities = async () => {
     try {
       const { data, error } = await supabase
@@ -103,6 +123,8 @@ export function RecentActivityFeed() {
           action_type,
           description,
           created_at,
+          ip_address,
+          metadata,
           profiles!user_activity_log_user_id_fkey (
             full_name,
             email
@@ -145,35 +167,60 @@ export function RecentActivityFeed() {
             </div>
           ) : (
             <div className="space-y-2">
-              {activities.map((activity) => (
-                <div
-                  key={activity.id}
-                  className="flex items-start gap-3 p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors"
-                >
-                  <div className={`p-2 rounded-full ${getActivityColor(activity.action_type)}`}>
-                    {getActivityIcon(activity.action_type)}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <p className="font-medium text-sm">
-                        {activity.profiles?.full_name || 'Usuário'}
-                      </p>
-                      <Badge variant="outline" className="text-xs">
-                        {activity.action_type}
-                      </Badge>
+              {activities.map((activity) => {
+                const isLogin = activity.action_type === 'login';
+                const loginMethod = activity.metadata?.login_method;
+                const browser = activity.metadata?.browser;
+                const os = activity.metadata?.os;
+                
+                return (
+                  <div
+                    key={activity.id}
+                    className="flex items-start gap-3 p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors"
+                  >
+                    <div className={`p-2 rounded-full ${getActivityColor(activity.action_type)}`}>
+                      {getActivityIcon(activity.action_type, loginMethod)}
                     </div>
-                    <p className="text-sm text-muted-foreground">
-                      {activity.description}
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {formatDistanceToNow(new Date(activity.created_at), {
-                        locale: ptBR,
-                        addSuffix: true
-                      })}
-                    </p>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <p className="font-medium text-sm">
+                          {activity.profiles?.full_name || 'Usuário'}
+                        </p>
+                        {isLogin && loginMethod && (
+                          <Badge 
+                            variant={loginMethod === 'azure' ? 'default' : 'outline'} 
+                            className={loginMethod === 'azure' ? 'bg-blue-500/10 text-blue-700 border-blue-500/20' : ''}
+                          >
+                            {loginMethod === 'azure' ? 'Microsoft' : 'Email'}
+                          </Badge>
+                        )}
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        {activity.description}
+                      </p>
+                      {isLogin && (browser || os || activity.ip_address) && (
+                        <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
+                          {browser && (
+                            <span>{browser.name} {browser.version}</span>
+                          )}
+                          {os && (
+                            <span>• {os.name} {os.version}</span>
+                          )}
+                          {activity.ip_address && (
+                            <span>• {maskIP(activity.ip_address)}</span>
+                          )}
+                        </div>
+                      )}
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {formatDistanceToNow(new Date(activity.created_at), {
+                          locale: ptBR,
+                          addSuffix: true
+                        })}
+                      </p>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </ScrollArea>

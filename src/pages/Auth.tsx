@@ -8,7 +8,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Truck } from "lucide-react";
+import { trackLogin } from "@/hooks/useLoginTracking";
+import { Truck, Shield } from "lucide-react";
 import { ForgotPasswordDialog } from "@/components/ForgotPasswordDialog";
 
 export default function Auth() {
@@ -45,19 +46,12 @@ export default function Auth() {
 
       // Atualizar last_login e registrar no activity log
       if (data.user) {
-        await Promise.all([
-          supabase.from('profiles').update({ 
-            last_login: new Date().toISOString() 
-          }).eq('id', data.user.id),
-          supabase.from('user_activity_log').insert({
-            user_id: data.user.id,
-            action_type: 'login',
-            description: 'Fez login no sistema',
-            metadata: {
-              timestamp: new Date().toISOString()
-            }
-          })
-        ]);
+      await supabase.from('profiles').update({
+        last_login: new Date().toISOString()
+      }).eq('id', data.user.id);
+
+      // Log login activity with full tracking
+      await trackLogin(data.user.id, 'email');
       }
 
       if (data.user) {
@@ -194,21 +188,16 @@ export default function Auth() {
                 </div>
               </div>
 
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full"
-                onClick={handleSignInWithMicrosoft}
-                disabled={loading}
-              >
-                <svg className="mr-2 h-4 w-4" viewBox="0 0 21 21">
-                  <rect x="1" y="1" width="9" height="9" fill="#f25022"/>
-                  <rect x="11" y="1" width="9" height="9" fill="#7fba00"/>
-                  <rect x="1" y="11" width="9" height="9" fill="#00a4ef"/>
-                  <rect x="11" y="11" width="9" height="9" fill="#ffb900"/>
-                </svg>
-                Entrar com Microsoft
-              </Button>
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full gap-2"
+            onClick={handleSignInWithMicrosoft}
+            disabled={loading}
+          >
+            <Shield className="h-4 w-4" />
+            Entrar com Microsoft
+          </Button>
             </TabsContent>
             
             <TabsContent value="signup">

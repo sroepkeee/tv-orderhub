@@ -5,6 +5,7 @@ import { UserAccessMetrics } from "@/components/admin/UserAccessMetrics";
 import { UserPresenceDashboard } from "@/components/admin/UserPresenceDashboard";
 import { RecentActivityFeed } from "@/components/admin/RecentActivityFeed";
 import { UserSessionsTable } from "@/components/admin/UserSessionsTable";
+import { LoginAuditTable } from "@/components/admin/LoginAuditTable";
 import { Shield, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
@@ -50,6 +51,7 @@ const Admin = () => {
               <UserPresenceDashboard />
               <RecentActivityFeed />
             </div>
+            <LoginAuditTable />
             <UserSessionsTable />
           </TabsContent>
 
