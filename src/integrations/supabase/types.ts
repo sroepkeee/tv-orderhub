@@ -1802,6 +1802,7 @@ export type Database = {
         | "ready_to_invoice"
         | "production_client"
         | "production_stock"
+        | "in_transit"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1945,6 +1946,7 @@ export const Constants = {
         "ready_to_invoice",
         "production_client",
         "production_stock",
+        "in_transit",
       ],
     },
   },
