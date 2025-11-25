@@ -178,13 +178,13 @@ export const KanbanView = ({ orders, onEdit, onStatusChange }: KanbanViewProps) 
       id: "production_client" as Phase,
       title: "Produção Clientes",
       icon: PackageCheck,
-      colorClass: "bg-phase-production-bg text-phase-production border-b-4 border-phase-border",
+      colorClass: "bg-phase-production-client-bg text-phase-production-client border-b-4 border-phase-production-client-border",
     },
     {
       id: "production_stock" as Phase,
       title: "Produção Estoque",
       icon: PackageCheck,
-      colorClass: "bg-purple-50 text-purple-700 border-b-4 border-purple-300",
+      colorClass: "bg-phase-production-bg text-phase-production border-b-4 border-phase-border",
     },
     {
       id: "balance_generation" as Phase,
@@ -214,7 +214,7 @@ export const KanbanView = ({ orders, onEdit, onStatusChange }: KanbanViewProps) 
       id: "ready_to_invoice" as Phase,
       title: "À Faturar",
       icon: ClipboardCheck,
-      colorClass: "bg-purple-50 text-purple-700 border-b-4 border-purple-300",
+      colorClass: "bg-phase-ready-invoice-bg text-phase-ready-invoice border-b-4 border-phase-border",
     },
     {
       id: "invoicing" as Phase,

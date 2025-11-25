@@ -140,6 +140,9 @@ export default {
           "almox-general-bg": "hsl(var(--phase-almox-general-bg))",
           production: "hsl(var(--phase-production))",
           "production-bg": "hsl(var(--phase-production-bg))",
+          "production-client": "hsl(var(--phase-production-client))",
+          "production-client-bg": "hsl(var(--phase-production-client-bg))",
+          "production-client-border": "hsl(var(--phase-production-client-border))",
           balance: "hsl(var(--phase-balance))",
           "balance-bg": "hsl(var(--phase-balance-bg))",
           laboratory: "hsl(var(--phase-laboratory))",
@@ -158,6 +161,7 @@ export default {
           "transit-bg": "hsl(var(--phase-transit-bg))",
           completion: "hsl(var(--phase-completion))",
           "completion-bg": "hsl(var(--phase-completion-bg))",
+          border: "hsl(var(--phase-border))",
         },
         progress: {
           good: "hsl(var(--progress-good))",
