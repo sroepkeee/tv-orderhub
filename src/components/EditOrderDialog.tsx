@@ -12,7 +12,7 @@ import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Calendar, User, FileText, CheckCircle, XCircle, Clock, History, Edit, Plus, Trash2, Loader2, MessageSquare, Download, Package, AlertCircle, BarChart3, Settings, Image as ImageIcon, File, FileSpreadsheet, ChevronDown, Send, Truck } from "lucide-react";
+import { Calendar, User, FileText, CheckCircle, XCircle, Clock, History, Edit, Plus, Trash2, Loader2, MessageSquare, Download, Package, AlertCircle, BarChart3, Settings, Image as ImageIcon, File, FileSpreadsheet, ChevronDown, Send, Truck, Save } from "lucide-react";
 import { useForm, Controller } from "react-hook-form";
 import { useQueryClient } from "@tanstack/react-query";
 import { Order } from "./Dashboard";
@@ -1947,7 +1947,7 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                     </div>}
                 </div>
 
-                <div className="grid grid-cols-1 gap-3">
+                <div className="grid grid-cols-2 gap-3">
                   <div>
                     <Label htmlFor="deliveryDeadline">Prazo de Entrega</Label>
                     <Input {...register("deliveryDeadline", {
@@ -1955,104 +1955,6 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                     })} type="date" />
                   </div>
                 </div>
-
-
-                {/* Seção de Frete e Transporte */}
-                <Collapsible open={freightInfoOpen} onOpenChange={setFreightInfoOpen} className="border-t pt-4">
-                  <CollapsibleTrigger className="flex items-center justify-between w-full hover:bg-muted/50 p-2 rounded-lg transition-colors">
-                    <Label className="text-lg font-semibold flex items-center gap-2 cursor-pointer">
-                      <Package className="h-5 w-5" />
-                      Informações de Frete e Transporte
-                      {isSavingShipping && <span className="text-xs text-muted-foreground flex items-center gap-1">
-                          <Loader2 className="h-3 w-3 animate-spin" />
-                          Salvando...
-                        </span>}
-                    </Label>
-                    <ChevronDown className={`h-5 w-5 transition-transform ${freightInfoOpen ? 'rotate-180' : ''}`} />
-                  </CollapsibleTrigger>
-                  
-                  <CollapsibleContent className="space-y-3 mt-3">
-                    <div className="grid grid-cols-4 gap-3">
-                      <div>
-                        <Label htmlFor="freight_modality">Modalidade de Frete</Label>
-                        <Controller name="freight_modality" control={control} render={({
-                          field
-                        }) => <Select onValueChange={field.onChange} value={field.value || ""}>
-                              <SelectTrigger>
-                                <SelectValue placeholder="FOB ou CIF" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="FOB">FOB - Free On Board</SelectItem>
-                                <SelectItem value="CIF">CIF - Cost, Insurance and Freight</SelectItem>
-                              </SelectContent>
-                            </Select>} />
-                      </div>
-
-                      <div>
-                        <Label htmlFor="freight_type">Modo de Envio</Label>
-                        <Controller name="freight_type" control={control} render={({
-                          field
-                        }) => <Select onValueChange={field.onChange} value={field.value || ""}>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Selecione o modo" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="aereo">Aéreo</SelectItem>
-                                <SelectItem value="transportadora">Transportadora</SelectItem>
-                                <SelectItem value="correios">Correios</SelectItem>
-                                <SelectItem value="frota_propria">Frota Própria</SelectItem>
-                                <SelectItem value="retirada">Retirada no Local</SelectItem>
-                              </SelectContent>
-                            </Select>} />
-                      </div>
-
-                      <div>
-                        <Label htmlFor="carrier_name">Nome da Transportadora/Empresa</Label>
-                        <Input {...register("carrier_name")} placeholder="Ex: Azul Cargo, Correios, Jadlog" maxLength={100} onKeyDown={e => {
-                          if (e.key === 'Enter') {
-                            e.preventDefault();
-                            e.stopPropagation();
-                          }
-                        }} />
-                      </div>
-
-                      <div>
-                        <Label htmlFor="tracking_code">Código de Rastreamento</Label>
-                        <Input {...register("tracking_code")} placeholder="Ex: BR123456789BR" maxLength={100} onKeyDown={e => {
-                          if (e.key === 'Enter') {
-                            e.preventDefault();
-                            e.stopPropagation();
-                          }
-                        }} />
-                      </div>
-                    </div>
-
-                    {(getValues("freight_type") || getValues("freight_modality")) && <Card className="p-3 bg-green-50 dark:bg-green-950 border-green-200">
-                        <div className="flex items-center gap-2 text-sm flex-wrap">
-                          <CheckCircle className="h-4 w-4 text-green-600" />
-                          {getValues("freight_modality") && <Badge variant="outline" className="bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 border-blue-300">
-                              {getValues("freight_modality")}
-                            </Badge>}
-                          {getValues("freight_type") && <>
-                              {getValues("freight_modality") && <span className="text-muted-foreground">•</span>}
-                              <span className="font-medium">
-                                Modo de envio: {getValues("freight_type") === "aereo" ? "Aéreo" : getValues("freight_type") === "transportadora" ? "Transportadora" : getValues("freight_type") === "correios" ? "Correios" : getValues("freight_type") === "frota_propria" ? "Frota Própria" : "Retirada no Local"}
-                              </span>
-                            </>}
-                          {getValues("carrier_name") && <>
-                              <span className="text-muted-foreground">•</span>
-                              <span>{getValues("carrier_name")}</span>
-                            </>}
-                          {getValues("tracking_code") && <>
-                              <span className="text-muted-foreground">•</span>
-                              <span className="font-mono text-xs bg-white dark:bg-gray-800 px-2 py-1 rounded">
-                                {getValues("tracking_code")}
-                              </span>
-                            </>}
-                        </div>
-                      </Card>}
-                  </CollapsibleContent>
-                </Collapsible>
 
                 <div className="pt-3 border-t">
                   <Label className="text-sm font-medium mb-2 block">Status do Pedido</Label>
@@ -2415,15 +2317,16 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                 </div>
 
                 <div className="flex justify-between items-center gap-2 pt-3 sticky bottom-0 bg-background">
-                  <Button type="button" variant="destructive" size="sm" onClick={() => setShowDeleteConfirm(true)} className="gap-1.5">
-                    <Trash2 className="h-3.5 w-3.5" />
+                  <Button type="button" variant="destructive" size="default" onClick={() => setShowDeleteConfirm(true)} className="gap-2 px-6 py-2 text-base">
+                    <Trash2 className="h-5 w-5" />
                     Excluir Pedido
                   </Button>
                   <div className="flex gap-2">
-                    <Button type="button" variant="outline" size="sm" onClick={() => handleCloseAttempt(false)}>
+                    <Button type="button" variant="outline" size="default" onClick={() => handleCloseAttempt(false)} className="px-6 py-2 text-base">
                       Cancelar
                     </Button>
-                    <Button type="submit" size="sm" className="gap-2">
+                    <Button type="submit" size="default" className="gap-2 px-6 py-2 text-base">
+                      <Save className="h-5 w-5" />
                       {modifiedFields.size > 0 && (
                         <Badge variant="secondary" className="bg-orange-100 dark:bg-orange-900 text-orange-700 dark:text-orange-200">
                           {modifiedFields.size}
@@ -2534,7 +2437,19 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
 
           <TabsContent value="carriers" className="mt-4">
             <ScrollArea className="h-[calc(95vh-200px)] pr-4">
-              <CarriersTabContent order={order} />
+            <CarriersTabContent 
+              order={order}
+              freightModality={watch("freight_modality") || ""}
+              freightType={watch("freight_type") || ""}
+              carrierName={watch("carrier_name") || ""}
+              trackingCode={watch("tracking_code") || ""}
+              onFreightChange={(field, value) => {
+                setValue(field as any, value);
+                // Marcar como modificado
+                setModifiedFields(prev => new Set(prev).add(field));
+              }}
+              isSaving={isSavingShipping}
+            />
             </ScrollArea>
           </TabsContent>
 
