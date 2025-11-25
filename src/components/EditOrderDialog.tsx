@@ -856,48 +856,8 @@ export const EditOrderDialog = ({
       }
     }
 
-    // NOVO: Detectar mudança de Nº OP (production_order_number)
-    if (field === 'production_order_number' && oldItem.production_order_number !== value && oldItem.id) {
-      console.log(`🏭 Nº OP mudou: ${oldItem.production_order_number} → ${value}`);
-      
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) throw new Error('Usuário não autenticado');
-
-        // Salvar no banco IMEDIATAMENTE
-        const { error } = await supabase
-          .from('order_items')
-          .update({ production_order_number: value || null })
-          .eq('id', oldItem.id);
-        
-        if (error) throw error;
-
-        // Registrar no histórico
-        await recordItemChange(oldItem.id, 'production_order_number', oldItem.production_order_number || '', value || '', 'Nº OP alterado');
-
-        // Atualizar estado local
-        setItems(newItems);
-
-        toast({
-          title: "Nº OP atualizado",
-          description: "Ordem de Produção salva com sucesso."
-        });
-
-        console.log(`✅ Nº OP atualizado no banco`);
-        
-        // Recarregar histórico
-        loadHistory();
-        return;
-      } catch (error: any) {
-        console.error('Erro ao atualizar Nº OP:', error);
-        toast({
-          title: "Erro ao atualizar Nº OP",
-          description: error?.message || "Não foi possível salvar a alteração.",
-          variant: "destructive"
-        });
-        return;
-      }
-    }
+    // Atualizar apenas o estado local para production_order_number
+    // O salvamento será feito quando clicar em "Salvar Alterações"
 
     // NOVO: Detectar mudança de deliveryDate em itens
     if (field === 'deliveryDate' && oldItem.deliveryDate !== value && oldItem.id) {
