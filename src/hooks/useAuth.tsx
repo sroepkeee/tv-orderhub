@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
+import { trackLogin } from "./useLoginTracking";
 
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null);
@@ -14,6 +15,18 @@ export function useAuth() {
         setSession(session);
         setUser(session?.user ?? null);
         setLoading(false);
+
+        // Track OAuth logins (Microsoft)
+        if (event === 'SIGNED_IN' && session?.user) {
+          const provider = session.user.app_metadata?.provider;
+          
+          // Use setTimeout(0) to avoid potential deadlock
+          setTimeout(() => {
+            if (provider === 'azure') {
+              trackLogin(session.user.id, 'azure');
+            }
+          }, 0);
+        }
       }
     );
 

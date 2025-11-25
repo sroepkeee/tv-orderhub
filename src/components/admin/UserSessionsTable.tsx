@@ -18,6 +18,9 @@ interface UserSession {
   last_login: string | null;
   is_active: boolean;
   activity_count: number;
+  last_ip: string | null;
+  last_browser: string | null;
+  preferred_method: string | null;
 }
 
 export function UserSessionsTable() {
@@ -49,7 +52,7 @@ export function UserSessionsTable() {
 
       if (profileError) throw profileError;
 
-      // Get activity counts for each user
+      // Get activity counts and login details for each user
       const sessionsWithActivity = await Promise.all(
         (profiles || []).map(async (profile) => {
           const { count } = await supabase
@@ -57,9 +60,52 @@ export function UserSessionsTable() {
             .select('id', { count: 'exact', head: true })
             .eq('user_id', profile.id);
 
+          // Get last login details
+          const { data: lastLogin } = await supabase
+            .from('user_activity_log')
+            .select('ip_address, metadata')
+            .eq('user_id', profile.id)
+            .eq('action_type', 'login')
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .single();
+
+          // Get preferred login method
+          const { data: loginMethods } = await supabase
+            .from('user_activity_log')
+            .select('metadata')
+            .eq('user_id', profile.id)
+            .eq('action_type', 'login')
+            .order('created_at', { ascending: false })
+            .limit(10);
+
+          const methodCounts = loginMethods?.reduce((acc: any, log: any) => {
+            const method = log.metadata?.login_method || 'unknown';
+            acc[method] = (acc[method] || 0) + 1;
+            return acc;
+          }, {});
+
+          const preferredMethod = methodCounts 
+            ? Object.keys(methodCounts).reduce((a, b) => methodCounts[a] > methodCounts[b] ? a : b)
+            : null;
+
+          const metadata = lastLogin?.metadata as { 
+            browser?: { name?: string; version?: string }; 
+            os?: { name?: string; version?: string };
+            login_method?: string;
+          } | undefined;
+          
+          const browserInfo = metadata?.browser;
+          const lastBrowser = browserInfo 
+            ? `${browserInfo.name || ''} ${browserInfo.version || ''}`.trim()
+            : null;
+
           return {
             ...profile,
-            activity_count: count || 0
+            activity_count: count || 0,
+            last_ip: lastLogin?.ip_address || null,
+            last_browser: lastBrowser,
+            preferred_method: preferredMethod
           };
         })
       );
@@ -77,14 +123,26 @@ export function UserSessionsTable() {
     return onlineUsers.some(user => user.user_id === userId);
   };
 
+  const maskIP = (ip: string | null) => {
+    if (!ip) return 'N/A';
+    const parts = ip.split('.');
+    if (parts.length === 4) {
+      return `${parts[0]}.${parts[1]}.xxx.xxx`;
+    }
+    return ip;
+  };
+
   const exportToCSV = () => {
-    const headers = ['Nome', 'Email', 'Departamento', 'Status', 'Último Acesso', 'Ações'];
+    const headers = ['Nome', 'Email', 'Departamento', 'Status', 'Último Acesso', 'IP', 'Navegador', 'Método', 'Ações'];
     const rows = filteredSessions.map(session => [
       session.full_name || 'N/A',
       session.email || 'N/A',
       session.department || 'N/A',
       isUserOnline(session.id) ? 'Online' : 'Offline',
       session.last_login ? new Date(session.last_login).toLocaleString('pt-BR') : 'Nunca',
+      session.last_ip || 'N/A',
+      session.last_browser || 'N/A',
+      session.preferred_method || 'N/A',
       session.activity_count
     ]);
 
@@ -140,6 +198,9 @@ export function UserSessionsTable() {
                   <TableHead>Usuário</TableHead>
                   <TableHead>Departamento</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead>Último IP</TableHead>
+                  <TableHead>Navegador</TableHead>
+                  <TableHead>Método Preferido</TableHead>
                   <TableHead>Último Acesso</TableHead>
                   <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
@@ -147,7 +208,7 @@ export function UserSessionsTable() {
               <TableBody>
                 {filteredSessions.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center text-muted-foreground">
+                    <TableCell colSpan={8} className="text-center text-muted-foreground">
                       Nenhuma sessão encontrada
                     </TableCell>
                   </TableRow>
@@ -170,6 +231,27 @@ export function UserSessionsTable() {
                             <span className={`h-2 w-2 rounded-full ${online ? 'bg-green-500' : 'bg-gray-400'}`}></span>
                             {online ? 'Online' : 'Offline'}
                           </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <code className="text-xs bg-muted px-2 py-1 rounded">
+                            {maskIP(session.last_ip)}
+                          </code>
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-sm text-muted-foreground">
+                            {session.last_browser || 'N/A'}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          {session.preferred_method === 'azure' ? (
+                            <Badge className="bg-blue-500/10 text-blue-700 border-blue-500/20">
+                              Microsoft
+                            </Badge>
+                          ) : session.preferred_method === 'email' ? (
+                            <Badge variant="outline">Email</Badge>
+                          ) : (
+                            <span className="text-sm text-muted-foreground">N/A</span>
+                          )}
                         </TableCell>
                         <TableCell>
                           {session.last_login ? (
