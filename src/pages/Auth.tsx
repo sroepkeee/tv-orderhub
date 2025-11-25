@@ -114,6 +114,24 @@ export default function Auth() {
     }
   };
 
+  const handleSignInWithMicrosoft = async () => {
+    setLoading(true);
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'azure',
+        options: {
+          scopes: 'email profile openid',
+          redirectTo: `${window.location.origin}/`,
+        },
+      });
+      
+      if (error) throw error;
+    } catch (error: any) {
+      toast.error(error.message || "Erro ao fazer login com Microsoft");
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-primary/10 p-4 overflow-hidden">
       <Card className="w-full max-w-md">
@@ -164,6 +182,33 @@ export default function Auth() {
                   <ForgotPasswordDialog />
                 </div>
               </form>
+
+              <div className="relative my-4">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-background px-2 text-muted-foreground">
+                    Ou continue com
+                  </span>
+                </div>
+              </div>
+
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full"
+                onClick={handleSignInWithMicrosoft}
+                disabled={loading}
+              >
+                <svg className="mr-2 h-4 w-4" viewBox="0 0 21 21">
+                  <rect x="1" y="1" width="9" height="9" fill="#f25022"/>
+                  <rect x="11" y="1" width="9" height="9" fill="#7fba00"/>
+                  <rect x="1" y="11" width="9" height="9" fill="#00a4ef"/>
+                  <rect x="11" y="11" width="9" height="9" fill="#ffb900"/>
+                </svg>
+                Entrar com Microsoft
+              </Button>
             </TabsContent>
             
             <TabsContent value="signup">
