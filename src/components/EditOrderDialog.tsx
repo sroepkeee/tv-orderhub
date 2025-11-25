@@ -1005,6 +1005,41 @@ export const EditOrderDialog = ({
         description: `Item alterado para: ${statusLabels[value as keyof typeof statusLabels]}`
       });
 
+      // 🎯 Automação: mover pedido para fase de Compras se item marcado como purchase_required
+      if (value === 'purchase_required') {
+        const purchaseStatuses = ['purchase_pending', 'purchase_quoted', 'purchase_ordered', 'purchase_received'];
+        const currentStatus = watch('status') || order.status;
+        
+        if (!purchaseStatuses.includes(currentStatus)) {
+          const { data: { user } } = await supabase.auth.getUser();
+          
+          const { error: orderError } = await supabase
+            .from('orders')
+            .update({ status: 'purchase_pending' })
+            .eq('id', order.id);
+          
+          if (!orderError && user) {
+            await supabase.from('order_changes').insert({
+              order_id: order.id,
+              changed_by: user.id,
+              field_name: 'status',
+              old_value: currentStatus,
+              new_value: 'purchase_pending',
+              change_type: 'update',
+              change_category: 'phase_change'
+            });
+            
+            setValue('status', 'purchase_pending');
+            
+            toast({
+              title: "📦 Pedido movido para Compras",
+              description: `O pedido foi movido automaticamente para a fase de Compras.`,
+              duration: 5000,
+            });
+          }
+        }
+      }
+
       // ✨ Atualizar localmente em vez de recarregar do banco
       setItems(prev => prev.map(item => 
         item.id === oldItem.id 
