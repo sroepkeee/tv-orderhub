@@ -154,6 +154,11 @@ All colors MUST be HSL.
     --phase-completion: 220 40% 35%;
     --phase-completion-bg: 220 15% 94%;
     
+    /* Produção Clientes - Highlighted (Orange) */
+    --phase-production-client: 25 90% 50%;
+    --phase-production-client-bg: 25 100% 95%;
+    --phase-production-client-border: 25 90% 60%;
+    
     /* Unified phase border accent */
     --phase-border: 220 60% 50%;
 
@@ -325,6 +330,11 @@ All colors MUST be HSL.
     --phase-transit-bg: 220 20% 16%;
     --phase-completion: 220 30% 85%;
     --phase-completion-bg: 220 20% 16%;
+    
+    /* Produção Clientes - Highlighted (Orange) - Dark Mode */
+    --phase-production-client: 25 90% 70%;
+    --phase-production-client-bg: 25 80% 15%;
+    --phase-production-client-border: 25 80% 55%;
     
     /* Unified phase border accent */
     --phase-border: 220 70% 65%;
