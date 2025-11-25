@@ -136,6 +136,9 @@ export const EditOrderDialog = ({
   const [originalFormValues, setOriginalFormValues] = useState<Partial<Order>>({});
   const [modifiedFields, setModifiedFields] = useState<Set<string>>(new Set());
   const [showUnsavedChangesDialog, setShowUnsavedChangesDialog] = useState(false);
+  
+  // ✨ Estado para ignorar próxima atualização realtime (evitar reload desnecessário)
+  const [ignoreNextRealtimeUpdate, setIgnoreNextRealtimeUpdate] = useState(false);
 
   // Ref para rastrear últimos valores dos campos de frete
   const lastShippingRef = useRef({
@@ -795,6 +798,11 @@ export const EditOrderDialog = ({
       table: 'order_items',
       filter: `order_id=eq.${order.id}`
     }, () => {
+      // ✨ Ignorar se a mudança foi feita pelo próprio usuário
+      if (ignoreNextRealtimeUpdate) {
+        setIgnoreNextRealtimeUpdate(false);
+        return;
+      }
       console.log('🔄 Items atualizados - recarregando dados...');
       loadItems();
     }).subscribe();
@@ -965,6 +973,9 @@ export const EditOrderDialog = ({
     if (field === 'item_status' && oldItem.item_status !== value && oldItem.id) {
       console.log(`🔄 Situação mudou: ${oldItem.item_status} → ${value}`);
 
+      // ✨ Ignorar próximo evento realtime
+      setIgnoreNextRealtimeUpdate(true);
+
       // Salvar no banco
       const {
         error
@@ -973,6 +984,7 @@ export const EditOrderDialog = ({
       }).eq('id', oldItem.id);
       if (error) {
         console.error('Error updating item_status:', error);
+        setIgnoreNextRealtimeUpdate(false);
         toast({
           title: "Erro ao atualizar situação",
           description: error.message,
@@ -993,40 +1005,25 @@ export const EditOrderDialog = ({
         description: `Item alterado para: ${statusLabels[value as keyof typeof statusLabels]}`
       });
 
-      // Recarregar itens do banco para sincronizar UI
-      const {
-        data: reloadedItems
-      } = await supabase.from('order_items').select('*').eq('order_id', order.id).order('created_at', { ascending: true });
-      if (reloadedItems) {
-        const mappedItems = reloadedItems.map(dbItem => ({
-          id: dbItem.id,
-          itemCode: dbItem.item_code,
-          itemDescription: cleanItemDescription(dbItem.item_description),
-          unit: dbItem.unit,
-          requestedQuantity: dbItem.requested_quantity,
-          warehouse: dbItem.warehouse,
-          deliveryDate: dbItem.delivery_date,
-          deliveredQuantity: dbItem.delivered_quantity,
-          production_order_number: dbItem.production_order_number,
-          received_status: dbItem.received_status as 'pending' | 'partial' | 'completed',
-          item_status: dbItem.item_status as 'pending' | 'in_stock' | 'awaiting_production' | 'purchase_required' | 'purchase_requested' | 'completed',
-          item_source_type: dbItem.item_source_type as 'in_stock' | 'production' | 'out_of_stock',
-          production_estimated_date: dbItem.production_estimated_date,
-          unit_price: dbItem.unit_price,
-          discount_percent: dbItem.discount_percent,
-          ipi_percent: dbItem.ipi_percent,
-          icms_percent: dbItem.icms_percent,
-          total_value: dbItem.total_value,
-          sla_days: dbItem.sla_days,
-          is_imported: dbItem.is_imported,
-          import_lead_time_days: dbItem.import_lead_time_days,
-          sla_deadline: dbItem.sla_deadline,
-          current_phase: dbItem.current_phase,
-          phase_started_at: dbItem.phase_started_at,
-          userId: dbItem.user_id
-        }));
-        setItems(mappedItems);
-      }
+      // ✨ Atualizar localmente em vez de recarregar do banco
+      setItems(prev => prev.map(item => 
+        item.id === oldItem.id 
+          ? { ...item, item_status: value as OrderItem['item_status'] }
+          : item
+      ));
+      
+      setOriginalItems(prev => prev.map(item => 
+        item.id === oldItem.id 
+          ? { ...item, item_status: value as OrderItem['item_status'] }
+          : item
+      ));
+      
+      // Limpar campo modificado (já que foi salvo)
+      setModifiedFields(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(`${oldItem.id}_item_status`);
+        return newSet;
+      });
 
       // Recarregar histórico
       loadHistory();
@@ -1047,7 +1044,11 @@ export const EditOrderDialog = ({
     if (receivedQty >= requestedQty) {
       newItemStatus = 'completed';
     }
+    
     try {
+      // ✨ Ignorar próximo evento realtime
+      setIgnoreNextRealtimeUpdate(true);
+      
       const {
         error
       } = await supabase.from('order_items').update({
@@ -1066,34 +1067,27 @@ export const EditOrderDialog = ({
         await recordItemChange(itemId, 'item_status', oldItemStatus, newItemStatus, 'Quantidade completada');
       }
 
-      // Reload items from database
-      const {
-        data: updatedItems
-      } = await supabase.from('order_items').select('*').eq('order_id', order.id).order('created_at', { ascending: true });
-      if (updatedItems) {
-        setItems(updatedItems.map(item => ({
-          id: item.id,
-          itemCode: item.item_code,
-          itemDescription: cleanItemDescription(item.item_description),
-          unit: item.unit,
-          requestedQuantity: item.requested_quantity,
-          warehouse: item.warehouse,
-          deliveryDate: item.delivery_date,
-          deliveredQuantity: item.delivered_quantity,
-          production_order_number: item.production_order_number,
-          received_status: item.received_status as 'pending' | 'partial' | 'completed' || 'pending',
-          item_source_type: item.item_source_type as 'in_stock' | 'production' | 'out_of_stock' || 'in_stock',
-          item_status: item.item_status as 'pending' | 'in_stock' | 'awaiting_production' | 'purchase_required' | 'completed' || 'in_stock',
-          production_estimated_date: item.production_estimated_date,
-          userId: item.user_id,
-          sla_days: item.sla_days,
-          is_imported: item.is_imported,
-          import_lead_time_days: item.import_lead_time_days,
-          sla_deadline: item.sla_deadline,
-          current_phase: item.current_phase,
-          phase_started_at: item.phase_started_at
-        })));
-      }
+      // ✨ Atualizar localmente em vez de recarregar do banco
+      setItems(prev => prev.map(item => 
+        item.id === itemId 
+          ? { ...item, deliveredQuantity: receivedQty, item_status: newItemStatus as OrderItem['item_status'] }
+          : item
+      ));
+      
+      setOriginalItems(prev => prev.map(item => 
+        item.id === itemId 
+          ? { ...item, deliveredQuantity: receivedQty, item_status: newItemStatus as OrderItem['item_status'] }
+          : item
+      ));
+      
+      // Limpar campos modificados
+      setModifiedFields(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(`${itemId}_deliveredQuantity`);
+        newSet.delete(`${itemId}_item_status`);
+        return newSet;
+      });
+      
       toast({
         title: newItemStatus === 'completed' ? "✅ Item concluído" : "⚠️ Recebimento parcial",
         description: newItemStatus === 'completed' ? `Item concluído: ${receivedQty} de ${requestedQty} recebidos` : `Recebimento parcial: ${receivedQty} de ${requestedQty} recebidos (faltam ${requestedQty - receivedQty})`
@@ -1103,6 +1097,7 @@ export const EditOrderDialog = ({
       loadHistory();
     } catch (error) {
       console.error("Error updating received quantity:", error);
+      setIgnoreNextRealtimeUpdate(false);
       toast({
         title: "Erro",
         description: "Não foi possível atualizar a quantidade recebida.",
@@ -1115,6 +1110,9 @@ export const EditOrderDialog = ({
   const handleMarkAsCompleted = async (item: OrderItem) => {
     if (!item.id) return;
     try {
+      // ✨ Ignorar próximo evento realtime
+      setIgnoreNextRealtimeUpdate(true);
+      
       const {
         error
       } = await supabase.from('order_items').update({
@@ -1127,34 +1125,27 @@ export const EditOrderDialog = ({
       await recordItemChange(item.id, 'item_status', item.item_status || 'in_stock', 'completed', 'Marcado como concluído');
       await recordItemChange(item.id, 'delivered_quantity', item.deliveredQuantity, item.requestedQuantity);
 
-      // Recarregar items
-      const {
-        data: updatedItems
-      } = await supabase.from('order_items').select('*').eq('order_id', order.id).order('created_at', { ascending: true });
-      if (updatedItems) {
-        setItems(updatedItems.map(item => ({
-          id: item.id,
-          itemCode: item.item_code,
-          itemDescription: cleanItemDescription(item.item_description),
-          unit: item.unit,
-          requestedQuantity: item.requested_quantity,
-          warehouse: item.warehouse,
-          deliveryDate: item.delivery_date,
-          deliveredQuantity: item.delivered_quantity,
-          production_order_number: item.production_order_number,
-          received_status: item.received_status as 'pending' | 'partial' | 'completed' || 'pending',
-          item_source_type: item.item_source_type as 'in_stock' | 'production' | 'out_of_stock' || 'in_stock',
-          item_status: item.item_status as 'pending' | 'in_stock' | 'awaiting_production' | 'purchase_required' | 'completed' || 'in_stock',
-          production_estimated_date: item.production_estimated_date,
-          userId: item.user_id,
-          sla_days: item.sla_days,
-          is_imported: item.is_imported,
-          import_lead_time_days: item.import_lead_time_days,
-          sla_deadline: item.sla_deadline,
-          current_phase: item.current_phase,
-          phase_started_at: item.phase_started_at
-        })));
-      }
+      // ✨ Atualizar localmente em vez de recarregar do banco
+      setItems(prev => prev.map(i => 
+        i.id === item.id 
+          ? { ...i, deliveredQuantity: item.requestedQuantity, item_status: 'completed' as OrderItem['item_status'] }
+          : i
+      ));
+      
+      setOriginalItems(prev => prev.map(i => 
+        i.id === item.id 
+          ? { ...i, deliveredQuantity: item.requestedQuantity, item_status: 'completed' as OrderItem['item_status'] }
+          : i
+      ));
+      
+      // Limpar campos modificados
+      setModifiedFields(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(`${item.id}_deliveredQuantity`);
+        newSet.delete(`${item.id}_item_status`);
+        return newSet;
+      });
+      
       toast({
         title: "✅ Item concluído",
         description: "Item marcado como totalmente recebido e concluído"
@@ -1162,6 +1153,7 @@ export const EditOrderDialog = ({
       loadHistory();
     } catch (error) {
       console.error("Error marking as completed:", error);
+      setIgnoreNextRealtimeUpdate(false);
       toast({
         title: "Erro",
         description: "Não foi possível marcar o item como concluído.",
