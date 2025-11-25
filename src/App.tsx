@@ -18,12 +18,40 @@ import { useAuth } from "./hooks/useAuth";
 import { useAdminAuth } from "./hooks/useAdminAuth";
 import { usePhaseAuthorization } from "./hooks/usePhaseAuthorization";
 import { PendingApprovalScreen } from "./components/PendingApprovalScreen";
+import { CompleteProfileDialog } from "./components/CompleteProfileDialog";
+import { useEffect, useState } from "react";
+import { supabase } from "./integrations/supabase/client";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   const { isApproved, loading: authLoading } = usePhaseAuthorization();
+  const [profileIncomplete, setProfileIncomplete] = useState(false);
+  const [checkingProfile, setCheckingProfile] = useState(true);
   
-  if (loading || authLoading) {
+  useEffect(() => {
+    const checkProfile = async () => {
+      if (user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('department, location')
+          .eq('id', user.id)
+          .single();
+        
+        if (profile && (!profile.department || !profile.location)) {
+          setProfileIncomplete(true);
+        }
+      }
+      setCheckingProfile(false);
+    };
+    
+    if (!loading && user) {
+      checkProfile();
+    } else if (!loading) {
+      setCheckingProfile(false);
+    }
+  }, [user, loading]);
+  
+  if (loading || authLoading || checkingProfile) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
@@ -36,6 +64,10 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   
   if (!user) {
     return <Navigate to="/auth" replace />;
+  }
+
+  if (profileIncomplete) {
+    return <CompleteProfileDialog open={true} userId={user.id} userEmail={user.email} />;
   }
 
   if (!isApproved) {
