@@ -486,7 +486,7 @@ export const KanbanView = ({ orders, onEdit, onStatusChange }: KanbanViewProps) 
                 responsibleRole={phaseDetails.responsibleRole}
                 responsibleUsers={phaseDetails.responsibleUsers}
                 canDrag={canDrag}
-                linkTo={column.id === "purchases" ? "/purchases" : undefined}
+                linkTo={column.id === "purchases" ? "/compras" : undefined}
               />
             );
           })}
