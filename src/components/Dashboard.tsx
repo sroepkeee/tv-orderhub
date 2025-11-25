@@ -1673,6 +1673,12 @@ export const Dashboard = () => {
     if (!user) return;
     const order = orders.find(o => o.id === orderId);
     const previousStatus = order?.status;
+    
+    // 🚀 PASSO 1: Atualizar estado local IMEDIATAMENTE (feedback instantâneo)
+    setOrders(orders.map(o => 
+      o.id === orderId ? { ...o, status: newStatus } : o
+    ));
+
     try {
       // Detectar mudança para fase "Gerar Ordem"
       const orderGenerationStatuses = ['order_generation_pending', 'order_in_creation', 'order_generated'];
@@ -1696,59 +1702,59 @@ export const Dashboard = () => {
           console.log(`📅 Calculando prazo: hoje + ${orderTypeConfig.default_sla_days} dias = ${updateData.delivery_date}`);
         }
       }
+      
+      // PASSO 2: Salvar no banco
       const {
         error
       } = await supabase.from('orders').update(updateData).eq('id', orderId);
       if (error) throw error;
 
-      // Update local state
-      setOrders(orders.map(o => 
-        o.id === orderId ? { ...o, status: newStatus } : o
-      ));
-
-      // 📢 Broadcast para todos os usuários conectados
-      await supabase
-        .channel('order-status-broadcast')
-        .send({
-          type: 'broadcast',
-          event: 'status_changed',
-          payload: {
-            orderId,
-            newStatus,
-            changedBy: user.id,
-            orderNumber: order?.orderNumber,
-            timestamp: new Date().toISOString()
-          }
-        });
-
-      // Save to history
-      if (order && previousStatus) {
-        await saveOrderHistory(orderId, previousStatus, newStatus, order.orderNumber);
-      }
-
-      // ✨ Registrar mudança de status em order_changes para rastreamento completo
-      if (previousStatus !== newStatus) {
-        await supabase.from('order_changes').insert({
+      // 🔥 PASSO 3: Operações secundárias em PARALELO (não bloqueantes)
+      Promise.all([
+        // Broadcast para outros usuários
+        supabase
+          .channel('order-status-broadcast')
+          .send({
+            type: 'broadcast',
+            event: 'status_changed',
+            payload: {
+              orderId,
+              newStatus,
+              changedBy: user.id,
+              orderNumber: order?.orderNumber,
+              timestamp: new Date().toISOString()
+            }
+          }),
+        
+        // Salvar histórico
+        order && previousStatus ? saveOrderHistory(orderId, previousStatus, newStatus, order.orderNumber) : Promise.resolve(),
+        
+        // Registrar em order_changes
+        previousStatus !== newStatus ? supabase.from('order_changes').insert({
           order_id: orderId,
           field_name: 'status',
           old_value: previousStatus,
           new_value: newStatus,
           changed_by: user.id,
           change_category: 'status_change'
-        });
-        console.log('✅ Mudança de status registrada em order_changes:', {
-          usuario: user.email,
-          de: previousStatus,
-          para: newStatus
-        });
-      }
-      await loadOrders();
+        }) : Promise.resolve()
+      ]).then(() => {
+        console.log('✅ Operações secundárias concluídas em background');
+      }).catch((error) => {
+        console.error('⚠️ Erro em operações secundárias (não crítico):', error);
+      });
+
       const description = isMovingToOrderGeneration && updateData.delivery_date ? `Pedido ${order?.orderNumber} movido para ${getStatusLabel(newStatus)} - Prazo calculado automaticamente` : `Pedido ${order?.orderNumber} movido para ${getStatusLabel(newStatus)}`;
       toast({
         title: "Status atualizado",
         description
       });
     } catch (error: any) {
+      // 🔄 ROLLBACK: Se falhar, reverter para estado anterior
+      setOrders(orders.map(o => 
+        o.id === orderId ? { ...o, status: previousStatus! } : o
+      ));
+      
       toast({
         title: "Erro ao atualizar status",
         description: error.message,

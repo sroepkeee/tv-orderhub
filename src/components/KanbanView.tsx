@@ -385,37 +385,41 @@ export const KanbanView = ({ orders, onEdit, onStatusChange }: KanbanViewProps) 
 
     const newStatus = getDefaultStatusForPhase(targetPhase);
     
-    // 🆕 REGISTRAR LOG MANUAL DE MUDANÇA DE FASE
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        await supabase.from('user_activity_log').insert({
-          user_id: user.id,
-          action_type: 'update',
-          table_name: 'orders',
-          record_id: orderId,
-          description: `Moveu pedido ${order.orderNumber} de ${currentPhase} para ${targetPhase}`,
-          metadata: {
-            order_number: order.orderNumber,
-            old_phase: currentPhase,
-            new_phase: targetPhase,
-            old_status: order.status,
-            new_status: newStatus,
-            action_source: 'kanban_drag_drop'
-          }
-        });
-      }
-    } catch (error) {
-      console.error('Erro ao registrar log de atividade:', error);
-    }
-    
-    // 🚀 Optimistic update: atualizar UI imediatamente
+    // 🚀 PASSO 1: Optimistic update IMEDIATAMENTE (instantâneo!)
     setOptimisticOrders(prev => 
       prev.map(o => o.id === orderId ? { ...o, status: newStatus } : o)
     );
     
-    // Enviar para servidor (se falhar, o useEffect vai reverter com data real)
+    // 🚀 PASSO 2: Enviar para servidor (não bloqueia UI)
     onStatusChange(orderId, newStatus);
+    
+    // 🔥 PASSO 3: Log em background (fire-and-forget, não bloqueia)
+    const logActivity = async () => {
+      try {
+        const { data: { user: currentUser } } = await supabase.auth.getUser();
+        if (currentUser) {
+          await supabase.from('user_activity_log').insert({
+            user_id: currentUser.id,
+            action_type: 'update',
+            table_name: 'orders',
+            record_id: orderId,
+            description: `Moveu pedido ${order.orderNumber} de ${currentPhase} para ${targetPhase}`,
+            metadata: {
+              order_number: order.orderNumber,
+              old_phase: currentPhase,
+              new_phase: targetPhase,
+              old_status: order.status,
+              new_status: newStatus,
+              action_source: 'kanban_drag_drop'
+            }
+          });
+          console.log('✅ Log registrado em background');
+        }
+      } catch (error) {
+        console.error('⚠️ Erro ao registrar log (não crítico):', error);
+      }
+    };
+    logActivity(); // Fire-and-forget
   };
 
   const handleDragCancel = () => {
