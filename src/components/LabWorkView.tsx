@@ -297,34 +297,6 @@ export const LabWorkView = ({
   return (
     <ScrollArea className="h-[calc(95vh-200px)] pr-4">
       <div className="space-y-4">
-        {/* Requisitos gerais */}
-        {(requiresFirmware || requiresImage) && (
-          <Card className="p-4 bg-amber-50 dark:bg-amber-950 border-amber-300">
-            <h3 className="font-semibold text-amber-900 dark:text-amber-100 mb-3">
-              📋 Requisitos do Pedido
-            </h3>
-            <div className="grid grid-cols-2 gap-3">
-              {requiresFirmware && (
-                <div className="flex items-start gap-2">
-                  <Cpu className="h-5 w-5 text-blue-600 mt-0.5" />
-                  <div>
-                    <p className="text-sm font-medium">Firmware Requerido</p>
-                    <p className="text-xs text-muted-foreground">{firmwareProjectName}</p>
-                  </div>
-                </div>
-              )}
-              {requiresImage && (
-                <div className="flex items-start gap-2">
-                  <HardDrive className="h-5 w-5 text-purple-600 mt-0.5" />
-                  <div>
-                    <p className="text-sm font-medium">Imagem Requerida</p>
-                    <p className="text-xs text-muted-foreground">{imageProjectName}</p>
-                  </div>
-                </div>
-              )}
-            </div>
-          </Card>
-        )}
 
         {/* Lista de itens */}
         {items.map((item) => {

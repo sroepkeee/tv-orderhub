@@ -1956,62 +1956,6 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                   </div>
                 </div>
 
-                {/* Configurações de Firmware e Imagem */}
-                <Collapsible open={labConfigOpen} onOpenChange={setLabConfigOpen} className="border-t pt-4">
-                  <CollapsibleTrigger className="flex items-center justify-between w-full hover:bg-muted/50 p-2 rounded-lg transition-colors">
-                    <Label className="text-lg font-semibold flex items-center gap-2 cursor-pointer">
-                      <Settings className="h-5 w-5" />
-                      Configuração de Placas (Laboratório)
-                    </Label>
-                    <ChevronDown className={`h-5 w-5 transition-transform ${labConfigOpen ? 'rotate-180' : ''}`} />
-                  </CollapsibleTrigger>
-                  
-                  <CollapsibleContent className="space-y-3 mt-3">
-                    <div className="grid grid-cols-2 gap-4">
-                      {/* Firmware Card */}
-                      <Card className="p-4 space-y-3 bg-blue-50 dark:bg-blue-950 border-blue-200">
-                        <div className="flex items-center space-x-2">
-                          <Controller name="requires_firmware" control={control} render={({
-                            field
-                          }) => <Checkbox id="edit_requires_firmware" checked={field.value || false} onCheckedChange={field.onChange} />} />
-                          <Label htmlFor="edit_requires_firmware" className="font-semibold cursor-pointer">
-                            🔧 Requer Firmware Específico
-                          </Label>
-                        </div>
-                        
-                        <div>
-                          <Label htmlFor="firmware_project_name">Nome do Projeto/Firmware</Label>
-                          <Input {...register("firmware_project_name")} placeholder="Ex: FW_PLACA_V2.3.1" maxLength={200} className="bg-white dark:bg-gray-900" />
-                        </div>
-                        
-                        {getValues("requires_firmware") && getValues("firmware_project_name") && <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-300">
-                            ✅ {getValues("firmware_project_name")}
-                          </Badge>}
-                      </Card>
-
-                      {/* Imagem Card */}
-                      <Card className="p-4 space-y-3 bg-purple-50 dark:bg-purple-950 border-purple-200">
-                        <div className="flex items-center space-x-2">
-                          <Controller name="requires_image" control={control} render={({
-                            field
-                          }) => <Checkbox id="edit_requires_image" checked={field.value || false} onCheckedChange={field.onChange} />} />
-                          <Label htmlFor="edit_requires_image" className="font-semibold cursor-pointer">
-                            💾 Requer Imagem Específica
-                          </Label>
-                        </div>
-                        
-                        <div>
-                          <Label htmlFor="image_project_name">Nome da Imagem</Label>
-                          <Input {...register("image_project_name")} placeholder="Ex: IMG_LINUX_2024_Q1" maxLength={200} className="bg-white dark:bg-gray-900" />
-                        </div>
-                        
-                        {getValues("requires_image") && getValues("image_project_name") && <Badge variant="outline" className="bg-purple-100 text-purple-800 border-purple-300">
-                            ✅ {getValues("image_project_name")}
-                          </Badge>}
-                      </Card>
-                    </div>
-                  </CollapsibleContent>
-                </Collapsible>
 
                 {/* Seção de Frete e Transporte */}
                 <Collapsible open={freightInfoOpen} onOpenChange={setFreightInfoOpen} className="border-t pt-4">
@@ -2500,7 +2444,86 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
           </TabsContent>
 
           <TabsContent value="lab" className="mt-4">
-            <LabWorkView orderId={order.id} items={items} requiresFirmware={order.requires_firmware} firmwareProjectName={order.firmware_project_name} requiresImage={order.requires_image} imageProjectName={order.image_project_name} />
+            <ScrollArea className="h-[calc(95vh-200px)] pr-4">
+              <div className="space-y-4">
+                {/* Seção de Configuração de Firmware/Imagem */}
+                <Card className="p-4 border-amber-300 bg-amber-50/50 dark:bg-amber-950/20">
+                  <h3 className="font-semibold flex items-center gap-2 mb-4">
+                    <Settings className="h-5 w-5" />
+                    Configuração de Firmware e Imagem
+                  </h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    {/* Firmware Card */}
+                    <Card className="p-4 space-y-3 bg-blue-50 dark:bg-blue-950 border-blue-200">
+                      <div className="flex items-center space-x-2">
+                        <Controller
+                          name="requires_firmware"
+                          control={control}
+                          render={({ field }) => (
+                            <Checkbox
+                              id="lab_requires_firmware"
+                              checked={field.value || false}
+                              onCheckedChange={field.onChange}
+                            />
+                          )}
+                        />
+                        <Label htmlFor="lab_requires_firmware" className="font-semibold cursor-pointer">
+                          🔧 Requer Firmware Específico
+                        </Label>
+                      </div>
+                      <div>
+                        <Label htmlFor="firmware_project_name">Nome do Projeto/Firmware</Label>
+                        <Input
+                          id="firmware_project_name"
+                          {...register("firmware_project_name")}
+                          placeholder="Ex: FW_PLACA_V2.3.1"
+                          maxLength={200}
+                        />
+                      </div>
+                    </Card>
+
+                    {/* Imagem Card */}
+                    <Card className="p-4 space-y-3 bg-purple-50 dark:bg-purple-950 border-purple-200">
+                      <div className="flex items-center space-x-2">
+                        <Controller
+                          name="requires_image"
+                          control={control}
+                          render={({ field }) => (
+                            <Checkbox
+                              id="lab_requires_image"
+                              checked={field.value || false}
+                              onCheckedChange={field.onChange}
+                            />
+                          )}
+                        />
+                        <Label htmlFor="lab_requires_image" className="font-semibold cursor-pointer">
+                          💾 Requer Imagem Específica
+                        </Label>
+                      </div>
+                      <div>
+                        <Label htmlFor="image_project_name">Nome da Imagem</Label>
+                        <Input
+                          id="image_project_name"
+                          {...register("image_project_name")}
+                          placeholder="Ex: IMG_LINUX_2024_Q1"
+                          maxLength={200}
+                        />
+                      </div>
+                    </Card>
+                  </div>
+                </Card>
+
+                {/* Componente LabWorkView */}
+                <LabWorkView
+                  orderId={order.id}
+                  items={items}
+                  requiresFirmware={watch("requires_firmware") || false}
+                  firmwareProjectName={watch("firmware_project_name")}
+                  requiresImage={watch("requires_image") || false}
+                  imageProjectName={watch("image_project_name")}
+                />
+              </div>
+            </ScrollArea>
           </TabsContent>
 
           <TabsContent value="volumes" className="mt-4">
