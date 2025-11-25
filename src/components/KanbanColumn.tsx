@@ -25,6 +25,7 @@ interface KanbanColumnProps {
   }>;
   canDrag?: boolean;
   linkTo?: string;
+  animatedCardIds?: Set<string>;
 }
 export const KanbanColumn = ({
   id,
@@ -39,7 +40,8 @@ export const KanbanColumn = ({
   responsibleRole,
   responsibleUsers,
   canDrag = true,
-  linkTo
+  linkTo,
+  animatedCardIds
 }: KanbanColumnProps) => {
   const navigate = useNavigate();
   const highCount = orders.filter(o => o.priority === "high").length;
@@ -60,7 +62,7 @@ export const KanbanColumn = ({
   } = useDroppable({
     id: id
   });
-  return <div ref={setNodeRef} className={`kanban-column transition-all duration-300 flex flex-col ${isOver ? "drop-target" : ""}`}>
+  return <div ref={setNodeRef} className={`kanban-column transition-all duration-300 flex flex-col ${isOver ? "drop-target ring-2 ring-primary/30 bg-primary/5 scale-[1.01]" : ""}`}>
       {/* Column Header */}
       <div className={`${headerStyles} ${pulseClass} rounded-t-lg p-3 sticky top-0 z-10 h-12 flex items-center transition-all duration-200`}>
         <div className="flex items-center justify-between w-full">
@@ -113,7 +115,7 @@ export const KanbanColumn = ({
             Nenhum pedido nesta fase
             {linkTo}
           </div> : <>
-            {orders.map(order => <KanbanCard key={order.id} order={order} onEdit={onEdit} onStatusChange={onStatusChange} canDrag={canDrag} />)}
+            {orders.map(order => <KanbanCard key={order.id} order={order} onEdit={onEdit} onStatusChange={onStatusChange} canDrag={canDrag} isAnimating={animatedCardIds?.has(order.id)} />)}
             {linkTo && <Button variant="outline" size="sm" className="w-full gap-2 mt-2" onClick={() => navigate(linkTo)}>
                 <Icon className="h-4 w-4" />
                 Ver Módulo de Compras

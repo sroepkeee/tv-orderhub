@@ -48,6 +48,7 @@ interface KanbanViewProps {
 export const KanbanView = ({ orders, onEdit, onStatusChange }: KanbanViewProps) => {
   const [activeId, setActiveId] = React.useState<string | null>(null);
   const [optimisticOrders, setOptimisticOrders] = React.useState<Order[]>(orders);
+  const [recentlyMovedCards, setRecentlyMovedCards] = React.useState<Set<string>>(new Set());
   const [phaseOrder, setPhaseOrder] = React.useState<Map<Phase, number>>(new Map());
   const { getPhaseInfo, loading: phaseInfoLoading } = usePhaseInfo();
   const { canViewPhase, canEditPhase, userRoles, loading: authLoading } = usePhaseAuthorization();
@@ -390,10 +391,22 @@ export const KanbanView = ({ orders, onEdit, onStatusChange }: KanbanViewProps) 
       prev.map(o => o.id === orderId ? { ...o, status: newStatus } : o)
     );
     
-    // 🚀 PASSO 2: Enviar para servidor (não bloqueia UI)
+    // 🚀 PASSO 2: Marcar card como recém-movido para animação
+    setRecentlyMovedCards(prev => new Set(prev).add(orderId));
+    
+    // Remover da lista após animação completar
+    setTimeout(() => {
+      setRecentlyMovedCards(prev => {
+        const next = new Set(prev);
+        next.delete(orderId);
+        return next;
+      });
+    }, 300);
+    
+    // 🚀 PASSO 3: Enviar para servidor (não bloqueia UI)
     onStatusChange(orderId, newStatus);
     
-    // 🔥 PASSO 3: Log em background (fire-and-forget, não bloqueia)
+    // 🔥 PASSO 4: Log em background (fire-and-forget, não bloqueia)
     const logActivity = async () => {
       try {
         const { data: { user: currentUser } } = await supabase.auth.getUser();
@@ -487,6 +500,7 @@ export const KanbanView = ({ orders, onEdit, onStatusChange }: KanbanViewProps) 
                 responsibleUsers={phaseDetails.responsibleUsers}
                 canDrag={canDrag}
                 linkTo={column.id === "purchases" ? "/compras" : undefined}
+                animatedCardIds={recentlyMovedCards}
               />
             );
           })}

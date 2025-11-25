@@ -221,12 +221,23 @@ export default {
             boxShadow: "0 0 4px 1px hsl(var(--ecommerce-pulse) / 0.12)"
           },
         },
+        "card-pop-in": {
+          "0%": { opacity: "0", transform: "scale(0.9)" },
+          "50%": { transform: "scale(1.02)" },
+          "100%": { opacity: "1", transform: "scale(1)" }
+        },
+        "card-slide-in": {
+          "0%": { opacity: "0", transform: "translateY(-10px)" },
+          "100%": { opacity: "1", transform: "translateY(0)" }
+        }
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
         "pulse-critical": "pulse-critical 3s ease-in-out infinite",
         "ecommerce-pulse": "ecommerce-pulse 12s cubic-bezier(0.4, 0, 0.2, 1) infinite",
+        "card-pop-in": "card-pop-in 0.25s cubic-bezier(0.34, 1.56, 0.64, 1) forwards",
+        "card-slide-in": "card-slide-in 0.2s ease-out forwards"
       },
     },
   },
