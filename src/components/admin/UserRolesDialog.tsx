@@ -177,7 +177,8 @@ export const UserRolesDialog = ({ open, onOpenChange, user, onSuccess }: UserRol
 
   // Group roles by area
   const rolesByArea = {
-    'Operações': availableRoles.filter(r => ['almox_ssm', 'order_generation', 'almox_general', 'production', 'balance_generation', 'laboratory'].includes(r.value)),
+    'Operações': availableRoles.filter(r => ['almox_ssm', 'order_generation', 'almox_general', 'balance_generation', 'laboratory'].includes(r.value)),
+    'Produção': availableRoles.filter(r => ['production_client', 'production_stock'].includes(r.value)),
     'Expedição': availableRoles.filter(r => ['packaging', 'logistics', 'in_transit'].includes(r.value)),
     'Comercial': availableRoles.filter(r => r.value === 'freight_quote'),
     'Financeiro': availableRoles.filter(r => ['ready_to_invoice', 'invoicing'].includes(r.value)),
