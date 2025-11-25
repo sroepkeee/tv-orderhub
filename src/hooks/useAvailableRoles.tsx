@@ -31,6 +31,7 @@ export const useAvailableRoles = () => {
         'almox_general',
         'production_client',
         'production_stock',
+        'purchases',
         'balance_generation',
         'laboratory',
         'packaging',
