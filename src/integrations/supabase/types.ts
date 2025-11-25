@@ -1751,6 +1751,7 @@ export type Database = {
           role: string
         }[]
       }
+      get_phase_from_order: { Args: { _order_id: string }; Returns: string }
       get_phase_from_status: { Args: { _status: string }; Returns: string }
       get_user_phases: {
         Args: { _user_id: string }
