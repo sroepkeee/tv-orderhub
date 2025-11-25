@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,13 +25,14 @@ import { ExceptionCommentDialog } from "./ExceptionCommentDialog";
 import { PhaseButtons } from "./PhaseButtons";
 import { ConfirmationDialog } from "./ConfirmationDialog";
 import { OrderTypeSelector } from "@/components/OrderTypeSelector";
-import { cleanItemDescription } from "@/lib/utils";
+import { cleanItemDescription, cn } from "@/lib/utils";
 import { OrderMetricsTab } from "./metrics/OrderMetricsTab";
 import { EnhancedOrderTimeline } from "./EnhancedOrderTimeline";
 import { LabWorkView } from "./LabWorkView";
 import { CarriersTabContent } from "./carriers/CarriersTabContent";
 import { VolumeManager } from "./VolumeManager";
 import { OrderComments } from "./OrderComments";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 interface HistoryEvent {
   id: string;
   changed_at: string;
@@ -130,6 +131,12 @@ export const EditOrderDialog = ({
   const [labConfigOpen, setLabConfigOpen] = useState(false);
   const [freightInfoOpen, setFreightInfoOpen] = useState(false);
 
+  // ✨ Estados para rastrear alterações não salvas
+  const [originalItems, setOriginalItems] = useState<OrderItem[]>([]);
+  const [originalFormValues, setOriginalFormValues] = useState<Partial<Order>>({});
+  const [modifiedFields, setModifiedFields] = useState<Set<string>>(new Set());
+  const [showUnsavedChangesDialog, setShowUnsavedChangesDialog] = useState(false);
+
   // Ref para rastrear últimos valores dos campos de frete
   const lastShippingRef = useRef({
     freight_modality: null as string | null,
@@ -150,6 +157,56 @@ export const EditOrderDialog = ({
       setCurrentUserId(user?.id || null);
     });
   }, [open]);
+
+  // ✨ Verificar se há alterações não salvas
+  const hasUnsavedChanges = useCallback((): boolean => {
+    // Verificar mudanças nos itens
+    if (items.length !== originalItems.length) return true;
+    
+    for (let i = 0; i < items.length; i++) {
+      const current = items[i];
+      const original = originalItems.find(o => o.id === current.id);
+      if (!original) return true;
+      
+      // Campos que são salvos apenas no "Salvar Alterações"
+      if (current.production_order_number !== original.production_order_number) return true;
+      if (current.deliveredQuantity !== original.deliveredQuantity) return true;
+      if (current.itemCode !== original.itemCode) return true;
+      if (current.itemDescription !== original.itemDescription) return true;
+      if (current.requestedQuantity !== original.requestedQuantity) return true;
+      if (current.unit !== original.unit) return true;
+      if (current.warehouse !== original.warehouse) return true;
+      if (current.deliveryDate !== original.deliveryDate) return true;
+      if (current.item_status !== original.item_status) return true;
+    }
+    
+    // Verificar mudanças no formulário
+    const currentValues = getValues();
+    if (currentValues.deliveryDeadline !== originalFormValues.deliveryDeadline) return true;
+    if (currentValues.client !== originalFormValues.client) return true;
+    if (currentValues.deskTicket !== originalFormValues.deskTicket) return true;
+    if (currentValues.type !== originalFormValues.type) return true;
+    if (currentValues.priority !== originalFormValues.priority) return true;
+    
+    return false;
+  }, [items, originalItems, getValues, originalFormValues]);
+
+  // ✨ Verificar se um campo específico foi modificado
+  const isFieldModified = useCallback((itemId: string, field: string): boolean => {
+    return modifiedFields.has(`${itemId}_${field}`);
+  }, [modifiedFields]);
+
+  // ✨ Interceptar tentativa de fechar o diálogo
+  const handleCloseAttempt = useCallback((open: boolean) => {
+    if (!open && hasUnsavedChanges()) {
+      // Mostrar diálogo de confirmação
+      setShowUnsavedChangesDialog(true);
+    } else {
+      // Fechar diretamente
+      onOpenChange(open);
+    }
+  }, [hasUnsavedChanges, onOpenChange]);
+
 
   // Load history from database (order + items + freight changes)
   const loadHistory = async () => {
@@ -544,6 +601,18 @@ export const EditOrderDialog = ({
       };
       reset(orderData);
 
+      // ✨ Armazenar valores originais do formulário
+      setOriginalFormValues({
+        deliveryDeadline: order.deliveryDeadline,
+        deskTicket: order.deskTicket,
+        client: order.client,
+        type: order.type,
+        priority: order.priority
+      });
+
+      // ✨ Limpar campos modificados ao abrir
+      setModifiedFields(new Set());
+
       // Inicializar ref com valores atuais
       lastShippingRef.current = {
         freight_modality: (order as any).freight_modality ?? null,
@@ -684,6 +753,8 @@ export const EditOrderDialog = ({
       purchase_action_started_by: item.purchase_action_started_by
     }));
     setItems(mappedItems);
+    // ✨ Armazenar cópia original para comparação posterior
+    setOriginalItems(JSON.parse(JSON.stringify(mappedItems)));
   };
 
   // Real-time subscription for history, comments, attachments and items updates
@@ -798,6 +869,25 @@ export const EditOrderDialog = ({
       ...newItems[index],
       [field]: value
     };
+
+    // ✨ Rastrear se o campo foi modificado em relação ao original
+    if (oldItem.id) {
+      const original = originalItems.find(o => o.id === oldItem.id);
+      if (original) {
+        const fieldKey = `${oldItem.id}_${field}`;
+        const isModified = (original as any)[field] !== value;
+        
+        setModifiedFields(prev => {
+          const newSet = new Set(prev);
+          if (isModified) {
+            newSet.add(fieldKey);
+          } else {
+            newSet.delete(fieldKey);
+          }
+          return newSet;
+        });
+      }
+    }
 
     // NOVO: Detectar mudança de armazém
     if (field === 'warehouse' && oldItem.warehouse !== value && oldItem.id) {
@@ -1567,6 +1657,18 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
       }
       onSave(updatedOrder);
       onOpenChange(false);
+      
+      // ✨ Limpar campos modificados após salvar com sucesso
+      setModifiedFields(new Set());
+      setOriginalItems(JSON.parse(JSON.stringify(items)));
+      setOriginalFormValues({
+        deliveryDeadline: data.deliveryDeadline,
+        deskTicket: data.deskTicket,
+        client: data.client,
+        type: data.type,
+        priority: data.priority
+      });
+      
       console.log('✅ [SUCESSO] Pedido salvo com sucesso');
     } catch (error: any) {
       console.error('❌ [ERRO CRÍTICO] Falha ao salvar pedido:', error);
@@ -1745,7 +1847,7 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
     return "secondary";
   };
   return <>
-      <Dialog open={open} onOpenChange={onOpenChange}>
+      <Dialog open={open} onOpenChange={handleCloseAttempt}>
         <DialogContent className="max-w-[95vw] max-h-[95vh] p-4">
           <DialogHeader className="pb-3">
             <div className="flex items-center justify-between">
@@ -2140,12 +2242,23 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                                 />
                               </TableCell>
                               <TableCell>
-                                <Input 
-                                  value={item.production_order_number || ''} 
-                                  onChange={e => updateItem(index, "production_order_number", e.target.value)} 
-                                  placeholder="OP-000" 
-                                  className="h-8 text-sm font-mono bg-amber-50 dark:bg-amber-950/50 border-amber-200 dark:border-amber-800 focus-visible:ring-amber-400" 
-                                />
+                                <div className="relative">
+                                  <Input 
+                                    value={item.production_order_number || ''} 
+                                    onChange={e => updateItem(index, "production_order_number", e.target.value)} 
+                                    placeholder="OP-000" 
+                                    className={cn(
+                                      "h-8 text-sm font-mono bg-amber-50 dark:bg-amber-950/50 border-amber-200 dark:border-amber-800 focus-visible:ring-amber-400",
+                                      item.id && isFieldModified(item.id, 'production_order_number') && "ring-2 ring-orange-400 border-orange-400"
+                                    )}
+                                  />
+                                  {item.id && isFieldModified(item.id, 'production_order_number') && (
+                                    <span 
+                                      className="absolute -top-1 -right-1 w-2 h-2 bg-orange-500 rounded-full" 
+                                      title="Campo modificado - não salvo" 
+                                    />
+                                  )}
+                                </div>
                               </TableCell>
                               <TableCell>
                                 <Select value={item.item_status || 'in_stock'} onValueChange={(value: 'pending' | 'in_stock' | 'awaiting_production' | 'purchase_required' | 'purchase_requested' | 'completed') => updateItem(index, "item_status", value)}>
@@ -2296,34 +2409,45 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                               </TableCell>
                               <TableCell>
                                 <div className="flex flex-col gap-0.5">
-                                  <Input 
-                                    type="number" 
-                                    step="0.01" 
-                                    value={item.deliveredQuantity} 
-                                    onChange={e => {
-                                      const newQty = parseFloat(e.target.value) || 0;
+                                  <div className="relative">
+                                    <Input 
+                                      type="number" 
+                                      step="0.01" 
+                                      value={item.deliveredQuantity} 
+                                      onChange={e => {
+                                        const newQty = parseFloat(e.target.value) || 0;
 
-                                      // Se o item já foi salvo, atualizar no banco
-                                      if (item.id) {
-                                        handleUpdateReceivedQuantity(item.id, newQty, item.requestedQuantity);
-                                      } else {
-                                        // Se ainda não foi salvo, apenas atualiza localmente
-                                        const validQty = Math.max(0, Math.min(newQty, item.requestedQuantity));
-                                        updateItem(index, "deliveredQuantity", validQty);
-                                      }
-                                    }} 
-                                    onBlur={e => {
-                                      // Validar ao sair do campo
-                                      if (!item.id) {
-                                        const newQty = Math.max(0, Math.min(parseFloat(e.target.value) || 0, item.requestedQuantity));
-                                        updateItem(index, "deliveredQuantity", newQty);
-                                      }
-                                    }} 
-                                    min="0" 
-                                    max={item.requestedQuantity} 
-                                    className="h-8 text-sm bg-background/80 dark:bg-muted/40" 
-                                    placeholder="0" 
-                                  />
+                                        // Se o item já foi salvo, atualizar no banco
+                                        if (item.id) {
+                                          handleUpdateReceivedQuantity(item.id, newQty, item.requestedQuantity);
+                                        } else {
+                                          // Se ainda não foi salvo, apenas atualiza localmente
+                                          const validQty = Math.max(0, Math.min(newQty, item.requestedQuantity));
+                                          updateItem(index, "deliveredQuantity", validQty);
+                                        }
+                                      }} 
+                                      onBlur={e => {
+                                        // Validar ao sair do campo
+                                        if (!item.id) {
+                                          const newQty = Math.max(0, Math.min(parseFloat(e.target.value) || 0, item.requestedQuantity));
+                                          updateItem(index, "deliveredQuantity", newQty);
+                                        }
+                                      }} 
+                                      min="0" 
+                                      max={item.requestedQuantity} 
+                                      className={cn(
+                                        "h-8 text-sm bg-background/80 dark:bg-muted/40",
+                                        item.id && isFieldModified(item.id, 'deliveredQuantity') && "ring-2 ring-orange-400 border-orange-400"
+                                      )}
+                                      placeholder="0" 
+                                    />
+                                    {item.id && isFieldModified(item.id, 'deliveredQuantity') && (
+                                      <span 
+                                        className="absolute -top-1 -right-1 w-2 h-2 bg-orange-500 rounded-full" 
+                                        title="Campo modificado - não salvo" 
+                                      />
+                                    )}
+                                  </div>
                                   {item.requestedQuantity > 0 && (
                                     <div className="h-1 rounded-full bg-muted overflow-hidden">
                                       <div 
@@ -2360,10 +2484,15 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                     Excluir Pedido
                   </Button>
                   <div className="flex gap-2">
-                    <Button type="button" variant="outline" size="sm" onClick={() => onOpenChange(false)}>
+                    <Button type="button" variant="outline" size="sm" onClick={() => handleCloseAttempt(false)}>
                       Cancelar
                     </Button>
-                    <Button type="submit" size="sm">
+                    <Button type="submit" size="sm" className="gap-2">
+                      {modifiedFields.size > 0 && (
+                        <Badge variant="secondary" className="bg-orange-100 dark:bg-orange-900 text-orange-700 dark:text-orange-200">
+                          {modifiedFields.size}
+                        </Badge>
+                      )}
                       Salvar Alterações
                     </Button>
                   </div>
@@ -2565,6 +2694,45 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
     }} saving={savingException} />
       
       <ConfirmationDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm} title="Excluir Pedido" description={`Tem certeza que deseja excluir o pedido ${order?.orderNumber}? Esta ação é irreversível e excluirá o pedido e todos os seus itens, comentários, anexos e histórico do sistema.`} onConfirm={handleDelete} variant="destructive" confirmText={deleting ? "Excluindo..." : "Sim, excluir"} cancelText="Cancelar" />
+
+      {/* Diálogo de Alterações Não Salvas */}
+      <AlertDialog open={showUnsavedChangesDialog} onOpenChange={setShowUnsavedChangesDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>⚠️ Alterações não salvas</AlertDialogTitle>
+            <AlertDialogDescription>
+              Você tem {modifiedFields.size} alteração(ões) pendente(s) que ainda não foram salvas. O que deseja fazer?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex gap-2 sm:justify-between">
+            <AlertDialogCancel onClick={() => setShowUnsavedChangesDialog(false)}>
+              Cancelar
+            </AlertDialogCancel>
+            <div className="flex gap-2">
+              <Button 
+                variant="destructive" 
+                onClick={() => {
+                  setShowUnsavedChangesDialog(false);
+                  setItems(originalItems);
+                  reset(originalFormValues);
+                  setModifiedFields(new Set());
+                  onOpenChange(false);
+                }}
+              >
+                Descartar
+              </Button>
+              <Button 
+                onClick={() => {
+                  setShowUnsavedChangesDialog(false);
+                  handleSubmit(onSubmit)();
+                }}
+              >
+                Salvar e Fechar
+              </Button>
+            </div>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Date Change Category Dialog for Items */}
       <Dialog open={showItemDateChangeDialog} onOpenChange={setShowItemDateChangeDialog}>
