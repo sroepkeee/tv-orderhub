@@ -2035,17 +2035,42 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                       <Table>
                         <TableHeader>
                           <TableRow>
-                            <TableHead className="w-[120px]">Código</TableHead>
-                            <TableHead className="min-w-[200px]">Descrição</TableHead>
+                            <TableHead className="w-[120px]">
+                              <div className="flex items-center gap-1.5">
+                                <Package className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
+                                <span>Código</span>
+                              </div>
+                            </TableHead>
+                            <TableHead className="min-w-[200px]">
+                              <div className="flex items-center gap-1.5">
+                                <FileText className="h-3.5 w-3.5" />
+                                <span>Descrição</span>
+                              </div>
+                            </TableHead>
                             <TableHead className="w-[80px]">UND</TableHead>
                             <TableHead className="w-[100px]">Qtd. Sol.</TableHead>
-                            <TableHead className="w-[100px]">Armazém</TableHead>
-                              <TableHead className="w-[140px]">Data Entrega</TableHead>
-                              <TableHead className="w-[100px]">Nº OP</TableHead>
-                              <TableHead className="w-[180px]">Situação</TableHead>
-                              <TableHead className="w-[140px]">Compra/Import.</TableHead>
-                              <TableHead className="w-[120px]">Qtd. Recebida</TableHead>
-                              <TableHead className="w-[100px]">Ações</TableHead>
+                            <TableHead className="w-[100px]">
+                              <div className="flex items-center gap-1.5">
+                                <Package className="h-3.5 w-3.5 text-teal-600 dark:text-teal-400" />
+                                <span>Armazém</span>
+                              </div>
+                            </TableHead>
+                            <TableHead className="w-[140px]">
+                              <div className="flex items-center gap-1.5">
+                                <Calendar className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" />
+                                <span>Data Entrega</span>
+                              </div>
+                            </TableHead>
+                            <TableHead className="w-[100px]">
+                              <div className="flex items-center gap-1.5">
+                                <BarChart3 className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+                                <span>Nº OP</span>
+                              </div>
+                            </TableHead>
+                            <TableHead className="w-[180px]">Situação</TableHead>
+                            <TableHead className="w-[140px]">Compra/Import.</TableHead>
+                            <TableHead className="w-[120px]">Qtd. Recebida</TableHead>
+                            <TableHead className="w-[100px]">Ações</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -2055,34 +2080,74 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                                 ${item.deliveredQuantity >= item.requestedQuantity && item.deliveredQuantity > 0 ? 'border-l-4 border-l-green-500' : ''}
                               `}>
                               <TableCell>
-                                <Input value={item.itemCode} onChange={e => updateItem(index, "itemCode", e.target.value)} placeholder="ITEM-001" className="h-8 text-sm" />
+                                <Input 
+                                  value={item.itemCode} 
+                                  onChange={e => updateItem(index, "itemCode", e.target.value)} 
+                                  placeholder="ITEM-001" 
+                                  className="h-8 text-sm font-mono bg-blue-50 dark:bg-blue-950/50 border-blue-200 dark:border-blue-800 focus-visible:ring-blue-400" 
+                                />
                               </TableCell>
                               <TableCell>
-                                <Input value={item.itemDescription} onChange={e => updateItem(index, "itemDescription", e.target.value)} placeholder="Descrição" className="h-8 text-sm" />
+                                <Input 
+                                  value={item.itemDescription} 
+                                  onChange={e => updateItem(index, "itemDescription", e.target.value)} 
+                                  placeholder="Descrição" 
+                                  className="h-8 text-sm bg-background/80 dark:bg-muted/40" 
+                                />
                               </TableCell>
                               <TableCell>
-                                <Input value={item.unit} onChange={e => updateItem(index, "unit", e.target.value)} placeholder="UND" className="h-8 text-sm" />
+                                <Input 
+                                  value={item.unit} 
+                                  onChange={e => updateItem(index, "unit", e.target.value)} 
+                                  placeholder="UND" 
+                                  className="h-8 text-sm bg-background/80 dark:bg-muted/40" 
+                                />
                               </TableCell>
                               <TableCell>
-                                <Input type="number" step="0.01" value={item.requestedQuantity} onChange={e => updateItem(index, "requestedQuantity", parseFloat(e.target.value) || 0)} min="0" className="h-8 text-sm" />
+                                <Input 
+                                  type="number" 
+                                  step="0.01" 
+                                  value={item.requestedQuantity} 
+                                  onChange={e => updateItem(index, "requestedQuantity", parseFloat(e.target.value) || 0)} 
+                                  min="0" 
+                                  className="h-8 text-sm bg-background/80 dark:bg-muted/40" 
+                                />
                               </TableCell>
                               <TableCell className="p-1">
-                                <Input value={item.warehouse} onChange={e => updateItem(index, "warehouse", e.target.value)} placeholder="Armazém" className="h-8 text-sm" />
+                                <div className="flex items-center gap-1.5">
+                                  <div className="w-2 h-2 rounded-full bg-teal-500 flex-shrink-0" />
+                                  <Input 
+                                    value={item.warehouse} 
+                                    onChange={e => updateItem(index, "warehouse", e.target.value)} 
+                                    placeholder="Armazém" 
+                                    className="h-8 text-sm bg-teal-50 dark:bg-teal-950/50 border-teal-200 dark:border-teal-800 focus-visible:ring-teal-400" 
+                                  />
+                                </div>
                               </TableCell>
                               <TableCell>
-                                <Input type="date" value={item.deliveryDate} onChange={e => updateItem(index, "deliveryDate", e.target.value)} className="h-8 text-sm" />
+                                <Input 
+                                  type="date" 
+                                  value={item.deliveryDate} 
+                                  onChange={e => updateItem(index, "deliveryDate", e.target.value)} 
+                                  className="h-8 text-sm bg-purple-50 dark:bg-purple-950/50 border-purple-200 dark:border-purple-800 focus-visible:ring-purple-400" 
+                                />
                               </TableCell>
                               <TableCell>
                                 <Input 
                                   value={item.production_order_number || ''} 
                                   onChange={e => updateItem(index, "production_order_number", e.target.value)} 
                                   placeholder="OP-000" 
-                                  className="h-8 text-sm font-mono" 
+                                  className="h-8 text-sm font-mono bg-amber-50 dark:bg-amber-950/50 border-amber-200 dark:border-amber-800 focus-visible:ring-amber-400" 
                                 />
                               </TableCell>
                               <TableCell>
                                 <Select value={item.item_status || 'in_stock'} onValueChange={(value: 'pending' | 'in_stock' | 'awaiting_production' | 'purchase_required' | 'purchase_requested' | 'completed') => updateItem(index, "item_status", value)}>
-                                  <SelectTrigger className="h-8 text-sm">
+                                  <SelectTrigger className={`h-8 text-sm ${
+                                    item.item_status === 'completed' ? 'bg-green-100 dark:bg-green-900/50 border-green-400 text-green-900 dark:text-green-100' :
+                                    item.item_status === 'purchase_required' || item.item_status === 'purchase_requested' ? 'bg-orange-100 dark:bg-orange-900/50 border-orange-400 text-orange-900 dark:text-orange-100' :
+                                    item.item_status === 'awaiting_production' ? 'bg-blue-100 dark:bg-blue-900/50 border-blue-400 text-blue-900 dark:text-blue-100' :
+                                    'bg-muted/50'
+                                  }`}>
                                     <SelectValue />
                                   </SelectTrigger>
                                   <SelectContent>
@@ -2223,26 +2288,46 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                                 </div>
                               </TableCell>
                               <TableCell>
-                                <div className="flex items-center gap-1">
-                                  <Input type="number" step="0.01" value={item.deliveredQuantity} onChange={e => {
-                                const newQty = parseFloat(e.target.value) || 0;
+                                <div className="flex flex-col gap-0.5">
+                                  <Input 
+                                    type="number" 
+                                    step="0.01" 
+                                    value={item.deliveredQuantity} 
+                                    onChange={e => {
+                                      const newQty = parseFloat(e.target.value) || 0;
 
-                                // Se o item já foi salvo, atualizar no banco
-                                if (item.id) {
-                                  handleUpdateReceivedQuantity(item.id, newQty, item.requestedQuantity);
-                                } else {
-                                  // Se ainda não foi salvo, apenas atualiza localmente
-                                  const validQty = Math.max(0, Math.min(newQty, item.requestedQuantity));
-                                  updateItem(index, "deliveredQuantity", validQty);
-                                }
-                              }} onBlur={e => {
-                                // Validar ao sair do campo
-                                if (!item.id) {
-                                  const newQty = Math.max(0, Math.min(parseFloat(e.target.value) || 0, item.requestedQuantity));
-                                  updateItem(index, "deliveredQuantity", newQty);
-                                }
-                              }} min="0" max={item.requestedQuantity} className="h-8 text-sm" placeholder="0" />
-                                  {item.deliveredQuantity > 0 && item.deliveredQuantity < item.requestedQuantity}
+                                      // Se o item já foi salvo, atualizar no banco
+                                      if (item.id) {
+                                        handleUpdateReceivedQuantity(item.id, newQty, item.requestedQuantity);
+                                      } else {
+                                        // Se ainda não foi salvo, apenas atualiza localmente
+                                        const validQty = Math.max(0, Math.min(newQty, item.requestedQuantity));
+                                        updateItem(index, "deliveredQuantity", validQty);
+                                      }
+                                    }} 
+                                    onBlur={e => {
+                                      // Validar ao sair do campo
+                                      if (!item.id) {
+                                        const newQty = Math.max(0, Math.min(parseFloat(e.target.value) || 0, item.requestedQuantity));
+                                        updateItem(index, "deliveredQuantity", newQty);
+                                      }
+                                    }} 
+                                    min="0" 
+                                    max={item.requestedQuantity} 
+                                    className="h-8 text-sm bg-background/80 dark:bg-muted/40" 
+                                    placeholder="0" 
+                                  />
+                                  {item.requestedQuantity > 0 && (
+                                    <div className="h-1 rounded-full bg-muted overflow-hidden">
+                                      <div 
+                                        className={`h-full transition-all ${
+                                          item.deliveredQuantity >= item.requestedQuantity ? 'bg-green-500' :
+                                          item.deliveredQuantity > 0 ? 'bg-yellow-500' : 'bg-red-500'
+                                        }`}
+                                        style={{ width: `${Math.min(100, (item.deliveredQuantity / item.requestedQuantity) * 100)}%` }}
+                                      />
+                                    </div>
+                                  )}
                                 </div>
                               </TableCell>
                               <TableCell>
