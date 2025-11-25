@@ -8,7 +8,6 @@ import { useDroppable } from "@dnd-kit/core";
 import { Phase } from "./KanbanView";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useNavigate } from "react-router-dom";
-
 interface KanbanColumnProps {
   id: Phase;
   title: string;
@@ -65,10 +64,7 @@ export const KanbanColumn = ({
       {/* Column Header */}
       <div className={`${headerStyles} ${pulseClass} rounded-t-lg p-3 sticky top-0 z-10 h-12 flex items-center transition-all duration-200`}>
         <div className="flex items-center justify-between w-full">
-          <div 
-            className={`flex items-center gap-2 ${linkTo ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''}`}
-            onClick={() => linkTo && navigate(linkTo)}
-          >
+          <div className={`flex items-center gap-2 ${linkTo ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''}`} onClick={() => linkTo && navigate(linkTo)}>
             <Icon className={`${iconSize} ${iconOpacity} transition-all`} />
             <h3 className={`font-semibold text-sm ${titleOpacity}`}>{title}</h3>
             {linkTo && <ExternalLink className="h-3 w-3 opacity-60" />}
@@ -113,37 +109,16 @@ export const KanbanColumn = ({
 
       {/* Cards Container */}
       <div className={`kanban-cards-container flex-1 ${containerBg} ${containerBorder} rounded-b-lg p-2 overflow-y-auto space-y-2 animate-fade-in transition-all duration-200`}>
-        {orders.length === 0 ? (
-          <div className="text-center text-muted-foreground text-sm py-8">
+        {orders.length === 0 ? <div className="text-center text-muted-foreground text-sm py-8">
             Nenhum pedido nesta fase
-            {linkTo && (
-              <Button 
-                variant="outline" 
-                size="sm" 
-                className="mt-4 gap-2"
-                onClick={() => navigate(linkTo)}
-              >
-                <Icon className="h-4 w-4" />
-                Ver Módulo de Compras
-              </Button>
-            )}
-          </div>
-        ) : (
-          <>
+            {linkTo}
+          </div> : <>
             {orders.map(order => <KanbanCard key={order.id} order={order} onEdit={onEdit} onStatusChange={onStatusChange} canDrag={canDrag} />)}
-            {linkTo && (
-              <Button 
-                variant="outline" 
-                size="sm" 
-                className="w-full gap-2 mt-2"
-                onClick={() => navigate(linkTo)}
-              >
+            {linkTo && <Button variant="outline" size="sm" className="w-full gap-2 mt-2" onClick={() => navigate(linkTo)}>
                 <Icon className="h-4 w-4" />
                 Ver Módulo de Compras
-              </Button>
-            )}
-          </>
-        )}
+              </Button>}
+          </>}
       </div>
     </div>;
 };
