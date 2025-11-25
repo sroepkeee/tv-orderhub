@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Clock, AlertCircle, GripVertical, Info } from "lucide-react";
+import { Clock, AlertCircle, GripVertical, Info, ShoppingCart } from "lucide-react";
 import { Order } from "@/components/Dashboard";
 import { OrderItem } from "@/components/AddOrderDialog";
 import { useDraggable } from "@dnd-kit/core";
@@ -132,6 +132,12 @@ export const KanbanCard = ({
   };
   const daysRemaining = calculateDaysRemaining(order.deliveryDeadline);
   const progressBarColor = getProgressBarColor(daysRemaining);
+  
+  // Contar itens que precisam de compra
+  const purchaseItemsCount = order.items?.filter(
+    i => i.item_status === 'purchase_required' || i.item_status === 'purchase_requested'
+  ).length || 0;
+  
   return <div ref={setNodeRef} style={style} className={isDragging ? "dragging" : ""}>
         <Card className={`relative kanban-card p-2 transition-all duration-200 ${!isEcommerce ? getPriorityClass(order.priority) : ''} ${isDragging ? 'cursor-grabbing opacity-50 scale-105 shadow-2xl' : 'cursor-pointer hover:shadow-lg hover:scale-[1.01]'} ${isVendasEcommerce ? 'animate-ecommerce-pulse border-[3px]' : ''}`} onClick={handleCardClick} onMouseDown={() => setClickStart(Date.now())}>
         {/* Selo E-commerce no canto superior direito */}
@@ -212,7 +218,7 @@ export const KanbanCard = ({
         
         {/* Item Source Indicators - Monochromatic */}
         {order.items && order.items.length > 0 && (
-          <div className="flex gap-2 mt-1 text-[10px] text-muted-foreground">
+          <div className="flex gap-2 mt-1 text-[10px] text-muted-foreground flex-wrap">
             {countItemsBySource(order.items).inStock > 0 && (
               <span>✓ {countItemsBySource(order.items).inStock} estoque</span>
             )}
@@ -221,6 +227,12 @@ export const KanbanCard = ({
             )}
             {countItemsBySource(order.items).outOfStock > 0 && (
               <span className="text-red-500">⚠ {countItemsBySource(order.items).outOfStock} falta</span>
+            )}
+            {purchaseItemsCount > 0 && (
+              <Badge variant="outline" className="bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-400 border-amber-300 dark:border-amber-800 gap-1 text-[10px] px-1.5 py-0 h-4">
+                <ShoppingCart className="h-2.5 w-2.5" />
+                {purchaseItemsCount}
+              </Badge>
             )}
           </div>
         )}
