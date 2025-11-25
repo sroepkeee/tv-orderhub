@@ -33,6 +33,8 @@ import { CarriersTabContent } from "./carriers/CarriersTabContent";
 import { VolumeManager } from "./VolumeManager";
 import { OrderComments } from "./OrderComments";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useProfilesCache } from "@/hooks/useProfilesCache";
 interface HistoryEvent {
   id: string;
   changed_at: string;
@@ -85,6 +87,7 @@ export const EditOrderDialog = ({
     toast
   } = useToast();
   const queryClient = useQueryClient();
+  const { getProfiles } = useProfilesCache();
   const [activeTab, setActiveTab] = useState(() => {
     const savedTab = sessionStorage.getItem('activeTab');
     if (savedTab) {
@@ -127,6 +130,9 @@ export const EditOrderDialog = ({
   const [isChangingStatus, setIsChangingStatus] = useState(false);
   const [isSavingShipping, setIsSavingShipping] = useState(false);
 
+  // ✨ Estados para lazy loading de abas
+  const [loadedTabs, setLoadedTabs] = useState<Set<string>>(new Set(['edit']));
+
   // Estados para controlar seções colapsáveis
   const [labConfigOpen, setLabConfigOpen] = useState(false);
   const [freightInfoOpen, setFreightInfoOpen] = useState(false);
@@ -150,6 +156,20 @@ export const EditOrderDialog = ({
 
   // Ref para timeouts de debounce
   const saveTimers = useRef<Record<string, any>>({});
+  // ✨ Handler para lazy loading de abas
+  const handleTabChange = async (tab: string) => {
+    setActiveTab(tab);
+    
+    // Carregar dados apenas se a aba ainda não foi carregada
+    if (!loadedTabs.has(tab)) {
+      if (tab === 'attachments') {
+        await loadAttachments();
+      }
+      
+      setLoadedTabs(prev => new Set([...prev, tab]));
+    }
+  };
+
   useEffect(() => {
     if (!open) return;
     supabase.auth.getUser().then(({
@@ -211,88 +231,58 @@ export const EditOrderDialog = ({
   }, [hasUnsavedChanges, onOpenChange]);
 
 
-  // Load history from database (order + items + freight changes)
+  // ✨ Load history from database (order + items + freight changes) - OTIMIZADO COM CACHE
   const loadHistory = async () => {
     if (!order?.id) return;
     setLoadingHistory(true);
     try {
-      // Histórico do pedido
-      const {
-        data: orderHistory,
-        error: orderError
-      } = await supabase.from('order_history').select('*').eq('order_id', order.id).order('changed_at', {
-        ascending: false
-      });
-      if (orderError) throw orderError;
+      // Carregar histórico em paralelo
+      const [orderHistoryResult, itemHistoryResult, orderChangesResult] = await Promise.all([
+        supabase.from('order_history').select('*').eq('order_id', order.id).order('changed_at', { ascending: false }),
+        supabase.from('order_item_history').select(`*, order_items(item_code, item_description)`).eq('order_id', order.id).order('changed_at', { ascending: false }),
+        supabase.from('order_changes').select('*').eq('order_id', order.id).order('changed_at', { ascending: false })
+      ]);
 
-      // NOVO: Histórico dos itens
-      const {
-        data: itemHistory,
-        error: itemError
-      } = await supabase.from('order_item_history').select(`
-          *,
-          order_items(item_code, item_description)
-        `).eq('order_id', order.id).order('changed_at', {
-        ascending: false
-      });
-      if (itemError) console.error("Error loading item history:", itemError);
+      const orderHistory = orderHistoryResult.data || [];
+      const itemHistory = itemHistoryResult.data || [];
+      const orderChanges = orderChangesResult.data || [];
 
-      // NOVO: Histórico de mudanças gerais (frete, etc)
-      const {
-        data: orderChanges,
-        error: changesError
-      } = await supabase.from('order_changes').select('*').eq('order_id', order.id).order('changed_at', {
-        ascending: false
-      });
-      if (changesError) console.error("Error loading order changes:", changesError);
-
-      // Load user profiles for all events
-      const allUserIds = [...(orderHistory?.filter(h => h.user_id && h.user_id !== '00000000-0000-0000-0000-000000000000').map(h => h.user_id) || []), ...(itemHistory?.map(h => h.user_id) || []), ...(orderChanges?.map(h => h.changed_by) || [])];
+      // ✅ Usar cache de profiles
+      const allUserIds = [
+        ...(orderHistory.filter(h => h.user_id && h.user_id !== '00000000-0000-0000-0000-000000000000').map(h => h.user_id)),
+        ...(itemHistory.map(h => h.user_id)),
+        ...(orderChanges.map(h => h.changed_by))
+      ];
       const userIds = [...new Set(allUserIds)];
-      let profiles: any[] = [];
-      if (userIds.length > 0) {
-        const {
-          data: profilesData
-        } = await supabase.from('profiles').select('id, full_name, email').in('id', userIds);
-        profiles = profilesData || [];
-      }
+      const profiles = await getProfiles(userIds);
 
-      // Mesclar histórico de pedidos e itens
-      const orderHistoryWithNames = orderHistory?.map(event => {
+      // Mesclar histórico com nomes de usuários
+      const orderHistoryWithNames = orderHistory.map(event => {
         let userName = 'Sistema';
         if (event.user_id === '00000000-0000-0000-0000-000000000000') {
           userName = 'Sistema Laboratório';
         } else if (event.user_id) {
-          const profile = profiles.find(p => p.id === event.user_id);
+          const profile = profiles.find((p: any) => p.id === event.user_id);
           userName = profile?.full_name || profile?.email || 'Usuário';
         }
-        return {
-          ...event,
-          user_name: userName,
-          type: 'order' as const
-        };
-      }) || [];
-      const itemHistoryWithNames = itemHistory?.map(event => {
-        const profile = profiles.find(p => p.id === event.user_id);
+        return { ...event, user_name: userName, type: 'order' as const };
+      });
+
+      const itemHistoryWithNames = itemHistory.map(event => {
+        const profile = profiles.find((p: any) => p.id === event.user_id);
         const userName = profile?.full_name || profile?.email || 'Usuário';
-        return {
-          ...event,
-          user_name: userName,
-          type: 'item' as const
-        };
-      }) || [];
-      const orderChangesWithNames = orderChanges?.map(event => {
-        const profile = profiles.find(p => p.id === event.changed_by);
+        return { ...event, user_name: userName, type: 'item' as const };
+      });
+
+      const orderChangesWithNames = orderChanges.map(event => {
+        const profile = profiles.find((p: any) => p.id === event.changed_by);
         const userName = profile?.full_name || profile?.email || 'Usuário';
-        return {
-          ...event,
-          user_name: userName,
-          type: 'change' as const
-        };
-      }) || [];
+        return { ...event, user_name: userName, type: 'change' as const };
+      });
 
       // Combinar e ordenar por data
-      const combined = [...orderHistoryWithNames, ...itemHistoryWithNames, ...orderChangesWithNames].sort((a, b) => new Date(b.changed_at).getTime() - new Date(a.changed_at).getTime());
+      const combined = [...orderHistoryWithNames, ...itemHistoryWithNames, ...orderChangesWithNames]
+        .sort((a, b) => new Date(b.changed_at).getTime() - new Date(a.changed_at).getTime());
       setHistoryEvents(combined);
     } catch (error) {
       console.error("Error loading history:", error);
@@ -301,28 +291,30 @@ export const EditOrderDialog = ({
     }
   };
 
-  // Load comments from database
+  // ✨ Load comments from database - OTIMIZADO COM CACHE
   const loadComments = async () => {
     if (!order?.id) return;
     setLoadingComments(true);
     try {
-      const {
-        data: commentsData,
-        error
-      } = await supabase.from('order_comments').select('*').eq('order_id', order.id).order('created_at', {
-        ascending: false
-      });
+      const { data: commentsData, error } = await supabase
+        .from('order_comments')
+        .select('*')
+        .eq('order_id', order.id)
+        .order('created_at', { ascending: false });
+      
       if (error) throw error;
 
-      // Load user profiles for comments
+      // ✅ Usar cache de profiles
       const userIds = [...new Set(commentsData?.map(c => c.user_id) || [])];
-      const {
-        data: profiles
-      } = await supabase.from('profiles').select('id, full_name, email').in('id', userIds);
+      const profiles = await getProfiles(userIds);
+      
       const commentsWithNames = commentsData?.map(comment => ({
         ...comment,
-        user_name: profiles?.find(p => p.id === comment.user_id)?.full_name || profiles?.find(p => p.id === comment.user_id)?.email || 'Usuário'
+        user_name: profiles?.find((p: any) => p.id === comment.user_id)?.full_name || 
+                   profiles?.find((p: any) => p.id === comment.user_id)?.email || 
+                   'Usuário'
       })) || [];
+      
       setComments(commentsWithNames);
     } catch (error) {
       console.error("Error loading comments:", error);
@@ -331,34 +323,29 @@ export const EditOrderDialog = ({
     }
   };
 
-  // Load attachments from database
+  // ✨ Load attachments from database - OTIMIZADO COM CACHE
   const loadAttachments = async () => {
     if (!order?.id) return;
     setLoadingAttachments(true);
     try {
-      const {
-        data: attachmentsData,
-        error
-      } = await supabase.from('order_attachments').select('*').eq('order_id', order.id).order('uploaded_at', {
-        ascending: false
-      });
+      const { data: attachmentsData, error } = await supabase
+        .from('order_attachments')
+        .select('*')
+        .eq('order_id', order.id)
+        .order('uploaded_at', { ascending: false });
+      
       if (error) throw error;
 
-      // Load user profiles for attachments
+      // ✅ Usar cache de profiles
       const userIds = [...new Set(attachmentsData?.map(a => a.uploaded_by) || [])];
-      let profiles: any[] = [];
-      if (userIds.length > 0) {
-        const {
-          data: profilesData
-        } = await supabase.from('profiles').select('id, full_name, email').in('id', userIds);
-        profiles = profilesData || [];
-      }
+      const profiles = await getProfiles(userIds);
 
       // Combine attachments with user profiles
       const attachmentsWithProfiles = attachmentsData?.map(attachment => ({
         ...attachment,
-        profiles: profiles.find(p => p.id === attachment.uploaded_by)
+        profiles: profiles.find((p: any) => p.id === attachment.uploaded_by)
       })) || [];
+      
       setAttachments(attachmentsWithProfiles);
     } catch (error) {
       console.error("Error loading attachments:", error);
@@ -624,14 +611,45 @@ export const EditOrderDialog = ({
         tracking_code: (order as any).tracking_code ?? null
       };
 
-      // Carregar itens diretamente do banco para garantir dados atualizados
-      loadItems();
+      // ✅ OTIMIZAÇÃO 1: Usar items já carregados se disponíveis
+      if (order.items && order.items.length > 0) {
+        const mappedItems = order.items.map(item => ({
+          id: item.id,
+          itemCode: item.itemCode,
+          itemDescription: cleanItemDescription(item.itemDescription),
+          unit: item.unit,
+          requestedQuantity: item.requestedQuantity,
+          warehouse: item.warehouse,
+          deliveryDate: item.deliveryDate,
+          deliveredQuantity: item.deliveredQuantity,
+          received_status: item.received_status,
+          item_source_type: item.item_source_type,
+          item_status: item.item_status,
+          production_estimated_date: item.production_estimated_date,
+          is_imported: item.is_imported,
+          import_lead_time_days: item.import_lead_time_days,
+          sla_deadline: item.sla_deadline,
+          current_phase: item.current_phase,
+          phase_started_at: item.phase_started_at,
+          userId: item.userId,
+          purchase_action_started: item.purchase_action_started,
+          production_order_number: item.production_order_number,
+          purchase_action_started_at: item.purchase_action_started_at,
+          purchase_action_started_by: item.purchase_action_started_by
+        }));
+        setItems(mappedItems);
+        setOriginalItems(JSON.parse(JSON.stringify(mappedItems)));
+      } else {
+        // Fallback: carregar do banco se não estiver disponível
+        loadItems();
+      }
+
       setActiveTab("edit");
       setShowCommentInput(false);
       setNewComment("");
-      loadHistory();
-      loadComments();
-      loadAttachments();
+      
+      // ✅ OTIMIZAÇÃO 2: Resetar abas carregadas
+      setLoadedTabs(new Set(['edit']));
     }
   }, [open, order, reset]);
 
@@ -720,7 +738,7 @@ export const EditOrderDialog = ({
     };
   }, [open, order?.id, watch]);
 
-  // Função reutilizável para carregar items
+  // Função reutilizável para carregar items (fallback quando não disponível no order)
   const loadItems = async () => {
     if (!order?.id) return;
     
@@ -749,14 +767,12 @@ export const EditOrderDialog = ({
       current_phase: item.current_phase,
       phase_started_at: item.phase_started_at,
       userId: item.user_id,
-      // Campos de controle de compra
       purchase_action_started: item.purchase_action_started,
       production_order_number: item.production_order_number,
       purchase_action_started_at: item.purchase_action_started_at,
       purchase_action_started_by: item.purchase_action_started_by
     }));
     setItems(mappedItems);
-    // ✨ Armazenar cópia original para comparação posterior
     setOriginalItems(JSON.parse(JSON.stringify(mappedItems)));
   };
 
@@ -1891,7 +1907,7 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
             </div>
           </DialogHeader>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
           <TabsList className="grid w-full grid-cols-8 h-9">
             <TabsTrigger value="edit" className="flex items-center gap-1.5 data-[state=active]:bg-blue-500 data-[state=active]:text-white text-xs">
               <Edit className="h-3.5 w-3.5" />
@@ -2525,9 +2541,13 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                 </div>
               </div>
 
-              {loadingAttachments ? <div className="flex justify-center items-center py-8">
-                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                </div> : attachments.length === 0 ? <Card className="p-6 text-center text-muted-foreground">
+              {loadingAttachments ? (
+                <div className="space-y-3">
+                  <Skeleton className="h-24 w-full" />
+                  <Skeleton className="h-24 w-full" />
+                  <Skeleton className="h-24 w-full" />
+                </div>
+              ) : attachments.length === 0 ? <Card className="p-6 text-center text-muted-foreground">
                   <FileText className="h-12 w-12 mx-auto mb-2 opacity-50" />
                   <p>Nenhum anexo encontrado</p>
                 </Card> : <ScrollArea className="h-[400px]">
