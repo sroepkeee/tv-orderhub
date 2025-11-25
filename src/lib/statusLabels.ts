@@ -6,10 +6,17 @@
 export const STATUS_LABELS: Record<string, string> = {
   // Preparação/Planejamento
   "pending": "Pendente (Novo)",
-  "almox_ssm_pending": "ALMOX SSM - Aguardando",
+  "almox_ssm_pending": "Aguardando SSM",
   "in_analysis": "Em Análise",
   "awaiting_approval": "Aguardando Aprovação",
   "planned": "Planejado",
+  // Gerar Ordem
+  "order_generation_pending": "Pendente Ordem",
+  "order_in_creation": "Criando Ordem",
+  "order_generated": "Ordem Gerada",
+  // Almox Geral
+  "almox_general_separating": "Separando",
+  "almox_general_ready": "Pronto Almox Geral",
   // Separação/Produção
   "separation_started": "Iniciado a Separação",
   "in_production": "Em Produção",
@@ -51,6 +58,14 @@ export const STATUS_LABELS: Record<string, string> = {
   "in_stock": "Em estoque",
   "almox_ssm_received": "Recebido no Almox (SSM)",
   "almox_general_received": "Recebido no Almox (Geral)",
+  // Gerar Saldo
+  "balance_calculation": "Calculando Saldo",
+  "balance_review": "Revisando Saldo",
+  "balance_approved": "Saldo Aprovado",
+  // Laboratório
+  "awaiting_lab": "Aguardando Lab",
+  "in_lab_analysis": "Em Análise Lab",
+  "lab_completed": "Lab Concluído",
   // Status de itens (item_status)
   "awaiting_production": "Aguardando Produção",
   "purchase_required": "Solicitar Compra",
