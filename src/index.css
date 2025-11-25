@@ -133,6 +133,8 @@ All colors MUST be HSL.
     --phase-order-gen-bg: 220 15% 94%;
     --phase-almox-general: 220 40% 35%;
     --phase-almox-general-bg: 220 15% 94%;
+    --phase-purchases: 220 40% 35%;
+    --phase-purchases-bg: 220 15% 94%;
     --phase-production: 220 40% 35%;
     --phase-production-bg: 220 15% 94%;
     --phase-balance: 220 40% 35%;
@@ -310,6 +312,8 @@ All colors MUST be HSL.
     --phase-order-gen-bg: 220 20% 16%;
     --phase-almox-general: 220 30% 85%;
     --phase-almox-general-bg: 220 20% 16%;
+    --phase-purchases: 220 30% 85%;
+    --phase-purchases-bg: 220 20% 16%;
     --phase-production: 220 30% 85%;
     --phase-production-bg: 220 20% 16%;
     --phase-balance: 220 30% 85%;

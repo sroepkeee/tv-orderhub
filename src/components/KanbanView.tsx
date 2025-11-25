@@ -184,7 +184,7 @@ export const KanbanView = ({ orders, onEdit, onStatusChange }: KanbanViewProps) 
       id: "purchases" as Phase,
       title: "Compras",
       icon: ShoppingCart,
-      colorClass: "bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-400 border-b-4 border-amber-500",
+      colorClass: "bg-phase-purchases-bg text-phase-purchases border-b-4 border-phase-border",
     },
     {
       id: "production_client" as Phase,

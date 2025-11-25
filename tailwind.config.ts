@@ -138,6 +138,8 @@ export default {
           "order-gen-bg": "hsl(var(--phase-order-gen-bg))",
           "almox-general": "hsl(var(--phase-almox-general))",
           "almox-general-bg": "hsl(var(--phase-almox-general-bg))",
+          purchases: "hsl(var(--phase-purchases))",
+          "purchases-bg": "hsl(var(--phase-purchases-bg))",
           production: "hsl(var(--phase-production))",
           "production-bg": "hsl(var(--phase-production-bg))",
           "production-client": "hsl(var(--phase-production-client))",
