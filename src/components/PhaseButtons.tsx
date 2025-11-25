@@ -15,6 +15,7 @@ import {
   AlertCircle,
   Check,
   ClipboardCheck,
+  ShoppingCart,
 } from "lucide-react";
 import { Order } from "./Dashboard";
 import {
@@ -57,6 +58,18 @@ export const PhaseButtons = ({ order, onStatusChange }: PhaseButtonsProps) => {
         { value: "order_generation_pending", label: "Pendente Ordem" },
         { value: "order_in_creation", label: "Criando Ordem" },
         { value: "order_generated", label: "Ordem Gerada" },
+      ]
+    },
+    {
+      id: "purchases",
+      label: "Compras",
+      icon: ShoppingCart,
+      color: "text-amber-600",
+      statuses: [
+        { value: "purchase_pending", label: "Pendente Compra" },
+        { value: "purchase_quoted", label: "Cotação Recebida" },
+        { value: "purchase_ordered", label: "Pedido Emitido" },
+        { value: "purchase_received", label: "Material Recebido" },
       ]
     },
     {

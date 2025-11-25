@@ -20,8 +20,10 @@ interface Permission {
 const PHASES = [
   { key: 'almox_ssm', label: 'Almox SSM' },
   { key: 'order_generation', label: 'Gerar Ordem' },
+  { key: 'purchases', label: 'Compras' },
   { key: 'almox_general', label: 'Almox Geral' },
-  { key: 'production', label: 'Produção' },
+  { key: 'production_client', label: 'Produção Clientes' },
+  { key: 'production_stock', label: 'Produção Estoque' },
   { key: 'balance_generation', label: 'Gerar Saldo' },
   { key: 'laboratory', label: 'Laboratório' },
   { key: 'packaging', label: 'Embalagem' },

@@ -17,6 +17,11 @@ export const STATUS_LABELS: Record<string, string> = {
   // Almox Geral
   "almox_general_separating": "Separando",
   "almox_general_ready": "Pronto Almox Geral",
+  // Compras
+  "purchase_pending": "Pendente Compra",
+  "purchase_quoted": "Cotação Recebida",
+  "purchase_ordered": "Pedido Emitido",
+  "purchase_received": "Material Recebido",
   // Separação/Produção
   "separation_started": "Iniciado a Separação",
   "in_production": "Em Produção",

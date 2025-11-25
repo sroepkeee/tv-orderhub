@@ -14,6 +14,7 @@ import {
   Warehouse,
   Receipt,
   ClipboardCheck,
+  ShoppingCart,
 } from "lucide-react";
 import {
   DndContext,
@@ -36,7 +37,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 
-export type Phase = "almox_ssm" | "order_generation" | "almox_general" | "production_client" | "production_stock" | "balance_generation" | "laboratory" | "packaging" | "freight_quote" | "ready_to_invoice" | "invoicing" | "logistics" | "in_transit" | "completion";
+export type Phase = "almox_ssm" | "order_generation" | "purchases" | "almox_general" | "production_client" | "production_stock" | "balance_generation" | "laboratory" | "packaging" | "freight_quote" | "ready_to_invoice" | "invoicing" | "logistics" | "in_transit" | "completion";
 
 interface KanbanViewProps {
   orders: Order[];
@@ -93,6 +94,11 @@ export const KanbanView = ({ orders, onEdit, onStatusChange }: KanbanViewProps) 
       case "order_in_creation":
       case "order_generated":
         return "order_generation";
+      case "purchase_pending":
+      case "purchase_quoted":
+      case "purchase_ordered":
+      case "purchase_received":
+        return "purchases";
       case "almox_general_received":
       case "almox_general_separating":
       case "almox_general_ready":
@@ -173,6 +179,12 @@ export const KanbanView = ({ orders, onEdit, onStatusChange }: KanbanViewProps) 
       title: "Gerar Ordem",
       icon: FileEdit,
       colorClass: "bg-phase-order-gen-bg text-phase-order-gen border-b-4 border-phase-border",
+    },
+    {
+      id: "purchases" as Phase,
+      title: "Compras",
+      icon: ShoppingCart,
+      colorClass: "bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-400 border-b-4 border-amber-500",
     },
     {
       id: "production_client" as Phase,
@@ -274,6 +286,7 @@ export const KanbanView = ({ orders, onEdit, onStatusChange }: KanbanViewProps) 
     const sampleStatusMap: Record<Phase, Order["status"]> = {
       almox_ssm: "almox_ssm_pending",
       order_generation: "order_generation_pending",
+      purchases: "purchase_pending",
       almox_general: "almox_general_received",
       production_client: "in_production",
       production_stock: "in_production",
@@ -304,6 +317,8 @@ export const KanbanView = ({ orders, onEdit, onStatusChange }: KanbanViewProps) 
         return "almox_ssm_received";
       case "order_generation":
         return "order_generation_pending";
+      case "purchases":
+        return "purchase_pending";
       case "almox_general":
         return "almox_general_received";
       case "production_client":
