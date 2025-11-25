@@ -137,8 +137,8 @@ export const EditOrderDialog = ({
   const [modifiedFields, setModifiedFields] = useState<Set<string>>(new Set());
   const [showUnsavedChangesDialog, setShowUnsavedChangesDialog] = useState(false);
   
-  // ✨ Estado para ignorar próxima atualização realtime (evitar reload desnecessário)
-  const [ignoreNextRealtimeUpdate, setIgnoreNextRealtimeUpdate] = useState(false);
+  // ✨ Ref para ignorar próxima atualização realtime (evitar reload desnecessário)
+  const ignoreNextRealtimeUpdateRef = useRef(false);
 
   // Ref para rastrear últimos valores dos campos de frete
   const lastShippingRef = useRef({
@@ -799,8 +799,8 @@ export const EditOrderDialog = ({
       filter: `order_id=eq.${order.id}`
     }, () => {
       // ✨ Ignorar se a mudança foi feita pelo próprio usuário
-      if (ignoreNextRealtimeUpdate) {
-        setIgnoreNextRealtimeUpdate(false);
+      if (ignoreNextRealtimeUpdateRef.current) {
+        ignoreNextRealtimeUpdateRef.current = false;
         return;
       }
       console.log('🔄 Items atualizados - recarregando dados...');
@@ -974,7 +974,7 @@ export const EditOrderDialog = ({
       console.log(`🔄 Situação mudou: ${oldItem.item_status} → ${value}`);
 
       // ✨ Ignorar próximo evento realtime
-      setIgnoreNextRealtimeUpdate(true);
+      ignoreNextRealtimeUpdateRef.current = true;
 
       // Salvar no banco
       const {
@@ -984,7 +984,7 @@ export const EditOrderDialog = ({
       }).eq('id', oldItem.id);
       if (error) {
         console.error('Error updating item_status:', error);
-        setIgnoreNextRealtimeUpdate(false);
+        ignoreNextRealtimeUpdateRef.current = false;
         toast({
           title: "Erro ao atualizar situação",
           description: error.message,
@@ -1047,7 +1047,7 @@ export const EditOrderDialog = ({
     
     try {
       // ✨ Ignorar próximo evento realtime
-      setIgnoreNextRealtimeUpdate(true);
+      ignoreNextRealtimeUpdateRef.current = true;
       
       const {
         error
@@ -1097,7 +1097,7 @@ export const EditOrderDialog = ({
       loadHistory();
     } catch (error) {
       console.error("Error updating received quantity:", error);
-      setIgnoreNextRealtimeUpdate(false);
+      ignoreNextRealtimeUpdateRef.current = false;
       toast({
         title: "Erro",
         description: "Não foi possível atualizar a quantidade recebida.",
@@ -1111,7 +1111,7 @@ export const EditOrderDialog = ({
     if (!item.id) return;
     try {
       // ✨ Ignorar próximo evento realtime
-      setIgnoreNextRealtimeUpdate(true);
+      ignoreNextRealtimeUpdateRef.current = true;
       
       const {
         error
@@ -1153,7 +1153,7 @@ export const EditOrderDialog = ({
       loadHistory();
     } catch (error) {
       console.error("Error marking as completed:", error);
-      setIgnoreNextRealtimeUpdate(false);
+      ignoreNextRealtimeUpdateRef.current = false;
       toast({
         title: "Erro",
         description: "Não foi possível marcar o item como concluído.",
