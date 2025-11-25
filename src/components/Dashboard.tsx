@@ -35,6 +35,8 @@ type OrderStatus =
 "almox_ssm_pending" | "almox_ssm_received" | "almox_ssm_in_review" | "almox_ssm_approved"
 // Fase: Gerar Ordem
 | "order_generation_pending" | "order_in_creation" | "order_generated"
+// Fase: Compras
+| "purchase_pending" | "purchase_quoted" | "purchase_ordered" | "purchase_received"
 // Fase: Almox Geral
 | "almox_general_received" | "almox_general_separating" | "almox_general_ready"
 // Fase: Produção

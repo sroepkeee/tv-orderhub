@@ -5,6 +5,7 @@ export const ROLE_LABELS: Record<string, { name: string; area: string }> = {
   // Fases do sistema (sincronizadas com phase_config)
   'almox_ssm': { name: 'Almox SSM', area: 'Almoxarifado' },
   'order_generation': { name: 'Gerar Ordem', area: 'Planejamento' },
+  'purchases': { name: 'Compras', area: 'Suprimentos' },
   'almox_general': { name: 'Almox Geral', area: 'Almoxarifado' },
   'production_client': { name: 'Produção Clientes', area: 'Produção' },
   'production_stock': { name: 'Produção Estoque', area: 'Produção' },
