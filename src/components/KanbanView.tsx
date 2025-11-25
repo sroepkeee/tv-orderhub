@@ -333,6 +333,8 @@ export const KanbanView = ({ orders, onEdit, onStatusChange }: KanbanViewProps) 
         return "in_packaging";
       case "freight_quote":
         return "freight_quote_requested";
+      case "ready_to_invoice":
+        return "ready_to_invoice";
       case "invoicing":
         return "invoice_requested";
       case "logistics":
