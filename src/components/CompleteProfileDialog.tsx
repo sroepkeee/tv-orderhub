@@ -82,16 +82,19 @@ export function CompleteProfileDialog({ open, userId, userEmail }: CompleteProfi
               <SelectTrigger id="complete-department">
                 <SelectValue placeholder="Selecione sua área" />
               </SelectTrigger>
-              <SelectContent position="item-aligned" className="max-h-60">
-                <SelectItem value="Suporte">Suporte</SelectItem>
-                <SelectItem value="Almox SSM">Almox SSM</SelectItem>
-                <SelectItem value="Laboratório">Laboratório</SelectItem>
-                <SelectItem value="Planejamento">Planejamento</SelectItem>
-                <SelectItem value="Produção">Produção</SelectItem>
-                <SelectItem value="Logística">Logística</SelectItem>
-                <SelectItem value="Faturamento">Faturamento</SelectItem>
-                <SelectItem value="Compras">Compras</SelectItem>
+              <SelectContent className="max-h-60 z-50 bg-popover">
                 <SelectItem value="Administração">Administração</SelectItem>
+                <SelectItem value="Almoxarifado">Almoxarifado</SelectItem>
+                <SelectItem value="Compras">Compras</SelectItem>
+                <SelectItem value="Expedição">Expedição</SelectItem>
+                <SelectItem value="Financeiro">Financeiro</SelectItem>
+                <SelectItem value="Laboratório">Laboratório</SelectItem>
+                <SelectItem value="Logística">Logística</SelectItem>
+                <SelectItem value="Outros">Outros</SelectItem>
+                <SelectItem value="Produção">Produção</SelectItem>
+                <SelectItem value="Projetos">Projetos</SelectItem>
+                <SelectItem value="SSM">SSM</SelectItem>
+                <SelectItem value="TI">TI</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -102,7 +105,7 @@ export function CompleteProfileDialog({ open, userId, userEmail }: CompleteProfi
               <SelectTrigger id="complete-location">
                 <SelectValue placeholder="Selecione a localização" />
               </SelectTrigger>
-              <SelectContent position="item-aligned" className="max-h-60">
+              <SelectContent className="max-h-60 z-50 bg-popover">
                 <SelectItem value="Matriz">Matriz</SelectItem>
                 <SelectItem value="Filial">Filial</SelectItem>
               </SelectContent>
