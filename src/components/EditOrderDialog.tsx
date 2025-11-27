@@ -12,7 +12,7 @@ import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Calendar, User, FileText, CheckCircle, XCircle, Clock, History, Edit, Plus, Trash2, Loader2, MessageSquare, Download, Package, AlertCircle, BarChart3, Settings, Image as ImageIcon, File, FileSpreadsheet, ChevronDown, Send, Truck, Save } from "lucide-react";
+import { Calendar, User, FileText, CheckCircle, XCircle, Clock, History, Edit, Plus, Trash2, Loader2, MessageSquare, Download, Package, AlertCircle, BarChart3, Settings, Image as ImageIcon, File, FileSpreadsheet, ChevronDown, Send, Truck, Save, ShoppingCart, Factory } from "lucide-react";
 import { useForm, Controller } from "react-hook-form";
 import { useQueryClient } from "@tanstack/react-query";
 import { Order } from "./Dashboard";
@@ -2103,10 +2103,10 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                                 <span>Data Entrega</span>
                               </div>
                             </TableHead>
-                            <TableHead className="w-[100px]">
+                            <TableHead className="w-[120px]">
                               <div className="flex items-center gap-1.5">
-                                <BarChart3 className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
-                                <span>Nº OP</span>
+                                <FileText className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+                                <span>Nº Ordem</span>
                               </div>
                             </TableHead>
                             <TableHead className="w-[180px]">Situação</TableHead>
@@ -2176,12 +2176,34 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                               </TableCell>
                               <TableCell>
                                 <div className="relative">
+                                  {/* Label dinâmica baseada no status */}
+                                  {(item.item_status === 'purchase_required' || item.item_status === 'purchase_requested') && (
+                                    <div className="flex items-center gap-1 mb-1">
+                                      <ShoppingCart className="h-3 w-3 text-orange-500" />
+                                      <span className="text-xs text-orange-600 dark:text-orange-400 font-medium">O.C</span>
+                                    </div>
+                                  )}
+                                  {item.item_status === 'awaiting_production' && (
+                                    <div className="flex items-center gap-1 mb-1">
+                                      <Factory className="h-3 w-3 text-blue-500" />
+                                      <span className="text-xs text-blue-600 dark:text-blue-400 font-medium">O.P</span>
+                                    </div>
+                                  )}
                                   <Input 
                                     value={item.production_order_number || ''} 
                                     onChange={e => updateItem(index, "production_order_number", e.target.value)} 
-                                    placeholder="OP-000" 
+                                    placeholder={
+                                      (item.item_status === 'purchase_required' || item.item_status === 'purchase_requested') 
+                                        ? "OC-000" 
+                                        : "OP-000"
+                                    }
                                     className={cn(
-                                      "h-8 text-sm font-mono bg-amber-50 dark:bg-amber-950/50 border-amber-200 dark:border-amber-800 focus-visible:ring-amber-400",
+                                      "h-8 text-sm font-mono",
+                                      (item.item_status === 'purchase_required' || item.item_status === 'purchase_requested')
+                                        ? "bg-orange-50 dark:bg-orange-950/50 border-orange-200 dark:border-orange-800 focus-visible:ring-orange-400"
+                                        : item.item_status === 'awaiting_production'
+                                        ? "bg-blue-50 dark:bg-blue-950/50 border-blue-200 dark:border-blue-800 focus-visible:ring-blue-400"
+                                        : "bg-amber-50 dark:bg-amber-950/50 border-amber-200 dark:border-amber-800 focus-visible:ring-amber-400",
                                       item.id && isFieldModified(item.id, 'production_order_number') && "ring-2 ring-orange-400 border-orange-400"
                                     )}
                                   />
