@@ -9,6 +9,11 @@ interface WhatsAppStatus {
   isAuthorized: boolean;
 }
 
+interface QRCodeData {
+  qrcode: string;
+  expiresIn: number;
+}
+
 export function useWhatsAppStatus() {
   const [status, setStatus] = useState<WhatsAppStatus>({
     connected: false,
@@ -16,6 +21,7 @@ export function useWhatsAppStatus() {
     loading: true,
     isAuthorized: false,
   });
+  const [pollingInterval, setPollingInterval] = useState(30000); // Normal: 30s, Durante scan: 2s
   const { toast } = useToast();
 
   const checkAuthorization = useCallback(async () => {
@@ -82,17 +88,52 @@ export function useWhatsAppStatus() {
     }
   }, [checkAuthorization]);
 
+  const getQRCode = useCallback(async (): Promise<QRCodeData | null> => {
+    try {
+      const { data, error } = await supabase.functions.invoke('mega-api-qrcode');
+
+      if (error) {
+        console.error('Error getting QR code:', error);
+        toast({
+          title: 'Erro ao obter QR Code',
+          description: 'Não foi possível gerar o QR Code',
+          variant: 'destructive',
+        });
+        return null;
+      }
+
+      return {
+        qrcode: data.qrcode,
+        expiresIn: data.expiresIn || 60,
+      };
+    } catch (error) {
+      console.error('Error in getQRCode:', error);
+      return null;
+    }
+  }, [toast]);
+
+  const startFastPolling = useCallback(() => {
+    setPollingInterval(2000); // Polling rápido durante escaneamento
+  }, []);
+
+  const stopFastPolling = useCallback(() => {
+    setPollingInterval(30000); // Volta ao polling normal
+  }, []);
+
   useEffect(() => {
     checkStatus();
 
-    // Polling a cada 30 segundos
-    const interval = setInterval(checkStatus, 30000);
+    // Polling dinâmico baseado no intervalo atual
+    const interval = setInterval(checkStatus, pollingInterval);
 
     return () => clearInterval(interval);
-  }, [checkStatus]);
+  }, [checkStatus, pollingInterval]);
 
   return {
     ...status,
     refresh: checkStatus,
+    getQRCode,
+    startFastPolling,
+    stopFastPolling,
   };
 }
