@@ -14,9 +14,9 @@ export default function WhatsAppSettings() {
         <header className="border-b bg-background sticky top-0 z-10">
           <div className="flex items-center justify-between gap-4 p-4">
             <div className="flex items-center gap-4">
-              <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
-                <ArrowLeft className="h-5 w-5" />
-              </Button>
+            <Button variant="ghost" size="icon" onClick={() => navigate('/carriers-chat')}>
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
               <div>
                 <h1 className="text-2xl font-bold">Conexões WhatsApp</h1>
                 <p className="text-sm text-muted-foreground">Gerencie suas conexões com o WhatsApp Business API</p>
