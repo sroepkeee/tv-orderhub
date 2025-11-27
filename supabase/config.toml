@@ -32,3 +32,9 @@ verify_jwt = true
 
 [functions.mega-api-test-webhook]
 verify_jwt = true
+
+[functions.mega-api-logout]
+verify_jwt = true
+
+[functions.mega-api-update-instance]
+verify_jwt = true
