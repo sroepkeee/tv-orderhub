@@ -1513,8 +1513,7 @@ export const Dashboard = () => {
           // Calculate correct status based on quantities
           const statusToSave = computeReceivedStatus(item.deliveredQuantity, item.requestedQuantity);
           if (item.id) {
-            // Skip updating items not owned by current user (RLS)
-            if (item.userId && item.userId !== user.id) continue;
+            // RLS policies handle security - allow collaborative editing of all items
             const {
               error: updateError
             } = await supabase.from('order_items').update({
