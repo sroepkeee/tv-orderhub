@@ -376,6 +376,25 @@ export const KanbanView = ({ orders, onEdit, onStatusChange }: KanbanViewProps) 
     // Se soltar na mesma coluna, não faz nada
     if (currentPhase === targetPhase) return;
 
+    // 🚨 VALIDAR: Regra de categoria para fases de produção
+    if (targetPhase === 'production_stock' && order.order_category === 'vendas') {
+      toast({
+        title: "Movimento não permitido",
+        description: "Pedidos de vendas devem ser direcionados para 'Produção Clientes'. Apenas pedidos de reposição e operações especiais vão para 'Produção Estoque'.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    if (targetPhase === 'production_client' && order.order_category !== 'vendas') {
+      toast({
+        title: "Movimento não permitido",
+        description: "Apenas pedidos de vendas podem ser movidos para 'Produção Clientes'. Pedidos de reposição devem ir para 'Produção Estoque'.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     // ❌ VALIDAR: Usuário pode editar a fase de destino?
     if (!canEditPhase(targetPhase) && !userRoles.includes('admin')) {
       toast({
