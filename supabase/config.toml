@@ -17,3 +17,12 @@ verify_jwt = true
 
 [functions.update-message-status]
 verify_jwt = false
+
+[functions.mega-api-send]
+verify_jwt = true
+
+[functions.mega-api-webhook]
+verify_jwt = false
+
+[functions.mega-api-status]
+verify_jwt = true

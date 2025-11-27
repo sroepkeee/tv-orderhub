@@ -5,6 +5,7 @@ import { ArrowLeft, Loader2 } from 'lucide-react';
 import { WhatsAppContactList } from '@/components/carriers/WhatsAppContactList';
 import { OrderQuotesList } from '@/components/carriers/OrderQuotesList';
 import { ConversationThread } from '@/components/carriers/ConversationThread';
+import { WhatsAppConnectionStatus } from '@/components/carriers/WhatsAppConnectionStatus';
 import { useCarrierConversations } from '@/hooks/useCarrierConversations';
 import { useToast } from '@/hooks/use-toast';
 
@@ -62,7 +63,7 @@ export default function CarriersChat() {
       
       toast({
         title: 'Mensagem enviada',
-        description: 'Sua mensagem foi enviada para a transportadora'
+        description: 'Sua mensagem foi enviada via WhatsApp para a transportadora'
       });
       
       await loadConversations();
@@ -89,16 +90,19 @@ export default function CarriersChat() {
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b bg-background sticky top-0 z-10">
-        <div className="flex items-center gap-4 p-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <h1 className="text-2xl font-bold">Chat com Transportadoras</h1>
-          {selectedWhatsApp && contactConversations.length > 0 && (
-            <span className="text-sm text-muted-foreground">
-              • {contactConversations[0]?.carrier?.name}
-            </span>
-          )}
+        <div className="flex items-center justify-between gap-4 p-4">
+          <div className="flex items-center gap-4">
+            <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <h1 className="text-2xl font-bold">Chat com Transportadoras</h1>
+            {selectedWhatsApp && contactConversations.length > 0 && (
+              <span className="text-sm text-muted-foreground">
+                • {contactConversations[0]?.carrier?.name}
+              </span>
+            )}
+          </div>
+          <WhatsAppConnectionStatus />
         </div>
       </header>
 
