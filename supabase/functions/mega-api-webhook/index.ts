@@ -225,26 +225,48 @@ Deno.serve(async (req) => {
         }
       );
 
-    } else if (payload.event === 'connection.update') {
-      console.log('Connection update:', payload.data);
+    } else if (payload.event === 'connection.update' || payload.messageType === 'connection_update') {
+      console.log('Connection update received:', JSON.stringify(payload, null, 2));
       
       // Atualizar status da instância
       const connectionData = payload.data || {};
-      const isConnected = connectionData.state === 'open' || connectionData.connection === 'open';
+      const connectionMessage = payload.message || connectionData.message;
+      
+      // Detectar se está conectado
+      const isConnected = 
+        connectionMessage === 'phone_connected' ||
+        connectionData.state === 'open' ||
+        connectionData.connection === 'open' ||
+        payload.status === 'connected';
+      
+      // Extrair número de telefone do jid (formato: 555193291603@s.whatsapp.net)
+      const phoneFromJid = payload.jid?.replace('@s.whatsapp.net', '').replace('@lid', '') || 
+        connectionData.phoneNumber || 
+        payload.phoneNumber || 
+        null;
+      
+      console.log('Connection details:', {
+        isConnected,
+        phoneNumber: phoneFromJid,
+        message: connectionMessage,
+        state: connectionData.state,
+      });
       
       await supabase
         .from('whatsapp_instances')
         .upsert({
           instance_key: instanceKey,
           status: isConnected ? 'connected' : 'disconnected',
-          phone_number: connectionData.phoneNumber || null,
+          phone_number: phoneFromJid,
           connected_at: isConnected ? new Date().toISOString() : null,
-          qrcode: null, // Limpar QR code quando conectado
+          qrcode: isConnected ? null : undefined, // Limpar QR code quando conectado
           updated_at: new Date().toISOString(),
         }, { onConflict: 'instance_key' });
       
+      console.log('Instance status updated successfully');
+      
       return new Response(
-        JSON.stringify({ success: true, event: 'connection.update' }),
+        JSON.stringify({ success: true, event: 'connection.update', isConnected, phoneNumber: phoneFromJid }),
         {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 200,

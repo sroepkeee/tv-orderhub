@@ -1,3 +1,5 @@
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.58.0';
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -9,6 +11,11 @@ Deno.serve(async (req) => {
   }
 
   try {
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    );
+
     let megaApiUrl = (Deno.env.get('MEGA_API_URL') ?? '').trim();
     const megaApiToken = Deno.env.get('MEGA_API_TOKEN') ?? '';
     const megaApiInstance = Deno.env.get('MEGA_API_INSTANCE') ?? '';
@@ -71,7 +78,14 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Se conseguiu dados, processar resposta
+    // Buscar dados salvos da instância
+    const { data: instanceData } = await supabase
+      .from('whatsapp_instances')
+      .select('*')
+      .eq('instance_key', megaApiInstance)
+      .maybeSingle();
+
+    // Se conseguiu dados da API, processar resposta
     if (data) {
       // Normalizar resposta (diferentes formatos possíveis)
       const state = data.state || data.status || data.instance?.state || 'unknown';
@@ -81,9 +95,29 @@ Deno.serve(async (req) => {
         JSON.stringify({
           success: true,
           status: state,
-          connected: isConnected,
+          connected: isConnected || instanceData?.status === 'connected',
           instance: megaApiInstance,
+          phoneNumber: instanceData?.phone_number || data.phoneNumber,
+          connectedAt: instanceData?.connected_at,
           details: data,
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200,
+        }
+      );
+    }
+
+    // Se não conseguiu dados da API mas tem dados salvos, usar eles
+    if (instanceData) {
+      return new Response(
+        JSON.stringify({
+          success: true,
+          status: instanceData.status || 'unknown',
+          connected: instanceData.status === 'connected',
+          instance: megaApiInstance,
+          phoneNumber: instanceData.phone_number,
+          connectedAt: instanceData.connected_at,
         }),
         {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
