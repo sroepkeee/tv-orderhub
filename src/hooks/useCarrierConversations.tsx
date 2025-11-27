@@ -130,26 +130,17 @@ export const useCarrierConversations = () => {
     conversationType: string;
   }) => {
     try {
-      const { data, error } = await supabase.functions.invoke('send-carrier-message', {
+      const { data, error } = await supabase.functions.invoke('mega-api-send', {
         body: messageData,
       });
 
       if (error) throw error;
 
-      toast({
-        title: 'Mensagem enviada',
-        description: 'Sua mensagem foi enviada com sucesso.',
-      });
-
-      await loadConversations();
+      console.log('Message sent via Mega API:', data);
       return data;
     } catch (error: any) {
-      toast({
-        title: 'Erro ao enviar mensagem',
-        description: error.message,
-        variant: 'destructive',
-      });
-      return null;
+      console.error('Error sending message:', error);
+      throw error;
     }
   };
 

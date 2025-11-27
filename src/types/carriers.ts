@@ -103,3 +103,17 @@ export interface CarrierConversation {
   created_at: string;
   carrier?: Carrier;
 }
+
+export interface WhatsAppStatus {
+  connected: boolean;
+  status: string;
+  instance: string;
+}
+
+export interface WhatsAppAuthorization {
+  id: string;
+  user_id: string;
+  is_active: boolean;
+  authorized_at: string;
+  authorized_by?: string;
+}
