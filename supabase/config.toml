@@ -26,3 +26,6 @@ verify_jwt = false
 
 [functions.mega-api-status]
 verify_jwt = true
+
+[functions.mega-api-qrcode]
+verify_jwt = true
