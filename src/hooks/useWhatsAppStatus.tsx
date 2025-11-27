@@ -7,6 +7,8 @@ interface WhatsAppStatus {
   status: string;
   loading: boolean;
   isAuthorized: boolean;
+  phoneNumber?: string;
+  connectedAt?: Date;
 }
 
 interface QRCodeData {
@@ -20,6 +22,8 @@ export function useWhatsAppStatus() {
     status: 'unknown',
     loading: true,
     isAuthorized: false,
+    phoneNumber: undefined,
+    connectedAt: undefined,
   });
   const [pollingInterval, setPollingInterval] = useState(30000); // Normal: 30s, Durante scan: 2s
   const { toast } = useToast();
@@ -86,6 +90,8 @@ export function useWhatsAppStatus() {
         status: data.status || 'unknown',
         loading: false,
         isAuthorized: true,
+        phoneNumber: data.phoneNumber,
+        connectedAt: data.connectedAt ? new Date(data.connectedAt) : undefined,
       });
 
     } catch (error) {

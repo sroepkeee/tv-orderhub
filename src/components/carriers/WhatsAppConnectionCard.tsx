@@ -16,7 +16,11 @@ import {
 import { useToast } from '@/hooks/use-toast';
 
 export function WhatsAppConnectionCard() {
-  const { connected, status, loading, isAuthorized, refresh, getQRCode, startFastPolling, stopFastPolling } = useWhatsAppStatus();
+  const { 
+    connected, status, loading, isAuthorized, 
+    refresh, getQRCode, startFastPolling, stopFastPolling,
+    phoneNumber, connectedAt 
+  } = useWhatsAppStatus();
   const [qrDialogOpen, setQrDialogOpen] = useState(false);
   const { toast } = useToast();
 
@@ -102,11 +106,21 @@ export function WhatsAppConnectionCard() {
                 )}
               </div>
             </div>
-            {connected && (
+            
+            {connected && phoneNumber && (
+              <div>
+                <p className="text-sm text-muted-foreground mb-1">Número</p>
+                <p className="text-sm font-medium font-mono">
+                  +{phoneNumber.slice(0, 2)} ({phoneNumber.slice(2, 4)}) {phoneNumber.slice(4, 9)}-{phoneNumber.slice(9)}
+                </p>
+              </div>
+            )}
+            
+            {connected && connectedAt && (
               <div>
                 <p className="text-sm text-muted-foreground mb-1">Última conexão</p>
                 <p className="text-sm font-medium">
-                  {format(new Date(), "dd/MM/yyyy HH:mm", { locale: ptBR })}
+                  {format(connectedAt, "dd/MM/yyyy HH:mm", { locale: ptBR })}
                 </p>
               </div>
             )}
