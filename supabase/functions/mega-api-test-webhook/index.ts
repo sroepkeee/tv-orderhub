@@ -36,15 +36,23 @@ serve(async (req) => {
       throw new Error('Unauthorized');
     }
 
-    // Verificar se usuário está autorizado
+    // Verificar se usuário está autorizado (whitelist OU admin)
     const { data: authData } = await supabase
       .from('whatsapp_authorized_users')
       .select('is_active')
       .eq('user_id', user.id)
       .eq('is_active', true)
-      .single();
+      .maybeSingle();
 
-    if (!authData) {
+    // Verificar se é admin
+    const { data: adminRole } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', user.id)
+      .eq('role', 'admin')
+      .maybeSingle();
+
+    if (!authData && !adminRole) {
       return new Response(
         JSON.stringify({ 
           success: false, 
@@ -63,44 +71,35 @@ serve(async (req) => {
       .select('created_at')
       .order('created_at', { ascending: false })
       .limit(1)
-      .single();
+      .maybeSingle();
 
-    // Verificar status da conexão através do mega-api-status
-    const megaApiUrl = Deno.env.get('MEGA_API_URL');
-    const megaApiToken = Deno.env.get('MEGA_API_TOKEN');
+    // Buscar dados da instância no banco
     const megaApiInstance = Deno.env.get('MEGA_API_INSTANCE');
-
-    if (!megaApiUrl || !megaApiToken || !megaApiInstance) {
-      throw new Error('Mega API configuration missing');
+    
+    if (!megaApiInstance) {
+      throw new Error('Mega API instance configuration missing');
     }
 
-    const statusResponse = await fetch(
-      `${megaApiUrl}/rest/instance/connectionState/${megaApiInstance}`,
-      {
-        headers: {
-          'Authorization': `Bearer ${megaApiToken}`,
-        },
-      }
-    );
-
-    if (!statusResponse.ok) {
-      throw new Error('Failed to check connection status');
-    }
-
-    const statusData = await statusResponse.json();
-    const isConnected = statusData?.state === 'open';
+    const { data: instanceData } = await supabase
+      .from('whatsapp_instances')
+      .select('*')
+      .eq('instance_key', megaApiInstance)
+      .maybeSingle();
 
     console.log('Webhook test completed:', {
-      connected: isConnected,
+      connected: instanceData?.status === 'connected',
       lastWebhook: lastWebhook?.created_at,
+      instanceData: instanceData,
     });
 
     return new Response(
       JSON.stringify({
         success: true,
-        webhookConfigured: !!lastWebhook,
-        lastWebhookReceived: lastWebhook?.created_at || null,
-        connectionActive: isConnected,
+        webhookConfigured: !!lastWebhook || !!instanceData?.qrcode_updated_at,
+        lastWebhookReceived: lastWebhook?.created_at || instanceData?.qrcode_updated_at || null,
+        connectionActive: instanceData?.status === 'connected',
+        phoneNumber: instanceData?.phone_number,
+        connectedAt: instanceData?.connected_at,
       }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
