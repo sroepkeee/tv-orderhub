@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Loader2 } from 'lucide-react';
+import { ArrowLeft, Loader2, Settings } from 'lucide-react';
+import { useWhatsAppStatus } from '@/hooks/useWhatsAppStatus';
 import { WhatsAppContactList } from '@/components/carriers/WhatsAppContactList';
 import { OrderQuotesList } from '@/components/carriers/OrderQuotesList';
 import { ConversationThread } from '@/components/carriers/ConversationThread';
@@ -12,6 +13,7 @@ import { useToast } from '@/hooks/use-toast';
 export default function CarriersChat() {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { isAuthorized } = useWhatsAppStatus();
   const { 
     conversations, 
     loading, 
@@ -102,7 +104,20 @@ export default function CarriersChat() {
               </span>
             )}
           </div>
-          <WhatsAppConnectionStatus />
+          <div className="flex items-center gap-2">
+            {isAuthorized && (
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => navigate('/whatsapp-settings')}
+                className="gap-2"
+              >
+                <Settings className="h-4 w-4" />
+                Configurações WhatsApp
+              </Button>
+            )}
+            <WhatsAppConnectionStatus />
+          </div>
         </div>
       </header>
 

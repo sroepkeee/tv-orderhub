@@ -14,6 +14,7 @@ import CarriersChat from "./pages/CarriersChat";
 import Carriers from "./pages/Carriers";
 import Admin from "./pages/Admin";
 import Purchases from "./pages/Purchases";
+import WhatsAppSettings from "./pages/WhatsAppSettings";
 import { useAuth } from "./hooks/useAuth";
 import { useAdminAuth } from "./hooks/useAdminAuth";
 import { usePhaseAuthorization } from "./hooks/usePhaseAuthorization";
@@ -165,6 +166,11 @@ const App = () => {
             <Route path="/compras" element={
               <ProtectedRoute>
                 <Purchases />
+              </ProtectedRoute>
+            } />
+            <Route path="/whatsapp-settings" element={
+              <ProtectedRoute>
+                <WhatsAppSettings />
               </ProtectedRoute>
             } />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

@@ -29,3 +29,6 @@ verify_jwt = true
 
 [functions.mega-api-qrcode]
 verify_jwt = true
+
+[functions.mega-api-test-webhook]
+verify_jwt = true
