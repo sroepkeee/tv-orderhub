@@ -15,6 +15,7 @@ import Carriers from "./pages/Carriers";
 import Admin from "./pages/Admin";
 import Purchases from "./pages/Purchases";
 import WhatsAppSettings from "./pages/WhatsAppSettings";
+import { CarriersChatRoute } from "./components/CarriersChatRoute";
 import { useAuth } from "./hooks/useAuth";
 import { useAdminAuth } from "./hooks/useAdminAuth";
 import { usePhaseAuthorization } from "./hooks/usePhaseAuthorization";
@@ -148,7 +149,9 @@ const App = () => {
           } />
           <Route path="/carriers-chat" element={
               <ProtectedRoute>
-                <CarriersChat />
+                <CarriersChatRoute>
+                  <CarriersChat />
+                </CarriersChatRoute>
               </ProtectedRoute>
             } />
             <Route path="/transportadoras" element={
