@@ -142,8 +142,69 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Não tem QR code no cache - solicitar restart da instância
-    console.log('No valid QR code in cache, requesting instance restart');
+    // Tentar buscar QR code diretamente da API
+    console.log('Attempting to fetch QR code directly from Mega API');
+    
+    const qrcodeEndpoints = [
+      `/rest/instance/connect/${megaApiInstance}`,
+      `/instance/connect/${megaApiInstance}`,
+      `/rest/instance/qrcode/${megaApiInstance}`,
+      `/instance/qrcode/${megaApiInstance}`,
+      `/rest/instance/connectionState/${megaApiInstance}`,
+    ];
+
+    for (const endpoint of qrcodeEndpoints) {
+      try {
+        console.log('Trying QR endpoint:', `${megaApiUrl}${endpoint}`);
+        const response = await fetch(`${megaApiUrl}${endpoint}`, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${megaApiToken}`,
+            'Content-Type': 'application/json',
+          },
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          console.log('QR endpoint response:', { endpoint, hasData: !!data });
+          
+          // O QR pode vir em diferentes formatos
+          const qrcode = data.qrcode || data.base64 || data.qr || data.qrCode || data.code;
+          
+          if (qrcode) {
+            console.log('QR code found via direct API call');
+            
+            // Salvar no cache
+            await supabaseClient.from('whatsapp_instances').upsert({
+              instance_key: megaApiInstance,
+              qrcode: qrcode,
+              qrcode_updated_at: new Date().toISOString(),
+              status: 'waiting_scan',
+            });
+            
+            return new Response(
+              JSON.stringify({
+                success: true,
+                qrcode: qrcode,
+                expiresIn: 60,
+                status: 'available',
+              }),
+              {
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                status: 200,
+              }
+            );
+          }
+        } else {
+          console.log('QR endpoint failed:', endpoint, 'Status:', response.status);
+        }
+      } catch (error) {
+        console.error('Error calling QR endpoint:', endpoint, error);
+      }
+    }
+
+    // Não tem QR code no cache e não conseguiu via API - solicitar restart da instância
+    console.log('No QR code via direct API, requesting instance restart');
     
     // Tentar diferentes endpoints para solicitar novo QR code
     const restartEndpoints = [

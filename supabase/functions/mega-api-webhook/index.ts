@@ -35,15 +35,36 @@ Deno.serve(async (req) => {
     }
 
     // Processar QR Code Update
-    if (payload.messageType === 'qrcode_update') {
-      console.log('QR Code update received:', { instanceKey, hasQrcode: !!payload.qrcode });
+    const qrcode = 
+      payload.qrcode ||                           // formato 1: qrcode direto
+      payload.data?.qrcode ||                     // formato 2: dentro de data
+      payload.qrcode?.base64 ||                   // formato 3: base64 dentro de qrcode
+      payload.data?.qrcode?.base64 ||             // formato 4: base64 dentro de data.qrcode
+      payload.data?.code ||                       // formato 5: code dentro de data
+      payload.code;                               // formato 6: code direto
+
+    const isQrCodeEvent = 
+      payload.messageType === 'qrcode_update' ||
+      payload.event === 'qrcode.updated' ||
+      payload.event === 'qrcode' ||
+      payload.event === 'qr_code' ||
+      payload.event === 'connection.update' && qrcode ||
+      !!qrcode;
+
+    if (isQrCodeEvent && qrcode) {
+      console.log('QR Code update received:', { 
+        instanceKey, 
+        hasQrcode: !!qrcode,
+        event: payload.event,
+        messageType: payload.messageType 
+      });
       
       // Salvar QR code no cache
       const { error: upsertError } = await supabase
         .from('whatsapp_instances')
         .upsert({
           instance_key: instanceKey,
-          qrcode: payload.qrcode,
+          qrcode: qrcode,
           qrcode_updated_at: new Date().toISOString(),
           status: 'waiting_scan',
           updated_at: new Date().toISOString(),
