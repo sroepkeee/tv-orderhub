@@ -357,6 +357,21 @@ function extractOrderHeader(text: string): ParsedOrderData['orderInfo'] {
   return orderInfo;
 }
 
+/**
+ * Remove padrões de cabeçalho que foram erroneamente concatenados à descrição do item
+ */
+function sanitizeItemDescription(description: string): string {
+  return description
+    .replace(/\s*EMPRESA:.*$/i, '')
+    .replace(/\s*PEDIDO\s+N[ºo°]?:.*$/i, '')
+    .replace(/\s*EMISS[ÃA]O:.*$/i, '')
+    .replace(/\s*EXECUTIVO:.*$/i, '')
+    .replace(/\s*MATRIZ:.*$/i, '')
+    .replace(/\s*ROD\..*$/i, '')
+    .replace(/\s*RST\s+\d+.*$/i, '')
+    .trim();
+}
+
 // Helper function to find item description separately
 function findItemDescription(text: string, itemCode: string, itemNumber: string): string {
   // Try multiple patterns to find description
@@ -364,14 +379,14 @@ function findItemDescription(text: string, itemCode: string, itemNumber: string)
   const descRegex1 = new RegExp(`Item\\s+${itemNumber}[\\s\\S]{0,300}?Descri[çc][ãa]o\\s+([^\\n]+?)(?=Item\\s+\\d+|C[óo]digo\\s+\\d+|$)`, 'i');
   const match1 = text.match(descRegex1);
   if (match1 && match1[1].trim().length > 3) {
-    return match1[1].trim().substring(0, 200);
+    return sanitizeItemDescription(match1[1].trim().substring(0, 200));
   }
   
   // Pattern 2: "Código XXXXX ... Descrição XXXXX"
   const descRegex2 = new RegExp(`C[óo]digo\\s+${itemCode}[\\s\\S]{0,300}?Descri[çc][ãa]o\\s+([^\\n]+?)(?=Item\\s+\\d+|C[óo]digo\\s+\\d+|Qtde|$)`, 'i');
   const match2 = text.match(descRegex2);
   if (match2 && match2[1].trim().length > 3) {
-    return match2[1].trim().substring(0, 200);
+    return sanitizeItemDescription(match2[1].trim().substring(0, 200));
   }
   
   return 'Produto TOTVS';
@@ -617,11 +632,13 @@ function extractItemsTable(text: string): {
         for (const pattern of descPatterns) {
           const descMatch = expandedBlock.match(pattern);
           if (descMatch && descMatch[1].trim().length > 3) {
-            description = descMatch[1]
-              .trim()
-              .replace(/\s+/g, ' ')
-              .replace(/^\d+\s*-?\s*/, '')  // Remove código numérico inicial
-              .substring(0, 200);
+            description = sanitizeItemDescription(
+              descMatch[1]
+                .trim()
+                .replace(/\s+/g, ' ')
+                .replace(/^\d+\s*-?\s*/, '')  // Remove código numérico inicial
+                .substring(0, 200)
+            );
             break;
           }
         }
@@ -726,11 +743,13 @@ function extractItemsTable(text: string): {
       for (const pattern of descPatterns) {
         const descMatch = extendedContext.match(pattern);
         if (descMatch && descMatch[1].trim().length > 3) {
-          description = descMatch[1]
-            .trim()
-            .replace(/\s+/g, ' ')
-            .replace(/^\d+\s*-?\s*/, '')
-            .substring(0, 200);
+          description = sanitizeItemDescription(
+            descMatch[1]
+              .trim()
+              .replace(/\s+/g, ' ')
+              .replace(/^\d+\s*-?\s*/, '')
+              .substring(0, 200)
+          );
           break;
         }
       }
@@ -825,10 +844,12 @@ function extractItemsTable(text: string): {
         const descLine = lines.length > 1 ? lines[1].trim() : lines[0].trim();
         
         if (descLine && descLine.length > 5 && !/^Item\s+\d+/.test(descLine)) {
-          description = descLine
-            .replace(/\s+/g, ' ')
-            .replace(/^\d+\s*-?\s*/, '') // Remove código numérico inicial
-            .substring(0, 200);
+          description = sanitizeItemDescription(
+            descLine
+              .replace(/\s+/g, ' ')
+              .replace(/^\d+\s*-?\s*/, '') // Remove código numérico inicial
+              .substring(0, 200)
+          );
         }
       }
       
@@ -839,7 +860,9 @@ function extractItemsTable(text: string): {
         
         for (const line of lines) {
           if (!/^(Observa[çc][ãa]o|Descri[çc][ãa]o|Item\s+\d+|\|)/.test(line)) {
-            description = line.replace(/\s+/g, ' ').substring(0, 200);
+            description = sanitizeItemDescription(
+              line.replace(/\s+/g, ' ').substring(0, 200)
+            );
             break;
           }
         }
