@@ -17,48 +17,92 @@ Deno.serve(async (req) => {
       throw new Error('MEGA_API_URL not configured');
     }
 
-    // Garante que a URL tenha protocolo (https) para evitar erros "Invalid URL"
+    // Garantir que a URL tenha protocolo https
     if (!megaApiUrl.startsWith('http://') && !megaApiUrl.startsWith('https://')) {
       megaApiUrl = `https://${megaApiUrl}`;
     }
+    
+    // Remover barra final
+    megaApiUrl = megaApiUrl.replace(/\/+$/, '');
 
-    // Remove barras duplicadas no final ao montar a URL final
-    const statusUrl = `${megaApiUrl.replace(/\/+$/, '')}/rest/instance/connectionState/${megaApiInstance}`;
+    console.log('Checking connection status for instance:', megaApiInstance);
+    console.log('Base URL:', megaApiUrl);
 
-    console.log('Checking connection status for instance:', megaApiInstance, 'using URL:', statusUrl);
+    // Lista de endpoints para tentar (diferentes versões da API)
+    const endpoints = [
+      `/rest/instance/connectionState/${megaApiInstance}`,
+      `/instance/connectionState/${megaApiInstance}`,
+      `/rest/instance/fetchInstances/${megaApiInstance}`,
+    ];
 
-    // Consultar status da conexão
-    const response = await fetch(
-      statusUrl,
-      {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${megaApiToken}`,
-          'Content-Type': 'application/json',
-        },
+    let lastError = null;
+    let response = null;
+    let data = null;
+
+    // Tentar cada endpoint até encontrar um que funcione
+    for (const endpoint of endpoints) {
+      const statusUrl = `${megaApiUrl}${endpoint}`;
+      console.log('Trying endpoint:', statusUrl);
+
+      try {
+        response = await fetch(statusUrl, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${megaApiToken}`,
+            'Content-Type': 'application/json',
+          },
+        });
+
+        if (response.ok) {
+          data = await response.json();
+          console.log('Success with endpoint:', endpoint, 'Data:', data);
+          break;
+        } else if (response.status === 404) {
+          console.log('Endpoint not found (404):', endpoint);
+          lastError = `Endpoint not found: ${endpoint}`;
+        } else {
+          const errorText = await response.text();
+          console.log('Endpoint failed:', endpoint, 'Status:', response.status, 'Error:', errorText);
+          lastError = errorText;
+        }
+      } catch (fetchError) {
+        console.log('Fetch error for endpoint:', endpoint, 'Error:', fetchError);
+        lastError = fetchError instanceof Error ? fetchError.message : 'Unknown fetch error';
       }
-    );
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Mega API error:', errorText);
-      throw new Error(`Failed to get status: ${response.statusText}`);
     }
 
-    const data = await response.json();
-    console.log('Connection status:', data);
+    // Se conseguiu dados, processar resposta
+    if (data) {
+      // Normalizar resposta (diferentes formatos possíveis)
+      const state = data.state || data.status || data.instance?.state || 'unknown';
+      const isConnected = state === 'open' || state === 'connected';
 
-    // Normalizar resposta
-    const status = data.state || data.status || 'unknown';
-    const isConnected = status === 'open' || status === 'connected';
+      return new Response(
+        JSON.stringify({
+          success: true,
+          status: state,
+          connected: isConnected,
+          instance: megaApiInstance,
+          details: data,
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200,
+        }
+      );
+    }
 
+    // Se nenhum endpoint funcionou, retornar status desconhecido (não erro)
+    // Isso permite que o usuário ainda tente gerar QR Code
+    console.log('All endpoints failed. Last error:', lastError);
+    
     return new Response(
       JSON.stringify({
         success: true,
-        status: status,
-        connected: isConnected,
+        status: 'close',
+        connected: false,
         instance: megaApiInstance,
-        details: data,
+        message: 'Não foi possível verificar status. Tente gerar um novo QR Code para conectar.',
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
