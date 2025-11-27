@@ -24,7 +24,7 @@ export function WhatsAppQRCodeDialog({
   const [qrCode, setQrCode] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [expiresIn, setExpiresIn] = useState(60);
-  const [status, setStatus] = useState<'loading' | 'available' | 'scanning' | 'connected' | 'expired' | 'error'>('loading');
+  const [status, setStatus] = useState<'loading' | 'waiting' | 'available' | 'scanning' | 'connected' | 'expired' | 'error'>('loading');
   const { toast } = useToast();
 
   const loadQRCode = async () => {
@@ -32,7 +32,13 @@ export function WhatsAppQRCodeDialog({
     setStatus('loading');
     try {
       const data = await getQRCode();
-      if (data?.qrcode) {
+      
+      // Verificar se é status 'waiting' (aguardando QR code do servidor)
+      if ((data as any)?.status === 'waiting') {
+        setStatus('waiting');
+        // Iniciar polling para buscar o QR code
+        startWaitingPolling();
+      } else if (data?.qrcode) {
         setQrCode(data.qrcode);
         setExpiresIn(data.expiresIn);
         setStatus('available');
@@ -58,6 +64,50 @@ export function WhatsAppQRCodeDialog({
     } finally {
       setLoading(false);
     }
+  };
+
+  const startWaitingPolling = () => {
+    let attempts = 0;
+    const maxAttempts = 10; // 10 tentativas x 3s = 30 segundos
+
+    const pollForQRCode = async () => {
+      attempts++;
+      console.log(`Polling for QR code (attempt ${attempts}/${maxAttempts})`);
+      
+      try {
+        const data = await getQRCode();
+        if (data?.qrcode) {
+          console.log('QR code received!');
+          setQrCode(data.qrcode);
+          setExpiresIn(data.expiresIn);
+          setStatus('available');
+          startConnectionPolling();
+          return true; // Parar polling
+        }
+      } catch (error) {
+        console.error('Error polling for QR code:', error);
+      }
+
+      if (attempts >= maxAttempts) {
+        console.log('Polling timeout - max attempts reached');
+        setStatus('error');
+        toast({
+          title: 'Timeout',
+          description: 'QR Code não foi recebido a tempo. Tente novamente.',
+          variant: 'destructive',
+        });
+        return true; // Parar polling
+      }
+
+      return false; // Continuar polling
+    };
+
+    const pollInterval = setInterval(async () => {
+      const shouldStop = await pollForQRCode();
+      if (shouldStop) {
+        clearInterval(pollInterval);
+      }
+    }, 3000); // Polling a cada 3 segundos
   };
 
   const startConnectionPolling = () => {
@@ -136,6 +186,16 @@ export function WhatsAppQRCodeDialog({
               <div className="flex flex-col items-center gap-3">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
                 <p className="text-sm text-muted-foreground">Gerando QR Code...</p>
+              </div>
+            )}
+
+            {status === 'waiting' && (
+              <div className="flex flex-col items-center gap-3">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                <p className="text-sm text-muted-foreground">Solicitando QR Code...</p>
+                <p className="text-xs text-muted-foreground">
+                  Aguarde, o QR será gerado em instantes
+                </p>
               </div>
             )}
 

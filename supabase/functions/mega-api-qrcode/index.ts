@@ -142,20 +142,67 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Aguardando QR code do webhook
-    console.log('No valid QR code in cache, waiting for webhook');
-    return new Response(
-      JSON.stringify({
-        success: true,
-        qrcode: null,
-        status: 'waiting',
-        message: 'Aguardando QR Code do servidor... O webhook enviará em instantes.',
-      }),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200,
+    // Não tem QR code no cache - solicitar restart da instância
+    console.log('No valid QR code in cache, requesting instance restart');
+    
+    // Tentar diferentes endpoints para solicitar novo QR code
+    const restartEndpoints = [
+      `/rest/instance/restart/${megaApiInstance}`,
+      `/instance/restart/${megaApiInstance}`,
+      `/rest/instance/logout/${megaApiInstance}`,
+    ];
+
+    let restartRequested = false;
+    for (const endpoint of restartEndpoints) {
+      try {
+        console.log('Trying restart endpoint:', `${megaApiUrl}${endpoint}`);
+        const restartResponse = await fetch(`${megaApiUrl}${endpoint}`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${megaApiToken}`,
+            'Content-Type': 'application/json',
+          },
+        });
+        
+        if (restartResponse.ok) {
+          console.log('Instance restart requested successfully via', endpoint);
+          restartRequested = true;
+          break;
+        } else {
+          console.log('Endpoint failed:', endpoint, 'Status:', restartResponse.status);
+        }
+      } catch (error) {
+        console.error('Error calling restart endpoint:', endpoint, error);
       }
-    );
+    }
+
+    if (restartRequested) {
+      return new Response(
+        JSON.stringify({
+          success: true,
+          qrcode: null,
+          status: 'waiting',
+          message: 'QR Code solicitado. Aguarde alguns segundos...',
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200,
+        }
+      );
+    } else {
+      return new Response(
+        JSON.stringify({
+          success: true,
+          qrcode: null,
+          status: 'waiting',
+          message: 'Aguardando QR Code do servidor...',
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200,
+        }
+      );
+    }
 
   } catch (error) {
     console.error('Error in mega-api-qrcode:', error);
