@@ -1,5 +1,8 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.58.0';
 
+// QR Code validity period (3 minutes - WhatsApp QR codes typically last 2-3 minutes)
+const QR_CODE_VALIDITY_SECONDS = 180;
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -63,6 +66,13 @@ Deno.serve(async (req) => {
     const megaApiToken = Deno.env.get('MEGA_API_TOKEN');
     const megaApiInstance = Deno.env.get('MEGA_API_INSTANCE');
 
+    // Log configuration for debugging
+    console.log('Mega API Config:', {
+      url: megaApiUrl,
+      instance: megaApiInstance,
+      tokenPresent: !!megaApiToken,
+    });
+
     if (!megaApiUrl || !megaApiToken || !megaApiInstance) {
       console.error('Missing Mega API configuration');
       return new Response(
@@ -122,14 +132,14 @@ Deno.serve(async (req) => {
       const now = new Date();
       const ageSeconds = (now.getTime() - updatedAt.getTime()) / 1000;
       
-      // QR codes expiram em ~60 segundos
-      if (ageSeconds < 60) {
+      // QR codes expiram em ~180 segundos (3 minutos)
+      if (ageSeconds < QR_CODE_VALIDITY_SECONDS) {
         console.log('Returning cached QR code (age:', Math.floor(ageSeconds), 'seconds)');
         return new Response(
           JSON.stringify({
             success: true,
             qrcode: instanceData.qrcode,
-            expiresIn: Math.max(0, 60 - Math.floor(ageSeconds)),
+            expiresIn: Math.max(0, QR_CODE_VALIDITY_SECONDS - Math.floor(ageSeconds)),
             status: 'available',
           }),
           {
@@ -186,7 +196,7 @@ Deno.serve(async (req) => {
               JSON.stringify({
                 success: true,
                 qrcode: qrcode,
-                expiresIn: 60,
+                expiresIn: QR_CODE_VALIDITY_SECONDS,
                 status: 'available',
               }),
               {
@@ -251,6 +261,24 @@ Deno.serve(async (req) => {
         }
       );
     } else {
+      // Fallback: Return cached QR code even if "expired" when all attempts fail
+      if (instanceData?.qrcode) {
+        console.log('Returning cached QR code as fallback (may be expired)');
+        return new Response(
+          JSON.stringify({
+            success: true,
+            qrcode: instanceData.qrcode,
+            expiresIn: 0, // Indicate it may be expired
+            status: 'available',
+            warning: 'QR Code pode ter expirado. Escaneie rapidamente ou tente gerar novamente se não funcionar.',
+          }),
+          {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 200,
+          }
+        );
+      }
+      
       return new Response(
         JSON.stringify({
           success: true,
