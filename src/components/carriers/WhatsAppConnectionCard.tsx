@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { MessageCircle, QrCode, RefreshCw, MoreVertical } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { MessageCircle, QrCode, RefreshCw, MoreVertical, Pencil } from 'lucide-react';
 import { useWhatsAppStatus } from '@/hooks/useWhatsAppStatus';
 import { WhatsAppQRCodeDialog } from './WhatsAppQRCodeDialog';
 import { format } from 'date-fns';
@@ -13,15 +14,39 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 
 export function WhatsAppConnectionCard() {
   const { 
     connected, status, loading, isAuthorized, 
     refresh, getQRCode, startFastPolling, stopFastPolling,
-    phoneNumber, connectedAt 
+    phoneNumber, connectedAt, instanceName,
+    disconnect, updateInstanceName
   } = useWhatsAppStatus();
   const [qrDialogOpen, setQrDialogOpen] = useState(false);
+  const [disconnectDialogOpen, setDisconnectDialogOpen] = useState(false);
+  const [editNameDialogOpen, setEditNameDialogOpen] = useState(false);
+  const [editingName, setEditingName] = useState('');
+  const [isDisconnecting, setIsDisconnecting] = useState(false);
+  const [isSavingName, setIsSavingName] = useState(false);
   const { toast } = useToast();
 
   const handleConnect = async () => {
@@ -43,12 +68,41 @@ export function WhatsAppConnectionCard() {
     });
   };
 
-  const handleDisconnect = () => {
-    toast({
-      title: 'Função em desenvolvimento',
-      description: 'A função de desconectar está em desenvolvimento.',
-      variant: 'default',
-    });
+  const handleDisconnectClick = () => {
+    setDisconnectDialogOpen(true);
+  };
+
+  const handleDisconnectConfirm = async () => {
+    setIsDisconnecting(true);
+    const success = await disconnect();
+    setIsDisconnecting(false);
+    if (success) {
+      setDisconnectDialogOpen(false);
+    }
+  };
+
+  const handleEditNameClick = () => {
+    setEditingName(instanceName || 'Imply Frete');
+    setEditNameDialogOpen(true);
+  };
+
+  const handleSaveName = async () => {
+    if (!editingName.trim()) {
+      toast({
+        title: 'Nome inválido',
+        description: 'Por favor, insira um nome válido.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsSavingName(true);
+    const success = await updateInstanceName(editingName.trim());
+    setIsSavingName(false);
+    
+    if (success) {
+      setEditNameDialogOpen(false);
+    }
   };
 
   if (!isAuthorized) {
@@ -65,7 +119,7 @@ export function WhatsAppConnectionCard() {
                 <MessageCircle className="h-6 w-6 text-green-600 dark:text-green-400" />
               </div>
               <div>
-                <CardTitle className="text-lg">Imply Frete</CardTitle>
+                <CardTitle className="text-lg">{instanceName || 'Imply Frete'}</CardTitle>
                 <Badge variant="secondary" className="mt-1">
                   MEGA API
                 </Badge>
@@ -78,10 +132,14 @@ export function WhatsAppConnectionCard() {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={handleDisconnect} disabled={!connected}>
+                <DropdownMenuItem 
+                  onClick={handleDisconnectClick} 
+                  disabled={!connected || isDisconnecting}
+                >
                   Desconectar
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => toast({ title: 'Em desenvolvimento' })}>
+                <DropdownMenuItem onClick={handleEditNameClick}>
+                  <Pencil className="h-4 w-4 mr-2" />
                   Editar nome
                 </DropdownMenuItem>
               </DropdownMenuContent>
@@ -160,6 +218,73 @@ export function WhatsAppConnectionCard() {
         checkStatus={refresh}
         isConnected={connected}
       />
+
+      <AlertDialog open={disconnectDialogOpen} onOpenChange={setDisconnectDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Desconectar WhatsApp?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Isso irá desconectar a conta WhatsApp atual ({instanceName || 'Imply Frete'}). 
+              Você precisará escanear o QR Code novamente para reconectar.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDisconnecting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleDisconnectConfirm}
+              disabled={isDisconnecting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDisconnecting ? 'Desconectando...' : 'Desconectar'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <Dialog open={editNameDialogOpen} onOpenChange={setEditNameDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Editar Nome da Instância</DialogTitle>
+            <DialogDescription>
+              Escolha um nome personalizado para identificar esta conexão WhatsApp.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label htmlFor="instance-name" className="text-sm font-medium">
+                Nome da Instância
+              </label>
+              <Input
+                id="instance-name"
+                value={editingName}
+                onChange={(e) => setEditingName(e.target.value)}
+                placeholder="Ex: Imply Frete"
+                disabled={isSavingName}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    handleSaveName();
+                  }
+                }}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => setEditNameDialogOpen(false)}
+              disabled={isSavingName}
+            >
+              Cancelar
+            </Button>
+            <Button 
+              onClick={handleSaveName}
+              disabled={isSavingName || !editingName.trim()}
+            >
+              {isSavingName ? 'Salvando...' : 'Salvar'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

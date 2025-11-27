@@ -99,6 +99,7 @@ Deno.serve(async (req) => {
           instance: megaApiInstance,
           phoneNumber: instanceData?.phone_number || data.phoneNumber,
           connectedAt: instanceData?.connected_at,
+          instanceName: instanceData?.name,
           details: data,
         }),
         {
@@ -118,6 +119,7 @@ Deno.serve(async (req) => {
           instance: megaApiInstance,
           phoneNumber: instanceData.phone_number,
           connectedAt: instanceData.connected_at,
+          instanceName: instanceData.name,
         }),
         {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },

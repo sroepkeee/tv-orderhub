@@ -1778,6 +1778,7 @@ export type Database = {
           created_at: string | null
           id: string
           instance_key: string
+          name: string | null
           phone_number: string | null
           qrcode: string | null
           qrcode_updated_at: string | null
@@ -1789,6 +1790,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           instance_key: string
+          name?: string | null
           phone_number?: string | null
           qrcode?: string | null
           qrcode_updated_at?: string | null
@@ -1800,6 +1802,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           instance_key?: string
+          name?: string | null
           phone_number?: string | null
           qrcode?: string | null
           qrcode_updated_at?: string | null

@@ -9,6 +9,7 @@ interface WhatsAppStatus {
   isAuthorized: boolean;
   phoneNumber?: string;
   connectedAt?: Date;
+  instanceName?: string;
 }
 
 interface QRCodeData {
@@ -24,6 +25,7 @@ export function useWhatsAppStatus() {
     isAuthorized: false,
     phoneNumber: undefined,
     connectedAt: undefined,
+    instanceName: undefined,
   });
   const [pollingInterval, setPollingInterval] = useState(30000); // Normal: 30s, Durante scan: 2s
   const { toast } = useToast();
@@ -92,6 +94,7 @@ export function useWhatsAppStatus() {
         isAuthorized: true,
         phoneNumber: data.phoneNumber,
         connectedAt: data.connectedAt ? new Date(data.connectedAt) : undefined,
+        instanceName: data.instanceName || 'Imply Frete',
       });
 
     } catch (error) {
@@ -137,6 +140,85 @@ export function useWhatsAppStatus() {
     setPollingInterval(30000); // Volta ao polling normal
   }, []);
 
+  const disconnect = useCallback(async () => {
+    try {
+      const { data, error } = await supabase.functions.invoke('mega-api-logout');
+
+      if (error) {
+        console.error('Error disconnecting WhatsApp:', error);
+        toast({
+          title: 'Erro ao desconectar',
+          description: 'Não foi possível desconectar o WhatsApp',
+          variant: 'destructive',
+        });
+        return false;
+      }
+
+      // Atualizar estado local
+      setStatus(prev => ({
+        ...prev,
+        connected: false,
+        status: 'disconnected',
+        phoneNumber: undefined,
+        connectedAt: undefined,
+      }));
+
+      toast({
+        title: 'WhatsApp Desconectado',
+        description: 'A conexão foi encerrada com sucesso.',
+      });
+
+      return true;
+    } catch (error) {
+      console.error('Error in disconnect:', error);
+      toast({
+        title: 'Erro ao desconectar',
+        description: 'Ocorreu um erro inesperado',
+        variant: 'destructive',
+      });
+      return false;
+    }
+  }, [toast]);
+
+  const updateInstanceName = useCallback(async (name: string) => {
+    try {
+      const { data, error } = await supabase.functions.invoke('mega-api-update-instance', {
+        body: { name },
+      });
+
+      if (error) {
+        console.error('Error updating instance name:', error);
+        toast({
+          title: 'Erro ao atualizar nome',
+          description: 'Não foi possível atualizar o nome da instância',
+          variant: 'destructive',
+        });
+        return false;
+      }
+
+      // Atualizar estado local
+      setStatus(prev => ({
+        ...prev,
+        instanceName: data.name,
+      }));
+
+      toast({
+        title: 'Nome Atualizado',
+        description: 'O nome da instância foi atualizado com sucesso.',
+      });
+
+      return true;
+    } catch (error) {
+      console.error('Error in updateInstanceName:', error);
+      toast({
+        title: 'Erro ao atualizar nome',
+        description: 'Ocorreu um erro inesperado',
+        variant: 'destructive',
+      });
+      return false;
+    }
+  }, [toast]);
+
   useEffect(() => {
     checkStatus();
 
@@ -152,5 +234,7 @@ export function useWhatsAppStatus() {
     getQRCode,
     startFastPolling,
     stopFastPolling,
+    disconnect,
+    updateInstanceName,
   };
 }
