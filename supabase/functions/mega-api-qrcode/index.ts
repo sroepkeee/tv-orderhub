@@ -30,23 +30,36 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Verificar se o usuário está autorizado a usar WhatsApp
-    const { data: authData, error: authError } = await supabaseClient
+    // Verificar se o usuário está autorizado (whitelist ou admin)
+    const { data: authData } = await supabaseClient
       .from('whatsapp_authorized_users')
-      .select('id, is_active')
+      .select('id')
       .eq('user_id', user.id)
       .eq('is_active', true)
       .maybeSingle();
 
-    if (authError || !authData) {
-      console.error('User not authorized for WhatsApp:', authError);
-      return new Response(
-        JSON.stringify({ error: 'Usuário não autorizado para WhatsApp' }),
-        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+    // Se não está na whitelist, verificar se é admin
+    if (!authData) {
+      const { data: adminRole } = await supabaseClient
+        .from('user_roles')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('role', 'admin')
+        .maybeSingle();
+
+      if (!adminRole) {
+        console.error('User not authorized for WhatsApp - not in whitelist and not admin');
+        return new Response(
+          JSON.stringify({ error: 'Usuário não autorizado para WhatsApp' }),
+          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      console.log('User authorized via admin role');
+    } else {
+      console.log('User authorized via whitelist');
     }
 
-    const megaApiUrl = Deno.env.get('MEGA_API_URL');
+    let megaApiUrl = Deno.env.get('MEGA_API_URL');
     const megaApiToken = Deno.env.get('MEGA_API_TOKEN');
     const megaApiInstance = Deno.env.get('MEGA_API_INSTANCE');
 
@@ -58,40 +71,81 @@ Deno.serve(async (req) => {
       );
     }
 
-    console.log(`Fetching QR Code from Mega API for instance: ${megaApiInstance}`);
+    // Garantir que a URL tenha protocolo https
+    if (!megaApiUrl.startsWith('http://') && !megaApiUrl.startsWith('https://')) {
+      megaApiUrl = `https://${megaApiUrl}`;
+    }
+    
+    // Remover barra final
+    megaApiUrl = megaApiUrl.replace(/\/+$/, '');
 
-    // Chamar endpoint de QR Code da Mega API
-    const qrResponse = await fetch(`${megaApiUrl}/rest/instance/qrcode/${megaApiInstance}`, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${megaApiToken}`,
-        'Content-Type': 'application/json',
-      },
-    });
+    console.log('Fetching QR Code from Mega API for instance:', megaApiInstance);
+    console.log('Base URL:', megaApiUrl);
 
-    if (!qrResponse.ok) {
-      const errorText = await qrResponse.text();
-      console.error('Mega API QR Code error:', qrResponse.status, errorText);
+    // Lista de endpoints para tentar (diferentes versões da API)
+    const endpoints = [
+      `/rest/instance/qrcode/${megaApiInstance}`,
+      `/instance/qrcode/${megaApiInstance}`,
+      `/rest/qrcode/${megaApiInstance}`,
+    ];
+
+    let lastError = null;
+    let qrResponse = null;
+    let qrData = null;
+
+    // Tentar cada endpoint até encontrar um que funcione
+    for (const endpoint of endpoints) {
+      const qrUrl = `${megaApiUrl}${endpoint}`;
+      console.log('Trying QR endpoint:', qrUrl);
+
+      try {
+        qrResponse = await fetch(qrUrl, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${megaApiToken}`,
+            'Content-Type': 'application/json',
+          },
+        });
+
+        if (qrResponse.ok) {
+          qrData = await qrResponse.json();
+          console.log('QR Code fetched successfully from endpoint:', endpoint);
+          break;
+        } else if (qrResponse.status === 404) {
+          console.log('QR endpoint not found (404):', endpoint);
+          lastError = `Endpoint not found: ${endpoint}`;
+        } else {
+          const errorText = await qrResponse.text();
+          console.log('QR endpoint failed:', endpoint, 'Status:', qrResponse.status, 'Error:', errorText);
+          lastError = errorText;
+        }
+      } catch (fetchError) {
+        console.log('Fetch error for QR endpoint:', endpoint, 'Error:', fetchError);
+        lastError = fetchError instanceof Error ? fetchError.message : 'Unknown fetch error';
+      }
+    }
+
+    // Se conseguiu QR Code, retornar
+    if (qrData) {
       return new Response(
-        JSON.stringify({ 
-          error: 'Erro ao obter QR Code',
-          details: errorText,
-          status: qrResponse.status
+        JSON.stringify({
+          success: true,
+          qrcode: qrData.qrcode || qrData.qr_code_image_url || qrData.base64 || qrData.qr,
+          expiresIn: 60, // QR codes geralmente expiram em 60 segundos
         }),
-        { status: qrResponse.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    const qrData = await qrResponse.json();
-    console.log('QR Code fetched successfully');
-
+    // Se nenhum endpoint funcionou, retornar erro
+    console.error('All QR endpoints failed. Last error:', lastError);
     return new Response(
-      JSON.stringify({
-        success: true,
-        qrcode: qrData.qrcode || qrData.qr_code_image_url || qrData.base64,
-        expiresIn: 60, // QR codes geralmente expiram em 60 segundos
+      JSON.stringify({ 
+        error: 'Não foi possível gerar QR Code',
+        details: lastError,
+        message: 'Todos os endpoints da API falharam. Verifique a configuração da Mega API.',
       }),
-      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
   } catch (error) {
