@@ -5,6 +5,8 @@ import { ConversationHeader } from './ConversationHeader';
 import { MessageInput } from './MessageInput';
 import { CarrierConversation } from '@/types/carriers';
 import { Loader2 } from 'lucide-react';
+import { format, isSameDay } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 
 interface ConversationThreadProps {
   conversations: CarrierConversation[];
@@ -17,25 +19,17 @@ export function ConversationThread({
   onSendMessage, 
   loading 
 }: ConversationThreadProps) {
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
 
+  // Auto-scroll para última mensagem quando novas mensagens chegam
   useEffect(() => {
-    // Scroll para a última mensagem quando novas mensagens chegam
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    if (scrollAreaRef.current) {
+      const viewport = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]');
+      if (viewport) {
+        viewport.scrollTop = viewport.scrollHeight;
+      }
     }
   }, [conversations]);
-
-  if (loading) {
-    return (
-      <div className="flex-1 flex items-center justify-center bg-muted/20">
-        <div className="text-center text-muted-foreground">
-          <Loader2 className="animate-spin h-8 w-8 mx-auto mb-2" />
-          <p className="text-sm">Carregando conversas...</p>
-        </div>
-      </div>
-    );
-  }
 
   if (conversations.length === 0) {
     return (
@@ -53,17 +47,65 @@ export function ConversationThread({
     (a, b) => new Date(a.sent_at).getTime() - new Date(b.sent_at).getTime()
   );
 
+  // Tentar extrair número do pedido da mensagem
+  const extractOrderNumber = (message: string): string | null => {
+    const match = message.match(/#?(\d{6,})/);
+    return match ? match[1] : null;
+  };
+
+  const orderNumber = extractOrderNumber(firstConv.message_content) || 
+    firstConv.order_id.substring(0, 8);
+
+  // Agrupar mensagens por data para separadores
+  const messagesWithDates: Array<{ type: 'date' | 'message'; date?: Date; message?: CarrierConversation }> = [];
+  let lastDate: Date | null = null;
+
+  sortedConversations.forEach((msg) => {
+    const msgDate = new Date(msg.sent_at);
+    
+    if (!lastDate || !isSameDay(lastDate, msgDate)) {
+      messagesWithDates.push({ type: 'date', date: msgDate });
+      lastDate = msgDate;
+    }
+    
+    messagesWithDates.push({ type: 'message', message: msg });
+  });
+
   return (
     <div className="flex-1 flex flex-col h-full">
       <ConversationHeader 
         carrier={firstConv.carrier} 
         orderId={firstConv.order_id}
+        orderNumber={orderNumber}
       />
 
-      <ScrollArea className="flex-1 p-4" ref={scrollRef}>
-        {sortedConversations.map((message) => (
-          <MessageBubble key={message.id} message={message} />
-        ))}
+      <ScrollArea className="flex-1 p-4" ref={scrollAreaRef}>
+        {messagesWithDates.map((item, index) => {
+          if (item.type === 'date' && item.date) {
+            return (
+              <div key={`date-${index}`} className="flex justify-center my-4">
+                <div className="bg-muted px-3 py-1 rounded-full text-xs text-muted-foreground">
+                  {format(item.date, "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
+                </div>
+              </div>
+            );
+          }
+          
+          if (item.type === 'message' && item.message) {
+            return <MessageBubble key={item.message.id} message={item.message} />;
+          }
+          
+          return null;
+        })}
+        
+        {loading && (
+          <div className="flex justify-center py-2">
+            <div className="bg-muted px-3 py-1 rounded-full text-xs text-muted-foreground flex items-center gap-2">
+              <Loader2 className="h-3 w-3 animate-spin" />
+              Enviando mensagem...
+            </div>
+          </div>
+        )}
       </ScrollArea>
 
       <MessageInput onSendMessage={onSendMessage} disabled={loading} />

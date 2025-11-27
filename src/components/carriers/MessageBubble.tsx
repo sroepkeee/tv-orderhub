@@ -43,6 +43,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
   const isRead = !!message.read_at;
 
   const { formatted, isQuote } = formatCarrierMessage(message.message_content);
+  const senderLabel = isOutbound ? 'Você' : (message.carrier?.name || 'Transportadora');
 
   return (
     <div className={`flex ${isOutbound ? 'justify-end' : 'justify-start'} mb-4`}>
@@ -53,6 +54,12 @@ export function MessageBubble({ message }: MessageBubbleProps) {
             : 'bg-muted text-foreground'
         }`}
       >
+        <div className={`text-xs font-semibold mb-1 ${
+          isOutbound ? 'text-primary-foreground/90' : 'text-foreground/90'
+        }`}>
+          {senderLabel}
+        </div>
+        
         {isQuote ? (
           <div className="text-sm whitespace-pre-wrap break-words font-medium">
             {formatText(formatted)}
