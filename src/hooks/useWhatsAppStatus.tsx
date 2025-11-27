@@ -29,14 +29,25 @@ export function useWhatsAppStatus() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return false;
 
-      const { data, error } = await supabase
+      // Verifica se está na tabela whatsapp_authorized_users
+      const { data: whatsappAuth } = await supabase
         .from('whatsapp_authorized_users')
-        .select('id, is_active')
+        .select('id')
         .eq('user_id', user.id)
         .eq('is_active', true)
         .maybeSingle();
 
-      return !error && !!data;
+      if (whatsappAuth) return true;
+
+      // Se não está na tabela, verifica se é admin
+      const { data: adminRole } = await supabase
+        .from('user_roles')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('role', 'admin')
+        .maybeSingle();
+
+      return !!adminRole;
     } catch (error) {
       console.error('Error checking authorization:', error);
       return false;
