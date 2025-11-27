@@ -234,11 +234,34 @@ export function WhatsAppQRCodeDialog({
             )}
 
             {status === 'error' && (
-              <div className="flex flex-col items-center gap-3">
-                <p className="text-sm text-destructive font-medium">Erro ao carregar</p>
+              <div className="flex flex-col items-center gap-4">
+                <div className="flex items-center justify-center w-16 h-16 rounded-full bg-destructive/10">
+                  <RefreshCw className="h-8 w-8 text-destructive" />
+                </div>
+                <div className="text-center space-y-2">
+                  <p className="text-sm font-medium">Não foi possível gerar o QR Code</p>
+                  <p className="text-xs text-muted-foreground">
+                    Verifique se o webhook está configurado no painel Mega API
+                  </p>
+                  <div className="mt-4 p-3 bg-muted rounded-lg text-left space-y-2">
+                    <div>
+                      <p className="text-xs font-medium mb-1">URL do Webhook:</p>
+                      <code className="text-xs break-all block bg-background p-2 rounded border">
+                        https://wejkyyjhckdlttieuyku.supabase.co/functions/v1/mega-api-webhook
+                      </code>
+                    </div>
+                    <div>
+                      <p className="text-xs font-medium mb-1">Eventos necessários:</p>
+                      <div className="flex gap-2">
+                        <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded">qrcode</span>
+                        <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded">connection.update</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
                 <Button onClick={handleRefresh} variant="outline" size="sm">
                   <RefreshCw className="h-4 w-4 mr-2" />
-                  Tentar novamente
+                  Tentar Novamente
                 </Button>
               </div>
             )}
