@@ -46,16 +46,16 @@ export function MessageBubble({ message }: MessageBubbleProps) {
   const senderLabel = isOutbound ? 'Você' : (message.carrier?.name || 'Transportadora');
 
   return (
-    <div className={`flex ${isOutbound ? 'justify-end' : 'justify-start'} mb-4`}>
+    <div className={`flex ${isOutbound ? 'justify-end' : 'justify-start'} mb-3`}>
       <div
-        className={`max-w-[70%] rounded-lg p-3 ${
+        className={`max-w-[70%] rounded-lg p-3 shadow-sm ${
           isOutbound
-            ? 'bg-primary text-primary-foreground'
-            : 'bg-muted text-foreground'
+            ? 'bg-green-100 dark:bg-green-900/30 text-foreground rounded-br-none'
+            : 'bg-white dark:bg-muted text-foreground rounded-bl-none border border-border'
         }`}
       >
         <div className={`text-xs font-semibold mb-1 ${
-          isOutbound ? 'text-primary-foreground/90' : 'text-foreground/90'
+          isOutbound ? 'text-green-700 dark:text-green-300' : 'text-blue-700 dark:text-blue-300'
         }`}>
           {senderLabel}
         </div>
@@ -70,9 +70,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
           </p>
         )}
         
-        <div className={`flex items-center justify-end gap-1 mt-1 text-xs ${
-          isOutbound ? 'text-primary-foreground/70' : 'text-muted-foreground'
-        }`}>
+        <div className="flex items-center justify-end gap-1 mt-1 text-xs text-muted-foreground">
           <span>
             {format(new Date(message.sent_at), 'HH:mm', { locale: ptBR })}
           </span>

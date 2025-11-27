@@ -2,11 +2,12 @@ import { useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Search, Phone } from 'lucide-react';
+import { Search, Phone, MessageCircle } from 'lucide-react';
 import { CarrierConversation } from '@/types/carriers';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { formatCarrierMessage } from '@/lib/utils';
+import { ContactAvatar } from './ContactAvatar';
 
 interface WhatsAppContact {
   whatsapp: string;
@@ -95,11 +96,11 @@ export function WhatsAppContactList({
   };
 
   return (
-    <div className="w-80 border-r bg-background flex flex-col h-full">
-      <div className="p-4 border-b">
-        <h2 className="text-lg font-semibold mb-3 flex items-center gap-2">
-          <Phone className="h-5 w-5" />
-          Contatos WhatsApp
+    <div className="w-96 border-r bg-background flex flex-col h-full">
+      <div className="p-4 border-b space-y-3">
+        <h2 className="text-lg font-semibold flex items-center gap-2">
+          <MessageCircle className="h-5 w-5 text-primary" />
+          Conversas
         </h2>
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -122,46 +123,52 @@ export function WhatsAppContactList({
             <button
               key={contact.whatsapp}
               onClick={() => onSelectContact(contact)}
-              className={`w-full p-4 border-b text-left hover:bg-accent transition-colors ${
-                selectedWhatsApp === contact.whatsapp ? 'bg-accent border-l-4 border-l-primary' : ''
+              className={`w-full p-3 border-b text-left hover:bg-accent/50 transition-colors flex items-start gap-3 ${
+                selectedWhatsApp === contact.whatsapp ? 'bg-accent' : ''
               }`}
             >
-              <div className="flex items-start justify-between mb-2">
-                <div className="flex-1">
-                  <span className="font-semibold text-sm block mb-1">
+              <ContactAvatar name={contact.carrierName} size="md" />
+              
+              <div className="flex-1 min-w-0">
+                <div className="flex items-start justify-between gap-2 mb-1">
+                  <span className="font-semibold text-sm truncate">
                     {contact.carrierName}
                   </span>
-               <span className="text-xs text-muted-foreground flex items-center gap-1">
-                <Phone className="h-3 w-3" />
-                {formatWhatsApp(contact.whatsapp)}
-                {contact.whatsapp.startsWith('sem-whatsapp') && (
-                  <Badge variant="outline" className="text-xs ml-1">⚠️ Sem contato</Badge>
-                )}
-              </span>
+                  <span className="text-xs text-muted-foreground whitespace-nowrap flex-shrink-0">
+                    {formatDistanceToNow(new Date(contact.lastMessage.sent_at), {
+                      addSuffix: true,
+                      locale: ptBR
+                    })}
+                  </span>
                 </div>
-                <span className="text-xs text-muted-foreground ml-2 whitespace-nowrap">
-                  {formatDistanceToNow(new Date(contact.lastMessage.sent_at), {
-                    addSuffix: true,
-                    locale: ptBR
-                  })}
-                </span>
-              </div>
-              
-              <div className="flex items-center gap-2 mb-2">
-                <Badge variant="secondary" className="text-xs">
-                  {contact.orderCount} {contact.orderCount === 1 ? 'pedido' : 'pedidos'}
-                </Badge>
-                {contact.unreadCount > 0 && (
-                  <Badge variant="destructive" className="text-xs animate-pulse">
-                    {contact.unreadCount} não lida{contact.unreadCount > 1 ? 's' : ''}
-                  </Badge>
-                )}
-              </div>
+                
+                <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
+                  <Phone className="h-3 w-3" />
+                  <span className="truncate">{formatWhatsApp(contact.whatsapp)}</span>
+                </div>
 
-              <p className="text-sm text-muted-foreground truncate">
-                {contact.lastMessage.message_direction === 'outbound' ? '📤 ' : '📥 '}
-                {formatCarrierMessage(contact.lastMessage.message_content).formatted.split('\n')[0]}
-              </p>
+                <div className="flex items-start gap-2 mb-2">
+                  <p className="text-sm text-muted-foreground truncate flex-1">
+                    {contact.lastMessage.message_direction === 'outbound' ? (
+                      <span className="text-green-600 dark:text-green-400 font-medium">Você: </span>
+                    ) : (
+                      <span className="text-blue-600 dark:text-blue-400 font-medium">📱 </span>
+                    )}
+                    {formatCarrierMessage(contact.lastMessage.message_content).formatted.split('\n')[0]}
+                  </p>
+                </div>
+                
+                <div className="flex items-center gap-2">
+                  <Badge variant="secondary" className="text-xs">
+                    {contact.orderCount} {contact.orderCount === 1 ? 'pedido' : 'pedidos'}
+                  </Badge>
+                  {contact.unreadCount > 0 && (
+                    <Badge variant="destructive" className="text-xs">
+                      {contact.unreadCount}
+                    </Badge>
+                  )}
+                </div>
+              </div>
             </button>
           ))
         )}

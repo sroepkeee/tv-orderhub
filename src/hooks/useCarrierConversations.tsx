@@ -174,24 +174,35 @@ export const useCarrierConversations = () => {
     }
   };
 
-  const subscribeToNewMessages = () => {
+  const subscribeToNewMessages = (onSync?: () => void) => {
     const channel = supabase
-      .channel('carrier-conversations')
+      .channel('carrier-conversations-realtime')
       .on(
         'postgres_changes',
         {
-          event: 'INSERT',
+          event: '*',
           schema: 'public',
           table: 'carrier_conversations',
-          filter: 'message_direction=eq.inbound',
         },
-        () => {
-          loadConversations();
-          getUnreadCount();
+        (payload) => {
+          console.log('Evento na tabela carrier_conversations:', payload.eventType, payload);
           
-          // Play notification sound
-          const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSuBzvLZiTYIGWm98OScTgwOUKjl8bllHAU7k9nzzHkpBSh+zPLaizsKGGS54+ydUwYPVq/n77NYGws+k9bzzXcsBSh/zfPci0ELFGCu6PGlVBUIQ5zd8L9yIQUqf8/z24k5CBV');
-          audio.play().catch(() => {}); // Ignore errors
+          if (payload.eventType === 'INSERT') {
+            // Chamar callback de sincronização
+            onSync?.();
+            
+            // Atualizar contagem de não lidas
+            getUnreadCount();
+            
+            // Recarregar conversas para atualizar a lista
+            loadConversations();
+            
+            // Tocar som apenas para mensagens inbound
+            if (payload.new && (payload.new as any).message_direction === 'inbound') {
+              const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSuBzvLZiTYIGWm98OScTgwOUKjl8bllHAU7k9nzzHkpBSh+zPLaizsKGGS54+ydUwYPVq/n77NYGws+k9bzzXcsBSh/zfPci0ELFGCu6PGlVBUIQ5zd8L9yIQUqf8/z24k5CBV');
+              audio.play().catch(() => {}); // Ignore errors
+            }
+          }
         }
       )
       .subscribe();

@@ -4,11 +4,11 @@ import { Button } from '@/components/ui/button';
 import { ArrowLeft, Loader2, Settings } from 'lucide-react';
 import { useWhatsAppStatus } from '@/hooks/useWhatsAppStatus';
 import { WhatsAppContactList } from '@/components/carriers/WhatsAppContactList';
-import { OrderQuotesList } from '@/components/carriers/OrderQuotesList';
 import { ConversationThread } from '@/components/carriers/ConversationThread';
 import { WhatsAppConnectionStatus } from '@/components/carriers/WhatsAppConnectionStatus';
 import { useCarrierConversations } from '@/hooks/useCarrierConversations';
 import { useToast } from '@/hooks/use-toast';
+import { Badge } from '@/components/ui/badge';
 
 export default function CarriersChat() {
   const navigate = useNavigate();
@@ -19,46 +19,46 @@ export default function CarriersChat() {
     loading, 
     sendMessage, 
     loadConversations, 
-    subscribeToNewMessages 
+    subscribeToNewMessages,
+    unreadCount 
   } = useCarrierConversations();
   const [selectedWhatsApp, setSelectedWhatsApp] = useState<string | null>(null);
   const [selectedCarrierId, setSelectedCarrierId] = useState<string | null>(null);
-  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
+  const [syncing, setSyncing] = useState(false);
 
   useEffect(() => {
     loadConversations();
-    const unsubscribe = subscribeToNewMessages();
+    const unsubscribe = subscribeToNewMessages(() => {
+      setSyncing(true);
+      setTimeout(() => setSyncing(false), 1000);
+    });
     return () => {
       if (unsubscribe) unsubscribe();
     };
   }, []);
 
-  const handleSelectContact = (contact: { whatsapp: string; carrierId: string }) => {
+  const handleSelectContact = (contact: { whatsapp: string; carrierId: string; conversations: any[] }) => {
     setSelectedWhatsApp(contact.whatsapp);
     setSelectedCarrierId(contact.carrierId);
-    setSelectedOrderId(null);
-  };
-
-  const handleSelectOrder = (orderId: string) => {
-    setSelectedOrderId(orderId);
   };
 
   const handleSendMessage = async (message: string) => {
-    if (!selectedOrderId || !selectedWhatsApp) return;
+    if (!selectedWhatsApp || !selectedCarrierId) return;
 
+    // Pegar a primeira conversa deste contato para obter order_id
     const keyFor = (c: any) => c.carrier?.whatsapp || `sem-whatsapp:${c.carrier_id}`;
-    const conv = conversations.find(c => {
-      return c.order_id === selectedOrderId && keyFor(c) === selectedWhatsApp;
-    });
+    const contactConvs = conversations.filter(c => keyFor(c) === selectedWhatsApp);
     
-    if (!conv) return;
+    if (contactConvs.length === 0) return;
+    
+    const firstConv = contactConvs[0];
 
     setSending(true);
     try {
       await sendMessage({
-        carrierId: conv.carrier_id,
-        orderId: selectedOrderId,
+        carrierId: selectedCarrierId,
+        orderId: firstConv.order_id,
         message,
         conversationType: 'follow_up'
       });
@@ -81,12 +81,8 @@ export default function CarriersChat() {
   };
 
   const keyFor = (c: any) => c.carrier?.whatsapp || `sem-whatsapp:${c.carrier_id}`;
-  const contactConversations = selectedWhatsApp
+  const threadConversations = selectedWhatsApp
     ? conversations.filter(c => keyFor(c) === selectedWhatsApp)
-    : [];
-
-  const threadConversations = selectedOrderId
-    ? contactConversations.filter(c => c.order_id === selectedOrderId)
     : [];
 
   return (
@@ -97,11 +93,17 @@ export default function CarriersChat() {
             <Button variant="ghost" size="icon" onClick={() => navigate('/')}>
               <ArrowLeft className="h-5 w-5" />
             </Button>
-            <h1 className="text-2xl font-bold">Chat com Transportadoras</h1>
-            {selectedWhatsApp && contactConversations.length > 0 && (
-              <span className="text-sm text-muted-foreground">
-                • {contactConversations[0]?.carrier?.name}
-              </span>
+            <h1 className="text-2xl font-bold">WhatsApp - Chat com Transportadoras</h1>
+            {syncing && (
+              <Badge variant="secondary" className="gap-1 animate-pulse">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                Sincronizando...
+              </Badge>
+            )}
+            {unreadCount > 0 && (
+              <Badge variant="destructive" className="animate-pulse">
+                {unreadCount} não lida{unreadCount > 1 ? 's' : ''}
+              </Badge>
             )}
           </div>
           <div className="flex items-center gap-2">
@@ -134,16 +136,8 @@ export default function CarriersChat() {
           />
         )}
 
-        {selectedWhatsApp && (
-          <OrderQuotesList
-            conversations={contactConversations}
-            selectedOrderId={selectedOrderId || undefined}
-            onSelectOrder={handleSelectOrder}
-          />
-        )}
-
         <div className="flex-1">
-          {selectedOrderId ? (
+          {selectedWhatsApp ? (
             <ConversationThread
               conversations={threadConversations}
               onSendMessage={handleSendMessage}
@@ -152,8 +146,8 @@ export default function CarriersChat() {
           ) : (
             <div className="flex items-center justify-center h-full bg-muted/20">
               <div className="text-center text-muted-foreground">
-                <p className="text-lg mb-2">Selecione um pedido</p>
-                <p className="text-sm">Escolha um pedido para ver a conversa</p>
+                <p className="text-lg mb-2">Selecione um contato</p>
+                <p className="text-sm">Escolha um contato para ver a conversa</p>
               </div>
             </div>
           )}
