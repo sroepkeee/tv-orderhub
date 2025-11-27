@@ -1526,13 +1526,56 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
     if (!order?.id) return;
     setDeleting(true);
     try {
-      // 1. Excluir itens do pedido
-      const {
-        error: itemsError
-      } = await supabase.from('order_items').delete().eq('order_id', order.id);
-      if (itemsError) throw itemsError;
+      // 1. Buscar IDs dos itens do pedido para excluir tabelas relacionadas
+      const { data: orderItems } = await supabase
+        .from('order_items')
+        .select('id')
+        .eq('order_id', order.id);
+      
+      if (orderItems && orderItems.length > 0) {
+        const itemIds = orderItems.map(i => i.id);
+        
+        // Excluir trabalhos de laboratório dos itens
+        await supabase.from('lab_item_work').delete().in('order_item_id', itemIds);
+        
+        // Excluir histórico de itens
+        await supabase.from('order_item_history').delete().in('order_item_id', itemIds);
+      }
+      
+      // 2. Excluir itens do pedido
+      await supabase.from('order_items').delete().eq('order_id', order.id);
 
-      // 2. Excluir anexos do storage e da tabela
+      // 3. Buscar IDs das cotações para excluir respostas
+      const { data: quotes } = await supabase
+        .from('freight_quotes')
+        .select('id')
+        .eq('order_id', order.id);
+      
+      if (quotes && quotes.length > 0) {
+        const quoteIds = quotes.map(q => q.id);
+        // Excluir respostas das cotações
+        await supabase.from('freight_quote_responses').delete().in('quote_id', quoteIds);
+      }
+      
+      // 4. Excluir cotações de frete
+      await supabase.from('freight_quotes').delete().eq('order_id', order.id);
+
+      // 5. Excluir conversas com transportadoras
+      await supabase.from('carrier_conversations').delete().eq('order_id', order.id);
+
+      // 6. Excluir volumes do pedido
+      await supabase.from('order_volumes').delete().eq('order_id', order.id);
+
+      // 7. Excluir movimentações de estoque
+      await supabase.from('stock_movements').delete().eq('order_id', order.id);
+
+      // 8. Excluir menções
+      await supabase.from('mention_tags').delete().eq('order_id', order.id);
+
+      // 9. Excluir alterações do pedido
+      await supabase.from('order_changes').delete().eq('order_id', order.id);
+
+      // 10. Excluir anexos do storage e da tabela
       if (attachments.length > 0) {
         // Excluir arquivos do storage
         const filePaths = attachments.map(a => a.file_path);
@@ -1542,23 +1585,24 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
         await supabase.from('order_attachments').delete().eq('order_id', order.id);
       }
 
-      // 3. Excluir comentários
+      // 11. Excluir comentários
       await supabase.from('order_comments').delete().eq('order_id', order.id);
 
-      // 4. Excluir histórico
+      // 12. Excluir histórico
       await supabase.from('order_history').delete().eq('order_id', order.id);
 
-      // 5. Excluir notas de conclusão
+      // 13. Excluir notas de conclusão
       await supabase.from('order_completion_notes').delete().eq('order_id', order.id);
 
-      // 6. Excluir mudanças de data
+      // 14. Excluir mudanças de data
       await supabase.from('delivery_date_changes').delete().eq('order_id', order.id);
 
-      // 7. Excluir pedido
+      // 15. Finalmente, excluir o pedido
       const {
         error: orderError
       } = await supabase.from('orders').delete().eq('id', order.id);
       if (orderError) throw orderError;
+      
       toast({
         title: "Pedido excluído",
         description: `Pedido ${order.orderNumber} foi excluído com sucesso.`
