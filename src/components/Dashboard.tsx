@@ -1906,13 +1906,15 @@ export const Dashboard = () => {
                 <ShoppingCart className="h-4 w-4 mr-2" />
                 Compras
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => navigate('/carriers-chat')} className="relative">
-                <MessageSquare className="h-4 w-4 mr-2" />
-                Conversas
-                {unreadConversationsCount > 0 && <span className="ml-auto pl-2 text-xs font-semibold text-destructive">
-                    ({unreadConversationsCount})
-                  </span>}
-              </DropdownMenuItem>
+              {phasePermissions.some(p => p.phase_key === 'carriers_chat' && p.can_view) && (
+                <DropdownMenuItem onClick={() => navigate('/carriers-chat')} className="relative">
+                  <MessageSquare className="h-4 w-4 mr-2" />
+                  Conversas
+                  {unreadConversationsCount > 0 && <span className="ml-auto pl-2 text-xs font-semibold text-destructive">
+                      ({unreadConversationsCount})
+                    </span>}
+                </DropdownMenuItem>
+              )}
               {isAdmin && (
                 <>
                   <DropdownMenuSeparator />
