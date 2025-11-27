@@ -9,15 +9,27 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const megaApiUrl = Deno.env.get('MEGA_API_URL') ?? '';
+    let megaApiUrl = (Deno.env.get('MEGA_API_URL') ?? '').trim();
     const megaApiToken = Deno.env.get('MEGA_API_TOKEN') ?? '';
     const megaApiInstance = Deno.env.get('MEGA_API_INSTANCE') ?? '';
 
-    console.log('Checking connection status for instance:', megaApiInstance);
+    if (!megaApiUrl) {
+      throw new Error('MEGA_API_URL not configured');
+    }
+
+    // Garante que a URL tenha protocolo (https) para evitar erros "Invalid URL"
+    if (!megaApiUrl.startsWith('http://') && !megaApiUrl.startsWith('https://')) {
+      megaApiUrl = `https://${megaApiUrl}`;
+    }
+
+    // Remove barras duplicadas no final ao montar a URL final
+    const statusUrl = `${megaApiUrl.replace(/\/+$/, '')}/rest/instance/connectionState/${megaApiInstance}`;
+
+    console.log('Checking connection status for instance:', megaApiInstance, 'using URL:', statusUrl);
 
     // Consultar status da conexão
     const response = await fetch(
-      `${megaApiUrl}/rest/instance/connectionState/${megaApiInstance}`,
+      statusUrl,
       {
         method: 'GET',
         headers: {
