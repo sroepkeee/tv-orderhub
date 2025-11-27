@@ -19,15 +19,52 @@ Deno.serve(async (req) => {
     const payload = await req.json();
     console.log('Webhook received:', JSON.stringify(payload, null, 2));
 
-    // Validar instância
+    // Validar instância (verificar ambos instance_key e instance para compatibilidade)
     const megaApiInstance = Deno.env.get('MEGA_API_INSTANCE') ?? '';
-    if (payload.instance !== megaApiInstance) {
-      console.warn('Invalid instance:', payload.instance);
+    const instanceKey = payload.instance_key || payload.instance;
+    
+    if (instanceKey !== megaApiInstance) {
+      console.warn('Invalid instance:', instanceKey, 'Expected:', megaApiInstance);
       return new Response(
         JSON.stringify({ error: 'Invalid instance' }),
         {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 400,
+        }
+      );
+    }
+
+    // Processar QR Code Update
+    if (payload.messageType === 'qrcode_update') {
+      console.log('QR Code update received:', { instanceKey, hasQrcode: !!payload.qrcode });
+      
+      // Salvar QR code no cache
+      const { error: upsertError } = await supabase
+        .from('whatsapp_instances')
+        .upsert({
+          instance_key: instanceKey,
+          qrcode: payload.qrcode,
+          qrcode_updated_at: new Date().toISOString(),
+          status: 'waiting_scan',
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'instance_key' });
+
+      if (upsertError) {
+        console.error('Error saving QR code:', upsertError);
+        throw upsertError;
+      }
+
+      console.log('QR code cached successfully');
+
+      return new Response(
+        JSON.stringify({ 
+          success: true, 
+          event: 'qrcode_update',
+          cached: true 
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200,
         }
       );
     }
@@ -170,7 +207,21 @@ Deno.serve(async (req) => {
     } else if (payload.event === 'connection.update') {
       console.log('Connection update:', payload.data);
       
-      // Aqui podemos adicionar lógica para atualizar status de conexão no futuro
+      // Atualizar status da instância
+      const connectionData = payload.data || {};
+      const isConnected = connectionData.state === 'open' || connectionData.connection === 'open';
+      
+      await supabase
+        .from('whatsapp_instances')
+        .upsert({
+          instance_key: instanceKey,
+          status: isConnected ? 'connected' : 'disconnected',
+          phone_number: connectionData.phoneNumber || null,
+          connected_at: isConnected ? new Date().toISOString() : null,
+          qrcode: null, // Limpar QR code quando conectado
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'instance_key' });
+      
       return new Response(
         JSON.stringify({ success: true, event: 'connection.update' }),
         {

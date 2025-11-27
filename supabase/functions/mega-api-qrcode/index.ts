@@ -79,73 +79,82 @@ Deno.serve(async (req) => {
     // Remover barra final
     megaApiUrl = megaApiUrl.replace(/\/+$/, '');
 
-    console.log('Fetching QR Code from Mega API for instance:', megaApiInstance);
-    console.log('Base URL:', megaApiUrl);
+    console.log('Fetching QR code from cache for instance:', megaApiInstance);
 
-    // Lista de endpoints para tentar (diferentes versões da API)
-    const endpoints = [
-      `/rest/instance/qrcode/${megaApiInstance}`,
-      `/instance/qrcode/${megaApiInstance}`,
-      `/rest/qrcode/${megaApiInstance}`,
-    ];
+    // Buscar QR code do cache (salvo pelo webhook)
+    const { data: instanceData, error: cacheError } = await supabaseClient
+      .from('whatsapp_instances')
+      .select('qrcode, qrcode_updated_at, status, phone_number')
+      .eq('instance_key', megaApiInstance)
+      .maybeSingle();
 
-    let lastError = null;
-    let qrResponse = null;
-    let qrData = null;
-
-    // Tentar cada endpoint até encontrar um que funcione
-    for (const endpoint of endpoints) {
-      const qrUrl = `${megaApiUrl}${endpoint}`;
-      console.log('Trying QR endpoint:', qrUrl);
-
-      try {
-        qrResponse = await fetch(qrUrl, {
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${megaApiToken}`,
-            'Content-Type': 'application/json',
-          },
-        });
-
-        if (qrResponse.ok) {
-          qrData = await qrResponse.json();
-          console.log('QR Code fetched successfully from endpoint:', endpoint);
-          break;
-        } else if (qrResponse.status === 404) {
-          console.log('QR endpoint not found (404):', endpoint);
-          lastError = `Endpoint not found: ${endpoint}`;
-        } else {
-          const errorText = await qrResponse.text();
-          console.log('QR endpoint failed:', endpoint, 'Status:', qrResponse.status, 'Error:', errorText);
-          lastError = errorText;
-        }
-      } catch (fetchError) {
-        console.log('Fetch error for QR endpoint:', endpoint, 'Error:', fetchError);
-        lastError = fetchError instanceof Error ? fetchError.message : 'Unknown fetch error';
-      }
+    if (cacheError) {
+      console.error('Error fetching from cache:', cacheError);
     }
 
-    // Se conseguiu QR Code, retornar
-    if (qrData) {
+    console.log('Cache data:', { 
+      hasQrcode: !!instanceData?.qrcode, 
+      status: instanceData?.status,
+      updatedAt: instanceData?.qrcode_updated_at 
+    });
+
+    // Se instância está conectada
+    if (instanceData?.status === 'connected') {
+      console.log('Instance already connected');
       return new Response(
         JSON.stringify({
           success: true,
-          qrcode: qrData.qrcode || qrData.qr_code_image_url || qrData.base64 || qrData.qr,
-          expiresIn: 60, // QR codes geralmente expiram em 60 segundos
+          qrcode: null,
+          status: 'connected',
+          phoneNumber: instanceData.phone_number,
+          message: 'Instância já está conectada',
         }),
-        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200,
+        }
       );
     }
 
-    // Se nenhum endpoint funcionou, retornar erro
-    console.error('All QR endpoints failed. Last error:', lastError);
+    // Se tem QR code no cache e ainda está válido
+    if (instanceData?.qrcode && instanceData?.qrcode_updated_at) {
+      const updatedAt = new Date(instanceData.qrcode_updated_at);
+      const now = new Date();
+      const ageSeconds = (now.getTime() - updatedAt.getTime()) / 1000;
+      
+      // QR codes expiram em ~60 segundos
+      if (ageSeconds < 60) {
+        console.log('Returning cached QR code (age:', Math.floor(ageSeconds), 'seconds)');
+        return new Response(
+          JSON.stringify({
+            success: true,
+            qrcode: instanceData.qrcode,
+            expiresIn: Math.max(0, 60 - Math.floor(ageSeconds)),
+            status: 'available',
+          }),
+          {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 200,
+          }
+        );
+      } else {
+        console.log('QR code expired (age:', Math.floor(ageSeconds), 'seconds)');
+      }
+    }
+
+    // Aguardando QR code do webhook
+    console.log('No valid QR code in cache, waiting for webhook');
     return new Response(
-      JSON.stringify({ 
-        error: 'Não foi possível gerar QR Code',
-        details: lastError,
-        message: 'Todos os endpoints da API falharam. Verifique a configuração da Mega API.',
+      JSON.stringify({
+        success: true,
+        qrcode: null,
+        status: 'waiting',
+        message: 'Aguardando QR Code do servidor... O webhook enviará em instantes.',
       }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200,
+      }
     );
 
   } catch (error) {

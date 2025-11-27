@@ -1772,6 +1772,42 @@ export type Database = {
           },
         ]
       }
+      whatsapp_instances: {
+        Row: {
+          connected_at: string | null
+          created_at: string | null
+          id: string
+          instance_key: string
+          phone_number: string | null
+          qrcode: string | null
+          qrcode_updated_at: string | null
+          status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          connected_at?: string | null
+          created_at?: string | null
+          id?: string
+          instance_key: string
+          phone_number?: string | null
+          qrcode?: string | null
+          qrcode_updated_at?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          connected_at?: string | null
+          created_at?: string | null
+          id?: string
+          instance_key?: string
+          phone_number?: string | null
+          qrcode?: string | null
+          qrcode_updated_at?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       whatsapp_message_log: {
         Row: {
           conversation_id: string | null
