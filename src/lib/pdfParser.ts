@@ -372,21 +372,39 @@ function sanitizeItemDescription(description: string): string {
     .trim();
 }
 
-// Helper function to find item description separately
-function findItemDescription(text: string, itemCode: string, itemNumber: string): string {
-  // Try multiple patterns to find description
-  // Pattern 1: "Descrição XXXXX" near the item
-  const descRegex1 = new RegExp(`Item\\s+${itemNumber}[\\s\\S]{0,300}?Descri[çc][ãa]o\\s+([^\\n]+?)(?=Item\\s+\\d+|C[óo]digo\\s+\\d+|$)`, 'i');
-  const match1 = text.match(descRegex1);
-  if (match1 && match1[1].trim().length > 3) {
-    return sanitizeItemDescription(match1[1].trim().substring(0, 200));
+// Helper function to find item description separately - REESCRITA para prevenir troca entre itens
+function findItemDescription(blockText: string, itemCode: string, itemNumber: string): string {
+  // ESTRATÉGIA: Procurar descrição APENAS dentro do bloco do item (sem expansão)
+  // Isso previne a captura de descrições de itens adjacentes
+  
+  // Padrão 1: "Descrição: TEXTO" dentro do bloco
+  const descPattern1 = /Descri[çc][ãa]o[:\s]+(.+?)(?=Qtde|Uni|V\.\s*Unit|Desc\s|Total\s|Armaz|Item\s+\d+|C[óo]digo\s+\d{4,}|$)/is;
+  const match1 = blockText.match(descPattern1);
+  if (match1 && match1[1].trim().length > 8) {
+    const desc = match1[1]
+      .trim()
+      .replace(/\s+/g, ' ')  // Normalizar espaços
+      .replace(/^\d+\s*-?\s*/, '')  // Remover código numérico inicial se houver
+      .substring(0, 200);
+    
+    if (desc.length >= 8 && desc.length <= 200) {
+      return sanitizeItemDescription(desc);
+    }
   }
   
-  // Pattern 2: "Código XXXXX ... Descrição XXXXX"
-  const descRegex2 = new RegExp(`C[óo]digo\\s+${itemCode}[\\s\\S]{0,300}?Descri[çc][ãa]o\\s+([^\\n]+?)(?=Item\\s+\\d+|C[óo]digo\\s+\\d+|Qtde|$)`, 'i');
-  const match2 = text.match(descRegex2);
-  if (match2 && match2[1].trim().length > 3) {
-    return sanitizeItemDescription(match2[1].trim().substring(0, 200));
+  // Padrão 2: Texto imediatamente após "Código XXXXX" (sem rótulo "Descrição:")
+  const codeIndex = blockText.indexOf(itemCode);
+  if (codeIndex !== -1) {
+    const afterCode = blockText.substring(codeIndex + itemCode.length, codeIndex + itemCode.length + 300);
+    // Procurar texto em maiúsculas que pareça descrição (10-150 caracteres)
+    const implicitDescPattern = /^\s*([A-ZÀÁÃÂÉÊÍÓÔÕÚÇ][A-ZÀÁÃÂÉÊÍÓÔÕÚÇ0-9\s,\-\.\/\(\)]{10,150}?)(?=\s*Qtde|\s*\d+[\.,]\d+|\s*UND|$)/i;
+    const match2 = afterCode.match(implicitDescPattern);
+    if (match2 && match2[1]) {
+      const desc = match2[1].trim().replace(/\s+/g, ' ');
+      if (desc.length >= 10 && desc.length <= 200) {
+        return sanitizeItemDescription(desc);
+      }
+    }
   }
   
   return 'Produto TOTVS';
@@ -612,36 +630,11 @@ function extractItemsTable(text: string): {
         const armazemMatch = blockText.match(/Armaz[ée]m\s+(\d{1,3})/i);
         const warehouse = armazemMatch ? armazemMatch[1] : 'PRINCIPAL';
         
-        // DESCRIÇÃO (busca estendida - até 800 chars antes e depois)
+        // DESCRIÇÃO - BUSCA RESTRITA ao bloco do item (SEM expansão para prevenir trocas)
         let description = 'Produto TOTVS';
         
-        // Tentar extrair descrição no bloco expandido
-        const expandedStart = Math.max(0, blockStart - 500);
-        const expandedEnd = Math.min(tableText.length, blockEnd + 300);
-        const expandedBlock = tableText.slice(expandedStart, expandedEnd);
-        
-        const descPatterns = [
-          // Padrão 1: "Descrição: TEXTO"
-          new RegExp(`Descri[çc][ãa]o[:\\s]+(.+?)(?=Item\\s+\\d+|C[óo]digo\\s+\\d+|Qtde|LGPD|TOTAL\\s+DO\\s+PEDIDO|$)`, 'is'),
-          // Padrão 2: Próximo ao código
-          new RegExp(`C[óo]digo\\s+${itemCode}[\\s\\S]{0,400}?Descri[çc][ãa]o[:\\s]+(.+?)(?=Item\\s+\\d+|C[óo]digo\\s+\\d+|Qtde|$)`, 'is'),
-          // Padrão 3: Próximo ao número do item
-          new RegExp(`Item\\s+${itemNumber}[\\s\\S]{0,400}?Descri[çc][ãa]o[:\\s]+(.+?)(?=Item\\s+\\d+|C[óo]digo\\s+\\d+|Qtde|$)`, 'is')
-        ];
-        
-        for (const pattern of descPatterns) {
-          const descMatch = expandedBlock.match(pattern);
-          if (descMatch && descMatch[1].trim().length > 3) {
-            description = sanitizeItemDescription(
-              descMatch[1]
-                .trim()
-                .replace(/\s+/g, ' ')
-                .replace(/^\d+\s*-?\s*/, '')  // Remove código numérico inicial
-                .substring(0, 200)
-            );
-            break;
-          }
-        }
+        // Usar função helper que trabalha APENAS com o blockText (sem expansão)
+        description = findItemDescription(blockText, itemCode, itemNumber);
         
         // Verificar duplicatas
         const isDuplicate = items.some(
