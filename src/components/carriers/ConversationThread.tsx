@@ -56,36 +56,66 @@ export function ConversationThread({
   const orderNumber = extractOrderNumber(firstConv.message_content) || 
     firstConv.order_id.substring(0, 8);
 
-  // Agrupar mensagens por data para separadores
-  const messagesWithDates: Array<{ type: 'date' | 'message'; date?: Date; message?: CarrierConversation }> = [];
+  // Agrupar mensagens por data e pedido para separadores
+  const messagesWithSeparators: Array<{ 
+    type: 'date' | 'order' | 'message'; 
+    date?: Date; 
+    orderId?: string;
+    orderNumber?: string;
+    message?: CarrierConversation 
+  }> = [];
   let lastDate: Date | null = null;
+  let lastOrderId: string | null = null;
 
   sortedConversations.forEach((msg) => {
     const msgDate = new Date(msg.sent_at);
     
+    // Adicionar separador de data
     if (!lastDate || !isSameDay(lastDate, msgDate)) {
-      messagesWithDates.push({ type: 'date', date: msgDate });
+      messagesWithSeparators.push({ type: 'date', date: msgDate });
       lastDate = msgDate;
     }
     
-    messagesWithDates.push({ type: 'message', message: msg });
+    // Adicionar separador de pedido (se houver mais de um pedido)
+    const uniqueOrders = new Set(sortedConversations.map(c => c.order_id));
+    if (uniqueOrders.size > 1 && msg.order_id !== lastOrderId) {
+      const msgOrderNumber = extractOrderNumber(msg.message_content) || msg.order_id.substring(0, 8);
+      messagesWithSeparators.push({ 
+        type: 'order', 
+        orderId: msg.order_id,
+        orderNumber: msgOrderNumber
+      });
+      lastOrderId = msg.order_id;
+    }
+    
+    messagesWithSeparators.push({ type: 'message', message: msg });
   });
 
   return (
-    <div className="flex-1 flex flex-col h-full">
+    <div className="flex-1 flex flex-col h-full bg-background">
       <ConversationHeader 
         carrier={firstConv.carrier} 
         orderId={firstConv.order_id}
         orderNumber={orderNumber}
       />
 
-      <ScrollArea className="flex-1 p-4" ref={scrollAreaRef}>
-        {messagesWithDates.map((item, index) => {
+      <ScrollArea className="flex-1 p-4 bg-muted/10" ref={scrollAreaRef}>
+        {messagesWithSeparators.map((item, index) => {
           if (item.type === 'date' && item.date) {
             return (
               <div key={`date-${index}`} className="flex justify-center my-4">
-                <div className="bg-muted px-3 py-1 rounded-full text-xs text-muted-foreground">
+                <div className="bg-muted px-3 py-1 rounded-full text-xs text-muted-foreground shadow-sm">
                   {format(item.date, "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
+                </div>
+              </div>
+            );
+          }
+          
+          if (item.type === 'order' && item.orderNumber) {
+            return (
+              <div key={`order-${item.orderId}`} className="flex justify-center my-3">
+                <div className="bg-blue-100 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 px-3 py-1.5 rounded-md text-xs font-medium text-blue-700 dark:text-blue-300 shadow-sm">
+                  📦 Pedido #{item.orderNumber}
                 </div>
               </div>
             );
