@@ -100,6 +100,8 @@ Deno.serve(async (req) => {
     
     const megaApiToken = Deno.env.get('MEGA_API_TOKEN') ?? '';
     const megaApiInstance = activeInstance.instance_key;
+    
+    console.log('✅ Using WhatsApp instance from DB:', megaApiInstance);
 
     console.log('Sending WhatsApp message:', {
       instance: megaApiInstance,

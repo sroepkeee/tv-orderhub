@@ -161,7 +161,7 @@ serve(async (req) => {
     }
 
     const megaApiInstance = activeInstance?.instance_key || '';
-    console.log('Using WhatsApp instance:', megaApiInstance || 'none');
+    console.log('✅ Using WhatsApp instance from DB:', megaApiInstance || 'none');
 
     // Get user ID from authorization header
     const authHeader = req.headers.get('authorization');
