@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Search, Phone, MessageCircle } from 'lucide-react';
+import { Search, Phone, MessageCircle, MessageCircleOff } from 'lucide-react';
 import { CarrierConversation } from '@/types/carriers';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -143,7 +143,11 @@ export function WhatsAppContactList({
                 </div>
                 
                 <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
-                  <Phone className="h-3 w-3" />
+                  {contact.whatsapp.startsWith('sem-whatsapp') ? (
+                    <MessageCircleOff className="h-3 w-3 text-gray-400" />
+                  ) : (
+                    <Phone className="h-3 w-3" />
+                  )}
                   <span className="truncate">{formatWhatsApp(contact.whatsapp)}</span>
                 </div>
 
