@@ -94,14 +94,14 @@ async function sendViaMegaApi(
     
     console.log('Sending via Mega API to:', formattedNumber);
 
-    const response = await fetch(`${baseUrl}/rest/sendMessage/${megaApiInstance}/text`, {
+    const response = await fetch(`${baseUrl}/message/sendText/${megaApiInstance}`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${megaApiToken}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        phoneNumber: formattedNumber,
+        number: formattedNumber,
         text: message,
       }),
     });

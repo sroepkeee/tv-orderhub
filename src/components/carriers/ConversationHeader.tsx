@@ -44,10 +44,14 @@ export function ConversationHeader({ carrier, orderId, orderNumber }: Conversati
                 <span className="font-medium">{formattedPhone}</span>
               </div>
             )}
-            {orderId && (
+            {orderId ? (
               <Badge variant="secondary" className="text-xs flex items-center gap-1">
                 <Package className="h-3 w-3" />
                 {orderNumber ? `#${orderNumber}` : 'Pedido'}
+              </Badge>
+            ) : (
+              <Badge variant="outline" className="text-xs">
+                Conversa Geral
               </Badge>
             )}
           </div>

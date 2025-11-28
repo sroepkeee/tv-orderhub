@@ -69,8 +69,13 @@ Deno.serve(async (req) => {
       throw new Error('Carrier not found or WhatsApp not configured');
     }
 
-    // Formatar número de telefone (remover caracteres especiais)
-    const phoneNumber = carrier.whatsapp.replace(/\D/g, '');
+    // Formatar número de telefone (remover caracteres especiais e adicionar código do país)
+    let phoneNumber = carrier.whatsapp.replace(/\D/g, '');
+    
+    // Garantir código do país 55 (Brasil)
+    if (!phoneNumber.startsWith('55')) {
+      phoneNumber = `55${phoneNumber}`;
+    }
 
     // Buscar informações do pedido para contexto (opcional)
     let order = null;
@@ -122,7 +127,7 @@ Deno.serve(async (req) => {
     });
 
     const megaResponse = await fetch(
-      `${megaApiUrl}/rest/sendMessage/${megaApiInstance}/text`,
+      `${megaApiUrl}/message/sendText/${megaApiInstance}`,
       {
         method: 'POST',
         headers: {
@@ -130,7 +135,7 @@ Deno.serve(async (req) => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          phoneNumber: phoneNumber,
+          number: phoneNumber,
           text: fullMessage,
         }),
       }
