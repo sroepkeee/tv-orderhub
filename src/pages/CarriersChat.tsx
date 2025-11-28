@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Loader2, Settings } from 'lucide-react';
+import { ArrowLeft, Loader2, Settings, Package } from 'lucide-react';
 import { useWhatsAppStatus } from '@/hooks/useWhatsAppStatus';
 import { WhatsAppContactList } from '@/components/carriers/WhatsAppContactList';
 import { ConversationThread } from '@/components/carriers/ConversationThread';
@@ -10,8 +10,18 @@ import { useCarrierConversations } from '@/hooks/useCarrierConversations';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
 
+interface NavigationState {
+  carrierId?: string;
+  carrierWhatsapp?: string;
+  carrierName?: string;
+  orderId?: string;
+  orderNumber?: string;
+  returnTo?: string;
+}
+
 export default function CarriersChat() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { toast } = useToast();
   const { isAuthorized } = useWhatsAppStatus();
   const { 
@@ -26,6 +36,7 @@ export default function CarriersChat() {
   const [selectedCarrierId, setSelectedCarrierId] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [sourceOrder, setSourceOrder] = useState<NavigationState | null>(null);
 
   useEffect(() => {
     loadConversations();
@@ -37,6 +48,20 @@ export default function CarriersChat() {
       if (unsubscribe) unsubscribe();
     };
   }, []);
+
+  // Auto-selecionar contato quando vier de navegação
+  useEffect(() => {
+    const navigationState = location.state as NavigationState | null;
+    if (navigationState?.carrierId && conversations.length > 0) {
+      const carrierWhatsapp = navigationState.carrierWhatsapp || `sem-whatsapp:${navigationState.carrierId}`;
+      setSelectedWhatsApp(carrierWhatsapp);
+      setSelectedCarrierId(navigationState.carrierId);
+      setSourceOrder(navigationState);
+      
+      // Limpar o state para não re-selecionar em reloads
+      window.history.replaceState({}, document.title);
+    }
+  }, [location.state, conversations]);
 
   const handleSelectContact = (contact: { whatsapp: string; carrierId: string; conversations: any[] }) => {
     setSelectedWhatsApp(contact.whatsapp);
@@ -107,6 +132,24 @@ export default function CarriersChat() {
             )}
           </div>
           <div className="flex items-center gap-2">
+            {sourceOrder?.orderNumber && (
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => {
+                  navigate('/', { 
+                    state: { 
+                      openOrderId: sourceOrder.orderId,
+                      openOrderNumber: sourceOrder.orderNumber 
+                    }
+                  });
+                }}
+                className="gap-2"
+              >
+                <Package className="h-4 w-4" />
+                Voltar ao Pedido #{sourceOrder.orderNumber}
+              </Button>
+            )}
             {isAuthorized && (
               <Button 
                 variant="outline" 
