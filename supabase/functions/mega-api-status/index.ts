@@ -39,42 +39,51 @@ Deno.serve(async (req) => {
     const endpoints = [
       `/rest/instance/connectionState/${megaApiInstance}`,
       `/instance/connectionState/${megaApiInstance}`,
-      `/rest/instance/fetchInstances/${megaApiInstance}`,
     ];
 
     let lastError = null;
     let response = null;
     let data = null;
 
-    // Tentar cada endpoint até encontrar um que funcione
+    // Tentar cada endpoint com timeout de 8 segundos
     for (const endpoint of endpoints) {
       const statusUrl = `${megaApiUrl}${endpoint}`;
       console.log('Trying endpoint:', statusUrl);
 
       try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout
+
         response = await fetch(statusUrl, {
           method: 'GET',
           headers: {
             'apikey': megaApiToken,
             'Content-Type': 'application/json',
           },
+          signal: controller.signal,
         });
+
+        clearTimeout(timeoutId);
 
         if (response.ok) {
           data = await response.json();
-          console.log('Success with endpoint:', endpoint, 'Data:', data);
+          console.log('Success with endpoint:', endpoint);
           break;
         } else if (response.status === 404) {
           console.log('Endpoint not found (404):', endpoint);
           lastError = `Endpoint not found: ${endpoint}`;
         } else {
-          const errorText = await response.text();
-          console.log('Endpoint failed:', endpoint, 'Status:', response.status, 'Error:', errorText);
-          lastError = errorText;
+          console.log('Endpoint failed:', endpoint, 'Status:', response.status);
+          lastError = `API returned status ${response.status}`;
         }
       } catch (fetchError) {
         console.log('Fetch error for endpoint:', endpoint, 'Error:', fetchError);
         lastError = fetchError instanceof Error ? fetchError.message : 'Unknown fetch error';
+        // Don't continue if timeout - API is down
+        if (fetchError instanceof Error && fetchError.name === 'AbortError') {
+          console.log('Request timed out, skipping remaining endpoints');
+          break;
+        }
       }
     }
 
