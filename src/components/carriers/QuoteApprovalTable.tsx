@@ -6,7 +6,8 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { CheckCircle2, XCircle, Trophy, AlertTriangle, Clock, MessageSquare, MessageCircleOff } from 'lucide-react';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { CheckCircle2, XCircle, Trophy, AlertTriangle, Clock, MessageSquare, MessageCircleOff, Trash2 } from 'lucide-react';
 import { FreightQuote, FreightQuoteResponse } from '@/types/carriers';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -16,13 +17,15 @@ interface QuoteApprovalTableProps {
   responses: FreightQuoteResponse[];
   onApprove: (quoteId: string, responseId: string) => Promise<void>;
   onReject: (quoteId: string, responseId: string) => Promise<void>;
+  onDeleteQuote: (quoteId: string) => Promise<void>;
 }
 
 export function QuoteApprovalTable({ 
   quotes, 
   responses,
   onApprove,
-  onReject 
+  onReject,
+  onDeleteQuote
 }: QuoteApprovalTableProps) {
   const navigate = useNavigate();
   const [processingId, setProcessingId] = useState<string | null>(null);
@@ -252,6 +255,44 @@ export function QuoteApprovalTable({
                               <TooltipContent>
                                 {item.quote.carrier?.whatsapp ? 'Abrir chat' : 'Sem WhatsApp cadastrado'}
                               </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+
+                          {/* Botão de Exclusão */}
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <AlertDialog>
+                                  <AlertDialogTrigger asChild>
+                                    <Button 
+                                      size="sm" 
+                                      variant="ghost" 
+                                      className="h-7 px-2 text-red-600 hover:bg-red-100 dark:hover:bg-red-900/40"
+                                    >
+                                      <Trash2 className="h-3 w-3" />
+                                    </Button>
+                                  </AlertDialogTrigger>
+                                  <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                      <AlertDialogTitle>Excluir cotação?</AlertDialogTitle>
+                                      <AlertDialogDescription>
+                                        Esta ação irá excluir a cotação de "{item.quote.carrier?.name}" 
+                                        e todas as mensagens relacionadas. Esta ação não pode ser desfeita.
+                                      </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                      <AlertDialogAction 
+                                        onClick={() => onDeleteQuote(item.quote.id)} 
+                                        className="bg-red-600 hover:bg-red-700"
+                                      >
+                                        Excluir
+                                      </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                  </AlertDialogContent>
+                                </AlertDialog>
+                              </TooltipTrigger>
+                              <TooltipContent>Excluir cotação</TooltipContent>
                             </Tooltip>
                           </TooltipProvider>
 

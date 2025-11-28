@@ -36,7 +36,7 @@ export function CarriersTabContent({
 }: CarriersTabContentProps) {
   const [showQuoteDialog, setShowQuoteDialog] = useState(false);
   const [showComparison, setShowComparison] = useState(false);
-  const { quotes, responses, loadQuotesByOrder, selectQuote, rejectQuote, loading } = useFreightQuotes();
+  const { quotes, responses, loadQuotesByOrder, selectQuote, rejectQuote, deleteQuote, loading } = useFreightQuotes();
 
   useEffect(() => {
     if (order.id) {
@@ -256,6 +256,9 @@ export function CarriersTabContent({
                         quote={quote}
                         responses={quoteResponses}
                         onSelectQuote={selectQuote}
+                        onDeleteQuote={async (quoteId) => {
+                          await deleteQuote(quoteId, order.id);
+                        }}
                         orderId={order.id}
                         orderNumber={order.orderNumber}
                       />
@@ -281,6 +284,9 @@ export function CarriersTabContent({
                 onReject={async (quoteId, responseId) => {
                   await rejectQuote(quoteId, responseId);
                   await loadQuotesByOrder(order.id);
+                }}
+                onDeleteQuote={async (quoteId) => {
+                  await deleteQuote(quoteId, order.id);
                 }}
               />
             </div>

@@ -1,13 +1,14 @@
 import { useState } from 'react';
 import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Search, Phone, MessageCircle, MessageCircleOff } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { Search, MessageCircle, Trash2 } from 'lucide-react';
 import { CarrierConversation } from '@/types/carriers';
+import { ContactAvatar } from './ContactAvatar';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { formatCarrierMessage } from '@/lib/utils';
-import { ContactAvatar } from './ContactAvatar';
 
 interface WhatsAppContact {
   whatsapp: string | null;
@@ -23,12 +24,14 @@ interface WhatsAppContactListProps {
   conversations: CarrierConversation[];
   selectedWhatsApp?: string;
   onSelectContact: (contact: WhatsAppContact) => void;
+  onDeleteContact: (carrierId: string) => void;
 }
 
 export function WhatsAppContactList({ 
   conversations, 
   selectedWhatsApp, 
-  onSelectContact 
+  onSelectContact,
+  onDeleteContact
 }: WhatsAppContactListProps) {
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -121,60 +124,82 @@ export function WhatsAppContactList({
           </div>
         ) : (
           filteredContacts.map((contact) => (
-            <button
+            <div
               key={contact.carrier_id}
-              onClick={() => onSelectContact(contact)}
-              className={`w-full p-3 border-b text-left hover:bg-accent/50 transition-colors ${
-                selectedWhatsApp === contact.carrier_id ? 'bg-accent' : ''
-              }`}
+              className={`
+                flex items-center gap-3 p-3 transition-colors group border-b
+                ${selectedWhatsApp === contact.carrier_id
+                  ? 'bg-accent' 
+                  : 'hover:bg-muted/50'
+                }
+              `}
             >
-              <div className="flex items-center gap-3">
-                <ContactAvatar name={contact.carrierName} />
+              <div onClick={() => onSelectContact(contact)} className="flex items-center gap-3 flex-1 min-w-0 cursor-pointer">
+                <ContactAvatar name={contact.carrierName} size="md" />
                 
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between mb-1">
-                    <div className="flex items-center gap-2 flex-1 min-w-0">
-                      <h4 className="font-semibold text-sm truncate">
-                        {contact.carrierName}
-                      </h4>
-                      {contact.whatsapp ? (
-                        <MessageCircle className="h-3.5 w-3.5 text-green-600 dark:text-green-400 flex-shrink-0" />
-                      ) : (
-                        <MessageCircleOff className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
-                      )}
-                    </div>
-                    <span className="text-xs text-muted-foreground flex-shrink-0 ml-2">
-                      {formatDistanceToNow(new Date(contact.lastMessageDate), {
+                  <div className="flex items-center justify-between gap-2 mb-1">
+                    <p className="font-semibold text-sm truncate flex-1">
+                      {contact.carrierName}
+                    </p>
+                    <span className="text-xs text-muted-foreground whitespace-nowrap">
+                      {formatDistanceToNow(new Date(contact.lastMessageDate), { 
                         addSuffix: true,
-                        locale: ptBR,
+                        locale: ptBR 
                       })}
                     </span>
                   </div>
-                  
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
-                    <Phone className="h-3 w-3 flex-shrink-0" />
-                    <span className="truncate flex-1">
-                      {formatWhatsApp(contact.whatsapp)}
-                    </span>
-                  </div>
-                  
-                  <p className="text-xs text-muted-foreground truncate">
-                    {formatCarrierMessage(contact.lastMessage).formatted.substring(0, 60)}...
-                  </p>
-                  
-                  <div className="flex items-center gap-2 mt-1.5">
-                    <Badge variant="secondary" className="text-xs">
-                      {contact.orderCount} {contact.orderCount === 1 ? 'pedido' : 'pedidos'}
-                    </Badge>
+                  <div className="flex items-center gap-2">
+                    <p className="text-xs text-muted-foreground truncate flex-1">
+                      {contact.lastMessage}
+                    </p>
                     {contact.unreadCount > 0 && (
-                      <Badge className="bg-green-500 text-white text-xs">
-                        {contact.unreadCount} nova{contact.unreadCount > 1 ? 's' : ''}
+                      <Badge variant="default" className="h-5 px-1.5 text-xs bg-green-600">
+                        {contact.unreadCount}
                       </Badge>
                     )}
                   </div>
+                  {contact.orderCount > 0 && (
+                    <div className="flex items-center gap-1 mt-1">
+                      <Badge variant="outline" className="text-xs px-1.5 py-0">
+                        {contact.orderCount} pedido{contact.orderCount > 1 ? 's' : ''}
+                      </Badge>
+                    </div>
+                  )}
                 </div>
               </div>
-            </button>
+              
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity text-red-600 hover:bg-red-100 dark:hover:bg-red-900/40"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Excluir todas as mensagens?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Esta ação irá excluir todas as mensagens com "{contact.carrierName}". 
+                      Esta ação não pode ser desfeita.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                    <AlertDialogAction 
+                      onClick={() => onDeleteContact(contact.carrier_id)} 
+                      className="bg-red-600 hover:bg-red-700"
+                    >
+                      Excluir Tudo
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </div>
           ))
         )}
       </ScrollArea>

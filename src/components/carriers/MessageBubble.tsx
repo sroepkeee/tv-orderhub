@@ -1,11 +1,14 @@
 import { CarrierConversation } from '@/types/carriers';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Check, CheckCheck } from 'lucide-react';
+import { Check, CheckCheck, Trash2 } from 'lucide-react';
 import { formatCarrierMessage } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 
 interface MessageBubbleProps {
   message: CarrierConversation;
+  onDelete?: (id: string) => void;
 }
 
 // Função helper para processar formatação de texto
@@ -37,7 +40,7 @@ const formatText = (text: string) => {
   });
 };
 
-export function MessageBubble({ message }: MessageBubbleProps) {
+export function MessageBubble({ message, onDelete }: MessageBubbleProps) {
   const isOutbound = message.message_direction === 'outbound';
   const isDelivered = !!message.delivered_at;
   const isRead = !!message.read_at;
@@ -46,14 +49,44 @@ export function MessageBubble({ message }: MessageBubbleProps) {
   const senderLabel = isOutbound ? 'Você' : (message.carrier?.name || 'Transportadora');
 
   return (
-    <div className={`flex ${isOutbound ? 'justify-end' : 'justify-start'} mb-3`}>
+    <div className={`flex ${isOutbound ? 'justify-end' : 'justify-start'} mb-3 group`}>
       <div
-        className={`max-w-[70%] rounded-xl p-3 shadow-md ${
+        className={`max-w-[70%] rounded-xl p-3 shadow-md relative ${
           isOutbound
             ? 'bg-[#dcf8c6] dark:bg-green-900/40 text-foreground rounded-br-none'
             : 'bg-white dark:bg-slate-800 text-foreground rounded-bl-none border border-border'
         }`}
       >
+        {onDelete && (
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="absolute -top-2 -right-2 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity bg-background border shadow-md hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-900/40"
+              >
+                <Trash2 className="h-3 w-3" />
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Excluir mensagem?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Esta ação não pode ser desfeita.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                <AlertDialogAction 
+                  onClick={() => onDelete(message.id)} 
+                  className="bg-red-600 hover:bg-red-700"
+                >
+                  Excluir
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        )}
         <div className={`text-xs font-semibold mb-1.5 ${
           isOutbound ? 'text-green-700 dark:text-green-300' : 'text-blue-600 dark:text-blue-400'
         }`}>

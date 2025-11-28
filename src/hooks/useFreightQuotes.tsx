@@ -228,6 +228,45 @@ export const useFreightQuotes = () => {
     }
   };
 
+  const deleteQuote = async (quoteId: string, orderId: string) => {
+    try {
+      // 1. Deletar respostas relacionadas
+      await supabase
+        .from('freight_quote_responses')
+        .delete()
+        .eq('quote_id', quoteId);
+
+      // 2. Deletar conversas relacionadas
+      await supabase
+        .from('carrier_conversations')
+        .delete()
+        .eq('quote_id', quoteId);
+
+      // 3. Deletar a cotação
+      const { error } = await supabase
+        .from('freight_quotes')
+        .delete()
+        .eq('id', quoteId);
+
+      if (error) throw error;
+
+      toast({
+        title: 'Cotação excluída',
+        description: 'A cotação foi removida com sucesso.',
+      });
+
+      await loadQuotesByOrder(orderId);
+      return true;
+    } catch (error: any) {
+      toast({
+        title: 'Erro ao excluir cotação',
+        description: error.message,
+        variant: 'destructive',
+      });
+      return false;
+    }
+  };
+
   return {
     quotes,
     responses,
@@ -238,5 +277,6 @@ export const useFreightQuotes = () => {
     selectQuote,
     rejectQuote,
     loadQuoteResponsesForOrder,
+    deleteQuote,
   };
 };

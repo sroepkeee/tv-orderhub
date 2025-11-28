@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Loader2, Settings, Package } from 'lucide-react';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { ArrowLeft, Loader2, Settings, Package, Trash2 } from 'lucide-react';
 import { useWhatsAppStatus } from '@/hooks/useWhatsAppStatus';
 import { WhatsAppContactList } from '@/components/carriers/WhatsAppContactList';
 import { ConversationThread } from '@/components/carriers/ConversationThread';
@@ -30,7 +31,9 @@ export default function CarriersChat() {
     sendMessage, 
     loadConversations, 
     subscribeToNewMessages,
-    unreadCount 
+    unreadCount,
+    deleteConversation,
+    deleteAllCarrierConversations
   } = useCarrierConversations();
   const [selectedWhatsApp, setSelectedWhatsApp] = useState<string | null>(null);
   const [selectedCarrierId, setSelectedCarrierId] = useState<string | null>(null);
@@ -152,6 +155,42 @@ export default function CarriersChat() {
                 Voltar ao Pedido #{sourceOrder.orderNumber}
               </Button>
             )}
+            {selectedCarrierId && (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    className="gap-2 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/40"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    Excluir Conversa
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Excluir todas as mensagens?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Esta ação irá excluir todas as mensagens com esta transportadora. 
+                      Esta ação não pode ser desfeita.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                    <AlertDialogAction 
+                      onClick={async () => {
+                        await deleteAllCarrierConversations(selectedCarrierId);
+                        setSelectedCarrierId(null);
+                        setSelectedWhatsApp(null);
+                      }} 
+                      className="bg-red-600 hover:bg-red-700"
+                    >
+                      Excluir Tudo
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
             {isAuthorized && (
               <Button 
                 variant="outline" 
@@ -178,6 +217,13 @@ export default function CarriersChat() {
             conversations={conversations}
             selectedWhatsApp={selectedWhatsApp || undefined}
             onSelectContact={handleSelectContact}
+            onDeleteContact={async (carrierId) => {
+              await deleteAllCarrierConversations(carrierId);
+              if (selectedCarrierId === carrierId) {
+                setSelectedCarrierId(null);
+                setSelectedWhatsApp(null);
+              }
+            }}
           />
         )}
 
@@ -186,6 +232,7 @@ export default function CarriersChat() {
             <ConversationThread
               conversations={threadConversations}
               onSendMessage={handleSendMessage}
+              onDeleteMessage={deleteConversation}
               loading={sending}
             />
           ) : (

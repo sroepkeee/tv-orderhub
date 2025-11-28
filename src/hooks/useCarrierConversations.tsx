@@ -237,6 +237,58 @@ export const useCarrierConversations = () => {
     getUnreadCount();
   }, []);
 
+  const deleteConversation = async (conversationId: string) => {
+    try {
+      const { error } = await supabase
+        .from('carrier_conversations')
+        .delete()
+        .eq('id', conversationId);
+
+      if (error) throw error;
+      
+      setConversations(prev => prev.filter(c => c.id !== conversationId));
+      
+      toast({
+        title: 'Mensagem excluída',
+        description: 'A mensagem foi removida.',
+      });
+      return true;
+    } catch (error: any) {
+      toast({
+        title: 'Erro ao excluir mensagem',
+        description: error.message,
+        variant: 'destructive',
+      });
+      return false;
+    }
+  };
+
+  const deleteAllCarrierConversations = async (carrierId: string) => {
+    try {
+      const { error } = await supabase
+        .from('carrier_conversations')
+        .delete()
+        .eq('carrier_id', carrierId);
+
+      if (error) throw error;
+      
+      setConversations(prev => prev.filter(c => c.carrier_id !== carrierId));
+      
+      toast({
+        title: 'Conversas excluídas',
+        description: 'Todas as mensagens com esta transportadora foram removidas.',
+      });
+      return true;
+    } catch (error: any) {
+      toast({
+        title: 'Erro ao excluir conversas',
+        description: error.message,
+        variant: 'destructive',
+      });
+      return false;
+    }
+  };
+
   return {
     conversations,
     loading,
@@ -248,5 +300,7 @@ export const useCarrierConversations = () => {
     markAsRead,
     getUnreadCount,
     subscribeToNewMessages,
+    deleteConversation,
+    deleteAllCarrierConversations,
   };
 };
