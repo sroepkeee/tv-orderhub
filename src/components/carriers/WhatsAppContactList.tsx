@@ -10,13 +10,13 @@ import { formatCarrierMessage } from '@/lib/utils';
 import { ContactAvatar } from './ContactAvatar';
 
 interface WhatsAppContact {
-  whatsapp: string;
+  whatsapp: string | null;
   carrierName: string;
-  carrierId: string;
+  carrier_id: string;
   orderCount: number;
   unreadCount: number;
-  lastMessage: CarrierConversation;
-  conversations: CarrierConversation[];
+  lastMessage: string;
+  lastMessageDate: string;
 }
 
 interface WhatsAppContactListProps {
@@ -32,9 +32,9 @@ export function WhatsAppContactList({
 }: WhatsAppContactListProps) {
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Agrupar por chave única (WhatsApp ou carrier_id para casos sem WhatsApp)
-  const groupedByWhatsApp = conversations.reduce((acc, conv) => {
-    const key = conv.carrier?.whatsapp || `sem-whatsapp:${conv.carrier_id}`;
+  // Agrupar conversas por carrier_id
+  const groupedConversations = conversations.reduce((acc, conv) => {
+    const key = conv.carrier_id;
     if (!acc[key]) {
       acc[key] = [];
     }
@@ -42,31 +42,30 @@ export function WhatsAppContactList({
     return acc;
   }, {} as Record<string, CarrierConversation[]>);
 
-  // Criar lista de contatos
-  const contacts: WhatsAppContact[] = Object.entries(groupedByWhatsApp).map(([key, convs]) => {
-    const sortedConvs = convs.sort((a, b) => 
-      new Date(b.sent_at).getTime() - new Date(a.sent_at).getTime()
-    );
-    
-    const lastMessage = sortedConvs[0];
-    const unreadCount = sortedConvs.filter(c => 
-      c.message_direction === 'inbound' && !c.read_at
+  // Criar lista de contatos a partir das conversas agrupadas
+  const contacts: WhatsAppContact[] = Object.entries(groupedConversations).map(([carrierId, convs]) => {
+    const lastMessage = convs[0]; // Primeira mensagem (mais recente)
+    const unreadCount = convs.filter(
+      c => c.message_direction === 'inbound' && !c.read_at
     ).length;
-
+    
     // Contar pedidos únicos
     const uniqueOrders = new Set(convs.map(c => c.order_id));
-
+    
+    // Usar dados reais do carrier
+    const carrier = lastMessage.carrier;
+    
     return {
-      whatsapp: key,
-      carrierName: lastMessage.carrier?.name || 'Transportadora',
-      carrierId: lastMessage.carrier_id,
-      orderCount: uniqueOrders.size,
+      whatsapp: carrier?.whatsapp || null,
+      carrierName: carrier?.name || 'Transportadora',
+      carrier_id: carrierId,
+      lastMessage: lastMessage.message_content,
+      lastMessageDate: lastMessage.sent_at,
       unreadCount,
-      lastMessage,
-      conversations: sortedConvs
+      orderCount: uniqueOrders.size,
     };
   }).sort((a, b) => 
-    new Date(b.lastMessage.sent_at).getTime() - new Date(a.lastMessage.sent_at).getTime()
+    new Date(b.lastMessageDate).getTime() - new Date(a.lastMessageDate).getTime()
   );
 
   const filteredContacts = contacts.filter(contact => {
@@ -74,13 +73,13 @@ export function WhatsAppContactList({
     const search = searchQuery.toLowerCase();
     return (
       contact.carrierName.toLowerCase().includes(search) ||
-      contact.whatsapp.includes(search) ||
-      contact.lastMessage.message_content.toLowerCase().includes(search)
+      (contact.whatsapp && contact.whatsapp.includes(search)) ||
+      contact.lastMessage.toLowerCase().includes(search)
     );
   });
 
-  const formatWhatsApp = (whatsapp: string) => {
-    if (!whatsapp || whatsapp.startsWith('sem-whatsapp')) return 'Sem WhatsApp';
+  const formatWhatsApp = (whatsapp: string | null) => {
+    if (!whatsapp) return 'Sem WhatsApp cadastrado';
     
     const cleaned = whatsapp.replace(/\D/g, '');
     
@@ -121,56 +120,56 @@ export function WhatsAppContactList({
         ) : (
           filteredContacts.map((contact) => (
             <button
-              key={contact.whatsapp}
+              key={contact.carrier_id}
               onClick={() => onSelectContact(contact)}
-              className={`w-full p-3 border-b text-left hover:bg-accent/50 transition-colors flex items-start gap-3 ${
-                selectedWhatsApp === contact.whatsapp ? 'bg-accent' : ''
+              className={`w-full p-3 border-b text-left hover:bg-accent/50 transition-colors ${
+                selectedWhatsApp === contact.carrier_id ? 'bg-accent' : ''
               }`}
             >
-              <ContactAvatar name={contact.carrierName} size="md" />
-              
-              <div className="flex-1 min-w-0">
-                <div className="flex items-start justify-between gap-2 mb-1">
-                  <span className="font-semibold text-sm truncate">
-                    {contact.carrierName}
-                  </span>
-                  <span className="text-xs text-muted-foreground whitespace-nowrap flex-shrink-0">
-                    {formatDistanceToNow(new Date(contact.lastMessage.sent_at), {
-                      addSuffix: true,
-                      locale: ptBR
-                    })}
-                  </span>
-                </div>
+              <div className="flex items-center gap-3">
+                <ContactAvatar name={contact.carrierName} />
                 
-                <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
-                  {contact.whatsapp.startsWith('sem-whatsapp') ? (
-                    <MessageCircleOff className="h-3 w-3 text-gray-400" />
-                  ) : (
-                    <Phone className="h-3 w-3" />
-                  )}
-                  <span className="truncate">{formatWhatsApp(contact.whatsapp)}</span>
-                </div>
-
-                <div className="flex items-start gap-2 mb-2">
-                  <p className="text-sm text-muted-foreground truncate flex-1">
-                    {contact.lastMessage.message_direction === 'outbound' ? (
-                      <span className="text-green-600 dark:text-green-400 font-medium">Você: </span>
-                    ) : (
-                      <span className="text-blue-600 dark:text-blue-400 font-medium">📱 </span>
-                    )}
-                    {formatCarrierMessage(contact.lastMessage.message_content).formatted.split('\n')[0]}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between mb-1">
+                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                      <h4 className="font-semibold text-sm truncate">
+                        {contact.carrierName}
+                      </h4>
+                      {contact.whatsapp ? (
+                        <MessageCircle className="h-3.5 w-3.5 text-green-600 dark:text-green-400 flex-shrink-0" />
+                      ) : (
+                        <MessageCircleOff className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+                      )}
+                    </div>
+                    <span className="text-xs text-muted-foreground flex-shrink-0 ml-2">
+                      {formatDistanceToNow(new Date(contact.lastMessageDate), {
+                        addSuffix: true,
+                        locale: ptBR,
+                      })}
+                    </span>
+                  </div>
+                  
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
+                    <Phone className="h-3 w-3 flex-shrink-0" />
+                    <span className="truncate flex-1">
+                      {formatWhatsApp(contact.whatsapp)}
+                    </span>
+                  </div>
+                  
+                  <p className="text-xs text-muted-foreground truncate">
+                    {formatCarrierMessage(contact.lastMessage).formatted.substring(0, 60)}...
                   </p>
-                </div>
-                
-                <div className="flex items-center gap-2">
-                  <Badge variant="secondary" className="text-xs">
-                    {contact.orderCount} {contact.orderCount === 1 ? 'pedido' : 'pedidos'}
-                  </Badge>
-                  {contact.unreadCount > 0 && (
-                    <Badge variant="destructive" className="text-xs">
-                      {contact.unreadCount}
+                  
+                  <div className="flex items-center gap-2 mt-1.5">
+                    <Badge variant="secondary" className="text-xs">
+                      {contact.orderCount} {contact.orderCount === 1 ? 'pedido' : 'pedidos'}
                     </Badge>
-                  )}
+                    {contact.unreadCount > 0 && (
+                      <Badge className="bg-green-500 text-white text-xs">
+                        {contact.unreadCount} nova{contact.unreadCount > 1 ? 's' : ''}
+                      </Badge>
+                    )}
+                  </div>
                 </div>
               </div>
             </button>

@@ -48,29 +48,29 @@ export function MessageBubble({ message }: MessageBubbleProps) {
   return (
     <div className={`flex ${isOutbound ? 'justify-end' : 'justify-start'} mb-3`}>
       <div
-        className={`max-w-[70%] rounded-lg p-3 shadow-sm ${
+        className={`max-w-[70%] rounded-xl p-3 shadow-md ${
           isOutbound
-            ? 'bg-green-100 dark:bg-green-900/30 text-foreground rounded-br-none'
-            : 'bg-white dark:bg-muted text-foreground rounded-bl-none border border-border'
+            ? 'bg-[#dcf8c6] dark:bg-green-900/40 text-foreground rounded-br-none'
+            : 'bg-white dark:bg-slate-800 text-foreground rounded-bl-none border border-border'
         }`}
       >
-        <div className={`text-xs font-semibold mb-1 ${
-          isOutbound ? 'text-green-700 dark:text-green-300' : 'text-blue-700 dark:text-blue-300'
+        <div className={`text-xs font-semibold mb-1.5 ${
+          isOutbound ? 'text-green-700 dark:text-green-300' : 'text-blue-600 dark:text-blue-400'
         }`}>
           {senderLabel}
         </div>
         
         {isQuote ? (
-          <div className="text-sm whitespace-pre-wrap break-words font-medium">
+          <div className="text-sm whitespace-pre-wrap break-words font-medium leading-relaxed">
             {formatText(formatted)}
           </div>
         ) : (
-          <p className="text-sm whitespace-pre-wrap break-words">
+          <p className="text-sm whitespace-pre-wrap break-words leading-relaxed">
             {formatted}
           </p>
         )}
         
-        <div className="flex items-center justify-end gap-1 mt-1 text-xs text-muted-foreground">
+        <div className="flex items-center justify-end gap-1 mt-2 text-xs opacity-70">
           <span>
             {format(new Date(message.sent_at), 'HH:mm', { locale: ptBR })}
           </span>
@@ -78,11 +78,11 @@ export function MessageBubble({ message }: MessageBubbleProps) {
           {isOutbound && (
             <span className="ml-1">
               {isRead ? (
-                <CheckCheck className="h-3 w-3 text-blue-400" />
+                <CheckCheck className="h-3.5 w-3.5 text-blue-500" />
               ) : isDelivered ? (
-                <CheckCheck className="h-3 w-3" />
+                <CheckCheck className="h-3.5 w-3.5 text-muted-foreground" />
               ) : (
-                <Check className="h-3 w-3" />
+                <Check className="h-3.5 w-3.5 text-muted-foreground" />
               )}
             </span>
           )}
