@@ -53,8 +53,7 @@ export default function CarriersChat() {
   useEffect(() => {
     const navigationState = location.state as NavigationState | null;
     if (navigationState?.carrierId && conversations.length > 0) {
-      const carrierWhatsapp = navigationState.carrierWhatsapp || `sem-whatsapp:${navigationState.carrierId}`;
-      setSelectedWhatsApp(carrierWhatsapp);
+      setSelectedWhatsApp(navigationState.carrierId);
       setSelectedCarrierId(navigationState.carrierId);
       setSourceOrder(navigationState);
       
@@ -63,17 +62,21 @@ export default function CarriersChat() {
     }
   }, [location.state, conversations]);
 
-  const handleSelectContact = (contact: { whatsapp: string; carrierId: string; conversations: any[] }) => {
-    setSelectedWhatsApp(contact.whatsapp);
-    setSelectedCarrierId(contact.carrierId);
+  const handleSelectContact = (contact: { 
+    whatsapp: string | null; 
+    carrier_id: string; 
+    lastMessage: string;
+    lastMessageDate: string;
+  }) => {
+    setSelectedWhatsApp(contact.carrier_id);
+    setSelectedCarrierId(contact.carrier_id);
   };
 
   const handleSendMessage = async (message: string) => {
-    if (!selectedWhatsApp || !selectedCarrierId) return;
+    if (!selectedCarrierId) return;
 
-    // Pegar a primeira conversa deste contato para obter order_id
-    const keyFor = (c: any) => c.carrier?.whatsapp || `sem-whatsapp:${c.carrier_id}`;
-    const contactConvs = conversations.filter(c => keyFor(c) === selectedWhatsApp);
+    // Pegar a primeira conversa deste carrier_id para obter order_id
+    const contactConvs = conversations.filter(c => c.carrier_id === selectedCarrierId);
     
     if (contactConvs.length === 0) return;
     
@@ -105,9 +108,8 @@ export default function CarriersChat() {
     }
   };
 
-  const keyFor = (c: any) => c.carrier?.whatsapp || `sem-whatsapp:${c.carrier_id}`;
-  const threadConversations = selectedWhatsApp
-    ? conversations.filter(c => keyFor(c) === selectedWhatsApp)
+  const threadConversations = selectedCarrierId
+    ? conversations.filter(c => c.carrier_id === selectedCarrierId)
     : [];
 
   return (

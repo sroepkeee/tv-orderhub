@@ -128,13 +128,28 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Processar mensagens recebidas (inbound)
-    if (payload.event === 'messages.upsert') {
+    // Processar diferentes tipos de evento de mensagem
+    const messageType = payload.messageType || payload.event;
+    console.log('📩 Processing event type:', messageType);
+    
+    if (payload.event === 'messages.upsert' || messageType === 'conversation' || messageType === 'extendedTextMessage') {
+      console.log('📩 Processing message event');
+      
       const messageData = payload.data;
+      const key = messageData?.key;
+      
+      // Filtrar mensagens de grupos
+      if (key?.remoteJid?.endsWith('@g.us')) {
+        console.log('⏭️ Skipping group message');
+        return new Response(
+          JSON.stringify({ success: true, message: 'Group message ignored' }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
       
       // Ignorar mensagens enviadas por nós
-      if (messageData.key?.fromMe) {
-        console.log('Ignoring outbound message');
+      if (key?.fromMe === true) {
+        console.log('⏭️ Ignoring outbound message');
         return new Response(
           JSON.stringify({ success: true, ignored: true }),
           {

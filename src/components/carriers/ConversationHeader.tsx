@@ -28,18 +28,20 @@ export function ConversationHeader({ carrier, orderId, orderNumber }: Conversati
   const formattedPhone = formatWhatsApp(carrier?.whatsapp);
 
   return (
-    <div className="border-b bg-background p-4">
+    <div className="border-b bg-background p-4 shadow-sm">
       <div className="flex items-center gap-3">
-        <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+        <div className="h-12 w-12 rounded-full bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center flex-shrink-0 shadow-sm">
           <Truck className="h-6 w-6 text-primary" />
         </div>
         <div className="flex-1 min-w-0">
-          <h3 className="font-semibold text-base">{carrier?.name || 'Transportadora'}</h3>
+          <h3 className="font-bold text-base text-foreground truncate">
+            {carrier?.name || 'Transportadora'}
+          </h3>
           <div className="flex flex-wrap items-center gap-2 mt-1">
             {formattedPhone && (
               <div className="flex items-center gap-1 text-xs text-muted-foreground">
                 <Phone className="h-3 w-3" />
-                <span>{formattedPhone}</span>
+                <span className="font-medium">{formattedPhone}</span>
               </div>
             )}
             {orderId && (

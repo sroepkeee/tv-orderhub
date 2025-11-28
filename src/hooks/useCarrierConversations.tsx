@@ -31,7 +31,15 @@ export const useCarrierConversations = () => {
         .order('sent_at', { ascending: false });
 
       if (error) throw error;
-      setConversations((data || []) as unknown as CarrierConversation[]);
+      
+      // Parse response preservando estrutura aninhada do Supabase
+      const parsedData = (data || []).map((conv: any) => ({
+        ...conv,
+        carrier: conv.carriers || null,
+        order: conv.orders || null,
+      }));
+      
+      setConversations(parsedData as CarrierConversation[]);
     } catch (error: any) {
       toast({
         title: 'Erro ao carregar conversas',
@@ -69,8 +77,14 @@ export const useCarrierConversations = () => {
 
       if (error) throw error;
       
-      setConversations((data || []) as unknown as CarrierConversation[]);
-      return data || [];
+      const parsedData = (data || []).map((conv: any) => ({
+        ...conv,
+        carrier: conv.carriers || null,
+        order: conv.orders || null,
+      }));
+      
+      setConversations(parsedData as CarrierConversation[]);
+      return parsedData;
     } catch (error: any) {
       toast({
         title: 'Erro ao carregar conversa',
@@ -109,8 +123,14 @@ export const useCarrierConversations = () => {
 
       if (error) throw error;
       
-      setConversations((data || []) as unknown as CarrierConversation[]);
-      return data || [];
+      const parsedData = (data || []).map((conv: any) => ({
+        ...conv,
+        carrier: conv.carriers || null,
+        order: conv.orders || null,
+      }));
+      
+      setConversations(parsedData as CarrierConversation[]);
+      return parsedData;
     } catch (error: any) {
       toast({
         title: 'Erro ao carregar conversas',
