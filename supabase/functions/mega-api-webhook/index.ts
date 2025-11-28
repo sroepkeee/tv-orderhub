@@ -63,19 +63,19 @@ Deno.serve(async (req) => {
     const payload = await req.json();
     console.log('Webhook received:', JSON.stringify(payload, null, 2));
 
-    // Validar instância
-    const megaApiInstance = Deno.env.get('MEGA_API_INSTANCE') ?? '';
+    // Validar instância - buscar no banco em vez de secret fixo
     const instanceKey = payload.instance_key || payload.instance;
+    console.log('🔑 Instance key received:', instanceKey);
     
-    if (instanceKey !== megaApiInstance) {
-      console.warn('Invalid instance:', instanceKey, 'Expected:', megaApiInstance);
-      return new Response(
-        JSON.stringify({ error: 'Invalid instance' }),
-        {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 400,
-        }
-      );
+    const { data: validInstance } = await supabase
+      .from('whatsapp_instances')
+      .select('instance_key')
+      .eq('instance_key', instanceKey)
+      .maybeSingle();
+    
+    if (!validInstance) {
+      console.warn('⚠️ Unknown instance:', instanceKey);
+      // Continuar processando mas logar warning
     }
 
     // Processar QR Code Update
@@ -135,11 +135,18 @@ Deno.serve(async (req) => {
     if (payload.event === 'messages.upsert' || messageType === 'conversation' || messageType === 'extendedTextMessage') {
       console.log('📩 Processing message event');
       
-      const messageData = payload.data;
-      const key = messageData?.key;
+      // Aceitar payload direto ou aninhado em .data
+      const messageData = payload.data || payload;
+      const key = payload.key || messageData?.key;
       
-      // Filtrar mensagens de grupos
-      if (key?.remoteJid?.endsWith('@g.us')) {
+      console.log('🔍 Extracted key:', JSON.stringify(key, null, 2));
+      
+      // Filtrar mensagens de grupos - checar ambos os formatos
+      const isGroupMessage = 
+        payload.isGroup === true ||
+        key?.remoteJid?.endsWith('@g.us');
+      
+      if (isGroupMessage) {
         console.log('⏭️ Skipping group message');
         return new Response(
           JSON.stringify({ success: true, message: 'Group message ignored' }),
@@ -159,27 +166,42 @@ Deno.serve(async (req) => {
         );
       }
 
-      // Extrair número de telefone
-      const remoteJid = messageData.key?.remoteJid || '';
-      const phoneNumber = remoteJid.replace('@s.whatsapp.net', '').replace(/\D/g, '');
+      // Extrair número de telefone - múltiplas fontes possíveis
+      const remoteJid = 
+        payload.jid ||                           // Formato da Mega API
+        key?.remoteJid ||                         // Formato padrão
+        messageData?.key?.remoteJid || 
+        '';
+      const phoneNumber = remoteJid
+        .replace(/@s\.whatsapp\.net$/g, '')
+        .replace(/@lid$/g, '')
+        .replace(/\D/g, '');
+      
+      console.log('📞 Phone number extracted:', phoneNumber, 'from remoteJid:', remoteJid);
 
-      // Extrair mensagem de texto
+      // Extrair mensagem de texto - múltiplas fontes
+      const message = payload.message || messageData.message;
       let messageText = '';
-      if (messageData.message?.conversation) {
-        messageText = messageData.message.conversation;
-      } else if (messageData.message?.extendedTextMessage?.text) {
-        messageText = messageData.message.extendedTextMessage.text;
-      } else if (messageData.message?.imageMessage?.caption) {
-        messageText = `[Imagem] ${messageData.message.imageMessage.caption}`;
-      } else if (messageData.message?.documentMessage?.caption) {
-        messageText = `[Documento] ${messageData.message.documentMessage.caption}`;
+      
+      if (message?.conversation) {
+        messageText = message.conversation;
+      } else if (message?.extendedTextMessage?.text) {
+        messageText = message.extendedTextMessage.text;
+      } else if (message?.imageMessage?.caption) {
+        messageText = `[Imagem] ${message.imageMessage.caption}`;
+      } else if (message?.documentMessage?.caption) {
+        messageText = `[Documento] ${message.documentMessage.caption}`;
+      } else if (payload.text) {
+        messageText = payload.text;
       } else {
         messageText = '[Mensagem de mídia]';
       }
 
-      console.log('Processing inbound message:', { phoneNumber, messageText });
+      console.log('📝 Processing inbound message:', { phoneNumber, messageText });
 
       // Buscar transportadora pelo número de WhatsApp
+      console.log('🔍 Looking for carrier with WhatsApp:', phoneNumber);
+      
       const { data: carrier, error: carrierError } = await supabase
         .from('carriers')
         .select('id, name, whatsapp')
@@ -192,7 +214,7 @@ Deno.serve(async (req) => {
       }
 
       if (!carrier) {
-        console.warn('Carrier not found for phone:', phoneNumber);
+        console.warn('⚠️ Carrier not found for phone:', phoneNumber);
         return new Response(
           JSON.stringify({ 
             success: true, 
@@ -322,7 +344,7 @@ Deno.serve(async (req) => {
         status: 'received',
       });
 
-      console.log('Message saved successfully:', conversation.id);
+      console.log('✅ Message saved successfully:', conversation.id);
 
       return new Response(
         JSON.stringify({ 
