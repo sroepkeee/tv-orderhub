@@ -104,7 +104,7 @@ Deno.serve(async (req) => {
       throw new Error('No connected WhatsApp instance found. Please connect a WhatsApp account first.');
     }
 
-    // Enviar mensagem via Mega API
+    // Enviar mensagem via Mega API com múltiplas tentativas
     let megaApiUrl = (Deno.env.get('MEGA_API_URL') ?? '').trim();
     
     // Garantir que a URL tenha protocolo https
@@ -126,25 +126,65 @@ Deno.serve(async (req) => {
       messagePreview: fullMessage.substring(0, 50)
     });
 
-    const megaResponse = await fetch(
-      `${megaApiUrl}/message/sendText/${megaApiInstance}`,
-      {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${megaApiToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          number: phoneNumber,
-          text: fullMessage,
-        }),
-      }
-    );
+    // Tentar múltiplos endpoints e formatos
+    const endpoints = [
+      `/message/sendText/${megaApiInstance}`,
+      `/rest/message/sendText/${megaApiInstance}`,
+      `/rest/sendMessage/${megaApiInstance}/text`,
+    ];
 
-    if (!megaResponse.ok) {
-      const errorText = await megaResponse.text();
-      console.error('Mega API error:', errorText);
-      throw new Error(`Failed to send message via Mega API: ${megaResponse.statusText}`);
+    const authHeadersList: Array<Record<string, string>> = [
+      { 'apikey': megaApiToken, 'Content-Type': 'application/json' },
+      { 'Authorization': `Bearer ${megaApiToken}`, 'Content-Type': 'application/json' },
+    ];
+
+    const bodyFormats = [
+      // Evolution API v1 format
+      { number: phoneNumber, textMessage: { text: fullMessage } },
+      // Alternative format
+      { number: phoneNumber, text: fullMessage },
+    ];
+
+    let megaResponse: Response | null = null;
+    let lastError = '';
+
+    for (const endpoint of endpoints) {
+      for (const headers of authHeadersList) {
+        for (const body of bodyFormats) {
+          const fullUrl = `${megaApiUrl}${endpoint}`;
+          console.log(`Trying endpoint: ${fullUrl}`);
+          console.log(`Headers:`, Object.keys(headers));
+          console.log(`Body format:`, Object.keys(body));
+
+          try {
+            const response = await fetch(fullUrl, {
+              method: 'POST',
+              headers,
+              body: JSON.stringify(body),
+            });
+
+            if (response.ok) {
+              megaResponse = response;
+              console.log(`✅ Success with endpoint: ${endpoint}`);
+              break;
+            } else {
+              const errorText = await response.text();
+              lastError = `${response.status}: ${errorText}`;
+              console.log(`❌ Failed (${response.status}): ${errorText.substring(0, 100)}`);
+            }
+          } catch (err) {
+            lastError = err instanceof Error ? err.message : String(err);
+            console.log(`❌ Request failed: ${lastError}`);
+          }
+        }
+        if (megaResponse?.ok) break;
+      }
+      if (megaResponse?.ok) break;
+    }
+
+    if (!megaResponse || !megaResponse.ok) {
+      console.error('All Mega API attempts failed. Last error:', lastError);
+      throw new Error(`Failed to send message via Mega API: ${lastError}`);
     }
 
     const megaData = await megaResponse.json();

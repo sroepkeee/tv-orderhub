@@ -72,7 +72,7 @@ function formatQuoteMessage(quoteData: any): string {
   return message;
 }
 
-// Função para enviar via Mega API
+// Função para enviar via Mega API com múltiplas tentativas
 async function sendViaMegaApi(
   carrierWhatsApp: string, 
   message: string,
@@ -94,31 +94,61 @@ async function sendViaMegaApi(
     
     console.log('Sending via Mega API to:', formattedNumber);
 
-    const response = await fetch(`${baseUrl}/message/sendText/${megaApiInstance}`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${megaApiToken}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        number: formattedNumber,
-        text: message,
-      }),
-    });
+    // Tentar múltiplos endpoints e formatos
+    const endpoints = [
+      `/message/sendText/${megaApiInstance}`,
+      `/rest/message/sendText/${megaApiInstance}`,
+      `/rest/sendMessage/${megaApiInstance}/text`,
+    ];
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Mega API error:', response.status, errorText);
-      return { success: false, error: `Mega API returned ${response.status}` };
+    const authHeadersList: Array<Record<string, string>> = [
+      { 'apikey': megaApiToken, 'Content-Type': 'application/json' },
+      { 'Authorization': `Bearer ${megaApiToken}`, 'Content-Type': 'application/json' },
+    ];
+
+    const bodyFormats = [
+      // Evolution API v1 format
+      { number: formattedNumber, textMessage: { text: message } },
+      // Alternative format
+      { number: formattedNumber, text: message },
+    ];
+
+    let lastError = '';
+
+    for (const endpoint of endpoints) {
+      for (const headers of authHeadersList) {
+        for (const body of bodyFormats) {
+          const fullUrl = `${baseUrl}${endpoint}`;
+          console.log(`Trying endpoint: ${fullUrl}`);
+
+          try {
+            const response = await fetch(fullUrl, {
+              method: 'POST',
+              headers,
+              body: JSON.stringify(body),
+            });
+
+            if (response.ok) {
+              const data = await response.json();
+              console.log(`✅ Success with endpoint: ${endpoint}`);
+              return { 
+                success: true, 
+                messageId: data.key?.id || data.message_id || data.id 
+              };
+            } else {
+              const errorText = await response.text();
+              lastError = `${response.status}: ${errorText}`;
+              console.log(`❌ Failed (${response.status})`);
+            }
+          } catch (err) {
+            lastError = err instanceof Error ? err.message : String(err);
+          }
+        }
+      }
     }
 
-    const data = await response.json();
-    console.log('Mega API success:', data);
-    
-    return { 
-      success: true, 
-      messageId: data.key?.id || data.message_id || data.id 
-    };
+    console.error('All Mega API attempts failed. Last error:', lastError);
+    return { success: false, error: `Mega API error: ${lastError}` };
   } catch (error) {
     console.error('Error sending via Mega API:', error);
     return { 
