@@ -57,7 +57,7 @@ Deno.serve(async (req) => {
         response = await fetch(statusUrl, {
           method: 'GET',
           headers: {
-            'apikey': megaApiToken,
+            'Authorization': `Bearer ${megaApiToken}`,
             'Content-Type': 'application/json',
           },
           signal: controller.signal,

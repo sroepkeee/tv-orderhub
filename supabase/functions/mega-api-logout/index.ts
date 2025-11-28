@@ -81,7 +81,7 @@ Deno.serve(async (req) => {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
-          'apikey': apiToken,
+          'Authorization': `Bearer ${apiToken}`,
         },
       });
 

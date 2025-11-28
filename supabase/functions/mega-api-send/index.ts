@@ -126,7 +126,7 @@ Deno.serve(async (req) => {
       {
         method: 'POST',
         headers: {
-          'apikey': megaApiToken,
+          'Authorization': `Bearer ${megaApiToken}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
