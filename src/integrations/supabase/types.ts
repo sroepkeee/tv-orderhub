@@ -17,6 +17,7 @@ export type Database = {
       carrier_conversations: {
         Row: {
           carrier_id: string
+          contact_type: string | null
           conversation_type: string
           created_at: string | null
           created_by: string | null
@@ -26,13 +27,14 @@ export type Database = {
           message_direction: string
           message_metadata: Json | null
           n8n_message_id: string | null
-          order_id: string
+          order_id: string | null
           quote_id: string | null
           read_at: string | null
           sent_at: string | null
         }
         Insert: {
           carrier_id: string
+          contact_type?: string | null
           conversation_type: string
           created_at?: string | null
           created_by?: string | null
@@ -42,13 +44,14 @@ export type Database = {
           message_direction: string
           message_metadata?: Json | null
           n8n_message_id?: string | null
-          order_id: string
+          order_id?: string | null
           quote_id?: string | null
           read_at?: string | null
           sent_at?: string | null
         }
         Update: {
           carrier_id?: string
+          contact_type?: string | null
           conversation_type?: string
           created_at?: string | null
           created_by?: string | null
@@ -58,7 +61,7 @@ export type Database = {
           message_direction?: string
           message_metadata?: Json | null
           n8n_message_id?: string | null
-          order_id?: string
+          order_id?: string | null
           quote_id?: string | null
           read_at?: string | null
           sent_at?: string | null

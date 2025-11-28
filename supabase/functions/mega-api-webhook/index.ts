@@ -259,7 +259,7 @@ Deno.serve(async (req) => {
         );
       }
 
-      // Buscar última cotação ativa desta transportadora
+      // Buscar última cotação ativa desta transportadora (opcional)
       const { data: lastQuote } = await supabase
         .from('freight_quotes')
         .select('id, order_id, status')
@@ -275,7 +275,7 @@ Deno.serve(async (req) => {
 
       console.log('Extracted quote data:', quoteData, 'Has data:', hasQuoteData);
 
-      let orderId = lastQuote?.order_id;
+      let orderId = lastQuote?.order_id || null;
 
       // Se não encontrou cotação ativa, buscar última conversa
       if (!orderId) {
@@ -283,29 +283,17 @@ Deno.serve(async (req) => {
           .from('carrier_conversations')
           .select('order_id')
           .eq('carrier_id', carrier.id)
+          .not('order_id', 'is', null)
           .order('sent_at', { ascending: false })
           .limit(1)
           .maybeSingle();
 
-        orderId = lastConversation?.order_id;
+        orderId = lastConversation?.order_id || null;
       }
 
-      if (!orderId) {
-        console.warn('No active conversation found for carrier:', carrier.id);
-        return new Response(
-          JSON.stringify({ 
-            success: true, 
-            warning: 'No active conversation',
-            carrierId: carrier.id 
-          }),
-          {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 200,
-          }
-        );
-      }
+      console.log('📦 Related order (optional):', orderId || 'none - general conversation');
 
-      // Salvar mensagem recebida
+      // Salvar mensagem recebida (com ou sem order_id)
       const { data: conversation, error: conversationError } = await supabase
         .from('carrier_conversations')
         .insert({
@@ -315,6 +303,7 @@ Deno.serve(async (req) => {
           conversation_type: hasQuoteData ? 'quote_request' : 'follow_up',
           message_direction: 'inbound',
           message_content: messageText,
+          contact_type: 'carrier',
           message_metadata: {
             received_via: 'mega_api',
             phone_number: phoneNumber,
