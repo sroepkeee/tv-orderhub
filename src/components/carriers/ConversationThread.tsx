@@ -11,12 +11,14 @@ import { ptBR } from 'date-fns/locale';
 interface ConversationThreadProps {
   conversations: CarrierConversation[];
   onSendMessage: (message: string) => void;
+  onDeleteMessage?: (id: string) => void;
   loading?: boolean;
 }
 
 export function ConversationThread({ 
   conversations, 
-  onSendMessage, 
+  onSendMessage,
+  onDeleteMessage,
   loading 
 }: ConversationThreadProps) {
   const scrollAreaRef = useRef<HTMLDivElement>(null);
@@ -122,7 +124,13 @@ export function ConversationThread({
           }
           
           if (item.type === 'message' && item.message) {
-            return <MessageBubble key={item.message.id} message={item.message} />;
+            return (
+              <MessageBubble 
+                key={item.message.id} 
+                message={item.message}
+                onDelete={onDeleteMessage}
+              />
+            );
           }
           
           return null;

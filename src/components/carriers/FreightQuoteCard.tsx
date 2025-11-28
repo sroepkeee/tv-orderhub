@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { MessageSquare, CheckCircle, Clock, Calendar, MapPin, CheckCheck, MessageCircleOff } from 'lucide-react';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { MessageSquare, CheckCircle, Clock, Calendar, MapPin, CheckCheck, MessageCircleOff, Trash2 } from 'lucide-react';
 import type { FreightQuote, FreightQuoteResponse } from '@/types/carriers';
 import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
@@ -12,6 +13,7 @@ interface FreightQuoteCardProps {
   quote: FreightQuote;
   responses: FreightQuoteResponse[];
   onSelectQuote: (quoteId: string, responseId: string) => void;
+  onDeleteQuote: (quoteId: string) => void;
   orderId: string;
   orderNumber: string;
 }
@@ -20,6 +22,7 @@ export const FreightQuoteCard = ({
   quote,
   responses,
   onSelectQuote,
+  onDeleteQuote,
   orderId,
   orderNumber,
 }: FreightQuoteCardProps) => {
@@ -122,6 +125,35 @@ export const FreightQuoteCard = ({
               <h3 className="text-xs font-bold truncate flex-1" title={quote.carrier?.name}>
                 {quote.carrier?.name || 'Transportadora'}
               </h3>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="h-6 w-6 hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-900/40"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Excluir cotação?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Esta ação irá excluir a cotação de "{quote.carrier?.name}" 
+                      e todas as mensagens relacionadas. Esta ação não pode ser desfeita.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                    <AlertDialogAction 
+                      onClick={() => onDeleteQuote(quote.id)} 
+                      className="bg-red-600 hover:bg-red-700"
+                    >
+                      Excluir
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
               {/* Status de envio WhatsApp */}
               {!hasWhatsApp ? (
                 <Badge variant="outline" className="text-xs border-gray-400 text-gray-600 px-2 py-0">
