@@ -37,15 +37,22 @@ Deno.serve(async (req) => {
       throw new Error('Unauthorized');
     }
 
-    // Verificar se usuário está autorizado
-    const { data: authData, error: authCheckError } = await supabase
+    // Verificar se usuário está autorizado (whitelist OU admin)
+    const { data: authData } = await supabase
       .from('whatsapp_authorized_users')
       .select('id, is_active')
       .eq('user_id', user.id)
       .eq('is_active', true)
       .maybeSingle();
 
-    if (authCheckError || !authData) {
+    const { data: adminRole } = await supabase
+      .from('user_roles')
+      .select('id')
+      .eq('user_id', user.id)
+      .eq('role', 'admin')
+      .maybeSingle();
+
+    if (!authData && !adminRole) {
       throw new Error('User not authorized to send WhatsApp messages');
     }
 
