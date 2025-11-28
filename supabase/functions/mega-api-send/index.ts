@@ -76,6 +76,17 @@ Deno.serve(async (req) => {
       ? `*Pedido ${order.order_number}* - ${order.customer_name}\n\n${message}`
       : message;
 
+    // Buscar instância conectada do banco de dados
+    const { data: activeInstance } = await supabase
+      .from('whatsapp_instances')
+      .select('instance_key')
+      .eq('status', 'connected')
+      .maybeSingle();
+
+    if (!activeInstance) {
+      throw new Error('No connected WhatsApp instance found. Please connect a WhatsApp account first.');
+    }
+
     // Enviar mensagem via Mega API
     let megaApiUrl = (Deno.env.get('MEGA_API_URL') ?? '').trim();
     
@@ -88,7 +99,7 @@ Deno.serve(async (req) => {
     megaApiUrl = megaApiUrl.replace(/\/+$/, '');
     
     const megaApiToken = Deno.env.get('MEGA_API_TOKEN') ?? '';
-    const megaApiInstance = Deno.env.get('MEGA_API_INSTANCE') ?? '';
+    const megaApiInstance = activeInstance.instance_key;
 
     console.log('Sending WhatsApp message:', {
       instance: megaApiInstance,

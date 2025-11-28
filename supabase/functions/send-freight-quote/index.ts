@@ -146,9 +146,22 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const megaApiUrl = Deno.env.get('MEGA_API_URL')!;
     const megaApiToken = Deno.env.get('MEGA_API_TOKEN')!;
-    const megaApiInstance = Deno.env.get('MEGA_API_INSTANCE')!;
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Buscar instância conectada do banco de dados
+    const { data: activeInstance } = await supabase
+      .from('whatsapp_instances')
+      .select('instance_key')
+      .eq('status', 'connected')
+      .maybeSingle();
+
+    if (!activeInstance) {
+      console.warn('⚠️ No connected WhatsApp instance found. Messages will be saved locally only.');
+    }
+
+    const megaApiInstance = activeInstance?.instance_key || '';
+    console.log('Using WhatsApp instance:', megaApiInstance || 'none');
 
     // Get user ID from authorization header
     const authHeader = req.headers.get('authorization');
