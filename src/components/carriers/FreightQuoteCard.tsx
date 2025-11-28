@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { MessageSquare, CheckCircle, Clock, Calendar, MapPin } from 'lucide-react';
+import { MessageSquare, CheckCircle, Clock, Calendar, MapPin, CheckCheck, MessageCircleOff } from 'lucide-react';
 import type { FreightQuote, FreightQuoteResponse } from '@/types/carriers';
 import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
@@ -28,6 +28,8 @@ export const FreightQuoteCard = ({
     sent_at?: string;
     delivered_at?: string;
     read_at?: string;
+    sent_via?: string;
+    has_whatsapp?: boolean;
   }>({});
   
   // Carregar status da mensagem
@@ -36,15 +38,22 @@ export const FreightQuoteCard = ({
       if (quote.id) {
         const { data } = await supabase
           .from('carrier_conversations')
-          .select('sent_at, delivered_at, read_at')
+          .select('sent_at, delivered_at, read_at, message_metadata')
           .eq('quote_id', quote.id)
           .eq('message_direction', 'outbound')
           .order('created_at', { ascending: false })
           .limit(1)
-          .single();
+          .maybeSingle();
         
         if (data) {
-          setMessageStatus(data);
+          const metadata = data.message_metadata as any;
+          setMessageStatus({
+            sent_at: data.sent_at,
+            delivered_at: data.delivered_at,
+            read_at: data.read_at,
+            sent_via: metadata?.sent_via || 'none',
+            has_whatsapp: metadata?.has_whatsapp || false,
+          });
         }
       }
     };
@@ -57,17 +66,20 @@ export const FreightQuoteCard = ({
       .on(
         'postgres_changes',
         {
-          event: 'UPDATE',
+          event: '*',
           schema: 'public',
           table: 'carrier_conversations',
           filter: `quote_id=eq.${quote.id}`
         },
         (payload) => {
           if (payload.new) {
+            const metadata = (payload.new as any).message_metadata || {};
             setMessageStatus({
-              sent_at: payload.new.sent_at,
-              delivered_at: payload.new.delivered_at,
-              read_at: payload.new.read_at
+              sent_at: (payload.new as any).sent_at,
+              delivered_at: (payload.new as any).delivered_at,
+              read_at: (payload.new as any).read_at,
+              sent_via: metadata.sent_via || 'none',
+              has_whatsapp: metadata.has_whatsapp || false,
             });
           }
         }
@@ -87,6 +99,11 @@ export const FreightQuoteCard = ({
   })[0];
 
   const hasResponse = !!bestResponse?.freight_value;
+  const hasWhatsApp = quote.carrier?.whatsapp;
+  const isSent = !!messageStatus.sent_at;
+  const isDelivered = !!messageStatus.delivered_at;
+  const isRead = !!messageStatus.read_at;
+
   const cardBorderClass = selectedResponse 
     ? 'border-green-500 bg-green-50/30' 
     : hasResponse 
@@ -101,9 +118,34 @@ export const FreightQuoteCard = ({
       <Card className={`hover:shadow-md transition-all hover:scale-105 ${cardBorderClass}`}>
         <CardHeader className="p-3 pb-2">
           <div className="flex flex-col gap-1">
-            <h3 className="text-xs font-bold truncate" title={quote.carrier?.name}>
-              {quote.carrier?.name || 'Transportadora'}
-            </h3>
+            <div className="flex items-center justify-between gap-2">
+              <h3 className="text-xs font-bold truncate flex-1" title={quote.carrier?.name}>
+                {quote.carrier?.name || 'Transportadora'}
+              </h3>
+              {/* Status de envio WhatsApp */}
+              {!hasWhatsApp ? (
+                <Badge variant="outline" className="text-xs border-gray-400 text-gray-600 px-2 py-0">
+                  <MessageCircleOff className="h-3 w-3 mr-1" />
+                  Sem WhatsApp
+                </Badge>
+              ) : isSent && (
+                <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                  {isRead ? (
+                    <Badge variant="outline" className="text-xs border-blue-400 text-blue-600 px-2 py-0">
+                      <CheckCheck className="h-3 w-3 text-blue-600" />
+                    </Badge>
+                  ) : isDelivered ? (
+                    <Badge variant="outline" className="text-xs border-gray-400 text-gray-600 px-2 py-0">
+                      <CheckCheck className="h-3 w-3" />
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="text-xs border-gray-400 text-gray-600 px-2 py-0">
+                      <CheckCircle className="h-3 w-3" />
+                    </Badge>
+                  )}
+                </div>
+              )}
+            </div>
             <div className="flex items-center gap-1">
               {selectedResponse ? (
                 <Badge className="bg-green-600 text-white text-xs px-2 py-0.5">
@@ -180,6 +222,7 @@ export const FreightQuoteCard = ({
                 });
               }}
               className="flex-1 h-7 text-xs px-2"
+              disabled={!hasWhatsApp}
             >
               <MessageSquare className="h-3 w-3" />
             </Button>

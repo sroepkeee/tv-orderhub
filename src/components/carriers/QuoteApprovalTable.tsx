@@ -1,10 +1,12 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
-import { CheckCircle2, XCircle, Trophy, AlertTriangle, Clock } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { CheckCircle2, XCircle, Trophy, AlertTriangle, Clock, MessageSquare, MessageCircleOff } from 'lucide-react';
 import { FreightQuote, FreightQuoteResponse } from '@/types/carriers';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -22,6 +24,7 @@ export function QuoteApprovalTable({
   onApprove,
   onReject 
 }: QuoteApprovalTableProps) {
+  const navigate = useNavigate();
   const [processingId, setProcessingId] = useState<string | null>(null);
 
   // Combina quotes com suas respostas (inclui cotações sem resposta)
@@ -217,42 +220,79 @@ export function QuoteApprovalTable({
                         )}
                       </TableCell>
                       <TableCell className="text-xs">
-                        {hasResponse ? (
-                          <div className="flex items-center justify-center gap-1">
-                            {!isSelected ? (
-                              <>
+                        <div className="flex items-center justify-center gap-1">
+                          {/* Botão de Chat */}
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
                                 <Button
                                   size="sm"
-                                  variant="default"
-                                  onClick={() => handleApprove(item.quote.id, item.response?.id || '')}
-                                  disabled={isProcessing || !hasMinimumQuotes}
-                                  className="gap-1 h-7 text-xs px-2"
+                                  variant="ghost"
+                                  onClick={() => {
+                                    navigate('/carriers-chat', {
+                                      state: {
+                                        carrierId: item.quote.carrier_id,
+                                        carrierWhatsapp: item.quote.carrier?.whatsapp,
+                                        carrierName: item.quote.carrier?.name,
+                                        orderId: item.quote.order_id,
+                                        returnTo: '/'
+                                      }
+                                    });
+                                  }}
+                                  disabled={!item.quote.carrier?.whatsapp}
+                                  className="h-7 px-2"
                                 >
-                                  <CheckCircle2 className="h-3 w-3" />
-                                  Aprovar
+                                  {item.quote.carrier?.whatsapp ? (
+                                    <MessageSquare className="h-3 w-3" />
+                                  ) : (
+                                    <MessageCircleOff className="h-3 w-3 text-muted-foreground" />
+                                  )}
                                 </Button>
-                                <Button
-                                  size="sm"
-                                  variant="destructive"
-                                  onClick={() => handleReject(item.quote.id, item.response?.id || '')}
-                                  disabled={isProcessing}
-                                  className="gap-1 h-7 text-xs px-2"
-                                >
-                                  <XCircle className="h-3 w-3" />
-                                  Reprovar
-                                </Button>
-                              </>
-                            ) : (
-                              <Badge variant="outline" className="text-green-600 border-green-600 text-xs">
-                                ✓ Selecionada
-                              </Badge>
-                            )}
-                          </div>
-                        ) : (
-                          <div className="text-center text-xs text-muted-foreground">
-                            Sem resposta
-                          </div>
-                        )}
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                {item.quote.carrier?.whatsapp ? 'Abrir chat' : 'Sem WhatsApp cadastrado'}
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+
+                          {/* Ações de aprovação */}
+                          {hasResponse ? (
+                            <>
+                              {!isSelected ? (
+                                <>
+                                  <Button
+                                    size="sm"
+                                    variant="default"
+                                    onClick={() => handleApprove(item.quote.id, item.response?.id || '')}
+                                    disabled={isProcessing || !hasMinimumQuotes}
+                                    className="gap-1 h-7 text-xs px-2"
+                                  >
+                                    <CheckCircle2 className="h-3 w-3" />
+                                    Aprovar
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="destructive"
+                                    onClick={() => handleReject(item.quote.id, item.response?.id || '')}
+                                    disabled={isProcessing}
+                                    className="gap-1 h-7 text-xs px-2"
+                                  >
+                                    <XCircle className="h-3 w-3" />
+                                    Reprovar
+                                  </Button>
+                                </>
+                              ) : (
+                                <Badge variant="outline" className="text-green-600 border-green-600 text-xs">
+                                  ✓ Selecionada
+                                </Badge>
+                              )}
+                            </>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">
+                              Aguardando
+                            </span>
+                          )}
+                        </div>
                       </TableCell>
                     </TableRow>
                   );

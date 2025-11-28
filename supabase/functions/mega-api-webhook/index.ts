@@ -5,6 +5,50 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Função para extrair dados de cotação da mensagem
+function extractQuoteData(messageText: string): {
+  freight_value: number | null;
+  delivery_time_days: number | null;
+} {
+  let freight_value: number | null = null;
+  let delivery_time_days: number | null = null;
+
+  // Regex para valor do frete (aceita vários formatos)
+  const valuePatterns = [
+    /R\$\s*(\d{1,3}(?:\.\d{3})*(?:,\d{2})?)/i,  // R$ 1.234,56
+    /valor[:\s]*R?\$?\s*(\d{1,3}(?:\.\d{3})*(?:,\d{2})?)/i,  // valor: R$ 1.234,56
+    /frete[:\s]*R?\$?\s*(\d{1,3}(?:\.\d{3})*(?:,\d{2})?)/i,  // frete: R$ 1.234,56
+    /cotação[:\s]*R?\$?\s*(\d{1,3}(?:\.\d{3})*(?:,\d{2})?)/i, // cotação: R$ 1.234,56
+  ];
+
+  for (const pattern of valuePatterns) {
+    const match = messageText.match(pattern);
+    if (match) {
+      // Converter formato brasileiro para número
+      const cleanValue = match[1].replace(/\./g, '').replace(',', '.');
+      freight_value = parseFloat(cleanValue);
+      break;
+    }
+  }
+
+  // Regex para prazo de entrega (aceita vários formatos)
+  const timePatterns = [
+    /(\d+)\s*dias?\s*(?:úteis)?/i,  // 5 dias, 10 dias úteis
+    /prazo[:\s]*(\d+)\s*dias?/i,    // prazo: 5 dias
+    /entrega[:\s]*(\d+)\s*dias?/i,  // entrega: 10 dias
+  ];
+
+  for (const pattern of timePatterns) {
+    const match = messageText.match(pattern);
+    if (match) {
+      delivery_time_days = parseInt(match[1]);
+      break;
+    }
+  }
+
+  return { freight_value, delivery_time_days };
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -19,7 +63,7 @@ Deno.serve(async (req) => {
     const payload = await req.json();
     console.log('Webhook received:', JSON.stringify(payload, null, 2));
 
-    // Validar instância (verificar ambos instance_key e instance para compatibilidade)
+    // Validar instância
     const megaApiInstance = Deno.env.get('MEGA_API_INSTANCE') ?? '';
     const instanceKey = payload.instance_key || payload.instance;
     
@@ -36,12 +80,12 @@ Deno.serve(async (req) => {
 
     // Processar QR Code Update
     const qrcode = 
-      payload.qrcode ||                           // formato 1: qrcode direto
-      payload.data?.qrcode ||                     // formato 2: dentro de data
-      payload.qrcode?.base64 ||                   // formato 3: base64 dentro de qrcode
-      payload.data?.qrcode?.base64 ||             // formato 4: base64 dentro de data.qrcode
-      payload.data?.code ||                       // formato 5: code dentro de data
-      payload.code;                               // formato 6: code direto
+      payload.qrcode ||
+      payload.data?.qrcode ||
+      payload.qrcode?.base64 ||
+      payload.data?.qrcode?.base64 ||
+      payload.data?.code ||
+      payload.code;
 
     const isQrCodeEvent = 
       payload.messageType === 'qrcode_update' ||
@@ -52,14 +96,8 @@ Deno.serve(async (req) => {
       !!qrcode;
 
     if (isQrCodeEvent && qrcode) {
-      console.log('QR Code update received:', { 
-        instanceKey, 
-        hasQrcode: !!qrcode,
-        event: payload.event,
-        messageType: payload.messageType 
-      });
+      console.log('QR Code update received');
       
-      // Salvar QR code no cache
       const { error: upsertError } = await supabase
         .from('whatsapp_instances')
         .upsert({
@@ -90,11 +128,11 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Processar diferentes tipos de eventos
+    // Processar mensagens recebidas (inbound)
     if (payload.event === 'messages.upsert') {
       const messageData = payload.data;
       
-      // Ignorar mensagens enviadas por nós (fromMe = true)
+      // Ignorar mensagens enviadas por nós
       if (messageData.key?.fromMe) {
         console.log('Ignoring outbound message');
         return new Response(
@@ -153,16 +191,38 @@ Deno.serve(async (req) => {
         );
       }
 
-      // Buscar última conversa ativa com esta transportadora
-      const { data: lastConversation } = await supabase
-        .from('carrier_conversations')
-        .select('order_id')
+      // Buscar última cotação ativa desta transportadora
+      const { data: lastQuote } = await supabase
+        .from('freight_quotes')
+        .select('id, order_id, status')
         .eq('carrier_id', carrier.id)
-        .order('sent_at', { ascending: false })
+        .in('status', ['sent', 'pending'])
+        .order('requested_at', { ascending: false })
         .limit(1)
         .maybeSingle();
 
-      if (!lastConversation) {
+      // Tentar extrair dados de cotação da mensagem
+      const quoteData = extractQuoteData(messageText);
+      const hasQuoteData = quoteData.freight_value !== null || quoteData.delivery_time_days !== null;
+
+      console.log('Extracted quote data:', quoteData, 'Has data:', hasQuoteData);
+
+      let orderId = lastQuote?.order_id;
+
+      // Se não encontrou cotação ativa, buscar última conversa
+      if (!orderId) {
+        const { data: lastConversation } = await supabase
+          .from('carrier_conversations')
+          .select('order_id')
+          .eq('carrier_id', carrier.id)
+          .order('sent_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        orderId = lastConversation?.order_id;
+      }
+
+      if (!orderId) {
         console.warn('No active conversation found for carrier:', carrier.id);
         return new Response(
           JSON.stringify({ 
@@ -182,8 +242,9 @@ Deno.serve(async (req) => {
         .from('carrier_conversations')
         .insert({
           carrier_id: carrier.id,
-          order_id: lastConversation.order_id,
-          conversation_type: 'follow_up',
+          order_id: orderId,
+          quote_id: lastQuote?.id || null,
+          conversation_type: hasQuoteData ? 'quote_request' : 'follow_up',
           message_direction: 'inbound',
           message_content: messageText,
           message_metadata: {
@@ -191,6 +252,7 @@ Deno.serve(async (req) => {
             phone_number: phoneNumber,
             mega_message_id: messageData.key?.id || null,
             message_timestamp: messageData.messageTimestamp,
+            extracted_quote_data: hasQuoteData ? quoteData : null,
           },
           sent_at: new Date().toISOString(),
           delivered_at: new Date().toISOString(),
@@ -201,6 +263,41 @@ Deno.serve(async (req) => {
       if (conversationError) {
         console.error('Error saving conversation:', conversationError);
         throw conversationError;
+      }
+
+      // Se detectou dados de cotação E há cotação ativa, criar resposta automaticamente
+      if (hasQuoteData && lastQuote) {
+        console.log('Creating automatic quote response for quote:', lastQuote.id);
+
+        const { error: responseError } = await supabase
+          .from('freight_quote_responses')
+          .insert({
+            quote_id: lastQuote.id,
+            freight_value: quoteData.freight_value,
+            delivery_time_days: quoteData.delivery_time_days,
+            response_text: messageText,
+            additional_info: {
+              auto_extracted: true,
+              source: 'whatsapp_mega_api',
+              phone_number: phoneNumber,
+            },
+            received_at: new Date().toISOString(),
+          });
+
+        if (responseError) {
+          console.error('Error creating quote response:', responseError);
+        } else {
+          // Atualizar status da cotação para 'responded'
+          await supabase
+            .from('freight_quotes')
+            .update({ 
+              status: 'responded',
+              response_received_at: new Date().toISOString()
+            })
+            .eq('id', lastQuote.id);
+
+          console.log('✅ Quote response created successfully');
+        }
       }
 
       // Salvar log de mensagem
@@ -217,7 +314,8 @@ Deno.serve(async (req) => {
           success: true, 
           conversationId: conversation.id,
           carrierId: carrier.id,
-          orderId: lastConversation.order_id
+          orderId: orderId,
+          quoteResponseCreated: hasQuoteData && !!lastQuote
         }),
         {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -226,20 +324,17 @@ Deno.serve(async (req) => {
       );
 
     } else if (payload.event === 'connection.update' || payload.messageType === 'connection_update') {
-      console.log('Connection update received:', JSON.stringify(payload, null, 2));
+      console.log('Connection update received');
       
-      // Atualizar status da instância
       const connectionData = payload.data || {};
       const connectionMessage = payload.message || connectionData.message;
       
-      // Detectar se está conectado
       const isConnected = 
         connectionMessage === 'phone_connected' ||
         connectionData.state === 'open' ||
         connectionData.connection === 'open' ||
         payload.status === 'connected';
       
-      // Extrair número de telefone do jid (formato: 555193291603@s.whatsapp.net)
       const phoneFromJid = payload.jid?.replace('@s.whatsapp.net', '').replace('@lid', '') || 
         connectionData.phoneNumber || 
         payload.phoneNumber || 
@@ -248,8 +343,6 @@ Deno.serve(async (req) => {
       console.log('Connection details:', {
         isConnected,
         phoneNumber: phoneFromJid,
-        message: connectionMessage,
-        state: connectionData.state,
       });
       
       await supabase
@@ -259,14 +352,14 @@ Deno.serve(async (req) => {
           status: isConnected ? 'connected' : 'disconnected',
           phone_number: phoneFromJid,
           connected_at: isConnected ? new Date().toISOString() : null,
-          qrcode: isConnected ? null : undefined, // Limpar QR code quando conectado
+          qrcode: isConnected ? null : undefined,
           updated_at: new Date().toISOString(),
         }, { onConflict: 'instance_key' });
       
       console.log('Instance status updated successfully');
       
       return new Response(
-        JSON.stringify({ success: true, event: 'connection.update', isConnected, phoneNumber: phoneFromJid }),
+        JSON.stringify({ success: true, event: 'connection.update', isConnected }),
         {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 200,
