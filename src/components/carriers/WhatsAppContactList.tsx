@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
@@ -16,12 +16,14 @@ interface WhatsAppContact {
   carrier_id: string;
   orderCount: number;
   unreadCount: number;
-  lastMessage: string;
-  lastMessageDate: string;
+  lastMessage?: string;
+  lastMessageDate?: string;
+  hasConversations: boolean;
 }
 
 interface WhatsAppContactListProps {
   conversations: CarrierConversation[];
+  allContacts: Array<{ id: string; name: string; whatsapp: string }>;
   selectedWhatsApp?: string;
   onSelectContact: (contact: WhatsAppContact) => void;
   onDeleteContact: (carrierId: string) => void;
@@ -29,6 +31,7 @@ interface WhatsAppContactListProps {
 
 export function WhatsAppContactList({ 
   conversations, 
+  allContacts,
   selectedWhatsApp, 
   onSelectContact,
   onDeleteContact
@@ -45,32 +48,45 @@ export function WhatsAppContactList({
     return acc;
   }, {} as Record<string, CarrierConversation[]>);
 
-  // Criar lista de contatos a partir das conversas agrupadas
-  const contacts: WhatsAppContact[] = Object.entries(groupedConversations).map(([carrierId, convs]) => {
-    const lastMessage = convs[0]; // Primeira mensagem (mais recente)
-    const unreadCount = convs.filter(
+  // Criar lista completa de contatos (todos com WhatsApp)
+  const contacts: WhatsAppContact[] = allContacts.map(carrier => {
+    const carrierConvs = groupedConversations[carrier.id] || [];
+    const hasConversations = carrierConvs.length > 0;
+    
+    const lastMessage = hasConversations ? carrierConvs[0] : null;
+    const unreadCount = carrierConvs.filter(
       c => c.message_direction === 'inbound' && !c.read_at
     ).length;
     
-    // Contar pedidos únicos
-    const uniqueOrders = new Set(convs.map(c => c.order_id));
-    
-    // Usar dados reais do carrier
-    const carrier = lastMessage.carrier;
+    // Contar pedidos únicos (apenas para os que têm conversas)
+    const uniqueOrders = new Set(
+      carrierConvs.map(c => c.order_id).filter(id => id !== null)
+    );
     
     return {
-      whatsapp: carrier?.whatsapp || null,
-      carrierName: carrier?.name || 'Transportadora',
-      carrier_id: carrierId,
-      lastMessage: lastMessage.message_content,
-      lastMessageDate: lastMessage.sent_at || lastMessage.created_at,
+      whatsapp: carrier.whatsapp,
+      carrierName: carrier.name,
+      carrier_id: carrier.id,
+      lastMessage: lastMessage?.message_content,
+      lastMessageDate: lastMessage?.sent_at || lastMessage?.created_at,
       unreadCount,
       orderCount: uniqueOrders.size,
+      hasConversations,
     };
   }).sort((a, b) => {
-    const dateA = new Date(a.lastMessageDate || 0).getTime();
-    const dateB = new Date(b.lastMessageDate || 0).getTime();
-    return dateB - dateA;
+    // Priorizar contatos com conversas no topo
+    if (a.hasConversations && !b.hasConversations) return -1;
+    if (!a.hasConversations && b.hasConversations) return 1;
+    
+    // Para contatos com conversas, ordenar por data da última mensagem
+    if (a.hasConversations && b.hasConversations) {
+      const dateA = new Date(a.lastMessageDate || 0).getTime();
+      const dateB = new Date(b.lastMessageDate || 0).getTime();
+      return dateB - dateA;
+    }
+    
+    // Para contatos sem conversas, ordenar alfabeticamente
+    return a.carrierName.localeCompare(b.carrierName);
   });
 
   const filteredContacts = contacts.filter(contact => {
@@ -79,7 +95,7 @@ export function WhatsAppContactList({
     return (
       contact.carrierName.toLowerCase().includes(search) ||
       (contact.whatsapp && contact.whatsapp.includes(search)) ||
-      contact.lastMessage.toLowerCase().includes(search)
+      (contact.lastMessage && contact.lastMessage.toLowerCase().includes(search))
     );
   });
 
@@ -104,7 +120,7 @@ export function WhatsAppContactList({
       <div className="p-4 border-b space-y-3">
         <h2 className="text-lg font-semibold flex items-center gap-2">
           <MessageCircle className="h-5 w-5 text-primary" />
-          Conversas
+          Contatos WhatsApp
         </h2>
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -115,6 +131,9 @@ export function WhatsAppContactList({
             className="pl-9"
           />
         </div>
+        <p className="text-xs text-muted-foreground">
+          {contacts.length} contato{contacts.length !== 1 ? 's' : ''} com WhatsApp
+        </p>
       </div>
 
       <ScrollArea className="flex-1">
@@ -142,17 +161,25 @@ export function WhatsAppContactList({
                     <p className="font-semibold text-sm truncate flex-1">
                       {contact.carrierName}
                     </p>
-                    <span className="text-xs text-muted-foreground whitespace-nowrap">
-                      {formatDistanceToNow(new Date(contact.lastMessageDate), { 
-                        addSuffix: true,
-                        locale: ptBR 
-                      })}
-                    </span>
+                    {contact.lastMessageDate && (
+                      <span className="text-xs text-muted-foreground whitespace-nowrap">
+                        {formatDistanceToNow(new Date(contact.lastMessageDate), { 
+                          addSuffix: true,
+                          locale: ptBR 
+                        })}
+                      </span>
+                    )}
                   </div>
                   <div className="flex items-center gap-2">
-                    <p className="text-xs text-muted-foreground truncate flex-1">
-                      {contact.lastMessage}
-                    </p>
+                    {contact.hasConversations ? (
+                      <p className="text-xs text-muted-foreground truncate flex-1">
+                        {contact.lastMessage}
+                      </p>
+                    ) : (
+                      <p className="text-xs text-muted-foreground italic flex-1">
+                        Sem mensagens ainda
+                      </p>
+                    )}
                     {contact.unreadCount > 0 && (
                       <Badge variant="default" className="h-5 px-1.5 text-xs bg-green-600">
                         {contact.unreadCount}
@@ -169,36 +196,38 @@ export function WhatsAppContactList({
                 </div>
               </div>
               
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity text-red-600 hover:bg-red-100 dark:hover:bg-red-900/40"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Excluir todas as mensagens?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      Esta ação irá excluir todas as mensagens com "{contact.carrierName}". 
-                      Esta ação não pode ser desfeita.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                    <AlertDialogAction 
-                      onClick={() => onDeleteContact(contact.carrier_id)} 
-                      className="bg-red-600 hover:bg-red-700"
+              {contact.hasConversations && (
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity text-red-600 hover:bg-red-100 dark:hover:bg-red-900/40"
+                      onClick={(e) => e.stopPropagation()}
                     >
-                      Excluir Tudo
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Excluir todas as mensagens?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Esta ação irá excluir todas as mensagens com "{contact.carrierName}". 
+                        Esta ação não pode ser desfeita.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                      <AlertDialogAction 
+                        onClick={() => onDeleteContact(contact.carrier_id)} 
+                        className="bg-red-600 hover:bg-red-700"
+                      >
+                        Excluir Tudo
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              )}
             </div>
           ))
         )}

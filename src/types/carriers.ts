@@ -88,13 +88,14 @@ export interface FreightQuoteResponse {
 
 export interface CarrierConversation {
   id: string;
-  order_id: string;
+  order_id: string | null; // Nullable - for general conversations
   carrier_id: string;
   quote_id?: string;
   conversation_type: 'quote_request' | 'follow_up' | 'negotiation' | 'general';
   message_direction: 'outbound' | 'inbound';
   message_content: string;
   message_metadata: Record<string, any>;
+  contact_type?: 'carrier' | 'customer' | 'technician' | 'supplier';
   sent_at: string;
   delivered_at?: string;
   read_at?: string;

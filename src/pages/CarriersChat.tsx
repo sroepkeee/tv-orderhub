@@ -29,7 +29,8 @@ export default function CarriersChat() {
     conversations, 
     loading, 
     sendMessage, 
-    loadConversations, 
+    loadConversations,
+    loadAllContacts,
     subscribeToNewMessages,
     unreadCount,
     deleteConversation,
@@ -40,13 +41,21 @@ export default function CarriersChat() {
   const [sending, setSending] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [sourceOrder, setSourceOrder] = useState<NavigationState | null>(null);
+  const [allContacts, setAllContacts] = useState<Array<{ id: string; name: string; whatsapp: string }>>([]);
 
   useEffect(() => {
-    loadConversations();
+    const loadData = async () => {
+      await loadConversations();
+      const contacts = await loadAllContacts();
+      setAllContacts(contacts);
+    };
+    loadData();
+    
     const unsubscribe = subscribeToNewMessages(() => {
       setSyncing(true);
       setTimeout(() => setSyncing(false), 1000);
     });
+    
     return () => {
       if (unsubscribe) unsubscribe();
     };
@@ -68,8 +77,8 @@ export default function CarriersChat() {
   const handleSelectContact = (contact: { 
     whatsapp: string | null; 
     carrier_id: string; 
-    lastMessage: string;
-    lastMessageDate: string;
+    lastMessage?: string;
+    lastMessageDate?: string;
   }) => {
     setSelectedWhatsApp(contact.carrier_id);
     setSelectedCarrierId(contact.carrier_id);
@@ -78,25 +87,22 @@ export default function CarriersChat() {
   const handleSendMessage = async (message: string) => {
     if (!selectedCarrierId) return;
 
-    // Pegar a primeira conversa deste carrier_id para obter order_id
+    // Pegar a primeira conversa deste carrier_id para obter order_id (se existir)
     const contactConvs = conversations.filter(c => c.carrier_id === selectedCarrierId);
-    
-    if (contactConvs.length === 0) return;
-    
-    const firstConv = contactConvs[0];
+    const orderId = contactConvs.length > 0 ? contactConvs[0].order_id : null;
 
     setSending(true);
     try {
       await sendMessage({
         carrierId: selectedCarrierId,
-        orderId: firstConv.order_id,
+        orderId: orderId || undefined,
         message,
-        conversationType: 'follow_up'
+        conversationType: 'general'
       });
       
       toast({
         title: 'Mensagem enviada',
-        description: 'Sua mensagem foi enviada via WhatsApp para a transportadora'
+        description: 'Sua mensagem foi enviada via WhatsApp'
       });
       
       await loadConversations();
@@ -215,6 +221,7 @@ export default function CarriersChat() {
         ) : (
           <WhatsAppContactList
             conversations={conversations}
+            allContacts={allContacts}
             selectedWhatsApp={selectedWhatsApp || undefined}
             onSelectContact={handleSelectContact}
             onDeleteContact={async (carrierId) => {

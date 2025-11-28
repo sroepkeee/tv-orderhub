@@ -7,9 +7,10 @@ const corsHeaders = {
 
 interface SendMessageRequest {
   carrierId: string;
-  orderId: string;
+  orderId?: string; // Optional - for general conversations
   message: string;
   conversationType: string;
+  contactType?: string; // 'carrier' | 'customer' | 'technician' | 'supplier'
 }
 
 Deno.serve(async (req) => {
@@ -48,7 +49,7 @@ Deno.serve(async (req) => {
       throw new Error('User not authorized to send WhatsApp messages');
     }
 
-    const { carrierId, orderId, message, conversationType }: SendMessageRequest = await req.json();
+    const { carrierId, orderId, message, conversationType, contactType }: SendMessageRequest = await req.json();
 
     // Buscar dados da transportadora
     const { data: carrier, error: carrierError } = await supabase
@@ -64,12 +65,16 @@ Deno.serve(async (req) => {
     // Formatar número de telefone (remover caracteres especiais)
     const phoneNumber = carrier.whatsapp.replace(/\D/g, '');
 
-    // Buscar informações do pedido para contexto
-    const { data: order } = await supabase
-      .from('orders')
-      .select('order_number, customer_name')
-      .eq('id', orderId)
-      .single();
+    // Buscar informações do pedido para contexto (opcional)
+    let order = null;
+    if (orderId) {
+      const { data: orderData } = await supabase
+        .from('orders')
+        .select('order_number, customer_name')
+        .eq('id', orderId)
+        .maybeSingle();
+      order = orderData;
+    }
 
     // Montar mensagem com contexto
     const fullMessage = order 
@@ -138,10 +143,11 @@ Deno.serve(async (req) => {
       .from('carrier_conversations')
       .insert({
         carrier_id: carrierId,
-        order_id: orderId,
+        order_id: orderId || null,
         conversation_type: conversationType,
         message_direction: 'outbound',
         message_content: fullMessage,
+        contact_type: contactType || 'carrier',
         message_metadata: {
           sent_via: 'mega_api',
           phone_number: phoneNumber,

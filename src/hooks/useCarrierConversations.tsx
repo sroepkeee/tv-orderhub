@@ -145,7 +145,7 @@ export const useCarrierConversations = () => {
 
   const sendMessage = async (messageData: {
     carrierId: string;
-    orderId: string;
+    orderId?: string; // Optional for general conversations
     message: string;
     conversationType: string;
   }) => {
@@ -232,6 +232,28 @@ export const useCarrierConversations = () => {
     };
   };
 
+  const loadAllContacts = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('carriers')
+        .select('id, name, whatsapp, is_active')
+        .not('whatsapp', 'is', null)
+        .eq('is_active', true)
+        .order('name', { ascending: true });
+
+      if (error) throw error;
+      return data || [];
+    } catch (error: any) {
+      console.error('Error loading contacts:', error);
+      toast({
+        title: 'Erro ao carregar contatos',
+        description: error.message,
+        variant: 'destructive',
+      });
+      return [];
+    }
+  };
+
   useEffect(() => {
     loadConversations();
     getUnreadCount();
@@ -296,6 +318,7 @@ export const useCarrierConversations = () => {
     loadConversations,
     loadConversationsByCarrier,
     loadConversationsByOrder,
+    loadAllContacts,
     sendMessage,
     markAsRead,
     getUnreadCount,
