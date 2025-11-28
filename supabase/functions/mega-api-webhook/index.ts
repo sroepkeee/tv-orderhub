@@ -179,13 +179,31 @@ Deno.serve(async (req) => {
         .replace(/@lid$/g, '')
         .replace(/\D/g, '');
       
-      // Normalize phone number - remove Brazil country code (55) if present
-      let normalizedPhone = phoneNumber;
-      if (normalizedPhone.startsWith('55') && normalizedPhone.length > 11) {
-        normalizedPhone = normalizedPhone.substring(2);
+      // Normalize phone number - create multiple variations for flexible matching
+      // WhatsApp sends: 555199050190 (country 55 + area 51 + 999050190)
+      // Database may have: 51999050190 (11 digits) or 5199050190 (10 digits)
+      const phoneVariations = [phoneNumber]; // Original: 555199050190
+      
+      // Try removing country code (55)
+      if (phoneNumber.startsWith('55') && phoneNumber.length > 11) {
+        phoneVariations.push(phoneNumber.substring(2)); // 5199050190
       }
       
-      console.log('📞 Phone number extracted:', phoneNumber, '→ normalized:', normalizedPhone);
+      // Try with mobile digit (9) inserted after area code
+      if (phoneNumber.startsWith('55') && phoneNumber.length === 12) {
+        // Format: 55 + area (2 digits) + mobile (9 digits)
+        const withoutCountry = phoneNumber.substring(2); // 5199050190
+        // Check if it needs the extra 9: area codes starting with 5 in RS
+        if (!withoutCountry.includes('9', 2)) {
+          const area = withoutCountry.substring(0, 2);
+          const number = withoutCountry.substring(2);
+          phoneVariations.push(area + '9' + number); // 51999050190
+        } else {
+          phoneVariations.push(withoutCountry);
+        }
+      }
+      
+      console.log('📞 Phone variations for search:', phoneVariations);
 
       // Extrair mensagem de texto - múltiplas fontes
       const message = payload.message || messageData.message;
@@ -207,13 +225,18 @@ Deno.serve(async (req) => {
 
       console.log('📝 Processing inbound message:', { phoneNumber, messageText });
 
-      // Find carrier by phone number - search both normalized and original formats
-      console.log('🔍 Looking for carrier with WhatsApp:', phoneNumber, 'or normalized:', normalizedPhone);
+      // Find carrier by phone number - search all variations
+      console.log('🔍 Looking for carrier with WhatsApp variations:', phoneVariations);
+      
+      // Build OR query with all phone variations
+      const orConditions = phoneVariations
+        .map(variation => `whatsapp.ilike.%${variation}%`)
+        .join(',');
       
       const { data: carrier, error: carrierError } = await supabase
         .from('carriers')
         .select('id, name, whatsapp')
-        .or(`whatsapp.ilike.%${normalizedPhone}%,whatsapp.ilike.%${phoneNumber}%`)
+        .or(orConditions)
         .maybeSingle();
 
       if (carrierError) {
