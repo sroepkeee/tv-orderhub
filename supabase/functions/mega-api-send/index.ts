@@ -77,7 +77,16 @@ Deno.serve(async (req) => {
       : message;
 
     // Enviar mensagem via Mega API
-    const megaApiUrl = Deno.env.get('MEGA_API_URL') ?? '';
+    let megaApiUrl = (Deno.env.get('MEGA_API_URL') ?? '').trim();
+    
+    // Garantir que a URL tenha protocolo https
+    if (!megaApiUrl.startsWith('http://') && !megaApiUrl.startsWith('https://')) {
+      megaApiUrl = `https://${megaApiUrl}`;
+    }
+    
+    // Remover barra final se houver
+    megaApiUrl = megaApiUrl.replace(/\/+$/, '');
+    
     const megaApiToken = Deno.env.get('MEGA_API_TOKEN') ?? '';
     const megaApiInstance = Deno.env.get('MEGA_API_INSTANCE') ?? '';
 
