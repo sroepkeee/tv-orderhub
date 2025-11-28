@@ -166,9 +166,9 @@ Deno.serve(async (req) => {
 
     // Formatos de autenticação a tentar
     const authHeaders = [
+      { 'Authorization': `Bearer ${megaApiToken}` },
       { 'apikey': megaApiToken },
       { 'Authorization': megaApiToken },
-      { 'Authorization': `Bearer ${megaApiToken}` },
       { 'Apikey': megaApiToken },
     ];
 
@@ -280,7 +280,7 @@ Deno.serve(async (req) => {
         const restartResponse = await fetch(`${megaApiUrl}${endpoint}`, {
           method: 'POST',
           headers: {
-            'apikey': megaApiToken,
+            'Authorization': `Bearer ${megaApiToken}`,
             'Content-Type': 'application/json',
           },
         });
