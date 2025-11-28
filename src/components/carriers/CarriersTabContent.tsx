@@ -257,6 +257,7 @@ export function CarriersTabContent({
                         responses={quoteResponses}
                         onSelectQuote={selectQuote}
                         orderId={order.id}
+                        orderNumber={order.orderNumber}
                       />
                     );
                   })}

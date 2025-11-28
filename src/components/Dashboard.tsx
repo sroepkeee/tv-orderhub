@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { useLocation } from "react-router-dom";
 import logo from "@/assets/logo.png";
 import { DateRange } from "react-day-picker";
 import { Badge } from "@/components/ui/badge";
@@ -207,6 +208,7 @@ export const Dashboard = () => {
   const { isAdmin } = useAdminAuth();
   const { phasePermissions, userRoles } = usePhaseAuthorization();
   const navigate = useNavigate();
+  const location = useLocation();
   const [activeTab, setActiveTab] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [orders, setOrders] = useState<Order[]>([]);
@@ -356,6 +358,21 @@ export const Dashboard = () => {
       window.removeEventListener('openOrder', handleOpenOrder as EventListener);
     };
   }, [orders]);
+
+  // Listener para navegação de retorno do chat (auto-abrir pedido)
+  useEffect(() => {
+    const navigationState = location.state as { openOrderId?: string; openOrderNumber?: string } | null;
+    if (navigationState?.openOrderId && orders.length > 0) {
+      const order = orders.find(o => o.id === navigationState.openOrderId);
+      if (order) {
+        setSelectedOrder(order);
+        setShowEditDialog(true);
+        
+        // Limpar o state para não reabrir em navegações futuras
+        window.history.replaceState({}, document.title);
+      }
+    }
+  }, [location.state, orders]);
   
   const loadUnreadCount = async () => {
     try {

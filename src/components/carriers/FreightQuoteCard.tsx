@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { MessageSquare, CheckCircle, Clock, Calendar, MapPin } from 'lucide-react';
 import type { FreightQuote, FreightQuoteResponse } from '@/types/carriers';
 import { format } from 'date-fns';
-import { CarrierConversationDialog } from './CarrierConversationDialog';
 import { supabase } from '@/integrations/supabase/client';
 
 interface FreightQuoteCardProps {
@@ -13,6 +13,7 @@ interface FreightQuoteCardProps {
   responses: FreightQuoteResponse[];
   onSelectQuote: (quoteId: string, responseId: string) => void;
   orderId: string;
+  orderNumber: string;
 }
 
 export const FreightQuoteCard = ({
@@ -20,8 +21,9 @@ export const FreightQuoteCard = ({
   responses,
   onSelectQuote,
   orderId,
+  orderNumber,
 }: FreightQuoteCardProps) => {
-  const [showConversation, setShowConversation] = useState(false);
+  const navigate = useNavigate();
   const [messageStatus, setMessageStatus] = useState<{
     sent_at?: string;
     delivered_at?: string;
@@ -165,7 +167,18 @@ export const FreightQuoteCard = ({
             <Button 
               variant="outline" 
               size="sm" 
-              onClick={() => setShowConversation(true)}
+              onClick={() => {
+                navigate('/carriers-chat', {
+                  state: {
+                    carrierId: quote.carrier_id,
+                    carrierWhatsapp: quote.carrier?.whatsapp,
+                    carrierName: quote.carrier?.name,
+                    orderId: orderId,
+                    orderNumber: orderNumber,
+                    returnTo: '/'
+                  }
+                });
+              }}
               className="flex-1 h-7 text-xs px-2"
             >
               <MessageSquare className="h-3 w-3" />
@@ -182,14 +195,6 @@ export const FreightQuoteCard = ({
           </div>
         </CardContent>
       </Card>
-
-      <CarrierConversationDialog
-        open={showConversation}
-        onOpenChange={setShowConversation}
-        orderId={orderId}
-        carrierId={quote.carrier_id}
-        carrierName={quote.carrier?.name}
-      />
     </>
   );
 };
