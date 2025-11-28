@@ -60,13 +60,15 @@ export function WhatsAppContactList({
       carrierName: carrier?.name || 'Transportadora',
       carrier_id: carrierId,
       lastMessage: lastMessage.message_content,
-      lastMessageDate: lastMessage.sent_at,
+      lastMessageDate: lastMessage.sent_at || lastMessage.created_at,
       unreadCount,
       orderCount: uniqueOrders.size,
     };
-  }).sort((a, b) => 
-    new Date(b.lastMessageDate).getTime() - new Date(a.lastMessageDate).getTime()
-  );
+  }).sort((a, b) => {
+    const dateA = new Date(a.lastMessageDate || 0).getTime();
+    const dateB = new Date(b.lastMessageDate || 0).getTime();
+    return dateB - dateA;
+  });
 
   const filteredContacts = contacts.filter(contact => {
     if (!searchQuery) return true;

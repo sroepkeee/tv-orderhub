@@ -28,7 +28,7 @@ export const useCarrierConversations = () => {
             customer_name
           )
         `)
-        .order('sent_at', { ascending: false });
+        .order('created_at', { ascending: false });
 
       if (error) throw error;
       
@@ -73,7 +73,7 @@ export const useCarrierConversations = () => {
           )
         `)
         .eq('carrier_id', carrierId)
-        .order('sent_at', { ascending: true });
+        .order('created_at', { ascending: true });
 
       if (error) throw error;
       
@@ -119,7 +119,7 @@ export const useCarrierConversations = () => {
           )
         `)
         .eq('order_id', orderId)
-        .order('sent_at', { ascending: true });
+        .order('created_at', { ascending: true });
 
       if (error) throw error;
       
