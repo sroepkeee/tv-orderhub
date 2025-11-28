@@ -166,18 +166,26 @@ Deno.serve(async (req) => {
         );
       }
 
-      // Extrair número de telefone - múltiplas fontes possíveis
+      // Extract phone number - prioritize key.remoteJid for inbound messages
+      // For received messages (fromMe: false), the sender is in key.remoteJid
+      // payload.jid is the connected instance number
       const remoteJid = 
-        payload.jid ||                           // Formato da Mega API
-        key?.remoteJid ||                         // Formato padrão
-        messageData?.key?.remoteJid || 
+        key?.remoteJid ||                         // Priority 1: sender's number
+        messageData?.key?.remoteJid ||            // Priority 2: fallback
+        payload.jid ||                            // Priority 3: instance number (last resort)
         '';
       const phoneNumber = remoteJid
         .replace(/@s\.whatsapp\.net$/g, '')
         .replace(/@lid$/g, '')
         .replace(/\D/g, '');
       
-      console.log('📞 Phone number extracted:', phoneNumber, 'from remoteJid:', remoteJid);
+      // Normalize phone number - remove Brazil country code (55) if present
+      let normalizedPhone = phoneNumber;
+      if (normalizedPhone.startsWith('55') && normalizedPhone.length > 11) {
+        normalizedPhone = normalizedPhone.substring(2);
+      }
+      
+      console.log('📞 Phone number extracted:', phoneNumber, '→ normalized:', normalizedPhone);
 
       // Extrair mensagem de texto - múltiplas fontes
       const message = payload.message || messageData.message;
@@ -199,13 +207,13 @@ Deno.serve(async (req) => {
 
       console.log('📝 Processing inbound message:', { phoneNumber, messageText });
 
-      // Buscar transportadora pelo número de WhatsApp
-      console.log('🔍 Looking for carrier with WhatsApp:', phoneNumber);
+      // Find carrier by phone number - search both normalized and original formats
+      console.log('🔍 Looking for carrier with WhatsApp:', phoneNumber, 'or normalized:', normalizedPhone);
       
       const { data: carrier, error: carrierError } = await supabase
         .from('carriers')
         .select('id, name, whatsapp')
-        .ilike('whatsapp', `%${phoneNumber}%`)
+        .or(`whatsapp.ilike.%${normalizedPhone}%,whatsapp.ilike.%${phoneNumber}%`)
         .maybeSingle();
 
       if (carrierError) {
