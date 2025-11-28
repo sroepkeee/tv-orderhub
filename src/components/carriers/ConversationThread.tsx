@@ -56,7 +56,7 @@ export function ConversationThread({
   };
 
   const orderNumber = extractOrderNumber(firstConv.message_content) || 
-    firstConv.order_id.substring(0, 8);
+    (firstConv.order_id ? firstConv.order_id.substring(0, 8) : null);
 
   // Agrupar mensagens por data e pedido para separadores
   const messagesWithSeparators: Array<{ 
@@ -79,9 +79,12 @@ export function ConversationThread({
     }
     
     // Adicionar separador de pedido (se houver mais de um pedido)
-    const uniqueOrders = new Set(sortedConversations.map(c => c.order_id));
-    if (uniqueOrders.size > 1 && msg.order_id !== lastOrderId) {
-      const msgOrderNumber = extractOrderNumber(msg.message_content) || msg.order_id.substring(0, 8);
+    const uniqueOrders = new Set(
+      sortedConversations.map(c => c.order_id).filter(Boolean)
+    );
+    if (uniqueOrders.size > 1 && msg.order_id && msg.order_id !== lastOrderId) {
+      const msgOrderNumber = extractOrderNumber(msg.message_content) || 
+        (msg.order_id ? msg.order_id.substring(0, 8) : null);
       messagesWithSeparators.push({ 
         type: 'order', 
         orderId: msg.order_id,
