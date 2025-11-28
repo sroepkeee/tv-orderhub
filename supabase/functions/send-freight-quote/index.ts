@@ -81,13 +81,20 @@ async function sendViaMegaApi(
   megaApiInstance: string
 ): Promise<{ success: boolean; messageId?: string; error?: string }> {
   try {
+    // Normalizar URL
+    let baseUrl = megaApiUrl.trim();
+    if (!baseUrl.startsWith('http://') && !baseUrl.startsWith('https://')) {
+      baseUrl = `https://${baseUrl}`;
+    }
+    baseUrl = baseUrl.replace(/\/+$/, '');
+    
     // Formatar número (remover caracteres especiais)
     const cleanNumber = carrierWhatsApp.replace(/\D/g, '');
     const formattedNumber = cleanNumber.startsWith('55') ? cleanNumber : `55${cleanNumber}`;
     
     console.log('Sending via Mega API to:', formattedNumber);
 
-    const response = await fetch(`${megaApiUrl}/rest/sendMessage/${megaApiInstance}`, {
+    const response = await fetch(`${baseUrl}/rest/sendMessage/${megaApiInstance}`, {
       method: 'POST',
       headers: {
         'apikey': megaApiToken,
