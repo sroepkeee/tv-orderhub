@@ -12,7 +12,7 @@ interface ProductionItemsTableProps {
   onOrderClick?: (orderId: string) => void;
 }
 
-type SortField = 'orderNumber' | 'itemCode' | 'deliveryDate' | 'requestedQuantity' | 'item_status' | 'createdAt' | 'daysInSystem' | 'productionOrderNumber';
+type SortField = 'orderNumber' | 'itemCode' | 'deliveryDate' | 'requestedQuantity' | 'item_status' | 'createdAt' | 'daysInSystem' | 'productionOrderNumber' | 'productionReleasedAt';
 type SortDirection = 'asc' | 'desc';
 
 const getItemStatusBadge = (status: string) => {
@@ -69,6 +69,11 @@ export const ProductionItemsTable = ({ items, onOrderClick }: ProductionItemsTab
           const dateA = a.orderIssueDate ? new Date(a.orderIssueDate) : new Date(a.created_at);
           const dateB = b.orderIssueDate ? new Date(b.orderIssueDate) : new Date(b.created_at);
           comparison = dateA.getTime() - dateB.getTime();
+          break;
+        case 'productionReleasedAt':
+          const releasedA = a.production_released_at ? new Date(a.production_released_at) : new Date(0);
+          const releasedB = b.production_released_at ? new Date(b.production_released_at) : new Date(0);
+          comparison = releasedA.getTime() - releasedB.getTime();
           break;
         case 'daysInSystem':
           const refDateA = a.orderIssueDate ? new Date(a.orderIssueDate) : new Date(a.created_at);
@@ -148,6 +153,9 @@ export const ProductionItemsTable = ({ items, onOrderClick }: ProductionItemsTab
               <TableHead className="w-[120px]">
                 <SortButton field="createdAt">Data Pedido</SortButton>
               </TableHead>
+              <TableHead className="w-[120px]">
+                <SortButton field="productionReleasedAt">Data Liberação</SortButton>
+              </TableHead>
               <TableHead className="w-[100px]">
                 <SortButton field="daysInSystem">Dias Sistema</SortButton>
               </TableHead>
@@ -170,7 +178,8 @@ export const ProductionItemsTable = ({ items, onOrderClick }: ProductionItemsTab
                                  differenceInDays(new Date(item.deliveryDate), today) >= 0 &&
                                  item.item_status !== 'completed';
               const orderDate = item.orderIssueDate ? new Date(item.orderIssueDate) : new Date(item.created_at);
-              const daysInSystem = differenceInDays(today, orderDate);
+              const startDate = item.production_released_at ? new Date(item.production_released_at) : orderDate;
+              const daysInSystem = differenceInDays(today, startDate);
               
               return (
                 <TableRow key={item.id} className={isCritical ? 'bg-red-50 dark:bg-red-950/20' : ''}>
@@ -203,6 +212,22 @@ export const ProductionItemsTable = ({ items, onOrderClick }: ProductionItemsTab
                         : format(new Date(item.created_at), 'dd/MM/yyyy', { locale: ptBR })
                       }
                     </span>
+                  </TableCell>
+                  <TableCell>
+                    {item.production_released_at ? (
+                      <div className="flex flex-col">
+                        <span className="text-sm font-medium text-green-600 dark:text-green-400">
+                          {format(new Date(item.production_released_at), 'dd/MM/yyyy', { locale: ptBR })}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          {format(new Date(item.production_released_at), 'HH:mm', { locale: ptBR })}
+                        </span>
+                      </div>
+                    ) : (
+                      <Badge variant="outline" className="text-xs text-orange-600">
+                        Não liberado
+                      </Badge>
+                    )}
                   </TableCell>
                   <TableCell>
                     <span className={`font-semibold ${
