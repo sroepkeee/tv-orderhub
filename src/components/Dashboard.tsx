@@ -102,6 +102,10 @@ export interface Order {
   production_released?: boolean;
   production_released_at?: string;
   production_released_by?: string;
+  // ✨ Campos de área de negócio (RATEIO)
+  cost_center?: string;
+  account_item?: string;
+  business_area?: 'ssm' | 'filial' | 'projetos' | 'ecommerce';
 }
 
 // Mock data
@@ -830,6 +834,12 @@ export const Dashboard = () => {
           shipping_date,
           vehicle_plate,
           driver_name,
+          production_released,
+          production_released_at,
+          production_released_by,
+          cost_center,
+          account_item,
+          business_area,
           order_items (
             id,
             item_code,
