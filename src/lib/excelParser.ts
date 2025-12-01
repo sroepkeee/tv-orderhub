@@ -18,6 +18,9 @@ export interface ParsedOrderData {
     operationCode?: string;
     executiveName?: string;
     shippingDate?: string;
+    costCenter?: string;
+    accountItem?: string;
+    businessArea?: string;
   };
   items: Array<{
     itemNumber: string;

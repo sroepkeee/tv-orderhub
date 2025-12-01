@@ -1180,7 +1180,10 @@ export type Database = {
       }
       orders: {
         Row: {
+          account_item: string | null
+          business_area: string | null
           carrier_name: string | null
+          cost_center: string | null
           created_at: string
           customer_document: string | null
           customer_name: string
@@ -1226,7 +1229,10 @@ export type Database = {
           vehicle_plate: string | null
         }
         Insert: {
+          account_item?: string | null
+          business_area?: string | null
           carrier_name?: string | null
+          cost_center?: string | null
           created_at?: string
           customer_document?: string | null
           customer_name: string
@@ -1272,7 +1278,10 @@ export type Database = {
           vehicle_plate?: string | null
         }
         Update: {
+          account_item?: string | null
+          business_area?: string | null
           carrier_name?: string | null
+          cost_center?: string | null
           created_at?: string
           customer_document?: string | null
           customer_name?: string

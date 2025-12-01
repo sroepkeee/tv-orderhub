@@ -339,6 +339,23 @@ function extractOrderHeader(text: string): ParsedOrderData['orderInfo'] {
     orderInfo.freightValue
   ].filter(Boolean).length;
   
+  // RATEIO - Centro de Custo e Item Conta
+  const rateioMatch = text.match(/RATEIO[\s\S]*?CENTRO\s+CUSTO:?\s*([^\n]+)/i);
+  if (rateioMatch) {
+    orderInfo.costCenter = rateioMatch[1].trim();
+    console.log('✅ Centro Custo:', orderInfo.costCenter);
+  }
+
+  const itemContaMatch = text.match(/ITEM\s+CONTA:?\s*([^\n]+)/i);
+  if (itemContaMatch) {
+    orderInfo.accountItem = itemContaMatch[1].trim();
+    console.log('✅ Item Conta:', orderInfo.accountItem);
+  }
+
+  // Derivar área de negócio automaticamente
+  orderInfo.businessArea = deriveBusinessArea(orderInfo.costCenter, orderInfo.accountItem);
+  console.log('✅ Área de Negócio:', orderInfo.businessArea);
+
   console.log('📊 Resumo da extração:', {
     pedido: !!orderInfo.orderNumber,
     cliente: !!orderInfo.customerName,
@@ -350,11 +367,43 @@ function extractOrderHeader(text: string): ParsedOrderData['orderInfo'] {
     valorFrete: !!orderInfo.freightValue,
     operacao: !!orderInfo.operationCode,
     executivo: !!orderInfo.executiveName,
-    dataEntrega: !!orderInfo.deliveryDate
+    dataEntrega: !!orderInfo.deliveryDate,
+    costCenter: !!orderInfo.costCenter,
+    accountItem: !!orderInfo.accountItem,
+    businessArea: !!orderInfo.businessArea
   });
-  console.log(`✅ Campos extraídos: ${extractedCount}/11`);
+  console.log(`✅ Campos extraídos: ${extractedCount + (orderInfo.costCenter ? 1 : 0) + (orderInfo.accountItem ? 1 : 0)}/13`);
   
   return orderInfo;
+}
+
+/**
+ * Deriva a área de negócio baseada no Centro de Custo e Item Conta
+ */
+function deriveBusinessArea(costCenter?: string, accountItem?: string): string {
+  const combined = `${costCenter || ''} ${accountItem || ''}`.toUpperCase();
+  
+  // E-commerce / Carrinho
+  if (combined.includes('E-COMMERCE') || combined.includes('ECOMMERCE') || combined.includes('CARRINHO')) {
+    return 'ecommerce';
+  }
+  
+  // Filial
+  if (combined.includes('FILIAL')) {
+    return 'filial';
+  }
+  
+  // Projetos / Instalações
+  if (combined.includes('PROJETO') || combined.includes('INSTALAÇÃO') || combined.includes('INSTALACAO')) {
+    return 'projetos';
+  }
+  
+  // SSM / Manutenção / Pós-venda (padrão Customer Service)
+  if (combined.includes('SSM') || combined.includes('CUSTOMER SERVICE') || combined.includes('POS-VENDA') || combined.includes('PÓS-VENDA')) {
+    return 'ssm';
+  }
+  
+  return 'ssm'; // Default
 }
 
 /**

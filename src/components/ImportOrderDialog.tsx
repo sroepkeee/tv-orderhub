@@ -233,7 +233,10 @@ export const ImportOrderDialog = ({
         freight_type: data.orderInfo.freightType || null,
         freight_value: data.orderInfo.freightValue || null,
         operation_code: data.orderInfo.operationCode || null,
-        executive_name: data.orderInfo.executiveName || null
+        executive_name: data.orderInfo.executiveName || null,
+        cost_center: data.orderInfo.costCenter || null,
+        account_item: data.orderInfo.accountItem || null,
+        business_area: data.orderInfo.businessArea || 'ssm'
       }).select().single();
       if (orderError) throw orderError;
       
