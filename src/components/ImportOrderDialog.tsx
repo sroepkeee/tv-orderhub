@@ -9,11 +9,12 @@ import { parsePdfOrder } from "@/lib/pdfParser";
 import { validateOrder, validatePdfOrder, ValidationResult } from "@/lib/orderValidator";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Upload, FileSpreadsheet, CheckCircle2, XCircle, AlertTriangle, Download } from "lucide-react";
+import { Upload, FileSpreadsheet, CheckCircle2, XCircle, AlertTriangle, Download, Database } from "lucide-react";
 import { cleanItemDescription } from "@/lib/utils";
 import { useDuplicateOrderCheck } from "@/hooks/useDuplicateOrderCheck";
 import { DuplicateOrderWarningDialog } from "@/components/DuplicateOrderWarningDialog";
 import { OrderItemsReviewTable } from "@/components/OrderItemsReviewTable";
+import { enrichWithRateioProject, RateioProject } from "@/lib/rateioEnrichment";
 interface ImportOrderDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -36,6 +37,7 @@ export const ImportOrderDialog = ({
     duplicateType: 'totvs' | 'internal' | 'combined' | null;
   }>({ show: false, existingOrder: null, parsedData: null, duplicateType: null });
   const { checkDuplicate, isChecking } = useDuplicateOrderCheck();
+  const [rateioProject, setRateioProject] = useState<RateioProject | null>(null);
   
   // Estados para progresso de parsing de PDF
   const [isParsing, setIsParsing] = useState(false);
@@ -94,6 +96,7 @@ export const ImportOrderDialog = ({
     setParseProgress(0);
     setParseStatus('Iniciando leitura do PDF...');
     setCanAnalyzeComplete(false);
+    setRateioProject(null);
 
     const controller = new AbortController();
     setAbortController(controller);
@@ -109,19 +112,29 @@ export const ImportOrderDialog = ({
         },
       });
       
-      setParsedData(data);
-      const validation = validatePdfOrder(data);
+      // Enriquecer com dados do projeto RATEIO
+      setParseStatus('Buscando projeto RATEIO...');
+      const enrichedData = await enrichWithRateioProject(data);
+      
+      if ((enrichedData as any).rateioProject) {
+        setRateioProject((enrichedData as any).rateioProject);
+        toast.success(`Projeto RATEIO encontrado: ${(enrichedData as any).rateioProject.description}`);
+      }
+      
+      setParsedData(enrichedData);
+      const validation = validatePdfOrder(enrichedData);
       setValidation(validation);
       
       // Aviso se parece ter itens faltando
-      if (data.quality?.expectedCount && data.quality.expectedCount > data.quality.itemsCount) {
+      const quality = (enrichedData as any).quality;
+      if (quality?.expectedCount && quality.expectedCount > quality.itemsCount) {
         toast.warning(
-          `Foram encontrados ${data.quality.itemsCount} itens, mas o PDF indica cerca de ${data.quality.expectedCount}. ` +
+          `Foram encontrados ${quality.itemsCount} itens, mas o PDF indica cerca de ${quality.expectedCount}. ` +
           `Revise o pedido importado, pode haver itens faltando.`
         );
       }
       
-      if (!analyzeComplete && data.items.length === 0) {
+      if (!analyzeComplete && enrichedData.items.length === 0) {
         setCanAnalyzeComplete(true);
         toast.warning('Nenhum item encontrado nas primeiras páginas. Deseja analisar o PDF completo?');
       }
@@ -238,7 +251,8 @@ export const ImportOrderDialog = ({
         cost_center: data.orderInfo.costCenter || null,
         account_item: data.orderInfo.accountItem || null,
         business_unit: data.orderInfo.businessUnit || null,
-        business_area: data.orderInfo.businessArea || 'ssm'
+        business_area: data.orderInfo.businessArea || 'ssm',
+        rateio_project_code: (data.orderInfo as any).rateioProjectCode || null
       }).select().single();
       if (orderError) throw orderError;
       
@@ -631,6 +645,15 @@ export const ImportOrderDialog = ({
                            parsedData.orderInfo.businessArea === 'ecommerce' ? '🛒 Carrinho' :
                            parsedData.orderInfo.businessArea}
                         </Badge>
+                      </div>
+                    )}
+                    {rateioProject && (
+                      <div className="col-span-2 mt-2 p-2 bg-green-50 dark:bg-green-950/30 rounded border border-green-200 dark:border-green-800">
+                        <div className="flex items-center gap-2">
+                          <Database className="h-4 w-4 text-green-600" />
+                          <strong className="text-green-700 dark:text-green-400">Projeto RATEIO:</strong>
+                          <span>{rateioProject.project_code} - {rateioProject.description}</span>
+                        </div>
                       </div>
                     )}
                   </div>

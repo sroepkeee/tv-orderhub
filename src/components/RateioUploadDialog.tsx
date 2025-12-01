@@ -3,13 +3,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
-import { Upload, FileSpreadsheet, CheckCircle2, AlertTriangle, Plus, RefreshCw } from "lucide-react";
+import { Upload, FileSpreadsheet, CheckCircle2, AlertTriangle, Plus, RefreshCw, Database } from "lucide-react";
 import Papa from "papaparse";
 
 interface RateioUploadDialogProps {
@@ -20,15 +17,15 @@ interface RateioUploadDialogProps {
 
 interface RateioCsvRow {
   codigo: string;
-  descricao?: string;
+  descricao: string;
   bu?: string;
   gestao?: string;
 }
 
 interface PreviewRow extends RateioCsvRow {
   exists: boolean;
-  orderId?: string;
-  orderNumber?: string;
+  existingId?: string;
+  derivedArea: string;
 }
 
 // Normalize column names (remove accents, uppercase)
@@ -41,11 +38,12 @@ const normalizeColumnName = (name: string): string => {
 };
 
 // Derive business_area from BU and GESTÃO
-const deriveBusinessAreaFromRateio = (bu?: string, gestao?: string): string => {
+export const deriveBusinessAreaFromRateio = (bu?: string, gestao?: string): string => {
   const combined = `${bu || ''} ${gestao || ''}`.toUpperCase();
   
   if (combined.includes('PAINEIS') || combined.includes('PAINÉIS') || 
-      combined.includes('BOWLING') || combined.includes('ELEVEN')) {
+      combined.includes('BOWLING') || combined.includes('ELEVEN') ||
+      combined.includes('PROJETO')) {
     return 'projetos';
   }
   if (combined.includes('E-COMMERCE') || combined.includes('ECOMMERCE') || 
@@ -59,12 +57,10 @@ const deriveBusinessAreaFromRateio = (bu?: string, gestao?: string): string => {
 };
 
 export const RateioUploadDialog = ({ open, onOpenChange, onSuccess }: RateioUploadDialogProps) => {
-  const { user } = useAuth();
   const [file, setFile] = useState<File | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [preview, setPreview] = useState<PreviewRow[]>([]);
   const [step, setStep] = useState<'upload' | 'preview'>('upload');
-  const [createNewOrders, setCreateNewOrders] = useState(false);
 
   const parseRow = (rawRow: Record<string, string>): RateioCsvRow | null => {
     const normalizedRow: Record<string, string> = {};
@@ -76,31 +72,34 @@ export const RateioUploadDialog = ({ open, onOpenChange, onSuccess }: RateioUplo
     });
 
     const codigo = normalizedRow['CODIGO'] || '';
-    if (!codigo) return null;
+    const descricao = normalizedRow['DESCRICAO'] || '';
+    
+    if (!codigo || !descricao) return null;
 
     return {
       codigo,
-      descricao: normalizedRow['DESCRICAO'] || undefined,
+      descricao,
       bu: normalizedRow['BU'] || undefined,
       gestao: normalizedRow['GESTAO'] || undefined,
     };
   };
 
-  const checkExistingOrders = async (rows: RateioCsvRow[]): Promise<PreviewRow[]> => {
+  const checkExistingProjects = async (rows: RateioCsvRow[]): Promise<PreviewRow[]> => {
     const codes = rows.map(r => r.codigo).filter(Boolean);
     
-    const { data: existingOrders } = await supabase
-      .from('orders')
-      .select('id, order_number, totvs_order_number')
-      .in('totvs_order_number', codes);
+    const { data: existingProjects } = await supabase
+      .from('rateio_projects')
+      .select('id, project_code')
+      .in('project_code', codes);
 
     return rows.map(row => {
-      const existingOrder = existingOrders?.find(o => o.totvs_order_number === row.codigo);
+      const existingProject = existingProjects?.find(p => p.project_code === row.codigo);
+      const derivedArea = deriveBusinessAreaFromRateio(row.bu, row.gestao);
       return {
         ...row,
-        exists: !!existingOrder,
-        orderId: existingOrder?.id,
-        orderNumber: existingOrder?.order_number
+        exists: !!existingProject,
+        existingId: existingProject?.id,
+        derivedArea
       };
     });
   };
@@ -129,19 +128,19 @@ export const RateioUploadDialog = ({ open, onOpenChange, onSuccess }: RateioUplo
             .filter((row): row is RateioCsvRow => row !== null);
           
           if (parsedRows.length === 0) {
-            toast.error("Nenhuma linha válida encontrada no CSV. Verifique se há coluna CÓDIGO.");
+            toast.error("Nenhuma linha válida encontrada. Verifique se há colunas CÓDIGO e DESCRIÇÃO.");
             setIsProcessing(false);
             return;
           }
 
-          const previewRows = await checkExistingOrders(parsedRows);
+          const previewRows = await checkExistingProjects(parsedRows);
           setPreview(previewRows);
           setStep('preview');
           
           const existingCount = previewRows.filter(r => r.exists).length;
           const newCount = previewRows.filter(r => !r.exists).length;
           
-          toast.success(`${parsedRows.length} registro(s) encontrado(s): ${existingCount} existente(s), ${newCount} novo(s)`);
+          toast.success(`${parsedRows.length} projeto(s): ${existingCount} existente(s), ${newCount} novo(s)`);
           setIsProcessing(false);
         },
         error: (error) => {
@@ -157,59 +156,50 @@ export const RateioUploadDialog = ({ open, onOpenChange, onSuccess }: RateioUplo
   };
 
   const handleImport = async () => {
-    if (!preview || preview.length === 0 || !user) return;
+    if (!preview || preview.length === 0) return;
 
     setIsProcessing(true);
 
     try {
       let updated = 0;
       let created = 0;
-      let skipped = 0;
 
       for (const row of preview) {
-        const businessArea = deriveBusinessAreaFromRateio(row.bu, row.gestao);
-        
-        if (row.exists && row.orderId) {
-          // UPDATE existing order
+        if (row.exists && row.existingId) {
+          // UPDATE existing project
           const { error } = await supabase
-            .from('orders')
+            .from('rateio_projects')
             .update({
+              description: row.descricao,
               business_unit: row.bu || null,
-              business_area: businessArea
+              management: row.gestao || null,
+              business_area: row.derivedArea,
+              updated_at: new Date().toISOString()
             })
-            .eq('id', row.orderId);
+            .eq('id', row.existingId);
 
           if (!error) updated++;
-        } else if (createNewOrders) {
-          // CREATE new order
+        } else {
+          // CREATE new project
           const { error } = await supabase
-            .from('orders')
+            .from('rateio_projects')
             .insert({
-              totvs_order_number: row.codigo,
-              order_number: `TOTVS-${row.codigo}`,
-              customer_name: row.descricao || 'Sem descrição',
+              project_code: row.codigo,
+              description: row.descricao,
               business_unit: row.bu || null,
-              business_area: businessArea,
-              status: 'pending',
-              priority: 'medium',
-              delivery_date: new Date().toISOString().split('T')[0],
-              delivery_address: 'A definir',
-              order_type: 'outros',
-              user_id: user.id
+              management: row.gestao || null,
+              business_area: row.derivedArea
             });
 
           if (!error) created++;
-        } else {
-          skipped++;
         }
       }
 
       const messages: string[] = [];
       if (updated > 0) messages.push(`${updated} atualizado(s)`);
       if (created > 0) messages.push(`${created} criado(s)`);
-      if (skipped > 0) messages.push(`${skipped} ignorado(s)`);
 
-      toast.success(`✅ Importação concluída: ${messages.join(', ')}`);
+      toast.success(`✅ Projetos importados: ${messages.join(', ')}`);
       onSuccess();
       onOpenChange(false);
       handleReset();
@@ -224,7 +214,6 @@ export const RateioUploadDialog = ({ open, onOpenChange, onSuccess }: RateioUplo
     setFile(null);
     setPreview([]);
     setStep('upload');
-    setCreateNewOrders(false);
   };
 
   const existingCount = preview.filter(r => r.exists).length;
@@ -235,8 +224,8 @@ export const RateioUploadDialog = ({ open, onOpenChange, onSuccess }: RateioUplo
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <FileSpreadsheet className="h-5 w-5" />
-            Importar RATEIO via CSV
+            <Database className="h-5 w-5" />
+            Cadastrar Projetos (RATEIO)
           </DialogTitle>
         </DialogHeader>
 
@@ -246,12 +235,12 @@ export const RateioUploadDialog = ({ open, onOpenChange, onSuccess }: RateioUplo
             <Alert>
               <AlertTriangle className="h-4 w-4" />
               <AlertDescription>
-                <strong>Formato esperado do CSV:</strong>
+                <strong>Formato do CSV (colunas obrigatórias):</strong>
                 <ul className="list-disc list-inside mt-2 text-sm space-y-1">
-                  <li><code className="bg-muted px-1 rounded">CÓDIGO</code> - Código TOTVS do pedido (obrigatório, para localizar)</li>
-                  <li><code className="bg-muted px-1 rounded">DESCRIÇÃO</code> - Descrição do pedido</li>
-                  <li><code className="bg-muted px-1 rounded">BU</code> - Business Unit (Autoatendimento, Painéis, Bowling, etc.)</li>
-                  <li><code className="bg-muted px-1 rounded">GESTÃO</code> - Área de gestão (SSM, Projetos, Filial, E-commerce)</li>
+                  <li><code className="bg-muted px-1 rounded">CÓDIGO</code> - Código do projeto (ex: 0, 1, 3, 4)</li>
+                  <li><code className="bg-muted px-1 rounded">DESCRIÇÃO</code> - Nome do projeto (ex: PROJETO ESTÁDIO BELÉM)</li>
+                  <li><code className="bg-muted px-1 rounded">BU</code> - Business Unit (Controle de Acessos, Bowling, etc.)</li>
+                  <li><code className="bg-muted px-1 rounded">GESTÃO</code> - Área de gestão (MATRIZ, FILIAL)</li>
                 </ul>
               </AlertDescription>
             </Alert>
@@ -259,10 +248,10 @@ export const RateioUploadDialog = ({ open, onOpenChange, onSuccess }: RateioUplo
             <div className="border-2 border-dashed rounded-lg p-8 text-center">
               <Upload className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
               <h3 className="text-lg font-medium mb-2">
-                Selecione um arquivo CSV
+                Selecione o arquivo CSV de projetos
               </h3>
               <p className="text-sm text-muted-foreground mb-4">
-                O sistema localizará pedidos pelo código TOTVS e atualizará as informações de RATEIO
+                Os projetos serão cadastrados e usados para preencher automaticamente os pedidos durante a importação de PDFs
               </p>
               <Input 
                 type="file" 
@@ -285,28 +274,15 @@ export const RateioUploadDialog = ({ open, onOpenChange, onSuccess }: RateioUplo
         {step === 'preview' && preview.length > 0 && (
           <div className="space-y-4">
             <div className="flex flex-wrap gap-2">
-              <Badge variant="outline" className="bg-green-50 text-green-700 dark:bg-green-950 dark:text-green-300">
-                <CheckCircle2 className="h-3 w-3 mr-1" />
-                {existingCount} existente(s)
+              <Badge variant="outline" className="bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-300">
+                <RefreshCw className="h-3 w-3 mr-1" />
+                {existingCount} a atualizar
               </Badge>
-              <Badge variant="outline" className="bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300">
+              <Badge variant="outline" className="bg-green-50 text-green-700 dark:bg-green-950 dark:text-green-300">
                 <Plus className="h-3 w-3 mr-1" />
                 {newCount} novo(s)
               </Badge>
             </div>
-
-            {newCount > 0 && (
-              <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
-                <Checkbox 
-                  id="createNew" 
-                  checked={createNewOrders}
-                  onCheckedChange={(checked) => setCreateNewOrders(!!checked)}
-                />
-                <Label htmlFor="createNew" className="text-sm cursor-pointer">
-                  Criar novos pedidos para {newCount} código(s) não encontrado(s)
-                </Label>
-              </div>
-            )}
 
             <div className="border rounded-lg overflow-hidden">
               <div className="max-h-80 overflow-y-auto">
@@ -315,46 +291,39 @@ export const RateioUploadDialog = ({ open, onOpenChange, onSuccess }: RateioUplo
                     <tr>
                       <th className="text-left p-2 border-b">Status</th>
                       <th className="text-left p-2 border-b">CÓDIGO</th>
-                      <th className="text-left p-2 border-b">Descrição</th>
+                      <th className="text-left p-2 border-b">DESCRIÇÃO</th>
                       <th className="text-left p-2 border-b">BU</th>
-                      <th className="text-left p-2 border-b">Gestão</th>
-                      <th className="text-left p-2 border-b">Área Derivada</th>
+                      <th className="text-left p-2 border-b">GESTÃO</th>
+                      <th className="text-left p-2 border-b">Área</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {preview.map((row, idx) => {
-                      const derivedArea = deriveBusinessAreaFromRateio(row.bu, row.gestao);
-                      return (
-                        <tr key={idx} className="border-b hover:bg-muted/50">
-                          <td className="p-2">
-                            {row.exists ? (
-                              <Badge variant="outline" className="bg-green-50 text-green-700 dark:bg-green-950 dark:text-green-300 text-xs">
-                                ✅ Atualizar
-                              </Badge>
-                            ) : createNewOrders ? (
-                              <Badge variant="outline" className="bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300 text-xs">
-                                🆕 Criar
-                              </Badge>
-                            ) : (
-                              <Badge variant="outline" className="bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-300 text-xs">
-                                ⏭️ Ignorar
-                              </Badge>
-                            )}
-                          </td>
-                          <td className="p-2 font-mono font-medium">{row.codigo}</td>
-                          <td className="p-2 max-w-[200px] truncate" title={row.descricao}>
-                            {row.descricao || '-'}
-                          </td>
-                          <td className="p-2">{row.bu || '-'}</td>
-                          <td className="p-2">{row.gestao || '-'}</td>
-                          <td className="p-2">
-                            <Badge variant="secondary" className="text-xs">
-                              {derivedArea}
+                    {preview.map((row, idx) => (
+                      <tr key={idx} className="border-b hover:bg-muted/50">
+                        <td className="p-2">
+                          {row.exists ? (
+                            <Badge variant="outline" className="bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-300 text-xs">
+                              🔄 Atualizar
                             </Badge>
-                          </td>
-                        </tr>
-                      );
-                    })}
+                          ) : (
+                            <Badge variant="outline" className="bg-green-50 text-green-700 dark:bg-green-950 dark:text-green-300 text-xs">
+                              🆕 Criar
+                            </Badge>
+                          )}
+                        </td>
+                        <td className="p-2 font-mono font-medium">{row.codigo}</td>
+                        <td className="p-2 max-w-[200px] truncate" title={row.descricao}>
+                          {row.descricao}
+                        </td>
+                        <td className="p-2 text-xs">{row.bu || '-'}</td>
+                        <td className="p-2 text-xs">{row.gestao || '-'}</td>
+                        <td className="p-2">
+                          <Badge variant="secondary" className="text-xs">
+                            {row.derivedArea}
+                          </Badge>
+                        </td>
+                      </tr>
+                    ))}
                   </tbody>
                 </table>
               </div>
@@ -366,7 +335,7 @@ export const RateioUploadDialog = ({ open, onOpenChange, onSuccess }: RateioUplo
               </Button>
               <Button 
                 onClick={handleImport} 
-                disabled={isProcessing || (existingCount === 0 && !createNewOrders)} 
+                disabled={isProcessing} 
                 className="gap-2"
               >
                 {isProcessing ? (
@@ -377,7 +346,7 @@ export const RateioUploadDialog = ({ open, onOpenChange, onSuccess }: RateioUplo
                 ) : (
                   <>
                     <CheckCircle2 className="h-4 w-4" />
-                    Confirmar Importação
+                    Importar {preview.length} Projeto(s)
                   </>
                 )}
               </Button>

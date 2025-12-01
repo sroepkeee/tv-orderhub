@@ -1219,6 +1219,7 @@ export type Database = {
           production_released: boolean | null
           production_released_at: string | null
           production_released_by: string | null
+          rateio_project_code: string | null
           requires_firmware: boolean | null
           requires_image: boolean | null
           shipping_date: string | null
@@ -1269,6 +1270,7 @@ export type Database = {
           production_released?: boolean | null
           production_released_at?: string | null
           production_released_by?: string | null
+          rateio_project_code?: string | null
           requires_firmware?: boolean | null
           requires_image?: boolean | null
           shipping_date?: string | null
@@ -1319,6 +1321,7 @@ export type Database = {
           production_released?: boolean | null
           production_released_at?: string | null
           production_released_by?: string | null
+          rateio_project_code?: string | null
           requires_firmware?: boolean | null
           requires_image?: boolean | null
           shipping_date?: string | null
@@ -1600,6 +1603,42 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      rateio_projects: {
+        Row: {
+          business_area: string | null
+          business_unit: string | null
+          created_at: string | null
+          description: string
+          id: string
+          is_active: boolean | null
+          management: string | null
+          project_code: string
+          updated_at: string | null
+        }
+        Insert: {
+          business_area?: string | null
+          business_unit?: string | null
+          created_at?: string | null
+          description: string
+          id?: string
+          is_active?: boolean | null
+          management?: string | null
+          project_code: string
+          updated_at?: string | null
+        }
+        Update: {
+          business_area?: string | null
+          business_unit?: string | null
+          created_at?: string | null
+          description?: string
+          id?: string
+          is_active?: boolean | null
+          management?: string | null
+          project_code?: string
+          updated_at?: string | null
+        }
+        Relationships: []
       }
       stock_movements: {
         Row: {
