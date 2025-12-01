@@ -1927,6 +1927,7 @@ export type Database = {
         | "production_stock"
         | "in_transit"
         | "purchases"
+        | "carriers_chat"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -2072,6 +2073,7 @@ export const Constants = {
         "production_stock",
         "in_transit",
         "purchases",
+        "carriers_chat",
       ],
     },
   },

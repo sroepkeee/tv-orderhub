@@ -33,6 +33,7 @@ const PHASES = [
   { key: 'logistics', label: 'Expedição' },
   { key: 'in_transit', label: 'Em Trânsito' },
   { key: 'completion', label: 'Conclusão' },
+  { key: 'carriers_chat', label: 'Chat Transportadoras' },
 ];
 
 export const PhasePermissionsMatrix = () => {
