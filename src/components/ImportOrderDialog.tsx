@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { parseExcelOrder, ParsedOrderData } from "@/lib/excelParser";
 import { parsePdfOrder } from "@/lib/pdfParser";
@@ -594,6 +595,48 @@ export const ImportOrderDialog = ({
                 <div><strong>Valor Frete:</strong> R$ {parsedData.orderInfo.freightValue?.toFixed(2) || '0.00'}</div>
                 <div><strong>Total Itens:</strong> {parsedData.items.length}</div>
               </div>
+              
+              {/* Seção RATEIO */}
+              {(parsedData.orderInfo.costCenter || parsedData.orderInfo.accountItem || parsedData.orderInfo.businessUnit || parsedData.orderInfo.executiveName) && (
+                <div className="mt-3 pt-3 border-t">
+                  <h4 className="font-semibold text-sm mb-2 flex items-center gap-2">
+                    📊 Informações de RATEIO
+                  </h4>
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                    {parsedData.orderInfo.executiveName && (
+                      <div><strong>Executivo:</strong> {parsedData.orderInfo.executiveName}</div>
+                    )}
+                    {parsedData.orderInfo.costCenter && (
+                      <div><strong>Centro de Custo:</strong> {parsedData.orderInfo.costCenter}</div>
+                    )}
+                    {parsedData.orderInfo.accountItem && (
+                      <div><strong>Item Conta:</strong> {parsedData.orderInfo.accountItem}</div>
+                    )}
+                    {parsedData.orderInfo.businessUnit && (
+                      <div><strong>B.U.:</strong> {parsedData.orderInfo.businessUnit}</div>
+                    )}
+                    {parsedData.orderInfo.businessArea && (
+                      <div className="col-span-2">
+                        <strong>Área de Negócio:</strong>{' '}
+                        <Badge className={
+                          parsedData.orderInfo.businessArea === 'ssm' ? 'bg-blue-100 text-blue-700' :
+                          parsedData.orderInfo.businessArea === 'projetos' ? 'bg-green-100 text-green-700' :
+                          parsedData.orderInfo.businessArea === 'filial' ? 'bg-orange-100 text-orange-700' :
+                          parsedData.orderInfo.businessArea === 'ecommerce' ? 'bg-purple-100 text-purple-700' :
+                          'bg-gray-100 text-gray-700'
+                        }>
+                          {parsedData.orderInfo.businessArea === 'ssm' ? '🔧 Manutenção' :
+                           parsedData.orderInfo.businessArea === 'projetos' ? '📐 Instalações' :
+                           parsedData.orderInfo.businessArea === 'filial' ? '🏢 Filial' :
+                           parsedData.orderInfo.businessArea === 'ecommerce' ? '🛒 Carrinho' :
+                           parsedData.orderInfo.businessArea}
+                        </Badge>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+              
               {parsedData.orderInfo.notes && <div className="mt-2 pt-2 border-t text-sm">
                   <strong>Observações:</strong> {parsedData.orderInfo.notes}
                 </div>}

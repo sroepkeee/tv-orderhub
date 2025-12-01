@@ -21,6 +21,7 @@ import { DateRangeFilter } from "./DateRangeFilter";
 import { UserMenu } from "./UserMenu";
 import { NotificationCenter } from "./NotificationCenter";
 import { ImportOrderDialog } from "./ImportOrderDialog";
+import { RateioUploadDialog } from "./RateioUploadDialog";
 import { RealtimeIndicator } from "./RealtimeIndicator";
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
@@ -225,6 +226,7 @@ export const Dashboard = () => {
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [unreadConversationsCount, setUnreadConversationsCount] = useState(0);
   const [showImportDialog, setShowImportDialog] = useState(false);
+  const [showRateioDialog, setShowRateioDialog] = useState(false);
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -2006,6 +2008,11 @@ export const Dashboard = () => {
                 <FileSpreadsheet className="h-4 w-4 mr-2" />
                 Importar do TOTVS
               </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => setShowRateioDialog(true)}>
+                <Package className="h-4 w-4 mr-2" />
+                Importar RATEIO (CSV)
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
           
@@ -2137,5 +2144,8 @@ export const Dashboard = () => {
 
       {/* Import Dialog */}
       <ImportOrderDialog open={showImportDialog} onOpenChange={setShowImportDialog} onImportSuccess={queueRefresh} />
+
+      {/* Rateio Upload Dialog */}
+      <RateioUploadDialog open={showRateioDialog} onOpenChange={setShowRateioDialog} onSuccess={queueRefresh} />
     </div>;
 };
