@@ -184,6 +184,7 @@ export const UserRolesDialog = ({ open, onOpenChange, user, onSuccess }: UserRol
     'Comercial': availableRoles.filter(r => r.value === 'freight_quote'),
     'Financeiro': availableRoles.filter(r => ['ready_to_invoice', 'invoicing'].includes(r.value)),
     'Finalização': availableRoles.filter(r => r.value === 'completion'),
+    'Comunicação': availableRoles.filter(r => r.value === 'carriers_chat'),
     'Administração': availableRoles.filter(r => r.value === 'admin'),
   };
 

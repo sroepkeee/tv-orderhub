@@ -17,5 +17,6 @@ export const ROLE_LABELS: Record<string, { name: string; area: string }> = {
   'invoicing': { name: 'Solicitado Faturamento', area: 'Financeiro' },
   'logistics': { name: 'Expedição', area: 'Expedição' },
   'in_transit': { name: 'Em Trânsito', area: 'Expedição' },
-  'completion': { name: 'Conclusão', area: 'Finalização' }
+  'completion': { name: 'Conclusão', area: 'Finalização' },
+  'carriers_chat': { name: 'Chat Transportadoras', area: 'Comunicação' }
 };
