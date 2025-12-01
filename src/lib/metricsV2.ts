@@ -41,7 +41,12 @@ export const calculateProductionStats = (orders: Order[]) => {
   const avgDays = productionOrders.length > 0
     ? Math.round(
         productionOrders.reduce((sum, o) => {
-          const start = o.issueDate ? parseISO(o.issueDate) : parseISO(o.createdDate);
+          // ✨ PRIORIZAR data de liberação de produção quando disponível
+          const start = o.production_released_at 
+            ? parseISO(o.production_released_at)
+            : o.issueDate 
+              ? parseISO(o.issueDate) 
+              : parseISO(o.createdDate);
           return sum + differenceInDays(today, start);
         }, 0) / productionOrders.length
       )
@@ -97,7 +102,12 @@ export const calculatePendingStats = (orders: Order[]) => {
   const avgWaitTime = pendingOrders.length > 0
     ? Math.round(
         pendingOrders.reduce((sum, o) => {
-          const start = o.issueDate ? parseISO(o.issueDate) : parseISO(o.createdDate);
+          // ✨ PRIORIZAR data de liberação quando disponível
+          const start = o.production_released_at 
+            ? parseISO(o.production_released_at)
+            : o.issueDate 
+              ? parseISO(o.issueDate) 
+              : parseISO(o.createdDate);
           return sum + differenceInDays(today, start);
         }, 0) / pendingOrders.length
       )

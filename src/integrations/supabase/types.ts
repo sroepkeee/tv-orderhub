@@ -1212,6 +1212,9 @@ export type Database = {
           package_weight_kg: number | null
           package_width_m: number | null
           priority: string
+          production_released: boolean | null
+          production_released_at: string | null
+          production_released_by: string | null
           requires_firmware: boolean | null
           requires_image: boolean | null
           shipping_date: string | null
@@ -1255,6 +1258,9 @@ export type Database = {
           package_weight_kg?: number | null
           package_width_m?: number | null
           priority: string
+          production_released?: boolean | null
+          production_released_at?: string | null
+          production_released_by?: string | null
           requires_firmware?: boolean | null
           requires_image?: boolean | null
           shipping_date?: string | null
@@ -1298,6 +1304,9 @@ export type Database = {
           package_weight_kg?: number | null
           package_width_m?: number | null
           priority?: string
+          production_released?: boolean | null
+          production_released_at?: string | null
+          production_released_by?: string | null
           requires_firmware?: boolean | null
           requires_image?: boolean | null
           shipping_date?: string | null
