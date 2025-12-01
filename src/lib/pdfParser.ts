@@ -313,12 +313,19 @@ function extractOrderHeader(text: string): ParsedOrderData['orderInfo'] {
     console.log('✅ Código Operação:', orderInfo.operationCode);
   }
   
-  // EXECUTIVO/REPRESENTANTE - Busca em CENTRO CUSTO, ITEM, CONTA ou campos similares
-  // Exemplo: "SSM - CUSTOMER SERVICE" ou "SSM - PAINEIS"
-  const execMatch = text.match(/(?:CENTRO\s+CUSTO|ITEM|CONTA)\s+([A-Z\s\-]+?)(?=\s+(?:PROJETO|POS\s+VENDA|TRANSPORTE|\n\n))/i);
+  // EXECUTIVO/REPRESENTANTE - Buscar campo EXECUTIVO: diretamente
+  // Exemplo: "EXECUTIVO: SSM - PAINEIS"
+  const execMatch = text.match(/EXECUTIVO:?\s*([A-Z0-9\s\-\.]+?)(?=\s*(?:MATRIZ|FILIAL|EMPRESA|ROD|CNPJ|CENTRO\s+CUSTO|\n\n))/i);
   if (execMatch) {
     orderInfo.executiveName = execMatch[1].trim();
     console.log('✅ Executivo:', orderInfo.executiveName);
+  } else {
+    // Fallback: buscar padrão em campos de RATEIO se não encontrar EXECUTIVO:
+    const execFallback = text.match(/(?:CENTRO\s+CUSTO|ITEM|CONTA)\s+([A-Z\s\-]+?)(?=\s+(?:PROJETO|POS\s+VENDA|TRANSPORTE|\n\n))/i);
+    if (execFallback) {
+      orderInfo.executiveName = execFallback[1].trim();
+      console.log('✅ Executivo (fallback):', orderInfo.executiveName);
+    }
   }
   
   // Valores padrão
@@ -369,30 +376,41 @@ function extractOrderHeader(text: string): ParsedOrderData['orderInfo'] {
     console.log('✅ TABELA - Item Conta:', orderInfo.accountItem);
     console.log('✅ TABELA - BU:', orderInfo.businessUnit);
   } else {
-    console.warn('❌ REGEX NÃO ENCONTROU PADRÃO DA TABELA, tentando fallbacks...');
-    // Fallback: buscar padrões individuais se tabela não funcionar
-    const centroCustoMatch = text.match(/(?:SSM|E-COMMERCE|FILIAL|PROJETO)\s*[-–]\s*[A-Z\s]+/i);
+    console.warn('❌ REGEX NÃO ENCONTROU PADRÃO DA TABELA, tentando fallbacks individuais...');
+    
+    // Fallback melhorado: extrair cada campo individualmente
+    // Centro de Custo: captura "SSM - CUSTOMER SERVICE", "PROJETO - CUSTOMER SERVICE", etc.
+    const centroCustoMatch = text.match(/(?:CENTRO\s+(?:DE\s+)?CUSTO)[:\s]*([A-Z0-9\s\-]+?)(?=\s+(?:ITEM|PROJETO|BU|\n))/i);
     if (centroCustoMatch) {
-      orderInfo.costCenter = centroCustoMatch[0].trim();
-      console.log('✅ Centro Custo (fallback):', orderInfo.costCenter);
+      orderInfo.costCenter = centroCustoMatch[1].trim();
+      console.log('✅ Centro Custo (fallback individual):', orderInfo.costCenter);
     }
     
-    const itemContaMatch = text.match(/PROJETO\s+(?:POS\s*VENDA|E-COMMERCE|FILIAL)[^\n]*/i);
+    // Item Conta: captura "PROJETO POS VENDA - CUSTOMER SERVICE", etc.
+    const itemContaMatch = text.match(/ITEM\s+CONTA[:\s]*([A-Z0-9\s\-]+?)(?=\s+(?:BU|Autoatend|Bowling|Pain[ée]|Eleven|Filial|\n))/i);
     if (itemContaMatch) {
-      orderInfo.accountItem = itemContaMatch[0].trim();
-      console.log('✅ Item Conta (fallback):', orderInfo.accountItem);
+      orderInfo.accountItem = itemContaMatch[1].trim();
+      console.log('✅ Item Conta (fallback individual):', orderInfo.accountItem);
+    } else {
+      // Fallback adicional sem "ITEM CONTA"
+      const itemFallback = text.match(/PROJETO\s+(?:POS\s*VENDA|E-COMMERCE|FILIAL)[^\n]*/i);
+      if (itemFallback) {
+        orderInfo.accountItem = itemFallback[0].trim();
+        console.log('✅ Item Conta (fallback genérico):', orderInfo.accountItem);
+      }
     }
     
-    const buMatch = text.match(/(?:Autoatendimento|Bowling|ElevenTickets|Pain[ée]is|Filial)/i);
+    // BU: captura nomes específicos de business units
+    const buMatch = text.match(/\b(Autoatendimento|Bowling|ElevenTickets|Pain[ée]is|Filial)\b/i);
     if (buMatch) {
-      orderInfo.businessUnit = buMatch[0].trim();
-      console.log('✅ BU (fallback):', orderInfo.businessUnit);
+      orderInfo.businessUnit = buMatch[1].trim();
+      console.log('✅ BU (fallback individual):', orderInfo.businessUnit);
     }
   }
 
-  // Derivar área de negócio automaticamente
-  orderInfo.businessArea = deriveBusinessArea(orderInfo.costCenter, orderInfo.accountItem, orderInfo.businessUnit);
-  console.log('🎯 ÁREA DE NEGÓCIO FINAL:', orderInfo.businessArea, '(derivada de:', orderInfo.costCenter, '|', orderInfo.accountItem, '|', orderInfo.businessUnit, ')');
+  // Derivar área de negócio automaticamente (incluindo executiveName como fallback)
+  orderInfo.businessArea = deriveBusinessArea(orderInfo.costCenter, orderInfo.accountItem, orderInfo.businessUnit, orderInfo.executiveName);
+  console.log('🎯 ÁREA DE NEGÓCIO FINAL:', orderInfo.businessArea, '(derivada de CC:', orderInfo.costCenter, '| IC:', orderInfo.accountItem, '| BU:', orderInfo.businessUnit, '| Exec:', orderInfo.executiveName, ')');
 
   console.log('📊 Resumo da extração:', {
     pedido: !!orderInfo.orderNumber,
@@ -417,10 +435,10 @@ function extractOrderHeader(text: string): ParsedOrderData['orderInfo'] {
 }
 
 /**
- * Deriva a área de negócio baseada no Centro de Custo, Item Conta e BU
+ * Deriva a área de negócio baseada no Centro de Custo, Item Conta, BU e Executivo
  */
-function deriveBusinessArea(costCenter?: string, accountItem?: string, businessUnit?: string): string {
-  const combined = `${costCenter || ''} ${accountItem || ''} ${businessUnit || ''}`.toUpperCase();
+function deriveBusinessArea(costCenter?: string, accountItem?: string, businessUnit?: string, executiveName?: string): string {
+  const combined = `${costCenter || ''} ${accountItem || ''} ${businessUnit || ''} ${executiveName || ''}`.toUpperCase();
   
   // E-commerce / Carrinho
   if (combined.includes('E-COMMERCE') || combined.includes('ECOMMERCE') || combined.includes('CARRINHO')) {
@@ -433,10 +451,14 @@ function deriveBusinessArea(costCenter?: string, accountItem?: string, businessU
   }
   
   // Projetos / Instalações (baseado em BUs específicas ou palavras-chave)
+  // IMPORTANTE: Painéis = Projetos (área de instalações)
+  if (combined.includes('PAINEIS') || combined.includes('PAINÉIS')) {
+    return 'projetos';
+  }
   if (combined.includes('PROJETO') && !combined.includes('POS VENDA') && !combined.includes('POS-VENDA') && !combined.includes('PÓS-VENDA')) {
     return 'projetos';
   }
-  if (combined.includes('ELEVEN') || combined.includes('BOWLING') || combined.includes('PAINEIS') || combined.includes('PAINÉIS')) {
+  if (combined.includes('ELEVEN') || combined.includes('BOWLING')) {
     return 'projetos';
   }
   
