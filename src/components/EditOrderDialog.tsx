@@ -129,6 +129,10 @@ export const EditOrderDialog = ({
   } | null>(null);
   const [isChangingStatus, setIsChangingStatus] = useState(false);
   const [isSavingShipping, setIsSavingShipping] = useState(false);
+  
+  // ✨ Estados para "Liberado Produção"
+  const [productionReleased, setProductionReleased] = useState(false);
+  const [productionReleasedAt, setProductionReleasedAt] = useState<string | null>(null);
 
   // ✨ Estados para lazy loading de abas
   const [loadedTabs, setLoadedTabs] = useState<Set<string>>(new Set(['edit']));
@@ -610,6 +614,10 @@ export const EditOrderDialog = ({
         carrier_name: (order as any).carrier_name ?? null,
         tracking_code: (order as any).tracking_code ?? null
       };
+      
+      // ✨ Inicializar estado de "Liberado Produção"
+      setProductionReleased((order as any).production_released || false);
+      setProductionReleasedAt((order as any).production_released_at || null);
 
       // ✅ OTIMIZAÇÃO 1: Usar items já carregados se disponíveis
       if (order.items && order.items.length > 0) {
@@ -1627,6 +1635,63 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
       setDeleting(false);
     }
   };
+  
+  // ✨ Handler para liberar pedido para produção
+  const handleProductionRelease = async (checked: boolean | string) => {
+    if (typeof checked === 'string') return; // Ignorar eventos de indeterminate
+    if (!checked || productionReleased) return; // Só permite marcar uma vez
+    
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Usuário não autenticado');
+      
+      const now = new Date().toISOString();
+      
+      // Atualizar no banco
+      const { error } = await supabase
+        .from('orders')
+        .update({
+          production_released: true,
+          production_released_at: now,
+          production_released_by: user.id
+        })
+        .eq('id', order.id);
+        
+      if (error) throw error;
+      
+      // Registrar no histórico
+      await supabase.from('order_changes').insert({
+        order_id: order.id,
+        changed_by: user.id,
+        field_name: 'production_released',
+        old_value: 'false',
+        new_value: 'true',
+        change_type: 'update',
+        change_category: 'production_release'
+      });
+      
+      // Atualizar estado local
+      setProductionReleased(true);
+      setProductionReleasedAt(now);
+      
+      toast({
+        title: "✅ Liberado para Produção",
+        description: "Os indicadores agora consideram esta data como início de produção.",
+        duration: 5000
+      });
+      
+      // Recarregar histórico
+      loadHistory();
+    } catch (error: any) {
+      console.error('Erro ao liberar produção:', error);
+      toast({
+        title: "Erro ao liberar produção",
+        description: error?.message || "Não foi possível salvar.",
+        variant: "destructive"
+      });
+    }
+  };
+  
   const onSubmit = async (data: Order) => {
     console.log('💾 [INICIO] Salvando pedido com dados:', data);
     try {
@@ -2048,6 +2113,30 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                     <Input {...register("deliveryDeadline", {
                       required: true
                     })} type="date" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Liberado Produção</Label>
+                    <div className="flex items-center gap-2 pt-2">
+                      <Checkbox 
+                        checked={productionReleased}
+                        onCheckedChange={handleProductionRelease}
+                        disabled={productionReleased}
+                      />
+                      <span className={cn(
+                        "text-sm",
+                        productionReleased ? "text-green-600 dark:text-green-400 font-medium" : "text-muted-foreground"
+                      )}>
+                        {productionReleased && productionReleasedAt
+                          ? `Liberado em ${format(new Date(productionReleasedAt), 'dd/MM/yyyy HH:mm')}`
+                          : 'Marcar para liberar'
+                        }
+                      </span>
+                    </div>
+                    {productionReleased && (
+                      <p className="text-xs text-muted-foreground">
+                        Indicadores de produção calculados a partir desta data
+                      </p>
+                    )}
                   </div>
                 </div>
 

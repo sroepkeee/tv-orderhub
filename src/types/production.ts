@@ -23,6 +23,7 @@ export interface ProductionItem {
   purchase_action_started_at?: string;
   purchase_action_started_by?: string;
   production_order_number?: string;
+  production_released_at?: string;
 }
 
 export interface ProductionStats {

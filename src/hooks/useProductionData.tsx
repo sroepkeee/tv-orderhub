@@ -16,7 +16,9 @@ export const useProductionData = () => {
             order_number,
             customer_name,
             status,
-            issue_date
+            issue_date,
+            production_released,
+            production_released_at
           )
         `)
         .not('orders.status', 'in', '(delivered,completed,cancelled)')
@@ -50,6 +52,7 @@ export const useProductionData = () => {
         purchase_action_started_at: item.purchase_action_started_at,
         purchase_action_started_by: item.purchase_action_started_by,
         production_order_number: item.production_order_number,
+        production_released_at: item.orders.production_released_at,
       })) as ProductionItem[];
     },
     staleTime: 30000, // 30 segundos

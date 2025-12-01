@@ -251,7 +251,10 @@ export default function Production() {
               const avgDays = productionItems.length > 0
                 ? Math.round(
                     productionItems.reduce((sum, i) => {
-                      const start = new Date(i.created_at);
+                      // ✨ USAR production_released_at quando disponível
+                      const start = i.production_released_at 
+                        ? new Date(i.production_released_at)
+                        : new Date(i.created_at);
                       return sum + differenceInDays(today, start);
                     }, 0) / productionItems.length
                   )
@@ -277,7 +280,10 @@ export default function Production() {
               const avgTime = pendingItems.length > 0
                 ? Math.round(
                     pendingItems.reduce((sum, i) => {
-                      const start = new Date(i.created_at);
+                      // ✨ USAR production_released_at quando disponível
+                      const start = i.production_released_at 
+                        ? new Date(i.production_released_at)
+                        : new Date(i.created_at);
                       return sum + differenceInDays(today, start);
                     }, 0) / pendingItems.length
                   )

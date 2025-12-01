@@ -98,6 +98,10 @@ export interface Order {
   package_width_m?: number;
   package_length_m?: number;
   updatedAt?: string;
+  // ✨ Campos de liberação de produção
+  production_released?: boolean;
+  production_released_at?: string;
+  production_released_by?: string;
 }
 
 // Mock data
