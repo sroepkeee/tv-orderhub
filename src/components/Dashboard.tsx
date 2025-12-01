@@ -108,6 +108,7 @@ export interface Order {
   account_item?: string;
   business_unit?: string;
   business_area?: 'ssm' | 'filial' | 'projetos' | 'ecommerce';
+  rateio_project_code?: string;
 }
 
 // Mock data
@@ -498,7 +499,13 @@ export const Dashboard = () => {
             items,
             userId: data.user_id,
             notes: data.notes,
-            createdAt: data.created_at
+            createdAt: data.created_at,
+            // Campos RATEIO
+            cost_center: data.cost_center || null,
+            account_item: data.account_item || null,
+            business_unit: data.business_unit || null,
+            business_area: data.business_area || null,
+            rateio_project_code: data.rateio_project_code || null
           } as Order;
           
           if (index === -1) {
@@ -844,6 +851,7 @@ export const Dashboard = () => {
           account_item,
           business_unit,
           business_area,
+          rateio_project_code,
           order_items (
             id,
             item_code,
@@ -1113,7 +1121,13 @@ export const Dashboard = () => {
           shipping_date: dbOrder.shipping_date || null,
           vehicle_plate: dbOrder.vehicle_plate || null,
           driver_name: dbOrder.driver_name || null,
-          updatedAt: dbOrder.updated_at || undefined
+          updatedAt: dbOrder.updated_at || undefined,
+          // Campos RATEIO
+          cost_center: dbOrder.cost_center || null,
+          account_item: dbOrder.account_item || null,
+          business_unit: dbOrder.business_unit || null,
+          business_area: dbOrder.business_area || null,
+          rateio_project_code: dbOrder.rateio_project_code || null
         };
       });
 
@@ -1520,7 +1534,11 @@ export const Dashboard = () => {
         carrier_name: (updatedOrder as any).carrier_name || null,
         freight_type: (updatedOrder as any).freight_type || null,
         freight_value: (updatedOrder as any).freight_value || null,
-        tracking_code: (updatedOrder as any).tracking_code || null
+        tracking_code: (updatedOrder as any).tracking_code || null,
+        // Campos de RATEIO
+        rateio_project_code: (updatedOrder as any).rateio_project_code || null,
+        business_unit: (updatedOrder as any).business_unit || null,
+        business_area: (updatedOrder as any).business_area || null
       }).eq('id', updatedOrder.id).select('id').single();
       if (orderError) throw orderError;
       if (!updatedRow) throw new Error("Sem permissão para atualizar este pedido.");
