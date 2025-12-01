@@ -340,24 +340,36 @@ function extractOrderHeader(text: string): ParsedOrderData['orderInfo'] {
   ].filter(Boolean).length;
   
   // RATEIO - Extrai Centro de Custo, Item Conta e BU da tabela
+  console.log('🔍 INICIANDO EXTRAÇÃO RATEIO...');
+  
+  // Extrair toda a seção RATEIO para debug
+  const rateioDebugMatch = text.match(/RATEIO[\s\S]{0,300}/i);
+  if (rateioDebugMatch) {
+    console.log('📄 Seção RATEIO encontrada (primeiros 300 caracteres):', rateioDebugMatch[0]);
+  } else {
+    console.warn('⚠️ Palavra "RATEIO" não encontrada no PDF!');
+  }
+  
   // Padrão: linha após cabeçalhos contém os valores (ex: "SSM - CUSTOMER SERVICE    PROJETO POS VENDA - CUSTOMER SERVICE    Autoatendimento")
   const rateioSectionMatch = text.match(/RATEIO[\s\S]{0,200}?(?:Centro\s+de\s+custo|Centro\s+Custo)[\s\S]{0,50}?(?:Item\s+conta)[\s\S]{0,50}?(?:BU)[\s\S]{0,10}?\n([^\n]+)/i);
   
   if (rateioSectionMatch) {
     const rateioLine = rateioSectionMatch[1].trim();
-    console.log('📋 Linha RATEIO bruta:', rateioLine);
+    console.log('✅ REGEX MATCH! Linha RATEIO bruta:', rateioLine);
     
     // Tentar separar os valores (geralmente separados por múltiplos espaços)
     const parts = rateioLine.split(/\s{2,}/); // 2+ espaços como separador
+    console.log('📊 Partes separadas:', parts.length, '|', parts);
     
     if (parts.length >= 1) orderInfo.costCenter = parts[0].trim();
     if (parts.length >= 2) orderInfo.accountItem = parts[1].trim();
     if (parts.length >= 3) orderInfo.businessUnit = parts[2].trim();
     
-    console.log('✅ Centro Custo:', orderInfo.costCenter);
-    console.log('✅ Item Conta:', orderInfo.accountItem);
-    console.log('✅ BU:', orderInfo.businessUnit);
+    console.log('✅ TABELA - Centro Custo:', orderInfo.costCenter);
+    console.log('✅ TABELA - Item Conta:', orderInfo.accountItem);
+    console.log('✅ TABELA - BU:', orderInfo.businessUnit);
   } else {
+    console.warn('❌ REGEX NÃO ENCONTROU PADRÃO DA TABELA, tentando fallbacks...');
     // Fallback: buscar padrões individuais se tabela não funcionar
     const centroCustoMatch = text.match(/(?:SSM|E-COMMERCE|FILIAL|PROJETO)\s*[-–]\s*[A-Z\s]+/i);
     if (centroCustoMatch) {
@@ -380,7 +392,7 @@ function extractOrderHeader(text: string): ParsedOrderData['orderInfo'] {
 
   // Derivar área de negócio automaticamente
   orderInfo.businessArea = deriveBusinessArea(orderInfo.costCenter, orderInfo.accountItem, orderInfo.businessUnit);
-  console.log('✅ Área de Negócio:', orderInfo.businessArea);
+  console.log('🎯 ÁREA DE NEGÓCIO FINAL:', orderInfo.businessArea, '(derivada de:', orderInfo.costCenter, '|', orderInfo.accountItem, '|', orderInfo.businessUnit, ')');
 
   console.log('📊 Resumo da extração:', {
     pedido: !!orderInfo.orderNumber,
