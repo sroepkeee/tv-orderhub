@@ -12,7 +12,7 @@ import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Calendar, User, FileText, CheckCircle, XCircle, Clock, History, Edit, Plus, Trash2, Loader2, MessageSquare, Download, Package, AlertCircle, BarChart3, Settings, Image as ImageIcon, File, FileSpreadsheet, ChevronDown, Send, Truck, Save, ShoppingCart, Factory, Info } from "lucide-react";
+import { Calendar, User, FileText, CheckCircle, XCircle, Clock, History, Edit, Plus, Trash2, Loader2, MessageSquare, Download, Package, AlertCircle, BarChart3, Settings, Image as ImageIcon, File, FileSpreadsheet, ChevronDown, Send, Truck, Save, ShoppingCart, Factory, Info, Building2, Wrench, Ruler } from "lucide-react";
 import { useForm, Controller } from "react-hook-form";
 import { useQueryClient } from "@tanstack/react-query";
 import { Order } from "./Dashboard";
@@ -2171,6 +2171,50 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                     </p>
                   </div>
                 </div>
+
+                {/* Seção RATEIO - Informações de Centro de Custo e Área de Negócio */}
+                {(order.cost_center || order.account_item || order.business_unit || order.business_area) && (
+                  <Card className="p-4 border-dashed border-blue-200 dark:border-blue-800 bg-blue-50/30 dark:bg-blue-950/20">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Building2 className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                      <h4 className="font-semibold text-sm text-blue-900 dark:text-blue-100">Informações de RATEIO</h4>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <div>
+                        <Label className="text-xs text-muted-foreground">Centro de Custo</Label>
+                        <p className="text-sm font-medium mt-1">{order.cost_center || '-'}</p>
+                      </div>
+                      <div>
+                        <Label className="text-xs text-muted-foreground">Item Conta</Label>
+                        <p className="text-sm font-medium mt-1">{order.account_item || '-'}</p>
+                      </div>
+                      <div>
+                        <Label className="text-xs text-muted-foreground">Business Unit</Label>
+                        <p className="text-sm font-medium mt-1">{order.business_unit || '-'}</p>
+                      </div>
+                      <div>
+                        <Label className="text-xs text-muted-foreground">Área de Negócio</Label>
+                        <Badge 
+                          variant="outline" 
+                          className={cn(
+                            "mt-1 gap-1.5",
+                            order.business_area === 'ssm' && "bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-700",
+                            order.business_area === 'filial' && "bg-gray-100 dark:bg-gray-900 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-700",
+                            order.business_area === 'projetos' && "bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300 border-blue-300 dark:border-blue-700",
+                            order.business_area === 'ecommerce' && "bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-300 border-purple-300 dark:border-purple-700"
+                          )}
+                        >
+                          {order.business_area === 'ssm' && <><Wrench className="h-3 w-3" /> Manutenção</>}
+                          {order.business_area === 'filial' && <><Building2 className="h-3 w-3" /> Filial</>}
+                          {order.business_area === 'projetos' && <><Ruler className="h-3 w-3" /> Projetos</>}
+                          {order.business_area === 'ecommerce' && <><ShoppingCart className="h-3 w-3" /> E-commerce</>}
+                          {!order.business_area && 'N/A'}
+                        </Badge>
+                      </div>
+                    </div>
+                  </Card>
+                )}
 
                 <div className="pt-3 border-t">
                   <Label className="text-sm font-medium mb-2 block">Status do Pedido</Label>
