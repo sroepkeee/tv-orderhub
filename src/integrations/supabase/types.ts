@@ -1182,6 +1182,7 @@ export type Database = {
         Row: {
           account_item: string | null
           business_area: string | null
+          business_unit: string | null
           carrier_name: string | null
           cost_center: string | null
           created_at: string
@@ -1231,6 +1232,7 @@ export type Database = {
         Insert: {
           account_item?: string | null
           business_area?: string | null
+          business_unit?: string | null
           carrier_name?: string | null
           cost_center?: string | null
           created_at?: string
@@ -1280,6 +1282,7 @@ export type Database = {
         Update: {
           account_item?: string | null
           business_area?: string | null
+          business_unit?: string | null
           carrier_name?: string | null
           cost_center?: string | null
           created_at?: string

@@ -236,6 +236,7 @@ export const ImportOrderDialog = ({
         executive_name: data.orderInfo.executiveName || null,
         cost_center: data.orderInfo.costCenter || null,
         account_item: data.orderInfo.accountItem || null,
+        business_unit: data.orderInfo.businessUnit || null,
         business_area: data.orderInfo.businessArea || 'ssm'
       }).select().single();
       if (orderError) throw orderError;
