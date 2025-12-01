@@ -105,6 +105,7 @@ export interface Order {
   // ✨ Campos de área de negócio (RATEIO)
   cost_center?: string;
   account_item?: string;
+  business_unit?: string;
   business_area?: 'ssm' | 'filial' | 'projetos' | 'ecommerce';
 }
 
@@ -839,6 +840,7 @@ export const Dashboard = () => {
           production_released_by,
           cost_center,
           account_item,
+          business_unit,
           business_area,
           order_items (
             id,

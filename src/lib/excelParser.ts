@@ -20,6 +20,7 @@ export interface ParsedOrderData {
     shippingDate?: string;
     costCenter?: string;
     accountItem?: string;
+    businessUnit?: string;
     businessArea?: string;
   };
   items: Array<{

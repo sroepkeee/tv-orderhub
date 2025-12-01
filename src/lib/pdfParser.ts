@@ -339,21 +339,47 @@ function extractOrderHeader(text: string): ParsedOrderData['orderInfo'] {
     orderInfo.freightValue
   ].filter(Boolean).length;
   
-  // RATEIO - Centro de Custo e Item Conta
-  const rateioMatch = text.match(/RATEIO[\s\S]*?CENTRO\s+CUSTO:?\s*([^\n]+)/i);
-  if (rateioMatch) {
-    orderInfo.costCenter = rateioMatch[1].trim();
+  // RATEIO - Extrai Centro de Custo, Item Conta e BU da tabela
+  // Padrão: linha após cabeçalhos contém os valores (ex: "SSM - CUSTOMER SERVICE    PROJETO POS VENDA - CUSTOMER SERVICE    Autoatendimento")
+  const rateioSectionMatch = text.match(/RATEIO[\s\S]{0,200}?(?:Centro\s+de\s+custo|Centro\s+Custo)[\s\S]{0,50}?(?:Item\s+conta)[\s\S]{0,50}?(?:BU)[\s\S]{0,10}?\n([^\n]+)/i);
+  
+  if (rateioSectionMatch) {
+    const rateioLine = rateioSectionMatch[1].trim();
+    console.log('📋 Linha RATEIO bruta:', rateioLine);
+    
+    // Tentar separar os valores (geralmente separados por múltiplos espaços)
+    const parts = rateioLine.split(/\s{2,}/); // 2+ espaços como separador
+    
+    if (parts.length >= 1) orderInfo.costCenter = parts[0].trim();
+    if (parts.length >= 2) orderInfo.accountItem = parts[1].trim();
+    if (parts.length >= 3) orderInfo.businessUnit = parts[2].trim();
+    
     console.log('✅ Centro Custo:', orderInfo.costCenter);
-  }
-
-  const itemContaMatch = text.match(/ITEM\s+CONTA:?\s*([^\n]+)/i);
-  if (itemContaMatch) {
-    orderInfo.accountItem = itemContaMatch[1].trim();
     console.log('✅ Item Conta:', orderInfo.accountItem);
+    console.log('✅ BU:', orderInfo.businessUnit);
+  } else {
+    // Fallback: buscar padrões individuais se tabela não funcionar
+    const centroCustoMatch = text.match(/(?:SSM|E-COMMERCE|FILIAL|PROJETO)\s*[-–]\s*[A-Z\s]+/i);
+    if (centroCustoMatch) {
+      orderInfo.costCenter = centroCustoMatch[0].trim();
+      console.log('✅ Centro Custo (fallback):', orderInfo.costCenter);
+    }
+    
+    const itemContaMatch = text.match(/PROJETO\s+(?:POS\s*VENDA|E-COMMERCE|FILIAL)[^\n]*/i);
+    if (itemContaMatch) {
+      orderInfo.accountItem = itemContaMatch[0].trim();
+      console.log('✅ Item Conta (fallback):', orderInfo.accountItem);
+    }
+    
+    const buMatch = text.match(/(?:Autoatendimento|Bowling|ElevenTickets|Pain[ée]is|Filial)/i);
+    if (buMatch) {
+      orderInfo.businessUnit = buMatch[0].trim();
+      console.log('✅ BU (fallback):', orderInfo.businessUnit);
+    }
   }
 
   // Derivar área de negócio automaticamente
-  orderInfo.businessArea = deriveBusinessArea(orderInfo.costCenter, orderInfo.accountItem);
+  orderInfo.businessArea = deriveBusinessArea(orderInfo.costCenter, orderInfo.accountItem, orderInfo.businessUnit);
   console.log('✅ Área de Negócio:', orderInfo.businessArea);
 
   console.log('📊 Resumo da extração:', {
@@ -370,18 +396,19 @@ function extractOrderHeader(text: string): ParsedOrderData['orderInfo'] {
     dataEntrega: !!orderInfo.deliveryDate,
     costCenter: !!orderInfo.costCenter,
     accountItem: !!orderInfo.accountItem,
+    businessUnit: !!orderInfo.businessUnit,
     businessArea: !!orderInfo.businessArea
   });
-  console.log(`✅ Campos extraídos: ${extractedCount + (orderInfo.costCenter ? 1 : 0) + (orderInfo.accountItem ? 1 : 0)}/13`);
+  console.log(`✅ Campos extraídos: ${extractedCount + (orderInfo.costCenter ? 1 : 0) + (orderInfo.accountItem ? 1 : 0) + (orderInfo.businessUnit ? 1 : 0)}/14`);
   
   return orderInfo;
 }
 
 /**
- * Deriva a área de negócio baseada no Centro de Custo e Item Conta
+ * Deriva a área de negócio baseada no Centro de Custo, Item Conta e BU
  */
-function deriveBusinessArea(costCenter?: string, accountItem?: string): string {
-  const combined = `${costCenter || ''} ${accountItem || ''}`.toUpperCase();
+function deriveBusinessArea(costCenter?: string, accountItem?: string, businessUnit?: string): string {
+  const combined = `${costCenter || ''} ${accountItem || ''} ${businessUnit || ''}`.toUpperCase();
   
   // E-commerce / Carrinho
   if (combined.includes('E-COMMERCE') || combined.includes('ECOMMERCE') || combined.includes('CARRINHO')) {
@@ -393,13 +420,16 @@ function deriveBusinessArea(costCenter?: string, accountItem?: string): string {
     return 'filial';
   }
   
-  // Projetos / Instalações
-  if (combined.includes('PROJETO') || combined.includes('INSTALAÇÃO') || combined.includes('INSTALACAO')) {
+  // Projetos / Instalações (baseado em BUs específicas ou palavras-chave)
+  if (combined.includes('PROJETO') && !combined.includes('POS VENDA') && !combined.includes('POS-VENDA') && !combined.includes('PÓS-VENDA')) {
+    return 'projetos';
+  }
+  if (combined.includes('ELEVEN') || combined.includes('BOWLING') || combined.includes('PAINEIS') || combined.includes('PAINÉIS')) {
     return 'projetos';
   }
   
   // SSM / Manutenção / Pós-venda (padrão Customer Service)
-  if (combined.includes('SSM') || combined.includes('CUSTOMER SERVICE') || combined.includes('POS-VENDA') || combined.includes('PÓS-VENDA')) {
+  if (combined.includes('SSM') || combined.includes('CUSTOMER SERVICE') || combined.includes('POS-VENDA') || combined.includes('PÓS-VENDA') || combined.includes('AUTOATENDIMENTO')) {
     return 'ssm';
   }
   
