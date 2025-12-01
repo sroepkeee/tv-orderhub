@@ -35,6 +35,7 @@ import { OrderComments } from "./OrderComments";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useProfilesCache } from "@/hooks/useProfilesCache";
+import { getAllRateioProjects, RateioProject } from "@/hooks/useRateioProjects";
 interface HistoryEvent {
   id: string;
   changed_at: string;
@@ -139,6 +140,11 @@ export const EditOrderDialog = ({
 
   // Estados para controlar seções colapsáveis
   const [labConfigOpen, setLabConfigOpen] = useState(false);
+  
+  // ✨ Estados para seleção de projeto RATEIO
+  const [rateioProjects, setRateioProjects] = useState<RateioProject[]>([]);
+  const [loadingProjects, setLoadingProjects] = useState(false);
+  const [selectedRateioProject, setSelectedRateioProject] = useState<string | null>(null);
   const [freightInfoOpen, setFreightInfoOpen] = useState(false);
 
   // ✨ Estados para rastrear alterações não salvas
@@ -618,6 +624,12 @@ export const EditOrderDialog = ({
       // ✨ Inicializar estado de "Liberado Produção"
       setProductionReleased((order as any).production_released || false);
       setProductionReleasedAt((order as any).production_released_at || null);
+      
+      // ✨ Inicializar projeto RATEIO selecionado
+      setSelectedRateioProject((order as any).rateio_project_code || null);
+      
+      // ✨ Carregar lista de projetos RATEIO
+      loadRateioProjects();
 
       // ✅ OTIMIZAÇÃO 1: Usar items já carregados se disponíveis
       if (order.items && order.items.length > 0) {
@@ -660,6 +672,53 @@ export const EditOrderDialog = ({
       setLoadedTabs(new Set(['edit']));
     }
   }, [open, order, reset]);
+  
+  // ✨ Carregar projetos RATEIO
+  const loadRateioProjects = async () => {
+    setLoadingProjects(true);
+    try {
+      const projects = await getAllRateioProjects();
+      setRateioProjects(projects);
+    } catch (error) {
+      console.error('Erro ao carregar projetos RATEIO:', error);
+    } finally {
+      setLoadingProjects(false);
+    }
+  };
+  
+  // ✨ Handler para mudança de projeto RATEIO
+  const handleRateioProjectChange = (projectCode: string) => {
+    const newValue = projectCode === "none" ? null : projectCode;
+    setSelectedRateioProject(newValue);
+    
+    const project = rateioProjects.find(p => p.project_code === newValue);
+    
+    if (project) {
+      // Atualizar campos relacionados automaticamente
+      setValue('business_unit' as any, project.business_unit);
+      setValue('business_area' as any, project.business_area);
+    }
+    
+    // Marcar como modificado
+    setModifiedFields(prev => new Set([...prev, 'rateio_project']));
+  };
+  
+  // ✨ Obter projeto RATEIO selecionado
+  const getSelectedRateioProject = (): RateioProject | null => {
+    if (!selectedRateioProject) return null;
+    return rateioProjects.find(p => p.project_code === selectedRateioProject) || null;
+  };
+  
+  // ✨ Obter label da área de negócio
+  const getBusinessAreaLabel = (area: string | null | undefined): string => {
+    switch (area) {
+      case 'ssm': return 'Manutenção (SSM)';
+      case 'filial': return 'Filial';
+      case 'projetos': return 'Projetos';
+      case 'ecommerce': return 'E-commerce';
+      default: return 'N/A';
+    }
+  };
 
   // Auto-save para campos de frete com debounce
   useEffect(() => {
@@ -1718,10 +1777,16 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
         console.log('✅ Totais calculados dos volumes:', { total_volumes, total_weight_kg });
       }
 
+      // ✨ Obter dados do projeto RATEIO selecionado
+      const selectedProject = getSelectedRateioProject();
+
       const updatedOrder = {
         ...data,
         id: order.id,
-        items
+        items,
+        rateio_project_code: selectedRateioProject,
+        business_unit: selectedProject?.business_unit || (order as any).business_unit,
+        business_area: selectedProject?.business_area || (order as any).business_area
       };
 
       // ✨ Track ALL field changes for complete history
@@ -2172,49 +2237,95 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                   </div>
                 </div>
 
-                {/* Seção RATEIO - Informações de Centro de Custo e Área de Negócio */}
-                {(order.cost_center || order.account_item || order.business_unit || order.business_area) && (
-                  <Card className="p-4 border-dashed border-blue-200 dark:border-blue-800 bg-blue-50/30 dark:bg-blue-950/20">
-                    <div className="flex items-center gap-2 mb-3">
-                      <Building2 className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                      <h4 className="font-semibold text-sm text-blue-900 dark:text-blue-100">Informações de RATEIO</h4>
+                {/* Seção RATEIO - Seleção de Projeto */}
+                <Card className="p-4 border-dashed border-blue-200 dark:border-blue-800 bg-blue-50/30 dark:bg-blue-950/20">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Building2 className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                    <h4 className="font-semibold text-sm text-blue-900 dark:text-blue-100">Projeto RATEIO</h4>
+                    {modifiedFields.has('rateio_project') && (
+                      <Badge variant="outline" className="text-xs bg-orange-100 text-orange-700 border-orange-300">
+                        Modificado
+                      </Badge>
+                    )}
+                  </div>
+                  
+                  <div className="space-y-3">
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Selecionar Projeto</Label>
+                      <Select 
+                        value={selectedRateioProject || "none"} 
+                        onValueChange={handleRateioProjectChange}
+                        disabled={loadingProjects}
+                      >
+                        <SelectTrigger className="mt-1">
+                          <SelectValue placeholder={loadingProjects ? "Carregando..." : "Selecione um projeto..."} />
+                        </SelectTrigger>
+                        <SelectContent className="max-h-[300px]">
+                          <SelectItem value="none">Nenhum projeto</SelectItem>
+                          {rateioProjects.map(project => (
+                            <SelectItem key={project.id} value={project.project_code}>
+                              <div className="flex items-center gap-2">
+                                <span className="font-mono text-xs bg-muted px-1 rounded">{project.project_code}</span>
+                                <span className="text-sm truncate max-w-[250px]">{project.description}</span>
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                     
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                      <div>
-                        <Label className="text-xs text-muted-foreground">Centro de Custo</Label>
-                        <p className="text-sm font-medium mt-1">{order.cost_center || '-'}</p>
+                    {/* Mostrar informações do projeto selecionado */}
+                    {selectedRateioProject && getSelectedRateioProject() && (
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-3 border-t border-blue-200 dark:border-blue-800">
+                        <div>
+                          <Label className="text-xs text-muted-foreground">Business Unit</Label>
+                          <p className="text-sm font-medium mt-1">{getSelectedRateioProject()?.business_unit || '-'}</p>
+                        </div>
+                        <div>
+                          <Label className="text-xs text-muted-foreground">Gestão</Label>
+                          <p className="text-sm font-medium mt-1">{getSelectedRateioProject()?.management || '-'}</p>
+                        </div>
+                        <div>
+                          <Label className="text-xs text-muted-foreground">Área de Negócio</Label>
+                          <Badge 
+                            variant="outline" 
+                            className={cn(
+                              "mt-1 gap-1.5",
+                              getSelectedRateioProject()?.business_area === 'ssm' && "bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-700",
+                              getSelectedRateioProject()?.business_area === 'filial' && "bg-gray-100 dark:bg-gray-900 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-700",
+                              getSelectedRateioProject()?.business_area === 'projetos' && "bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300 border-blue-300 dark:border-blue-700",
+                              getSelectedRateioProject()?.business_area === 'ecommerce' && "bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-300 border-purple-300 dark:border-purple-700"
+                            )}
+                          >
+                            {getSelectedRateioProject()?.business_area === 'ssm' && <><Wrench className="h-3 w-3" /> Manutenção</>}
+                            {getSelectedRateioProject()?.business_area === 'filial' && <><Building2 className="h-3 w-3" /> Filial</>}
+                            {getSelectedRateioProject()?.business_area === 'projetos' && <><Ruler className="h-3 w-3" /> Projetos</>}
+                            {getSelectedRateioProject()?.business_area === 'ecommerce' && <><ShoppingCart className="h-3 w-3" /> E-commerce</>}
+                            {!getSelectedRateioProject()?.business_area && 'N/A'}
+                          </Badge>
+                        </div>
+                        <div>
+                          <Label className="text-xs text-muted-foreground">Descrição</Label>
+                          <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{getSelectedRateioProject()?.description || '-'}</p>
+                        </div>
                       </div>
-                      <div>
-                        <Label className="text-xs text-muted-foreground">Item Conta</Label>
-                        <p className="text-sm font-medium mt-1">{order.account_item || '-'}</p>
+                    )}
+                    
+                    {/* Mostrar informações legadas se não há projeto selecionado mas tem dados */}
+                    {!selectedRateioProject && (order.cost_center || order.account_item) && (
+                      <div className="grid grid-cols-2 gap-3 pt-3 border-t border-blue-200 dark:border-blue-800">
+                        <div>
+                          <Label className="text-xs text-muted-foreground">Centro de Custo (legado)</Label>
+                          <p className="text-sm font-medium mt-1 text-muted-foreground">{order.cost_center || '-'}</p>
+                        </div>
+                        <div>
+                          <Label className="text-xs text-muted-foreground">Item Conta (legado)</Label>
+                          <p className="text-sm font-medium mt-1 text-muted-foreground">{order.account_item || '-'}</p>
+                        </div>
                       </div>
-                      <div>
-                        <Label className="text-xs text-muted-foreground">Business Unit</Label>
-                        <p className="text-sm font-medium mt-1">{order.business_unit || '-'}</p>
-                      </div>
-                      <div>
-                        <Label className="text-xs text-muted-foreground">Área de Negócio</Label>
-                        <Badge 
-                          variant="outline" 
-                          className={cn(
-                            "mt-1 gap-1.5",
-                            order.business_area === 'ssm' && "bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-700",
-                            order.business_area === 'filial' && "bg-gray-100 dark:bg-gray-900 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-700",
-                            order.business_area === 'projetos' && "bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300 border-blue-300 dark:border-blue-700",
-                            order.business_area === 'ecommerce' && "bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-300 border-purple-300 dark:border-purple-700"
-                          )}
-                        >
-                          {order.business_area === 'ssm' && <><Wrench className="h-3 w-3" /> Manutenção</>}
-                          {order.business_area === 'filial' && <><Building2 className="h-3 w-3" /> Filial</>}
-                          {order.business_area === 'projetos' && <><Ruler className="h-3 w-3" /> Projetos</>}
-                          {order.business_area === 'ecommerce' && <><ShoppingCart className="h-3 w-3" /> E-commerce</>}
-                          {!order.business_area && 'N/A'}
-                        </Badge>
-                      </div>
-                    </div>
-                  </Card>
-                )}
+                    )}
+                  </div>
+                </Card>
 
                 <div className="pt-3 border-t">
                   <Label className="text-sm font-medium mb-2 block">Status do Pedido</Label>
