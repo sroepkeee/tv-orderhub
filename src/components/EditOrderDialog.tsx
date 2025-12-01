@@ -12,7 +12,7 @@ import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Calendar, User, FileText, CheckCircle, XCircle, Clock, History, Edit, Plus, Trash2, Loader2, MessageSquare, Download, Package, AlertCircle, BarChart3, Settings, Image as ImageIcon, File, FileSpreadsheet, ChevronDown, Send, Truck, Save, ShoppingCart, Factory } from "lucide-react";
+import { Calendar, User, FileText, CheckCircle, XCircle, Clock, History, Edit, Plus, Trash2, Loader2, MessageSquare, Download, Package, AlertCircle, BarChart3, Settings, Image as ImageIcon, File, FileSpreadsheet, ChevronDown, Send, Truck, Save, ShoppingCart, Factory, Info } from "lucide-react";
 import { useForm, Controller } from "react-hook-form";
 import { useQueryClient } from "@tanstack/react-query";
 import { Order } from "./Dashboard";
@@ -2114,29 +2114,61 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                       required: true
                     })} type="date" />
                   </div>
-                  <div className="space-y-2">
-                    <Label>Liberado Produção</Label>
-                    <div className="flex items-center gap-2 pt-2">
+                  <div className={cn(
+                    "rounded-lg border-2 p-4 transition-all",
+                    productionReleased 
+                      ? "bg-green-50 dark:bg-green-950/30 border-green-300 dark:border-green-700"
+                      : "bg-amber-50 dark:bg-amber-950/30 border-amber-300 dark:border-amber-700 animate-pulse"
+                  )}>
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <Factory className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+                        <Label className="text-base font-semibold">Liberado Produção</Label>
+                      </div>
+                      <Badge variant={productionReleased ? "default" : "outline"} className={cn(
+                        productionReleased 
+                          ? "bg-green-600 hover:bg-green-600"
+                          : "bg-amber-100 text-amber-700 border-amber-400"
+                      )}>
+                        {productionReleased ? "✓ Liberado" : "⚠ Pendente"}
+                      </Badge>
+                    </div>
+                    
+                    <div className="flex items-center gap-3">
                       <Checkbox 
                         checked={productionReleased}
                         onCheckedChange={handleProductionRelease}
                         disabled={productionReleased}
+                        className={cn(
+                          "h-5 w-5",
+                          productionReleased ? "border-green-600" : "border-amber-500"
+                        )}
                       />
                       <span className={cn(
                         "text-sm",
-                        productionReleased ? "text-green-600 dark:text-green-400 font-medium" : "text-muted-foreground"
+                        productionReleased 
+                          ? "text-green-700 dark:text-green-300 font-medium" 
+                          : "text-amber-700 dark:text-amber-300"
                       )}>
                         {productionReleased && productionReleasedAt
-                          ? `Liberado em ${format(new Date(productionReleasedAt), 'dd/MM/yyyy HH:mm')}`
-                          : 'Marcar para liberar'
+                          ? `Liberado em ${format(new Date(productionReleasedAt), 'dd/MM/yyyy')} às ${format(new Date(productionReleasedAt), 'HH:mm')}`
+                          : 'Clique para liberar para produção'
                         }
                       </span>
                     </div>
-                    {productionReleased && (
-                      <p className="text-xs text-muted-foreground">
-                        Indicadores de produção calculados a partir desta data
-                      </p>
-                    )}
+                    
+                    <p className={cn(
+                      "text-xs mt-2 flex items-center gap-1",
+                      productionReleased 
+                        ? "text-green-600 dark:text-green-400" 
+                        : "text-amber-600 dark:text-amber-400"
+                    )}>
+                      <Info className="h-3 w-3" />
+                      {productionReleased 
+                        ? "Indicadores de produção calculados a partir desta data"
+                        : "Ao marcar, os indicadores de produção começarão a contar a partir desta data"
+                      }
+                    </p>
                   </div>
                 </div>
 
