@@ -436,34 +436,37 @@ function extractOrderHeader(text: string): ParsedOrderData['orderInfo'] {
 
 /**
  * Deriva a área de negócio baseada no Centro de Custo, Item Conta, BU e Executivo
+ * 
+ * Regras de classificação:
+ * - E-commerce: Centro de Custo contém "SSM E-COMMERCE"
+ * - Filial: Centro de Custo contém "FILIAL" ou remetente "IMPLY TECNOLOGIA FILIAL"
+ * - Projetos: Centro de Custo contém "SSM - PROJETOS"
+ * - SSM: Centro de Custo contém "SSM - CUSTOMER SERVICE"
  */
 function deriveBusinessArea(costCenter?: string, accountItem?: string, businessUnit?: string, executiveName?: string): string {
   const combined = `${costCenter || ''} ${accountItem || ''} ${businessUnit || ''} ${executiveName || ''}`.toUpperCase();
   
-  // E-commerce / Carrinho
-  if (combined.includes('E-COMMERCE') || combined.includes('ECOMMERCE') || combined.includes('CARRINHO')) {
+  // E-commerce = SSM E-commerce
+  if (combined.includes('SSM E-COMMERCE') || combined.includes('SSM ECOMMERCE') || combined.includes('SSM - E-COMMERCE')) {
     return 'ecommerce';
   }
   
-  // Filial
+  // Filial = FILIAL no Centro de Custo ou remetente
   if (combined.includes('FILIAL')) {
     return 'filial';
   }
   
-  // Projetos / Instalações (baseado em BUs específicas ou palavras-chave)
-  // IMPORTANTE: Painéis = Projetos (área de instalações)
-  if (combined.includes('PAINEIS') || combined.includes('PAINÉIS')) {
-    return 'projetos';
-  }
-  if (combined.includes('PROJETO') && !combined.includes('POS VENDA') && !combined.includes('POS-VENDA') && !combined.includes('PÓS-VENDA')) {
-    return 'projetos';
-  }
-  if (combined.includes('ELEVEN') || combined.includes('BOWLING')) {
+  // Projetos = SSM - Projetos (Painéis, Bowling, Eleven, etc.)
+  if (combined.includes('SSM - PROJETOS') || combined.includes('SSM PROJETOS') ||
+      combined.includes('PAINEIS') || combined.includes('PAINÉIS') ||
+      combined.includes('BOWLING') || combined.includes('ELEVEN')) {
     return 'projetos';
   }
   
-  // SSM / Manutenção / Pós-venda (padrão Customer Service)
-  if (combined.includes('SSM') || combined.includes('CUSTOMER SERVICE') || combined.includes('POS-VENDA') || combined.includes('PÓS-VENDA') || combined.includes('AUTOATENDIMENTO')) {
+  // SSM = SSM - Customer Service (default)
+  if (combined.includes('SSM - CUSTOMER') || combined.includes('CUSTOMER SERVICE') ||
+      combined.includes('SSM') || combined.includes('AUTOATENDIMENTO') ||
+      combined.includes('POS-VENDA') || combined.includes('PÓS-VENDA') || combined.includes('POS VENDA')) {
     return 'ssm';
   }
   

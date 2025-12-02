@@ -12,19 +12,19 @@ import { ROLE_LABELS } from "@/lib/roleLabels";
 import { cn } from "@/lib/utils";
 
 // Configuração de áreas de negócio
-const BUSINESS_AREA_CONFIG = {
+const BUSINESS_AREA_CONFIG: Record<string, { label: string; icon: typeof Wrench; className: string }> = {
   ssm: { 
-    label: 'Manutenção', 
+    label: 'SSM', 
     icon: Wrench, 
     className: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/50 dark:text-blue-300 dark:border-blue-800' 
   },
   ecommerce: { 
-    label: 'Carrinho', 
+    label: 'E-commerce', 
     icon: ShoppingCart, 
     className: 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/50 dark:text-purple-300 dark:border-purple-800' 
   },
   projetos: { 
-    label: 'Instalações', 
+    label: 'Projetos', 
     icon: Ruler, 
     className: 'bg-green-50 text-green-700 border-green-200 dark:bg-green-950/50 dark:text-green-300 dark:border-green-800' 
   },

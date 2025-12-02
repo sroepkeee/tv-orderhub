@@ -38,21 +38,34 @@ const normalizeColumnName = (name: string): string => {
 };
 
 // Derive business_area from BU and GESTÃO
+// Regras:
+// - E-commerce: SSM E-commerce
+// - Filial: FILIAL
+// - Projetos: SSM - Projetos (Painéis, Bowling, Eleven, etc.)
+// - SSM: SSM - Customer Service (default)
 export const deriveBusinessAreaFromRateio = (bu?: string, gestao?: string): string => {
   const combined = `${bu || ''} ${gestao || ''}`.toUpperCase();
   
-  if (combined.includes('PAINEIS') || combined.includes('PAINÉIS') || 
+  // E-commerce = SSM E-commerce
+  if (combined.includes('SSM E-COMMERCE') || combined.includes('SSM ECOMMERCE') || 
+      combined.includes('E-COMMERCE') || combined.includes('ECOMMERCE')) {
+    return 'ecommerce';
+  }
+  
+  // Filial
+  if (combined.includes('FILIAL')) {
+    return 'filial';
+  }
+  
+  // Projetos = SSM - Projetos (Painéis, Bowling, Eleven, etc.)
+  if (combined.includes('SSM - PROJETOS') || combined.includes('SSM PROJETOS') ||
+      combined.includes('PAINEIS') || combined.includes('PAINÉIS') || 
       combined.includes('BOWLING') || combined.includes('ELEVEN') ||
       combined.includes('PROJETO')) {
     return 'projetos';
   }
-  if (combined.includes('E-COMMERCE') || combined.includes('ECOMMERCE') || 
-      combined.includes('CARRINHO')) {
-    return 'ecommerce';
-  }
-  if (combined.includes('FILIAL')) {
-    return 'filial';
-  }
+  
+  // SSM = SSM - Customer Service (default)
   return 'ssm';
 };
 
