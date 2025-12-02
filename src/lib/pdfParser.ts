@@ -387,15 +387,15 @@ function extractOrderHeader(text: string): ParsedOrderData['orderInfo'] {
     }
     
     // Item Conta: captura "PROJETO POS VENDA - CUSTOMER SERVICE", etc.
-    const itemContaMatch = text.match(/ITEM\s+CONTA[:\s]*([A-Z0-9\s\-]+?)(?=\s+(?:BU|Autoatend|Bowling|Pain[ée]|Eleven|Filial|\n))/i);
+    const itemContaMatch = text.match(/ITEM\s+CONTA[:\s]*([A-Z0-9\s\-]+?)(?=\s+(?:BU|Autoatend|Bowling|Pain[ée]|Eleven|Filial|TRANSPORTE|\n))/i);
     if (itemContaMatch) {
-      orderInfo.accountItem = itemContaMatch[1].trim();
+      orderInfo.accountItem = sanitizeAccountItem(itemContaMatch[1].trim());
       console.log('✅ Item Conta (fallback individual):', orderInfo.accountItem);
     } else {
-      // Fallback adicional sem "ITEM CONTA"
-      const itemFallback = text.match(/PROJETO\s+(?:POS\s*VENDA|E-COMMERCE|FILIAL)[^\n]*/i);
+      // Fallback adicional sem "ITEM CONTA" - limita até CUSTOMER SERVICE ou marcadores
+      const itemFallback = text.match(/PROJETO\s+(?:POS\s*VENDA|E-COMMERCE|FILIAL)(?:\s*-\s*(?:CUSTOMER\s+SERVICE|PROJETOS|E-?COMMERCE))?/i);
       if (itemFallback) {
-        orderInfo.accountItem = itemFallback[0].trim();
+        orderInfo.accountItem = sanitizeAccountItem(itemFallback[0].trim());
         console.log('✅ Item Conta (fallback genérico):', orderInfo.accountItem);
       }
     }
@@ -432,6 +432,43 @@ function extractOrderHeader(text: string): ParsedOrderData['orderInfo'] {
   console.log(`✅ Campos extraídos: ${extractedCount + (orderInfo.costCenter ? 1 : 0) + (orderInfo.accountItem ? 1 : 0) + (orderInfo.businessUnit ? 1 : 0)}/14`);
   
   return orderInfo;
+}
+
+/**
+ * Sanitiza o valor do campo Item Conta, removendo texto extra após marcadores conhecidos
+ */
+function sanitizeAccountItem(value: string): string {
+  if (!value) return value;
+  
+  // Lista de marcadores que indicam fim do campo Item Conta
+  const stopMarkers = [
+    'TRANSPORTE',
+    'TRANSPORTADORA',
+    'SERVICO DE POSTAGEM',
+    'SERVIÇO DE POSTAGEM',
+    'FRETE/TIPO',
+    'FRETE:',
+    'VALOR:',
+    'EMBARQUE:',
+    'OBSERVAÇÃO:',
+    'OBSERVACAO:',
+    'DADOS DE ENTREGA',
+    'CORREIOS',
+    'CENTRALPOST'
+  ];
+  
+  let result = value;
+  const upperResult = result.toUpperCase();
+  
+  for (const marker of stopMarkers) {
+    const idx = upperResult.indexOf(marker);
+    if (idx > 0) {
+      result = result.substring(0, idx).trim();
+      break;
+    }
+  }
+  
+  return result;
 }
 
 /**
