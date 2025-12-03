@@ -130,10 +130,6 @@ export const EditOrderDialog = ({
   const [isChangingStatus, setIsChangingStatus] = useState(false);
   const [isSavingShipping, setIsSavingShipping] = useState(false);
   
-  // ✨ Estados para "Liberado Produção"
-  const [productionReleased, setProductionReleased] = useState(false);
-  const [productionReleasedAt, setProductionReleasedAt] = useState<string | null>(null);
-
   // ✨ Estados para lazy loading de abas
   const [loadedTabs, setLoadedTabs] = useState<Set<string>>(new Set(['edit']));
 
@@ -614,10 +610,6 @@ export const EditOrderDialog = ({
         carrier_name: (order as any).carrier_name ?? null,
         tracking_code: (order as any).tracking_code ?? null
       };
-      
-      // ✨ Inicializar estado de "Liberado Produção"
-      setProductionReleased((order as any).production_released || false);
-      setProductionReleasedAt((order as any).production_released_at || null);
 
       // ✅ OTIMIZAÇÃO 1: Usar items já carregados se disponíveis
       if (order.items && order.items.length > 0) {
@@ -1086,6 +1078,64 @@ export const EditOrderDialog = ({
             });
           }
         }
+      }
+
+      // 🎯 Automação: quando item muda para "awaiting_production", registrar data de liberação
+      if (value === 'awaiting_production') {
+        const { data: { user } } = await supabase.auth.getUser();
+        const now = new Date().toISOString();
+        
+        // 1. Atualizar phase_started_at no ITEM
+        await supabase.from('order_items').update({
+          phase_started_at: now
+        }).eq('id', oldItem.id);
+        
+        // 2. Verificar se pedido já tem production_released_at
+        const { data: orderData } = await supabase
+          .from('orders')
+          .select('production_released_at')
+          .eq('id', order.id)
+          .single();
+        
+        // 3. Se não tem, definir agora (primeiro item a entrar em produção)
+        if (!orderData?.production_released_at && user) {
+          await supabase.from('orders').update({
+            production_released: true,
+            production_released_at: now,
+            production_released_by: user.id
+          }).eq('id', order.id);
+          
+          await supabase.from('order_changes').insert({
+            order_id: order.id,
+            changed_by: user.id,
+            field_name: 'production_released',
+            old_value: 'false',
+            new_value: 'true',
+            change_type: 'update',
+            change_category: 'auto_production_release'
+          });
+          
+          toast({
+            title: "🏭 Liberado para Produção",
+            description: "Data de liberação registrada automaticamente.",
+            duration: 4000
+          });
+        }
+        
+        // Atualizar item local com phase_started_at
+        setItems(prev => prev.map(item => 
+          item.id === oldItem.id 
+            ? { ...item, item_status: value as OrderItem['item_status'], phase_started_at: now }
+            : item
+        ));
+        
+        setOriginalItems(prev => prev.map(item => 
+          item.id === oldItem.id 
+            ? { ...item, item_status: value as OrderItem['item_status'], phase_started_at: now }
+            : item
+        ));
+        
+        return;
       }
 
       // ✨ Atualizar localmente em vez de recarregar do banco
@@ -1660,62 +1710,6 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
     }
   };
   
-  // ✨ Handler para liberar pedido para produção
-  const handleProductionRelease = async (checked: boolean | string) => {
-    if (typeof checked === 'string') return; // Ignorar eventos de indeterminate
-    if (!checked || productionReleased) return; // Só permite marcar uma vez
-    
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Usuário não autenticado');
-      
-      const now = new Date().toISOString();
-      
-      // Atualizar no banco
-      const { error } = await supabase
-        .from('orders')
-        .update({
-          production_released: true,
-          production_released_at: now,
-          production_released_by: user.id
-        })
-        .eq('id', order.id);
-        
-      if (error) throw error;
-      
-      // Registrar no histórico
-      await supabase.from('order_changes').insert({
-        order_id: order.id,
-        changed_by: user.id,
-        field_name: 'production_released',
-        old_value: 'false',
-        new_value: 'true',
-        change_type: 'update',
-        change_category: 'production_release'
-      });
-      
-      // Atualizar estado local
-      setProductionReleased(true);
-      setProductionReleasedAt(now);
-      
-      toast({
-        title: "✅ Liberado para Produção",
-        description: "Os indicadores agora consideram esta data como início de produção.",
-        duration: 5000
-      });
-      
-      // Recarregar histórico
-      loadHistory();
-    } catch (error: any) {
-      console.error('Erro ao liberar produção:', error);
-      toast({
-        title: "Erro ao liberar produção",
-        description: error?.message || "Não foi possível salvar.",
-        variant: "destructive"
-      });
-    }
-  };
-  
   const onSubmit = async (data: Order) => {
     console.log('💾 [INICIO] Salvando pedido com dados:', data);
     try {
@@ -2142,62 +2136,6 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                       required: true
                     })} type="date" />
                   </div>
-                  <div className={cn(
-                    "rounded-lg border-2 p-4 transition-all",
-                    productionReleased 
-                      ? "bg-green-50 dark:bg-green-950/30 border-green-300 dark:border-green-700"
-                      : "bg-amber-50 dark:bg-amber-950/30 border-amber-300 dark:border-amber-700 animate-pulse"
-                  )}>
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center gap-2">
-                        <Factory className="h-5 w-5 text-amber-600 dark:text-amber-400" />
-                        <Label className="text-base font-semibold">Liberado Produção</Label>
-                      </div>
-                      <Badge variant={productionReleased ? "default" : "outline"} className={cn(
-                        productionReleased 
-                          ? "bg-green-600 hover:bg-green-600"
-                          : "bg-amber-100 text-amber-700 border-amber-400"
-                      )}>
-                        {productionReleased ? "✓ Liberado" : "⚠ Pendente"}
-                      </Badge>
-                    </div>
-                    
-                    <div className="flex items-center gap-3">
-                      <Checkbox 
-                        checked={productionReleased}
-                        onCheckedChange={handleProductionRelease}
-                        disabled={productionReleased}
-                        className={cn(
-                          "h-5 w-5",
-                          productionReleased ? "border-green-600" : "border-amber-500"
-                        )}
-                      />
-                      <span className={cn(
-                        "text-sm",
-                        productionReleased 
-                          ? "text-green-700 dark:text-green-300 font-medium" 
-                          : "text-amber-700 dark:text-amber-300"
-                      )}>
-                        {productionReleased && productionReleasedAt
-                          ? `Liberado em ${format(new Date(productionReleasedAt), 'dd/MM/yyyy')} às ${format(new Date(productionReleasedAt), 'HH:mm')}`
-                          : 'Clique para liberar para produção'
-                        }
-                      </span>
-                    </div>
-                    
-                    <p className={cn(
-                      "text-xs mt-2 flex items-center gap-1",
-                      productionReleased 
-                        ? "text-green-600 dark:text-green-400" 
-                        : "text-amber-600 dark:text-amber-400"
-                    )}>
-                      <Info className="h-3 w-3" />
-                      {productionReleased 
-                        ? "Indicadores de produção calculados a partir desta data"
-                        : "Ao marcar, os indicadores de produção começarão a contar a partir desta data"
-                      }
-                    </p>
-                </div>
                 </div>
 
                 {/* Seção RATEIO - 3 Campos Selecionáveis */}
