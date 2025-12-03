@@ -1222,6 +1222,7 @@ export type Database = {
           rateio_project_code: string | null
           requires_firmware: boolean | null
           requires_image: boolean | null
+          sender_company: string | null
           shipping_date: string | null
           status: string
           totvs_order_number: string | null
@@ -1273,6 +1274,7 @@ export type Database = {
           rateio_project_code?: string | null
           requires_firmware?: boolean | null
           requires_image?: boolean | null
+          sender_company?: string | null
           shipping_date?: string | null
           status: string
           totvs_order_number?: string | null
@@ -1324,6 +1326,7 @@ export type Database = {
           rateio_project_code?: string | null
           requires_firmware?: boolean | null
           requires_image?: boolean | null
+          sender_company?: string | null
           shipping_date?: string | null
           status?: string
           totvs_order_number?: string | null

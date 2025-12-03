@@ -109,6 +109,8 @@ export interface Order {
   business_unit?: string;
   business_area?: 'ssm' | 'filial' | 'projetos' | 'ecommerce';
   rateio_project_code?: string;
+  // ✨ Campo de empresa emissora
+  sender_company?: string;
 }
 
 // Mock data
@@ -505,7 +507,9 @@ export const Dashboard = () => {
             account_item: data.account_item || null,
             business_unit: data.business_unit || null,
             business_area: data.business_area || null,
-            rateio_project_code: data.rateio_project_code || null
+            rateio_project_code: data.rateio_project_code || null,
+            // Campo empresa emissora
+            sender_company: data.sender_company || null
           } as Order;
           
           if (index === -1) {
@@ -852,6 +856,7 @@ export const Dashboard = () => {
           business_unit,
           business_area,
           rateio_project_code,
+          sender_company,
           order_items (
             id,
             item_code,
@@ -1127,7 +1132,9 @@ export const Dashboard = () => {
           account_item: dbOrder.account_item || null,
           business_unit: dbOrder.business_unit || null,
           business_area: dbOrder.business_area || null,
-          rateio_project_code: dbOrder.rateio_project_code || null
+          rateio_project_code: dbOrder.rateio_project_code || null,
+          // Campo empresa emissora
+          sender_company: dbOrder.sender_company || null
         };
       });
 
@@ -1538,7 +1545,11 @@ export const Dashboard = () => {
         // Campos de RATEIO
         rateio_project_code: (updatedOrder as any).rateio_project_code || null,
         business_unit: (updatedOrder as any).business_unit || null,
-        business_area: (updatedOrder as any).business_area || null
+        business_area: (updatedOrder as any).business_area || null,
+        cost_center: (updatedOrder as any).cost_center || null,
+        account_item: (updatedOrder as any).account_item || null,
+        // Campo empresa emissora
+        sender_company: (updatedOrder as any).sender_company || null
       }).eq('id', updatedOrder.id).select('id').single();
       if (orderError) throw orderError;
       if (!updatedRow) throw new Error("Sem permissão para atualizar este pedido.");

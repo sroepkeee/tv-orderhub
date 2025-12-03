@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Clock, AlertCircle, GripVertical, Info, ShoppingCart, Wrench, Building2, Ruler } from "lucide-react";
+import { Clock, AlertCircle, GripVertical, Info, ShoppingCart, Wrench, Building2, Ruler, MapPin } from "lucide-react";
 import { Order } from "@/components/Dashboard";
 import { OrderItem } from "@/components/AddOrderDialog";
 import { useDraggable } from "@dnd-kit/core";
@@ -10,6 +10,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { usePhaseInfo } from "@/hooks/usePhaseInfo";
 import { ROLE_LABELS } from "@/lib/roleLabels";
 import { cn } from "@/lib/utils";
+import { getSenderById } from "@/lib/senderOptions";
 
 // Configuração de áreas de negócio
 const BUSINESS_AREA_CONFIG: Record<string, { label: string; icon: typeof Wrench; className: string }> = {
@@ -179,7 +180,7 @@ export const KanbanCard = ({
       {/* Header */}
       <div className="flex items-start justify-between mb-1 pr-5">
         <div className="flex flex-col gap-0.5">
-          <span className="font-bold text-xs flex items-center gap-1">
+          <span className="font-bold text-xs flex items-center gap-1 flex-wrap">
             {isEcommerce && <span className="text-base animate-pulse">🛒</span>}
             #{order.orderNumber}
             
@@ -229,9 +230,25 @@ export const KanbanCard = ({
               </TooltipProvider>
             )}
           </span>
-          <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-muted-foreground/30 text-muted-foreground">
-            {getTypeLabel(order.type)}
-          </Badge>
+          
+          {/* Badge da Empresa Emissora */}
+          <div className="flex items-center gap-1">
+            <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-muted-foreground/30 text-muted-foreground">
+              {getTypeLabel(order.type)}
+            </Badge>
+            {(order as any).sender_company && (() => {
+              const sender = getSenderById((order as any).sender_company);
+              return sender ? (
+                <Badge 
+                  variant="outline" 
+                  className="text-[9px] px-1 py-0 gap-0.5 h-4 bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-300 dark:border-emerald-800"
+                >
+                  <MapPin className="h-2.5 w-2.5" />
+                  {sender.state}
+                </Badge>
+              ) : null;
+            })()}
+          </div>
         </div>
         {order.priority === 'high' && (
           <Badge className="bg-red-500 text-white text-[10px] px-1.5 py-0">

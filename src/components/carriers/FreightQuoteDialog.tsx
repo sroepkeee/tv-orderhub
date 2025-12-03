@@ -18,33 +18,9 @@ import { useOrderTotalValue } from '@/hooks/useOrderTotalValue';
 import { useOrderVolumes } from '@/hooks/useOrderVolumes';
 import { extractCity, extractState } from '@/lib/addressParser';
 import { CarrierManagementDialog } from '@/components/carriers/CarrierManagementDialog';
+import { SENDER_OPTIONS } from '@/lib/senderOptions';
 import type { Order } from '@/components/Dashboard';
 import type { Carrier } from '@/types/carriers';
-
-// Dados dos remetentes disponíveis
-const SENDER_OPTIONS = [{
-  id: 'imply_tech',
-  name: 'IMPLY TECNOLOGIA ELETRÔNICA LTDA.',
-  cnpj: '05.681.400/0001-23',
-  address: 'Rodovia Imply Tecnologia, 1111 (RST 287 KM 105), Bairro Renascença, Santa Cruz do Sul/RS',
-  phone: '(51) 2106-8000',
-  email: 'imply@imply.com'
-}, {
-  id: 'imply_sp',
-  name: 'IMPLY SÃO PAULO',
-  cnpj: '05.681.400/0001-23',
-  // Mesmo CNPJ, filial
-  address: 'Av. Vereador Abel Ferreira, 1844 - Sala 1103, Edifício Anália Business Center, São Paulo/SP, CEP 03340-000',
-  phone: '(51) 2106-8000',
-  email: 'imply@imply.com'
-}, {
-  id: 'imply_rental',
-  name: 'IMPLY RENTAL LOCAÇÃO DE EQUIPAMENTOS E SERVIÇOS LTDA',
-  cnpj: '14.928.256/0001-78',
-  address: 'Rodovia Imply Tecnologia, 1111 (RST 287 KM 105), Bairro Renascença, Santa Cruz do Sul/RS',
-  phone: '(51) 2106-8000',
-  email: 'nfe@imply.com'
-}];
 interface FreightQuoteDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
