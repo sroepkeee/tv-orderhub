@@ -12,7 +12,8 @@ import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Calendar, User, FileText, CheckCircle, XCircle, Clock, History, Edit, Plus, Trash2, Loader2, MessageSquare, Download, Package, AlertCircle, BarChart3, Settings, Image as ImageIcon, File, FileSpreadsheet, ChevronDown, Send, Truck, Save, ShoppingCart, Factory, Info, Building2, Wrench, Ruler } from "lucide-react";
+import { Calendar, User, FileText, CheckCircle, XCircle, Clock, History, Edit, Plus, Trash2, Loader2, MessageSquare, Download, Package, AlertCircle, BarChart3, Settings, Image as ImageIcon, File, FileSpreadsheet, ChevronDown, Send, Truck, Save, ShoppingCart, Factory, Info, Building2, Wrench, Ruler, MapPin } from "lucide-react";
+import { SENDER_OPTIONS, COST_CENTERS, deriveBusinessAreaFromOrder } from "@/lib/senderOptions";
 import { useForm, Controller } from "react-hook-form";
 import { useQueryClient } from "@tanstack/react-query";
 import { Order } from "./Dashboard";
@@ -653,17 +654,10 @@ export const EditOrderDialog = ({
     }
   }, [open, order, reset]);
   
-  // ✨ Derivar business_area automaticamente do Centro de Custo
-  const deriveBusinessAreaFromCostCenter = (costCenter: string): string => {
-    if (!costCenter) return 'ssm';
-    const upper = costCenter.toUpperCase();
-    if (upper.includes('E-COMMERCE')) return 'ecommerce';
-    if (upper.includes('FILIAL')) return 'filial';
-    if (upper.includes('BOWLING') || upper.includes('ELEVENTICKETS') || upper.includes('PAINÉIS') || upper.includes('PAINEIS')) {
-      return 'projetos';
-    }
-    // SSM - Autoatendimento, SSM - Pós Venda → ssm
-    return 'ssm';
+  // ✨ Derivar business_area usando função compartilhada
+  const handleBusinessAreaDerivation = (senderCompany: string | undefined, costCenter: string | undefined) => {
+    const businessArea = deriveBusinessAreaFromOrder(senderCompany, costCenter);
+    setValue('business_area' as any, businessArea);
   };
   
   // ✨ Obter label da área de negócio
@@ -1743,7 +1737,8 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
         business_unit: watch('business_unit' as any) || (order as any).business_unit,
         business_area: watch('business_area' as any) || (order as any).business_area,
         cost_center: watch('cost_center' as any) || (order as any).cost_center,
-        account_item: watch('account_item' as any) || (order as any).account_item
+        account_item: watch('account_item' as any) || (order as any).account_item,
+        sender_company: watch('sender_company' as any) || (order as any).sender_company
       };
 
       // ✨ Track ALL field changes for complete history
@@ -2138,8 +2133,58 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                   </div>
                 </div>
 
-                {/* Seção RATEIO - 3 Campos Selecionáveis */}
+                {/* Seção Empresa Emissora + RATEIO */}
                 <Card className="p-4 border-dashed border-blue-200 dark:border-blue-800 bg-blue-50/30 dark:bg-blue-950/20">
+                  {/* Empresa Emissora */}
+                  <div className="mb-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <MapPin className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                      <h4 className="font-semibold text-sm text-emerald-900 dark:text-emerald-100">Empresa Emissora</h4>
+                    </div>
+                    <Select 
+                      value={(watch('sender_company' as any) || '')} 
+                      onValueChange={(value) => {
+                        const newValue = value === 'none' ? '' : value;
+                        setValue('sender_company' as any, newValue);
+                        // Derivar business_area automaticamente baseado na empresa + centro de custo
+                        handleBusinessAreaDerivation(newValue, watch('cost_center' as any) || '');
+                      }}
+                    >
+                      <SelectTrigger className="bg-white dark:bg-slate-900">
+                        <SelectValue placeholder="Selecionar empresa..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Nenhuma</SelectItem>
+                        {SENDER_OPTIONS.map(sender => (
+                          <SelectItem key={sender.id} value={sender.id}>
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium">{sender.shortName}</span>
+                              <span className="text-xs text-muted-foreground">({sender.state})</span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {watch('sender_company' as any) && (
+                      <div className="mt-2 text-xs text-muted-foreground bg-muted/50 rounded-md p-2">
+                        {(() => {
+                          const sender = SENDER_OPTIONS.find(s => s.id === watch('sender_company' as any));
+                          return sender ? (
+                            <div className="space-y-0.5">
+                              <p className="font-medium">{sender.name}</p>
+                              <p>CNPJ: {sender.cnpj}</p>
+                              <p className="line-clamp-1">{sender.address}</p>
+                            </div>
+                          ) : null;
+                        })()}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Divider */}
+                  <div className="border-t border-blue-200 dark:border-blue-800 my-3" />
+
+                  {/* RATEIO */}
                   <div className="flex items-center gap-2 mb-3">
                     <Building2 className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                     <h4 className="font-semibold text-sm text-blue-900 dark:text-blue-100">RATEIO</h4>
@@ -2174,9 +2219,8 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                         onValueChange={(value) => {
                           const newValue = value === 'none' ? '' : value;
                           setValue('cost_center' as any, newValue);
-                          // Derivar business_area automaticamente
-                          const businessArea = deriveBusinessAreaFromCostCenter(newValue);
-                          setValue('business_area' as any, businessArea);
+                          // Derivar business_area automaticamente baseado na empresa + centro de custo
+                          handleBusinessAreaDerivation(watch('sender_company' as any) || '', newValue);
                         }}
                       >
                         <SelectTrigger className="mt-1">
@@ -2184,12 +2228,11 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="none">Nenhum</SelectItem>
-                          <SelectItem value="SSM - Autoatendimento">SSM - Autoatendimento</SelectItem>
-                          <SelectItem value="SSM - Pós Venda">SSM - Pós Venda</SelectItem>
-                          <SelectItem value="SSM - Bowling">SSM - Bowling</SelectItem>
-                          <SelectItem value="SSM - E-commerce">SSM - E-commerce</SelectItem>
-                          <SelectItem value="SSM - Eleventickets">SSM - Eleventickets</SelectItem>
-                          <SelectItem value="SSM - Painéis">SSM - Painéis</SelectItem>
+                          {COST_CENTERS.map(cc => (
+                            <SelectItem key={cc.code} value={cc.name}>
+                              {cc.name}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     </div>
