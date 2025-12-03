@@ -178,7 +178,12 @@ export const ProductionItemsTable = ({ items, onOrderClick }: ProductionItemsTab
                                  differenceInDays(new Date(item.deliveryDate), today) >= 0 &&
                                  item.item_status !== 'completed';
               const orderDate = item.orderIssueDate ? new Date(item.orderIssueDate) : new Date(item.created_at);
-              const startDate = item.production_released_at ? new Date(item.production_released_at) : orderDate;
+              // Prioridade: phase_started_at do item (quando entrou em produção) > production_released_at do pedido > data do pedido
+              const startDate = item.phase_started_at && item.item_status === 'awaiting_production'
+                ? new Date(item.phase_started_at)
+                : item.production_released_at 
+                  ? new Date(item.production_released_at)
+                  : orderDate;
               const daysInSystem = differenceInDays(today, startDate);
               
               return (
