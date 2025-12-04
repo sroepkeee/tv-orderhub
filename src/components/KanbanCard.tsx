@@ -11,7 +11,7 @@ import { usePhaseInfo } from "@/hooks/usePhaseInfo";
 import { ROLE_LABELS } from "@/lib/roleLabels";
 import { cn } from "@/lib/utils";
 import { getSenderById } from "@/lib/senderOptions";
-
+import { useVisualMode } from "@/hooks/useVisualMode";
 // Configuração de áreas de negócio
 const BUSINESS_AREA_CONFIG: Record<string, { label: string; icon: typeof Wrench; className: string }> = {
   ssm: { 
@@ -55,6 +55,7 @@ export const KanbanCard = ({
 }: KanbanCardProps) => {
   const [clickStart, setClickStart] = useState<number>(0);
   const { getPhaseInfo } = usePhaseInfo();
+  const { isMinimal } = useVisualMode();
   const phaseInfo = getPhaseInfo(order.status);
   
   const {
@@ -182,7 +183,14 @@ export const KanbanCard = ({
     return (
       <div ref={setNodeRef} style={style} className={isDragging ? "dragging" : ""}>
         <Card 
-          className={`relative kanban-card p-1.5 transition-all duration-200 ${!isEcommerce ? getPriorityClass(order.priority) : ''} ${isDragging ? 'cursor-grabbing opacity-50 scale-105 shadow-2xl' : 'cursor-pointer hover:shadow-md hover:scale-[1.01]'} ${isVendasEcommerce ? 'animate-ecommerce-pulse border-[2px]' : ''} ${isAnimating ? 'animate-card-pop-in' : ''}`}
+          className={cn(
+            "relative kanban-card p-1.5 transition-all duration-200",
+            !isEcommerce && !isMinimal && getPriorityClass(order.priority),
+            isMinimal && "border-l border-l-border",
+            isDragging ? 'cursor-grabbing opacity-50 scale-105 shadow-2xl' : 'cursor-pointer hover:shadow-md hover:scale-[1.01]',
+            isVendasEcommerce && !isMinimal && 'animate-ecommerce-pulse border-[2px]',
+            isAnimating && 'animate-card-pop-in'
+          )}
           onClick={handleCardClick}
           onMouseDown={() => setClickStart(Date.now())}
         >
@@ -199,30 +207,56 @@ export const KanbanCard = ({
           
           {/* Line 1: Order number, badges, indicators */}
           <div className="flex items-center gap-1 flex-wrap pr-4">
-            {isEcommerce && <span className="text-xs">🛒</span>}
+            {isEcommerce && !isMinimal && <span className="text-xs">🛒</span>}
             <span className="font-bold text-[10px]">#{order.orderNumber}</span>
             
             {order.business_area && BUSINESS_AREA_CONFIG[order.business_area] && (
-              <Badge variant="outline" className={cn("text-[8px] px-0.5 py-0 h-3", BUSINESS_AREA_CONFIG[order.business_area].className)}>
+              <Badge 
+                variant="outline" 
+                className={cn(
+                  "text-[8px] px-0.5 py-0 h-3",
+                  isMinimal ? "minimal-badge" : BUSINESS_AREA_CONFIG[order.business_area].className
+                )}
+              >
                 {BUSINESS_AREA_CONFIG[order.business_area].label}
               </Badge>
             )}
             
             {sender && (
-              <Badge variant="outline" className="text-[8px] px-0.5 py-0 h-3 bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-300 dark:border-emerald-800">
+              <Badge 
+                variant="outline" 
+                className={cn(
+                  "text-[8px] px-0.5 py-0 h-3",
+                  isMinimal ? "minimal-badge" : "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-300 dark:border-emerald-800"
+                )}
+              >
                 {sender.state}
               </Badge>
             )}
             
-            {/* Source indicators compact */}
-            {sourceCounts.inStock > 0 && <span className="text-[9px] text-muted-foreground">✓{sourceCounts.inStock}</span>}
-            {sourceCounts.outOfStock > 0 && <span className="text-[9px] text-red-500">⚠{sourceCounts.outOfStock}</span>}
-            {purchaseItemsCount > 0 && <span className="text-[9px] text-amber-600">🛒{purchaseItemsCount}</span>}
+            {/* Source indicators compact - text only in minimal */}
+            {sourceCounts.inStock > 0 && (
+              <span className="text-[9px] text-muted-foreground">
+                {isMinimal ? `${sourceCounts.inStock}ok` : `✓${sourceCounts.inStock}`}
+              </span>
+            )}
+            {sourceCounts.outOfStock > 0 && (
+              <span className={cn("text-[9px]", isMinimal ? "text-muted-foreground font-medium" : "text-red-500")}>
+                {isMinimal ? `${sourceCounts.outOfStock}p` : `⚠${sourceCounts.outOfStock}`}
+              </span>
+            )}
+            {purchaseItemsCount > 0 && (
+              <span className={cn("text-[9px]", isMinimal ? "text-muted-foreground" : "text-amber-600")}>
+                {isMinimal ? `${purchaseItemsCount}c` : `🛒${purchaseItemsCount}`}
+              </span>
+            )}
             
             {/* Deadline compact */}
             <span className={cn(
               "text-[9px] font-medium ml-auto",
-              daysRemaining < 0 ? "text-red-500" : daysRemaining <= 2 ? "text-orange-500" : "text-muted-foreground"
+              isMinimal 
+                ? "text-muted-foreground"
+                : daysRemaining < 0 ? "text-red-500" : daysRemaining <= 2 ? "text-orange-500" : "text-muted-foreground"
             )}>
               {daysRemaining < 0 ? `${Math.abs(daysRemaining)}d↓` : daysRemaining === 0 ? "Hoje" : `${daysRemaining}d`}
             </span>
@@ -239,7 +273,14 @@ export const KanbanCard = ({
   
   // Full view rendering (existing)
   return <div ref={setNodeRef} style={style} className={isDragging ? "dragging" : ""}>
-        <Card className={`relative kanban-card p-2 transition-all duration-200 ${!isEcommerce ? getPriorityClass(order.priority) : ''} ${isDragging ? 'cursor-grabbing opacity-50 scale-105 shadow-2xl' : 'cursor-pointer hover:shadow-lg hover:scale-[1.01]'} ${isVendasEcommerce ? 'animate-ecommerce-pulse border-[3px]' : ''} ${isAnimating ? 'animate-card-pop-in' : ''}`} onClick={handleCardClick} onMouseDown={() => setClickStart(Date.now())}>
+        <Card className={cn(
+          "relative kanban-card p-2 transition-all duration-200",
+          !isEcommerce && !isMinimal && getPriorityClass(order.priority),
+          isMinimal && "border-l border-l-border",
+          isDragging ? 'cursor-grabbing opacity-50 scale-105 shadow-2xl' : 'cursor-pointer hover:shadow-lg hover:scale-[1.01]',
+          isVendasEcommerce && !isMinimal && 'animate-ecommerce-pulse border-[3px]',
+          isAnimating && 'animate-card-pop-in'
+        )} onClick={handleCardClick} onMouseDown={() => setClickStart(Date.now())}>
         {/* Selo E-commerce no canto superior direito */}
         {isEcommerce}
         {/* Drag handle */}
@@ -253,7 +294,7 @@ export const KanbanCard = ({
       <div className="flex items-start justify-between mb-1 pr-5">
         <div className="flex flex-col gap-0.5">
           <span className="font-bold text-xs flex items-center gap-1 flex-wrap">
-            {isEcommerce && <span className="text-base animate-pulse">🛒</span>}
+            {isEcommerce && !isMinimal && <span className="text-base animate-pulse">🛒</span>}
             #{order.orderNumber}
             
             {/* Badge de Área de Negócio */}
@@ -262,10 +303,10 @@ export const KanbanCard = ({
                 variant="outline" 
                 className={cn(
                   "text-[9px] px-1 py-0 gap-0.5 h-4",
-                  BUSINESS_AREA_CONFIG[order.business_area].className
+                  isMinimal ? "minimal-badge" : BUSINESS_AREA_CONFIG[order.business_area].className
                 )}
               >
-                {React.createElement(BUSINESS_AREA_CONFIG[order.business_area].icon, { 
+                {!isMinimal && React.createElement(BUSINESS_AREA_CONFIG[order.business_area].icon, { 
                   className: "h-2.5 w-2.5" 
                 })}
                 {BUSINESS_AREA_CONFIG[order.business_area].label}
@@ -313,9 +354,12 @@ export const KanbanCard = ({
               return sender ? (
                 <Badge 
                   variant="outline" 
-                  className="text-[9px] px-1 py-0 gap-0.5 h-4 bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-300 dark:border-emerald-800"
+                  className={cn(
+                    "text-[9px] px-1 py-0 gap-0.5 h-4",
+                    isMinimal ? "minimal-badge" : "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-300 dark:border-emerald-800"
+                  )}
                 >
-                  <MapPin className="h-2.5 w-2.5" />
+                  {!isMinimal && <MapPin className="h-2.5 w-2.5" />}
                   {sender.state}
                 </Badge>
               ) : null;
@@ -323,17 +367,26 @@ export const KanbanCard = ({
           </div>
         </div>
         {order.priority === 'high' && (
-          <Badge className="bg-red-500 text-white text-[10px] px-1.5 py-0">
+          <Badge className={cn(
+            "text-[10px] px-1.5 py-0",
+            isMinimal ? "minimal-badge" : "bg-red-500 text-white"
+          )}>
             Alta
           </Badge>
         )}
         {order.priority === 'medium' && (
-          <Badge variant="outline" className="border-orange-400 text-orange-600 dark:text-orange-400 text-[10px] px-1.5 py-0">
+          <Badge variant="outline" className={cn(
+            "text-[10px] px-1.5 py-0",
+            isMinimal ? "minimal-badge" : "border-orange-400 text-orange-600 dark:text-orange-400"
+          )}>
             Média
           </Badge>
         )}
         {order.priority === 'low' && (
-          <Badge variant="outline" className="border-green-400 text-green-600 dark:text-green-400 text-[10px] px-1.5 py-0">
+          <Badge variant="outline" className={cn(
+            "text-[10px] px-1.5 py-0",
+            isMinimal ? "minimal-badge" : "border-green-400 text-green-600 dark:text-green-400"
+          )}>
             Baixa
           </Badge>
         )}
@@ -348,22 +401,27 @@ export const KanbanCard = ({
           {order.items && order.items.length > 0 ? order.items.map(item => item.itemCode).join(", ") : order.description}
         </p>
         
-        {/* Item Source Indicators - Monochromatic */}
+        {/* Item Source Indicators */}
         {order.items && order.items.length > 0 && (
           <div className="flex gap-2 mt-1 text-[10px] text-muted-foreground flex-wrap">
             {countItemsBySource(order.items).inStock > 0 && (
-              <span>✓ {countItemsBySource(order.items).inStock} estoque</span>
+              <span>{isMinimal ? '' : '✓ '}{countItemsBySource(order.items).inStock} estoque</span>
             )}
             {countItemsBySource(order.items).production > 0 && (
-              <span>⚙ {countItemsBySource(order.items).production} produção</span>
+              <span>{isMinimal ? '' : '⚙ '}{countItemsBySource(order.items).production} produção</span>
             )}
             {countItemsBySource(order.items).outOfStock > 0 && (
-              <span className="text-red-500">⚠ {countItemsBySource(order.items).outOfStock} falta</span>
+              <span className={isMinimal ? "font-medium" : "text-red-500"}>
+                {isMinimal ? '' : '⚠ '}{countItemsBySource(order.items).outOfStock} falta
+              </span>
             )}
             {purchaseItemsCount > 0 && (
-              <Badge variant="outline" className="bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-400 border-amber-300 dark:border-amber-800 gap-1 text-[10px] px-1.5 py-0 h-4">
-                <ShoppingCart className="h-2.5 w-2.5" />
-                {purchaseItemsCount}
+              <Badge variant="outline" className={cn(
+                "gap-1 text-[10px] px-1.5 py-0 h-4",
+                isMinimal ? "minimal-badge" : "bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-400 border-amber-300 dark:border-amber-800"
+              )}>
+                {!isMinimal && <ShoppingCart className="h-2.5 w-2.5" />}
+                {purchaseItemsCount} compra
               </Badge>
             )}
           </div>
@@ -389,12 +447,18 @@ export const KanbanCard = ({
           </span>
         </div>
         <div className="flex items-center gap-1.5">
-          <div className="flex-1 h-1 bg-secondary rounded-full overflow-hidden">
-            <div className={`h-full ${progressBarColor} transition-all`} style={{
+          <div className={cn(
+            "flex-1 h-1 rounded-full overflow-hidden",
+            isMinimal ? "bg-border" : "bg-secondary"
+          )}>
+            <div className={cn(
+              "h-full transition-all",
+              isMinimal ? "bg-muted-foreground" : progressBarColor
+            )} style={{
               width: "100%"
             }} />
           </div>
-          {daysRemaining < 3 && <AlertCircle className="h-3 w-3 text-progress-critical" />}
+          {daysRemaining < 3 && !isMinimal && <AlertCircle className="h-3 w-3 text-progress-critical" />}
         </div>
         <p className="text-[10px] text-center font-medium">
           {daysRemaining < 0 ? `${Math.abs(daysRemaining)}d atraso` : daysRemaining === 0 ? "Hoje" : `${daysRemaining}d`}
