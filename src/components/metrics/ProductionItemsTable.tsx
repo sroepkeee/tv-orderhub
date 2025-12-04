@@ -1,8 +1,8 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ArrowUpDown, ExternalLink, CheckCircle2, XCircle } from "lucide-react";
+import { ArrowUpDown, ExternalLink, CheckCircle2, XCircle, Download } from "lucide-react";
 import { ProductionItem } from "@/types/production";
 import { format, differenceInDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -121,6 +121,87 @@ export const ProductionItemsTable = ({ items, onOrderClick }: ProductionItemsTab
     </Button>
   );
 
+  const getStatusLabel = (status: string) => {
+    const labels: Record<string, string> = {
+      'pending': 'Pendente',
+      'in_stock': 'Em Estoque',
+      'awaiting_production': 'Aguardando Produção',
+      'purchase_required': 'Solicitar Compra',
+      'purchase_requested': 'Solicitado Compra',
+      'completed': 'Concluído',
+    };
+    return labels[status] || status;
+  };
+
+  const exportToCSV = useCallback(() => {
+    const headers = [
+      'Pedido',
+      'Código',
+      'Descrição',
+      'Unidade',
+      'Qtd Solicitada',
+      'Qtd Recebida',
+      'Saldo',
+      'Situação',
+      'Data Pedido',
+      'Data Liberação',
+      'Dias Sistema',
+      'Data Entrega',
+      'Prazo (dias)',
+      'Nº OP',
+      'Data Est. Produção',
+      'Compra OK',
+      'Armazém'
+    ];
+
+    const rows = sortedItems.map((item) => {
+      const balance = item.requestedQuantity - item.deliveredQuantity;
+      const orderDate = item.orderIssueDate ? new Date(item.orderIssueDate) : new Date(item.created_at);
+      const releaseDate = item.phase_started_at || item.production_released_at;
+      const startDate = releaseDate ? new Date(releaseDate) : orderDate;
+      const daysInSystem = differenceInDays(today, startDate);
+      const daysRemaining = differenceInDays(new Date(item.deliveryDate), today);
+
+      return [
+        item.orderNumber,
+        item.itemCode,
+        `"${item.itemDescription.replace(/"/g, '""')}"`, // Escape quotes in description
+        item.unit,
+        item.requestedQuantity,
+        item.deliveredQuantity,
+        balance,
+        getStatusLabel(item.item_status || 'pending'),
+        format(orderDate, 'dd/MM/yyyy'),
+        releaseDate ? format(new Date(releaseDate), 'dd/MM/yyyy HH:mm') : 'Não liberado',
+        daysInSystem,
+        format(new Date(item.deliveryDate), 'dd/MM/yyyy'),
+        daysRemaining,
+        item.production_order_number || '-',
+        item.production_estimated_date ? format(new Date(item.production_estimated_date), 'dd/MM/yyyy') : '-',
+        item.purchase_action_started ? 'Sim' : 'Não',
+        item.warehouse
+      ];
+    });
+
+    const csvContent = [
+      headers.join(';'),
+      ...rows.map(row => row.join(';'))
+    ].join('\n');
+
+    // Add BOM for Excel compatibility with UTF-8
+    const BOM = '\uFEFF';
+    const blob = new Blob([BOM + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    
+    link.setAttribute('href', url);
+    link.setAttribute('download', `itens-producao-${format(new Date(), 'yyyy-MM-dd-HHmm')}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }, [sortedItems, today]);
+
   if (items.length === 0) {
     return (
       <div className="text-center py-12 text-muted-foreground">
@@ -131,6 +212,20 @@ export const ProductionItemsTable = ({ items, onOrderClick }: ProductionItemsTab
 
   return (
     <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <span className="text-sm text-muted-foreground">
+          {sortedItems.length} itens encontrados
+        </span>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={exportToCSV}
+          className="gap-2"
+        >
+          <Download className="h-4 w-4" />
+          Exportar CSV
+        </Button>
+      </div>
       <div className="rounded-md border overflow-x-auto">
         <Table className="min-w-[1600px]">
           <TableHeader>
