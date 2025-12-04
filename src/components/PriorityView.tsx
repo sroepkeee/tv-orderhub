@@ -4,7 +4,7 @@ import { Progress } from "@/components/ui/progress";
 import { Order } from "./Dashboard";
 import { ActionButtons } from "./ActionButtons";
 import { PhaseButtons } from "./PhaseButtons";
-import { ViewControls, SortOption, GroupOption, PhaseFilter, ViewMode, StatusFilter } from "./ViewControls";
+import { ViewControls, SortOption, GroupOption, PhaseFilter, ViewMode, StatusFilter, CardViewMode } from "./ViewControls";
 import { KanbanView } from "./KanbanView";
 import { ClipboardList, PackageCheck, Microscope, Boxes, Truck, CheckCircle2 } from "lucide-react";
 
@@ -35,10 +35,19 @@ export const PriorityView = ({
     const saved = localStorage.getItem("viewMode");
     return (saved as ViewMode) || "kanban";
   });
+  const [cardViewMode, setCardViewMode] = React.useState<CardViewMode>(() => {
+    const saved = localStorage.getItem("cardViewMode");
+    return (saved as CardViewMode) || "full";
+  });
 
   const handleViewModeChange = (mode: ViewMode) => {
     setViewMode(mode);
     localStorage.setItem("viewMode", mode);
+  };
+  
+  const handleCardViewModeChange = (mode: CardViewMode) => {
+    setCardViewMode(mode);
+    localStorage.setItem("cardViewMode", mode);
   };
 
   // Phase mapping helper
@@ -431,12 +440,14 @@ export const PriorityView = ({
         phaseFilter={phaseFilter}
         statusFilter={statusFilter}
         viewMode={viewMode}
+        cardViewMode={cardViewMode}
         orders={sortedOrders}
         onSortChange={setSortBy}
         onGroupChange={setGroupBy}
         onPhaseFilterChange={setPhaseFilter}
         onStatusFilterChange={setStatusFilter}
         onViewModeChange={handleViewModeChange}
+        onCardViewModeChange={handleCardViewModeChange}
       />
       
       {/* Orders Display */}
@@ -445,6 +456,7 @@ export const PriorityView = ({
           orders={sortedOrders}
           onEdit={(order) => onRowClick ? onRowClick(order) : onEdit(order)}
           onStatusChange={onStatusChange}
+          cardViewMode={cardViewMode}
         />
       ) : (
         <>

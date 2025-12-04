@@ -8,6 +8,7 @@ import { useDroppable } from "@dnd-kit/core";
 import { Phase } from "./KanbanView";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useNavigate } from "react-router-dom";
+import { CardViewMode } from "./KanbanCard";
 interface KanbanColumnProps {
   id: Phase;
   title: string;
@@ -26,6 +27,7 @@ interface KanbanColumnProps {
   canDrag?: boolean;
   linkTo?: string;
   animatedCardIds?: Set<string>;
+  cardViewMode?: CardViewMode;
 }
 export const KanbanColumn = ({
   id,
@@ -41,7 +43,8 @@ export const KanbanColumn = ({
   responsibleUsers,
   canDrag = true,
   linkTo,
-  animatedCardIds
+  animatedCardIds,
+  cardViewMode = "full"
 }: KanbanColumnProps) => {
   const navigate = useNavigate();
   const highCount = orders.filter(o => o.priority === "high").length;
@@ -115,7 +118,7 @@ export const KanbanColumn = ({
             Nenhum pedido nesta fase
             {linkTo}
           </div> : <>
-            {orders.map(order => <KanbanCard key={order.id} order={order} onEdit={onEdit} onStatusChange={onStatusChange} canDrag={canDrag} isAnimating={animatedCardIds?.has(order.id)} />)}
+            {orders.map(order => <KanbanCard key={order.id} order={order} onEdit={onEdit} onStatusChange={onStatusChange} canDrag={canDrag} isAnimating={animatedCardIds?.has(order.id)} viewMode={cardViewMode} />)}
             {linkTo && <Button variant="outline" size="sm" className="w-full gap-2 mt-2" onClick={() => navigate(linkTo)}>
                 <Icon className="h-4 w-4" />
                 Ver Módulo de Compras
