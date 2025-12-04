@@ -773,3 +773,111 @@ All colors MUST be HSL.
     color: hsl(220 60% 80%);
   }
 }
+
+/* ==========================================
+   MINIMAL MODE - Clean, monochromatic design
+   ========================================== */
+
+.minimal-mode {
+  /* Override priority colors to monochromatic */
+  --priority-high: 0 0% 25%;
+  --priority-high-bg: 0 0% 96%;
+  --priority-high-border: 0 0% 70%;
+  --priority-medium: 0 0% 45%;
+  --priority-medium-bg: 0 0% 96%;
+  --priority-medium-border: 0 0% 75%;
+  --priority-low: 0 0% 60%;
+  --priority-low-bg: 0 0% 96%;
+  --priority-low-border: 0 0% 80%;
+
+  /* Neutral progress colors */
+  --progress-good: 0 0% 40%;
+  --progress-warning: 0 0% 55%;
+  --progress-critical: 0 0% 30%;
+  --progress-overdue: 0 0% 25%;
+  --progress-today: 0 0% 45%;
+  --progress-safe: 0 0% 65%;
+
+  /* Neutral phase colors */
+  --phase-production-client: 0 0% 35%;
+  --phase-production-client-bg: 0 0% 95%;
+  --phase-production-client-border: 0 0% 70%;
+}
+
+.minimal-mode.dark {
+  --priority-high: 0 0% 75%;
+  --priority-high-bg: 0 0% 15%;
+  --priority-high-border: 0 0% 50%;
+  --priority-medium: 0 0% 60%;
+  --priority-medium-bg: 0 0% 15%;
+  --priority-medium-border: 0 0% 45%;
+  --priority-low: 0 0% 50%;
+  --priority-low-bg: 0 0% 15%;
+  --priority-low-border: 0 0% 40%;
+
+  --progress-good: 0 0% 60%;
+  --progress-warning: 0 0% 50%;
+  --progress-critical: 0 0% 70%;
+  --progress-overdue: 0 0% 75%;
+  --progress-today: 0 0% 55%;
+  --progress-safe: 0 0% 45%;
+
+  --phase-production-client: 0 0% 70%;
+  --phase-production-client-bg: 0 0% 18%;
+  --phase-production-client-border: 0 0% 45%;
+}
+
+/* Minimal mode card styles */
+.minimal-mode .kanban-card {
+  border-left-width: 1px !important;
+  border-left-color: hsl(0 0% 75%) !important;
+  box-shadow: none !important;
+  border: 1px solid hsl(0 0% 85%);
+}
+
+.minimal-mode.dark .kanban-card {
+  border-left-color: hsl(0 0% 40%) !important;
+  border-color: hsl(0 0% 30%);
+}
+
+.minimal-mode .kanban-card:hover {
+  box-shadow: 0 1px 3px hsl(0 0% 0% / 0.05) !important;
+  transform: none !important;
+}
+
+/* Minimal mode column headers */
+.minimal-mode .kanban-column > div:first-child {
+  background: hsl(0 0% 96%) !important;
+  border-left-width: 2px !important;
+  border-left-color: hsl(0 0% 70%) !important;
+  box-shadow: none !important;
+}
+
+.minimal-mode.dark .kanban-column > div:first-child {
+  background: hsl(0 0% 15%) !important;
+  border-left-color: hsl(0 0% 45%) !important;
+}
+
+/* Minimal mode badges */
+.minimal-mode .minimal-badge {
+  background: transparent !important;
+  border: 1px solid hsl(0 0% 70%);
+  color: hsl(0 0% 35%);
+}
+
+.minimal-mode.dark .minimal-badge {
+  border-color: hsl(0 0% 45%);
+  color: hsl(0 0% 70%);
+}
+
+/* Remove animations in minimal mode */
+.minimal-mode .animate-pulse,
+.minimal-mode .animate-pulse-slow,
+.minimal-mode .animate-ecommerce-pulse {
+  animation: none !important;
+}
+
+/* Subtle transitions only */
+.minimal-mode * {
+  transition-duration: 150ms !important;
+}

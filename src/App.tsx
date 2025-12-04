@@ -21,9 +21,9 @@ import { useAdminAuth } from "./hooks/useAdminAuth";
 import { usePhaseAuthorization } from "./hooks/usePhaseAuthorization";
 import { PendingApprovalScreen } from "./components/PendingApprovalScreen";
 import { CompleteProfileDialog } from "./components/CompleteProfileDialog";
+import { VisualModeProvider } from "./hooks/useVisualMode";
 import { useEffect, useState } from "react";
 import { supabase } from "./integrations/supabase/client";
-
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   const { isApproved, loading: authLoading } = usePhaseAuthorization();
@@ -126,61 +126,63 @@ const queryClient = new QueryClient({
 const App = () => {
   return (
     <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <Routes>
-            <Route path="/auth" element={<Auth />} />
-            <Route path="/" element={
+      <VisualModeProvider>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
+            <Routes>
+              <Route path="/auth" element={<Auth />} />
+              <Route path="/" element={
+                <ProtectedRoute>
+                  <Index />
+                </ProtectedRoute>
+              } />
+            <Route path="/metrics" element={
               <ProtectedRoute>
-                <Index />
+                <Metrics />
               </ProtectedRoute>
             } />
-          <Route path="/metrics" element={
-            <ProtectedRoute>
-              <Metrics />
-            </ProtectedRoute>
-          } />
-          <Route path="/producao" element={
-            <ProtectedRoute>
-              <Production />
-            </ProtectedRoute>
-          } />
-          <Route path="/carriers-chat" element={
+            <Route path="/producao" element={
               <ProtectedRoute>
-                <CarriersChatRoute>
-                  <CarriersChat />
-                </CarriersChatRoute>
+                <Production />
               </ProtectedRoute>
             } />
-            <Route path="/transportadoras" element={
-              <ProtectedRoute>
-                <Carriers />
-              </ProtectedRoute>
-            } />
-            <Route path="/admin/users" element={
-              <ProtectedRoute>
-                <AdminRoute>
-                  <Admin />
-                </AdminRoute>
-              </ProtectedRoute>
-            } />
-            <Route path="/compras" element={
-              <ProtectedRoute>
-                <Purchases />
-              </ProtectedRoute>
-            } />
-            <Route path="/whatsapp-settings" element={
-              <ProtectedRoute>
-                <WhatsAppSettings />
-              </ProtectedRoute>
-            } />
-            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </BrowserRouter>
-      </TooltipProvider>
+            <Route path="/carriers-chat" element={
+                <ProtectedRoute>
+                  <CarriersChatRoute>
+                    <CarriersChat />
+                  </CarriersChatRoute>
+                </ProtectedRoute>
+              } />
+              <Route path="/transportadoras" element={
+                <ProtectedRoute>
+                  <Carriers />
+                </ProtectedRoute>
+              } />
+              <Route path="/admin/users" element={
+                <ProtectedRoute>
+                  <AdminRoute>
+                    <Admin />
+                  </AdminRoute>
+                </ProtectedRoute>
+              } />
+              <Route path="/compras" element={
+                <ProtectedRoute>
+                  <Purchases />
+                </ProtectedRoute>
+              } />
+              <Route path="/whatsapp-settings" element={
+                <ProtectedRoute>
+                  <WhatsAppSettings />
+                </ProtectedRoute>
+              } />
+              {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </BrowserRouter>
+        </TooltipProvider>
+      </VisualModeProvider>
     </QueryClientProvider>
   );
 };

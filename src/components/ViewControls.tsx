@@ -14,8 +14,9 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { ArrowUpDown, Filter, Layers, LayoutGrid, List, Maximize2, Minimize2 } from "lucide-react";
+import { ArrowUpDown, Filter, Layers, LayoutGrid, List, Maximize2, Minimize2, Palette, Circle } from "lucide-react";
 import { Order } from "./Dashboard";
+import { useVisualMode } from "@/hooks/useVisualMode";
 
 export type SortOption = "priority" | "deadline" | "created" | "status";
 export type GroupOption = "priority" | "phase" | "type" | "category" | "none";
@@ -495,6 +496,9 @@ export const ViewControls = ({
             </Tooltip>
           )}
         </div>
+        
+        {/* Visual Mode Toggle */}
+        <VisualModeToggle />
 
         {/* Sort Control (hidden in Kanban view) */}
         {viewMode === "list" && (
@@ -611,6 +615,35 @@ export const ViewControls = ({
           <TooltipContent>Filtrar por Fase</TooltipContent>
         </Tooltip>
       </div>
+    </TooltipProvider>
+  );
+};
+
+// Visual Mode Toggle Component
+const VisualModeToggle = () => {
+  const { mode, toggleMode, isMinimal } = useVisualMode();
+  
+  return (
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            variant="outline"
+            size="icon"
+            className="h-7 w-7"
+            onClick={toggleMode}
+          >
+            {isMinimal ? (
+              <Palette className="h-3.5 w-3.5" />
+            ) : (
+              <Circle className="h-3.5 w-3.5" />
+            )}
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>
+          {isMinimal ? "Modo Colorido" : "Modo Minimalista"}
+        </TooltipContent>
+      </Tooltip>
     </TooltipProvider>
   );
 };
