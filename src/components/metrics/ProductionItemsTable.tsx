@@ -71,8 +71,9 @@ export const ProductionItemsTable = ({ items, onOrderClick }: ProductionItemsTab
           comparison = dateA.getTime() - dateB.getTime();
           break;
         case 'productionReleasedAt':
-          const releasedA = a.production_released_at ? new Date(a.production_released_at) : new Date(0);
-          const releasedB = b.production_released_at ? new Date(b.production_released_at) : new Date(0);
+          // Prioridade: phase_started_at do item > production_released_at do pedido
+          const releasedA = a.phase_started_at || a.production_released_at ? new Date(a.phase_started_at || a.production_released_at!) : new Date(0);
+          const releasedB = b.phase_started_at || b.production_released_at ? new Date(b.phase_started_at || b.production_released_at!) : new Date(0);
           comparison = releasedA.getTime() - releasedB.getTime();
           break;
         case 'daysInSystem':
@@ -219,20 +220,27 @@ export const ProductionItemsTable = ({ items, onOrderClick }: ProductionItemsTab
                     </span>
                   </TableCell>
                   <TableCell>
-                    {item.production_released_at ? (
-                      <div className="flex flex-col">
-                        <span className="text-sm font-medium text-green-600 dark:text-green-400">
-                          {format(new Date(item.production_released_at), 'dd/MM/yyyy', { locale: ptBR })}
-                        </span>
-                        <span className="text-xs text-muted-foreground">
-                          {format(new Date(item.production_released_at), 'HH:mm', { locale: ptBR })}
-                        </span>
-                      </div>
-                    ) : (
-                      <Badge variant="outline" className="text-xs text-orange-600">
-                        Não liberado
-                      </Badge>
-                    )}
+                    {(() => {
+                      // Prioridade: phase_started_at do item (quando entrou em "Aguardando Produção") > production_released_at do pedido
+                      const releaseDate = item.phase_started_at || item.production_released_at;
+                      if (releaseDate) {
+                        return (
+                          <div className="flex flex-col">
+                            <span className="text-sm font-medium text-green-600 dark:text-green-400">
+                              {format(new Date(releaseDate), 'dd/MM/yyyy', { locale: ptBR })}
+                            </span>
+                            <span className="text-xs text-muted-foreground">
+                              {format(new Date(releaseDate), 'HH:mm', { locale: ptBR })}
+                            </span>
+                          </div>
+                        );
+                      }
+                      return (
+                        <Badge variant="outline" className="text-xs text-orange-600">
+                          Não liberado
+                        </Badge>
+                      );
+                    })()}
                   </TableCell>
                   <TableCell>
                     <span className={`font-semibold ${
