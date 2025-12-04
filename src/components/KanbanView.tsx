@@ -26,7 +26,7 @@ import {
   DragEndEvent,
   DragOverlay,
 } from "@dnd-kit/core";
-import { KanbanCard } from "./KanbanCard";
+import { KanbanCard, CardViewMode } from "./KanbanCard";
 import { usePhaseInfo } from "@/hooks/usePhaseInfo";
 import { usePhaseAuthorization } from "@/hooks/usePhaseAuthorization";
 import { useAuth } from "@/hooks/useAuth";
@@ -43,9 +43,10 @@ interface KanbanViewProps {
   orders: Order[];
   onEdit: (order: Order) => void;
   onStatusChange: (orderId: string, newStatus: Order["status"]) => void;
+  cardViewMode?: CardViewMode;
 }
 
-export const KanbanView = ({ orders, onEdit, onStatusChange }: KanbanViewProps) => {
+export const KanbanView = ({ orders, onEdit, onStatusChange, cardViewMode = "full" }: KanbanViewProps) => {
   const [activeId, setActiveId] = React.useState<string | null>(null);
   const [optimisticOrders, setOptimisticOrders] = React.useState<Order[]>(orders);
   const [recentlyMovedCards, setRecentlyMovedCards] = React.useState<Set<string>>(new Set());
@@ -522,6 +523,7 @@ export const KanbanView = ({ orders, onEdit, onStatusChange }: KanbanViewProps) 
                 canDrag={canDrag}
                 linkTo={column.id === "purchases" ? "/compras" : undefined}
                 animatedCardIds={recentlyMovedCards}
+                cardViewMode={cardViewMode}
               />
             );
           })}
@@ -534,6 +536,7 @@ export const KanbanView = ({ orders, onEdit, onStatusChange }: KanbanViewProps) 
               order={activeOrder}
               onEdit={onEdit}
               onStatusChange={onStatusChange}
+              viewMode={cardViewMode}
             />
           </div>
         ) : null}

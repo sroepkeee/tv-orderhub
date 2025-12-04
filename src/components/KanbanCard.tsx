@@ -35,19 +35,23 @@ const BUSINESS_AREA_CONFIG: Record<string, { label: string; icon: typeof Wrench;
     className: 'bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-950/50 dark:text-orange-300 dark:border-orange-800' 
   }
 };
+export type CardViewMode = "full" | "compact";
+
 interface KanbanCardProps {
   order: Order;
   onEdit: (order: Order) => void;
   onStatusChange: (orderId: string, newStatus: Order["status"]) => void;
   canDrag?: boolean;
   isAnimating?: boolean;
+  viewMode?: CardViewMode;
 }
 export const KanbanCard = ({
   order,
   onEdit,
   onStatusChange,
   canDrag = true,
-  isAnimating = false
+  isAnimating = false,
+  viewMode = "full"
 }: KanbanCardProps) => {
   const [clickStart, setClickStart] = useState<number>(0);
   const { getPhaseInfo } = usePhaseInfo();
@@ -138,10 +142,14 @@ export const KanbanCard = ({
       production: 0,
       outOfStock: 0
     };
+    // Filtrar itens NÃO concluídos para mostrar indicadores de pendência
+    const activeItems = items.filter(i => 
+      !['completed', 'delivered', 'received'].includes(i.item_status || '')
+    );
     return {
-      inStock: items.filter(i => i.item_source_type === 'in_stock' || !i.item_source_type).length,
-      production: items.filter(i => i.item_source_type === 'production').length,
-      outOfStock: items.filter(i => i.item_source_type === 'out_of_stock').length
+      inStock: activeItems.filter(i => i.item_source_type === 'in_stock' || !i.item_source_type).length,
+      production: activeItems.filter(i => i.item_source_type === 'production').length,
+      outOfStock: activeItems.filter(i => i.item_source_type === 'out_of_stock').length
     };
   };
   const calculateDaysRemaining = (deadline: string) => {
@@ -166,6 +174,70 @@ export const KanbanCard = ({
     i => i.item_status === 'purchase_required' || i.item_status === 'purchase_requested'
   ).length || 0;
   
+  // Compact view rendering
+  if (viewMode === "compact") {
+    const sourceCounts = countItemsBySource(order.items);
+    const sender = (order as any).sender_company ? getSenderById((order as any).sender_company) : null;
+    
+    return (
+      <div ref={setNodeRef} style={style} className={isDragging ? "dragging" : ""}>
+        <Card 
+          className={`relative kanban-card p-1.5 transition-all duration-200 ${!isEcommerce ? getPriorityClass(order.priority) : ''} ${isDragging ? 'cursor-grabbing opacity-50 scale-105 shadow-2xl' : 'cursor-pointer hover:shadow-md hover:scale-[1.01]'} ${isVendasEcommerce ? 'animate-ecommerce-pulse border-[2px]' : ''} ${isAnimating ? 'animate-card-pop-in' : ''}`}
+          onClick={handleCardClick}
+          onMouseDown={() => setClickStart(Date.now())}
+        >
+          {/* Drag handle - compact */}
+          <div 
+            className="absolute right-0 top-0 p-0.5 rounded hover:bg-primary/10 text-muted-foreground cursor-grab active:cursor-grabbing transition-colors"
+            {...listeners}
+            {...attributes}
+            onMouseDown={e => { e.stopPropagation(); setClickStart(Date.now() + 500); }}
+            onClick={e => e.stopPropagation()}
+          >
+            <GripVertical className="h-3 w-3" />
+          </div>
+          
+          {/* Line 1: Order number, badges, indicators */}
+          <div className="flex items-center gap-1 flex-wrap pr-4">
+            {isEcommerce && <span className="text-xs">🛒</span>}
+            <span className="font-bold text-[10px]">#{order.orderNumber}</span>
+            
+            {order.business_area && BUSINESS_AREA_CONFIG[order.business_area] && (
+              <Badge variant="outline" className={cn("text-[8px] px-0.5 py-0 h-3", BUSINESS_AREA_CONFIG[order.business_area].className)}>
+                {BUSINESS_AREA_CONFIG[order.business_area].label}
+              </Badge>
+            )}
+            
+            {sender && (
+              <Badge variant="outline" className="text-[8px] px-0.5 py-0 h-3 bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-300 dark:border-emerald-800">
+                {sender.state}
+              </Badge>
+            )}
+            
+            {/* Source indicators compact */}
+            {sourceCounts.inStock > 0 && <span className="text-[9px] text-muted-foreground">✓{sourceCounts.inStock}</span>}
+            {sourceCounts.outOfStock > 0 && <span className="text-[9px] text-red-500">⚠{sourceCounts.outOfStock}</span>}
+            {purchaseItemsCount > 0 && <span className="text-[9px] text-amber-600">🛒{purchaseItemsCount}</span>}
+            
+            {/* Deadline compact */}
+            <span className={cn(
+              "text-[9px] font-medium ml-auto",
+              daysRemaining < 0 ? "text-red-500" : daysRemaining <= 2 ? "text-orange-500" : "text-muted-foreground"
+            )}>
+              {daysRemaining < 0 ? `${Math.abs(daysRemaining)}d↓` : daysRemaining === 0 ? "Hoje" : `${daysRemaining}d`}
+            </span>
+          </div>
+          
+          {/* Line 2: Client truncated */}
+          <p className="text-[9px] text-muted-foreground line-clamp-1 mt-0.5">
+            {order.client} • {order.items?.length || 0} itens
+          </p>
+        </Card>
+      </div>
+    );
+  }
+  
+  // Full view rendering (existing)
   return <div ref={setNodeRef} style={style} className={isDragging ? "dragging" : ""}>
         <Card className={`relative kanban-card p-2 transition-all duration-200 ${!isEcommerce ? getPriorityClass(order.priority) : ''} ${isDragging ? 'cursor-grabbing opacity-50 scale-105 shadow-2xl' : 'cursor-pointer hover:shadow-lg hover:scale-[1.01]'} ${isVendasEcommerce ? 'animate-ecommerce-pulse border-[3px]' : ''} ${isAnimating ? 'animate-card-pop-in' : ''}`} onClick={handleCardClick} onMouseDown={() => setClickStart(Date.now())}>
         {/* Selo E-commerce no canto superior direito */}

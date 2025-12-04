@@ -14,7 +14,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { ArrowUpDown, Filter, Layers, LayoutGrid, List } from "lucide-react";
+import { ArrowUpDown, Filter, Layers, LayoutGrid, List, Maximize2, Minimize2 } from "lucide-react";
 import { Order } from "./Dashboard";
 
 export type SortOption = "priority" | "deadline" | "created" | "status";
@@ -23,6 +23,7 @@ export type PhaseFilter = "all" | "preparation" | "production" | "packaging" | "
 export type ViewMode = "list" | "kanban";
 export type CategoryFilter = "all" | "reposicao" | "vendas" | "operacoes_especiais";
 export type StatusFilter = "all" | "high_priority" | "medium_priority" | "low_priority" | "critical_deadline" | "new_today" | "on_hold" | "delayed" | "preparation" | "production" | "packaging" | "invoicing" | "shipping" | "completed" | "ecommerce";
+export type CardViewMode = "full" | "compact";
 
 interface ViewControlsProps {
   sortBy: SortOption;
@@ -31,6 +32,7 @@ interface ViewControlsProps {
   viewMode: ViewMode;
   categoryFilter?: CategoryFilter;
   statusFilter?: StatusFilter;
+  cardViewMode?: CardViewMode;
   orders?: Order[];
   onSortChange: (sort: SortOption) => void;
   onGroupChange: (group: GroupOption) => void;
@@ -38,6 +40,7 @@ interface ViewControlsProps {
   onViewModeChange: (mode: ViewMode) => void;
   onCategoryFilterChange?: (category: CategoryFilter) => void;
   onStatusFilterChange?: (status: StatusFilter) => void;
+  onCardViewModeChange?: (mode: CardViewMode) => void;
 }
 
 export const ViewControls = ({
@@ -47,6 +50,7 @@ export const ViewControls = ({
   viewMode,
   categoryFilter = "all",
   statusFilter = "all",
+  cardViewMode = "full",
   orders = [],
   onSortChange,
   onGroupChange,
@@ -54,6 +58,7 @@ export const ViewControls = ({
   onViewModeChange,
   onCategoryFilterChange,
   onStatusFilterChange,
+  onCardViewModeChange,
 }: ViewControlsProps) => {
   const sortOptions = [
     { value: "priority" as SortOption, label: "Prioridade" },
@@ -466,6 +471,29 @@ export const ViewControls = ({
             </TooltipTrigger>
             <TooltipContent>Kanban</TooltipContent>
           </Tooltip>
+          
+          {/* Card View Mode Toggle (only in Kanban view) */}
+          {viewMode === "kanban" && onCardViewModeChange && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant={cardViewMode === "compact" ? "default" : "outline"}
+                  size="icon"
+                  className="h-7 w-7"
+                  onClick={() => onCardViewModeChange(cardViewMode === "full" ? "compact" : "full")}
+                >
+                  {cardViewMode === "compact" ? (
+                    <Maximize2 className="h-3.5 w-3.5" />
+                  ) : (
+                    <Minimize2 className="h-3.5 w-3.5" />
+                  )}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                {cardViewMode === "compact" ? "Cards Completos" : "Cards Compactos"}
+              </TooltipContent>
+            </Tooltip>
+          )}
         </div>
 
         {/* Sort Control (hidden in Kanban view) */}
