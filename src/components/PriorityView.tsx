@@ -6,6 +6,7 @@ import { ActionButtons } from "./ActionButtons";
 import { PhaseButtons } from "./PhaseButtons";
 import { ViewControls, SortOption, GroupOption, PhaseFilter, ViewMode, StatusFilter, CardViewMode } from "./ViewControls";
 import { KanbanView } from "./KanbanView";
+import { MatrixView } from "./MatrixView";
 import { ClipboardList, PackageCheck, Microscope, Boxes, Truck, CheckCircle2 } from "lucide-react";
 
 interface PriorityViewProps {
@@ -457,6 +458,11 @@ export const PriorityView = ({
           onEdit={(order) => onRowClick ? onRowClick(order) : onEdit(order)}
           onStatusChange={onStatusChange}
           cardViewMode={cardViewMode}
+        />
+      ) : viewMode === "matrix" ? (
+        <MatrixView
+          orders={sortedOrders}
+          onOrderClick={(order) => onRowClick ? onRowClick(order) : onEdit(order)}
         />
       ) : (
         <>
