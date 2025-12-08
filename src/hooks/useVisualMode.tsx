@@ -11,21 +11,36 @@ interface VisualModeContextType {
 const VisualModeContext = createContext<VisualModeContextType | undefined>(undefined);
 
 export const VisualModeProvider = ({ children }: { children: ReactNode }) => {
-  const [mode, setMode] = useState<VisualMode>(() => {
-    const saved = localStorage.getItem("visualMode");
-    return (saved as VisualMode) || "colorful";
-  });
+  // Inicializar com default seguro, sem acessar localStorage durante SSR
+  const [mode, setMode] = useState<VisualMode>("colorful");
+  const [isLoaded, setIsLoaded] = useState(false);
 
+  // Carregar do localStorage apenas no cliente após montagem
   useEffect(() => {
-    localStorage.setItem("visualMode", mode);
-    
-    // Apply class to document for global CSS targeting
-    if (mode === "minimal") {
-      document.documentElement.classList.add("minimal-mode");
-    } else {
-      document.documentElement.classList.remove("minimal-mode");
+    try {
+      const saved = localStorage.getItem("visualMode");
+      if (saved === "colorful" || saved === "minimal") {
+        setMode(saved);
+      }
+    } catch (e) {
+      // Ignorar erros de localStorage
     }
-  }, [mode]);
+    setIsLoaded(true);
+  }, []);
+
+  // Salvar no localStorage e aplicar classe ao DOM
+  useEffect(() => {
+    if (!isLoaded) return;
+    
+    try {
+      localStorage.setItem("visualMode", mode);
+    } catch (e) {
+      // Ignorar erros de localStorage
+    }
+    
+    // Aplicar classe ao document de forma segura
+    document.documentElement.classList.toggle("minimal-mode", mode === "minimal");
+  }, [mode, isLoaded]);
 
   const toggleMode = () => {
     setMode(prev => prev === "colorful" ? "minimal" : "colorful");
@@ -41,7 +56,7 @@ export const VisualModeProvider = ({ children }: { children: ReactNode }) => {
 export const useVisualMode = () => {
   const context = useContext(VisualModeContext);
   if (!context) {
-    // Fallback for when used outside provider
+    // Fallback para quando usado fora do provider
     return {
       mode: "colorful" as VisualMode,
       toggleMode: () => {},

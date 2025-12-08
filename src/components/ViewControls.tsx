@@ -14,14 +14,14 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { ArrowUpDown, Filter, Layers, LayoutGrid, List, Maximize2, Minimize2, Palette, Circle } from "lucide-react";
+import { ArrowUpDown, Filter, Layers, LayoutGrid, List, Maximize2, Minimize2, Palette, Circle, Table2 } from "lucide-react";
 import { Order } from "./Dashboard";
 import { useVisualMode } from "@/hooks/useVisualMode";
 
 export type SortOption = "priority" | "deadline" | "created" | "status";
 export type GroupOption = "priority" | "phase" | "type" | "category" | "none";
 export type PhaseFilter = "all" | "preparation" | "production" | "packaging" | "logistics" | "completion";
-export type ViewMode = "list" | "kanban";
+export type ViewMode = "list" | "kanban" | "matrix";
 export type CategoryFilter = "all" | "reposicao" | "vendas" | "operacoes_especiais";
 export type StatusFilter = "all" | "high_priority" | "medium_priority" | "low_priority" | "critical_deadline" | "new_today" | "on_hold" | "delayed" | "preparation" | "production" | "packaging" | "invoicing" | "shipping" | "completed" | "ecommerce";
 export type CardViewMode = "full" | "compact";
@@ -471,6 +471,19 @@ export const ViewControls = ({
               </Button>
             </TooltipTrigger>
             <TooltipContent>Kanban</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant={viewMode === "matrix" ? "default" : "ghost"}
+                size="icon"
+                className="h-7 w-7"
+                onClick={() => onViewModeChange("matrix")}
+              >
+                <Table2 className="h-3.5 w-3.5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Matriz de Fases</TooltipContent>
           </Tooltip>
           
           {/* Card View Mode Toggle (only in Kanban view) */}
