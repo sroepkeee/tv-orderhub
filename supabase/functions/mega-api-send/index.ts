@@ -127,10 +127,32 @@ Deno.serve(async (req) => {
     });
 
     // Tentar múltiplos endpoints e formatos
-    const endpoints = [
-      `/message/sendText/${megaApiInstance}`,
-      `/rest/message/sendText/${megaApiInstance}`,
+    // Observação: alguns tenants da Mega API/Evolution usam instance com/sem prefixos (ex: "megastart-")
+    const instanceCandidates = Array.from(
+      new Set(
+        [
+          megaApiInstance,
+          megaApiInstance.replace(/^megastart-/, ''),
+          megaApiInstance.replace(/^start-/, ''),
+          megaApiInstance.replace(/^mega-/, ''),
+        ]
+          .map((s) => (s ?? '').trim())
+          .filter((s) => s.length > 0)
+      )
+    );
+
+    console.log('Instance candidates:', instanceCandidates);
+
+    const endpointTemplates = [
+      '/message/sendText/{instance}',
+      '/rest/message/sendText/{instance}',
+      '/rest/sendMessage/{instance}/text',
+      '/sendMessage/{instance}/text',
     ];
+
+    const endpoints = instanceCandidates.flatMap((instance) =>
+      endpointTemplates.map((tpl) => tpl.replace('{instance}', instance))
+    );
 
     // Headers com diferentes formatos de autenticação
     const authHeadersList: Array<Record<string, string>> = [
@@ -139,12 +161,14 @@ Deno.serve(async (req) => {
       { 'Authorization': `Bearer ${megaApiToken}`, 'Content-Type': 'application/json' },
     ];
 
-    // Body formats: Evolution API v2 e v1
+    // Body formats: variações comuns entre versões
     const bodyFormats = [
-      // Evolution API v2 format (latest)
+      // Evolution API v2 format
       { number: phoneNumber, text: fullMessage },
       // Evolution API v1 format
       { number: phoneNumber, textMessage: { text: fullMessage } },
+      // Algumas implementações aceitam "message" direto
+      { number: phoneNumber, message: fullMessage },
     ];
 
     let megaResponse: Response | null = null;
