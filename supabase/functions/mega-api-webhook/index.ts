@@ -87,65 +87,77 @@ async function sendAutoReplyMessage(
       formattedPhone = '55' + formattedPhone;
     }
 
-    // Mega API START usa /rest/sendMessage/{instance}/text
-    // Ref: https://apistart02.megaapi.com.br/docs/
-    const endpoint = `/rest/sendMessage/${instance.instance_key}/text`;
+    // Evolution API (Mega API START) usa /message/sendText/{instance}
+    const endpoint = `/message/sendText/${instance.instance_key}`;
     const sendUrl = `${normalizedUrl}${endpoint}`;
 
-    // Mega API START usa header 'apikey'
-    const headers = {
-      'apikey': megaApiToken,
-      'Content-Type': 'application/json',
-    };
-
-    // Formato Mega API START: { messageData: { to: "55XXX", text: "...", linkPreview: false } }
+    // Body formato Evolution API: { number, text, linkPreview }
     const body = {
-      messageData: {
-        to: formattedPhone,
-        text: message,
-        linkPreview: false,
-      },
+      number: formattedPhone,
+      text: message,
+      linkPreview: true,
     };
 
     console.log(`📤 Sending auto-reply to: ${sendUrl}`);
 
-    try {
-      const response = await fetch(sendUrl, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(body),
-      });
+    // Multi-header fallback para compatibilidade
+    const authFormats: Record<string, string>[] = [
+      { 'apikey': megaApiToken },
+      { 'Authorization': `Bearer ${megaApiToken}` },
+      { 'Apikey': megaApiToken },
+    ];
 
-      if (response.ok) {
-        console.log('✅ Auto-reply message sent successfully');
-        
-        if (carrierId) {
-          await supabase
-            .from('carrier_conversations')
-            .insert({
-              carrier_id: carrierId,
-              conversation_type: 'general',
-              message_direction: 'outbound',
-              message_content: message,
-              contact_type: 'customer',
-              message_metadata: {
-                sent_via: 'ai_auto_reply',
+    for (const authHeader of authFormats) {
+      try {
+        const headers: Record<string, string> = {
+          'Content-Type': 'application/json',
+          ...authHeader,
+        };
+
+        const response = await fetch(sendUrl, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(body),
+        });
+
+        if (response.ok) {
+          console.log('✅ Auto-reply message sent successfully');
+          
+          if (carrierId) {
+            await supabase
+              .from('carrier_conversations')
+              .insert({
+                carrier_id: carrierId,
+                conversation_type: 'general',
+                message_direction: 'outbound',
+                message_content: message,
+                contact_type: 'customer',
+                message_metadata: {
+                  sent_via: 'ai_auto_reply',
+                  sent_at: new Date().toISOString(),
+                },
                 sent_at: new Date().toISOString(),
-              },
-              sent_at: new Date().toISOString(),
-            });
+              });
+          }
+          
+          return true;
+        } else if (response.status === 401 || response.status === 403) {
+          const errorText = await response.text();
+          console.log(`❌ Auth failed (${Object.keys(authHeader)[0]}): ${response.status} - trying next...`);
+          continue; // Tentar próximo header
+        } else {
+          const errorText = await response.text();
+          console.log(`❌ Failed ${response.status}: ${errorText.substring(0, 100)}`);
+          return false;
         }
-        
-        return true;
-      } else {
-        const errorText = await response.text();
-        console.log(`❌ Failed ${response.status}: ${errorText.substring(0, 100)}`);
-        return false;
+      } catch (err) {
+        console.error('❌ Fetch error:', err);
+        continue;
       }
-    } catch (err) {
-      console.error('❌ Fetch error:', err);
-      return false;
     }
+    
+    console.error('❌ All auth methods failed');
+    return false;
   } catch (error) {
     console.error('❌ Error sending auto-reply:', error);
     return false;

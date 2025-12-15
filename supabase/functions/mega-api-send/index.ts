@@ -129,49 +129,63 @@ Deno.serve(async (req) => {
 
     
 
-    // Mega API START usa /rest/sendMessage/{instance}/text
-    // Ref: https://apistart02.megaapi.com.br/docs/
-    const endpoint = `/rest/sendMessage/${megaApiInstance}/text`;
+    // Evolution API (Mega API START) usa /message/sendText/{instance}
+    const endpoint = `/message/sendText/${megaApiInstance}`;
     const fullUrl = `${megaApiUrl}${endpoint}`;
 
     console.log('Sending to:', fullUrl);
 
-    // Mega API START usa header 'apikey'
-    const headers = {
-      'apikey': megaApiToken,
-      'Content-Type': 'application/json',
-    };
-
-    // Formato Mega API START: { messageData: { to: "55XXX", text: "...", linkPreview: false } }
+    // Body formato Evolution API: { number, text, linkPreview }
     const body = {
-      messageData: {
-        to: phoneNumber,
-        text: fullMessage,
-        linkPreview: false,
-      },
+      number: phoneNumber,
+      text: fullMessage,
+      linkPreview: true,
     };
 
     console.log('Request body:', JSON.stringify(body));
 
-    const megaResponse = await fetch(fullUrl, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(body),
-    });
+    // Multi-header fallback para compatibilidade
+    const authFormats: Record<string, string>[] = [
+      { 'apikey': megaApiToken },
+      { 'Authorization': `Bearer ${megaApiToken}` },
+      { 'Apikey': megaApiToken },
+    ];
 
-    const responseText = await megaResponse.text();
-    console.log('Response status:', megaResponse.status);
-    console.log('Response body:', responseText.substring(0, 300));
+    let megaData: any = null;
+    let lastError = '';
 
-    if (!megaResponse.ok) {
-      throw new Error(`Mega API error: ${megaResponse.status} - ${responseText}`);
+    for (const authHeader of authFormats) {
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        ...authHeader,
+      };
+
+      const megaResponse = await fetch(fullUrl, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(body),
+      });
+
+      const responseText = await megaResponse.text();
+      console.log(`Response (${Object.keys(authHeader)[0]}):`, megaResponse.status, responseText.substring(0, 300));
+
+      if (megaResponse.ok) {
+        try {
+          megaData = JSON.parse(responseText);
+        } catch {
+          megaData = { raw: responseText };
+        }
+        break; // Sucesso
+      } else if (megaResponse.status === 401 || megaResponse.status === 403) {
+        lastError = `${megaResponse.status}: ${responseText}`;
+        continue; // Tentar próximo header
+      } else {
+        throw new Error(`Mega API error: ${megaResponse.status} - ${responseText}`);
+      }
     }
 
-    let megaData;
-    try {
-      megaData = JSON.parse(responseText);
-    } catch {
-      megaData = { raw: responseText };
+    if (!megaData) {
+      throw new Error(`All auth methods failed. Last error: ${lastError}`);
     }
 
     console.log('Mega API response:', megaData);

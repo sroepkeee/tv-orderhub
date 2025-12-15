@@ -370,59 +370,69 @@ ${agentConfig.signature ? `\n\nAssinatura: ${agentConfig.signature}` : ''}`;
 
     console.log('📤 Using instance:', megaApiInstance);
 
-    // Mega API START usa /rest/sendMessage/{instance}/text
-    // Ref: https://apistart02.megaapi.com.br/docs/
-    const endpoint = `/rest/sendMessage/${megaApiInstance}/text`;
+    // Evolution API (Mega API START) usa /message/sendText/{instance}
+    const endpoint = `/message/sendText/${megaApiInstance}`;
     const sendUrl = `${baseUrl}${endpoint}`;
 
-    // Mega API START usa header 'apikey'
-    const headers = {
-      'apikey': megaApiToken,
-      'Content-Type': 'application/json',
-    };
-
-    // Formato Mega API START: { messageData: { to: "55XXX", text: "...", linkPreview: false } }
+    // Body formato Evolution API: { number, text, linkPreview }
     const body = {
-      messageData: {
-        to: formattedPhone,
-        text: generatedMessage,
-        linkPreview: false,
-      },
+      number: formattedPhone,
+      text: generatedMessage,
+      linkPreview: true,
     };
 
     console.log(`📤 Sending to: ${sendUrl}`);
     console.log('📤 Body:', JSON.stringify(body));
 
+    // Multi-header fallback para compatibilidade
+    const authFormats: Record<string, string>[] = [
+      { 'apikey': megaApiToken },
+      { 'Authorization': `Bearer ${megaApiToken}` },
+      { 'Apikey': megaApiToken },
+    ];
+
     let megaResponse: Response | null = null;
     let megaResponseBody: any = null;
     let lastError = '';
 
-    try {
-      const response = await fetch(sendUrl, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(body),
-      });
+    for (const authHeader of authFormats) {
+      try {
+        const headers: Record<string, string> = {
+          'Content-Type': 'application/json',
+          ...authHeader,
+        };
 
-      const responseText = await response.text();
-      console.log(`📤 Response: ${response.status} - ${responseText.substring(0, 200)}`);
+        const response = await fetch(sendUrl, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(body),
+        });
 
-      if (response.ok) {
-        megaResponse = response;
-        try {
-          megaResponseBody = JSON.parse(responseText);
-        } catch {
-          megaResponseBody = { raw: responseText };
+        const responseText = await response.text();
+        console.log(`📤 Response (${Object.keys(authHeader)[0]}): ${response.status} - ${responseText.substring(0, 200)}`);
+
+        if (response.ok) {
+          megaResponse = response;
+          try {
+            megaResponseBody = JSON.parse(responseText);
+          } catch {
+            megaResponseBody = { raw: responseText };
+          }
+          console.log('✅ Message sent successfully');
+          break; // Sucesso, sair do loop
+        } else if (response.status === 401 || response.status === 403) {
+          lastError = `${response.status}: ${responseText.substring(0, 200)}`;
+          continue; // Tentar próximo header
+        } else {
+          lastError = `${response.status}: ${responseText.substring(0, 200)}`;
+          break; // Outro erro, não tentar mais
         }
-        console.log('✅ Message sent successfully');
-      } else {
-        lastError = `${response.status}: ${responseText.substring(0, 200)}`;
+      } catch (fetchError) {
+        lastError = fetchError instanceof Error ? fetchError.message : 'Unknown fetch error';
+        console.error(`❌ Fetch error:`, lastError);
+        continue;
       }
-    } catch (fetchError) {
-      lastError = fetchError instanceof Error ? fetchError.message : 'Unknown fetch error';
-      console.error(`❌ Fetch error:`, lastError);
     }
-
 
     const messageSent = megaResponse !== null && megaResponse.ok;
     const sendResult = megaResponseBody || { error: lastError };
