@@ -56,6 +56,13 @@ interface Conversation {
   score?: number | null;
 }
 
+interface MessageMetadata {
+  is_ai_generated?: boolean;
+  sent_via?: string;
+  model?: string;
+  processing_time_ms?: number;
+}
+
 interface Message {
   id: string;
   message_content: string;
@@ -64,7 +71,21 @@ interface Message {
   delivered_at: string | null;
   read_at: string | null;
   contact_type: string;
+  conversation_type: string;
+  message_metadata: MessageMetadata | null;
 }
+
+// Helper to parse message_metadata from Json
+const parseMessageMetadata = (metadata: unknown): MessageMetadata | null => {
+  if (!metadata || typeof metadata !== 'object') return null;
+  const m = metadata as Record<string, unknown>;
+  return {
+    is_ai_generated: m.is_ai_generated as boolean | undefined,
+    sent_via: m.sent_via as string | undefined,
+    model: m.model as string | undefined,
+    processing_time_ms: m.processing_time_ms as number | undefined,
+  };
+};
 
 interface Props {
   selectedAgentType?: 'carrier' | 'customer';
@@ -195,12 +216,26 @@ export function AIAgentMessagesTab({ selectedAgentType = 'carrier' }: Props) {
     try {
       const { data, error } = await supabase
         .from('carrier_conversations')
-        .select('*')
+        .select('id, message_content, message_direction, created_at, delivered_at, read_at, contact_type, conversation_type, message_metadata')
         .eq('carrier_id', carrierId)
         .order('created_at', { ascending: true });
 
       if (error) throw error;
-      setMessages(data || []);
+      
+      // Map data to Message interface with parsed metadata
+      const mappedMessages: Message[] = (data || []).map(msg => ({
+        id: msg.id,
+        message_content: msg.message_content,
+        message_direction: msg.message_direction,
+        created_at: msg.created_at,
+        delivered_at: msg.delivered_at,
+        read_at: msg.read_at,
+        contact_type: msg.contact_type || 'carrier',
+        conversation_type: msg.conversation_type,
+        message_metadata: parseMessageMetadata(msg.message_metadata),
+      }));
+      
+      setMessages(mappedMessages);
     } catch (error) {
       console.error('Error loading messages:', error);
     }
@@ -246,7 +281,18 @@ export function AIAgentMessagesTab({ selectedAgentType = 'carrier' }: Props) {
 
       // Update messages if this is the selected conversation
       if (selectedConversation?.carrier_id === carrierId) {
-        setMessages(prev => [...prev, newRecord as Message]);
+        const mappedMessage: Message = {
+          id: newRecord.id,
+          message_content: newRecord.message_content,
+          message_direction: newRecord.message_direction,
+          created_at: newRecord.created_at,
+          delivered_at: newRecord.delivered_at,
+          read_at: newRecord.read_at,
+          contact_type: newRecord.contact_type || 'carrier',
+          conversation_type: newRecord.conversation_type,
+          message_metadata: parseMessageMetadata(newRecord.message_metadata),
+        };
+        setMessages(prev => [...prev, mappedMessage]);
       }
     }
   }, [selectedConversation, loadConversations]);
@@ -727,36 +773,56 @@ export function AIAgentMessagesTab({ selectedAgentType = 'carrier' }: Props) {
                           <p className="text-sm">Nenhuma mensagem</p>
                         </div>
                       ) : (
-                        messages.map(message => (
-                          <div
-                            key={message.id}
-                            className={`flex ${message.message_direction === 'outbound' ? 'justify-end' : 'justify-start'}`}
-                          >
+                        messages.map(message => {
+                          const isAiGenerated = message.message_metadata?.is_ai_generated || 
+                            message.message_metadata?.sent_via === 'ai_agent_auto_reply';
+                          
+                          return (
                             <div
-                              className={`max-w-[75%] px-3 py-2 rounded-lg ${
-                                message.message_direction === 'outbound'
-                                  ? 'bg-[#dcf8c6] dark:bg-green-900/50'
-                                  : 'bg-muted'
-                              }`}
+                              key={message.id}
+                              className={`flex ${message.message_direction === 'outbound' ? 'justify-end' : 'justify-start'}`}
                             >
-                              <p className="text-sm whitespace-pre-wrap break-words">
-                                {message.message_content}
-                              </p>
-                              <div className={`flex items-center gap-1 mt-1 ${
-                                message.message_direction === 'outbound' ? 'justify-end' : 'justify-start'
-                              }`}>
-                                <span className="text-[10px] text-muted-foreground">
-                                  {format(new Date(message.created_at), 'HH:mm', { locale: ptBR })}
-                                </span>
-                                {message.message_direction === 'outbound' && (
-                                  <span className={message.read_at ? 'text-blue-500' : 'text-muted-foreground'}>
-                                    {message.read_at ? '✓✓' : message.delivered_at ? '✓✓' : '✓'}
-                                  </span>
+                              <div
+                                className={`max-w-[75%] px-3 py-2 rounded-lg ${
+                                  message.message_direction === 'outbound'
+                                    ? isAiGenerated 
+                                      ? 'bg-blue-100 dark:bg-blue-900/40 border border-blue-200 dark:border-blue-800'
+                                      : 'bg-[#dcf8c6] dark:bg-green-900/50'
+                                    : 'bg-muted'
+                                }`}
+                              >
+                                {/* AI Badge */}
+                                {isAiGenerated && (
+                                  <div className="flex items-center gap-1 mb-1">
+                                    <Badge variant="outline" className="text-[9px] h-4 px-1.5 bg-blue-50 dark:bg-blue-950/50 border-blue-300 text-blue-600 dark:text-blue-400">
+                                      🤖 IA
+                                    </Badge>
+                                    {message.message_metadata?.model && (
+                                      <span className="text-[9px] text-muted-foreground">
+                                        {message.message_metadata.model}
+                                      </span>
+                                    )}
+                                  </div>
                                 )}
+                                <p className="text-sm whitespace-pre-wrap break-words">
+                                  {message.message_content}
+                                </p>
+                                <div className={`flex items-center gap-1 mt-1 ${
+                                  message.message_direction === 'outbound' ? 'justify-end' : 'justify-start'
+                                }`}>
+                                  <span className="text-[10px] text-muted-foreground">
+                                    {format(new Date(message.created_at), 'HH:mm', { locale: ptBR })}
+                                  </span>
+                                  {message.message_direction === 'outbound' && (
+                                    <span className={message.read_at ? 'text-blue-500' : 'text-muted-foreground'}>
+                                      {message.read_at ? '✓✓' : message.delivered_at ? '✓✓' : '✓'}
+                                    </span>
+                                  )}
+                                </div>
                               </div>
                             </div>
-                          </div>
-                        ))
+                          );
+                        })
                       )}
                       <div ref={messagesEndRef} />
                     </div>

@@ -898,45 +898,76 @@ Use este contexto para:
     }
 
     // 9. Save outbound message to carrier_conversations
+    console.log('💾 [Save] Salvando resposta do agente em carrier_conversations...');
+    console.log('💾 [Save] Dados:', { carrier_id, order_id, contact_type, messageSent });
+    
     if (carrier_id) {
-      await supabase.from('carrier_conversations').insert({
-        carrier_id,
-        order_id,
-        conversation_type: 'ai_response',
-        message_direction: 'outbound',
-        message_content: generatedMessage,
-        contact_type: 'carrier',
-        message_metadata: {
-          sent_via: 'ai_agent_auto_reply',
-          model: agentConfig.llm_model,
-          processing_time_ms: Date.now() - startTime,
-          mega_response: sendResult,
-        },
-        sent_at: new Date().toISOString(),
-        delivered_at: messageSent ? new Date().toISOString() : null,
-      });
+      const { data: insertData, error: insertError } = await supabase
+        .from('carrier_conversations')
+        .insert({
+          carrier_id,
+          order_id: order_id || null, // Garantir null explícito se undefined
+          conversation_type: 'general', // Usar 'general' para consistência com outras mensagens
+          message_direction: 'outbound',
+          message_content: generatedMessage,
+          contact_type: contact_type || 'carrier', // Usar contact_type do request
+          message_metadata: {
+            sent_via: 'ai_agent_auto_reply',
+            model: agentConfig.llm_model,
+            processing_time_ms: Date.now() - startTime,
+            mega_response: sendResult,
+            is_ai_generated: true,
+          },
+          sent_at: new Date().toISOString(),
+          delivered_at: messageSent ? new Date().toISOString() : null,
+        })
+        .select('id')
+        .single();
+
+      if (insertError) {
+        console.error('❌ [Save] Erro ao salvar resposta em carrier_conversations:', insertError);
+        console.error('❌ [Save] Detalhes:', JSON.stringify(insertError, null, 2));
+      } else {
+        console.log('✅ [Save] Resposta salva com sucesso! ID:', insertData?.id);
+      }
+    } else {
+      console.warn('⚠️ [Save] Sem carrier_id, não salvando em carrier_conversations');
     }
 
-    // 10. Log to ai_notification_log
-    await supabase.from('ai_notification_log').insert({
-      channel: 'whatsapp',
-      recipient: sender_phone,
-      message_content: generatedMessage,
-      status: messageSent ? 'sent' : 'failed',
-      sent_at: new Date().toISOString(),
-      metadata: {
-        conversation_id,
-        carrier_id,
-        carrier_name,
-        order_id,
-        generated_by: 'ai_agent',
-        model: agentConfig.llm_model,
-        processing_time_ms: Date.now() - startTime,
-        knowledge_used: relevantKnowledge.map(k => k.title),
-        conversation_history_count: conversationHistory.length,
-        openai_usage: openaiData.usage,
-      }
-    });
+    // 10. Log to ai_notification_log (sempre salvar para rastreabilidade)
+    console.log('📝 [Log] Salvando em ai_notification_log...');
+    const { data: logData, error: logError } = await supabase
+      .from('ai_notification_log')
+      .insert({
+        channel: 'whatsapp',
+        recipient: sender_phone,
+        message_content: generatedMessage,
+        status: messageSent ? 'sent' : 'failed',
+        sent_at: new Date().toISOString(),
+        order_id: order_id || null,
+        metadata: {
+          conversation_id,
+          carrier_id,
+          carrier_name,
+          contact_type,
+          order_id,
+          generated_by: 'ai_agent_auto_reply',
+          model: agentConfig.llm_model,
+          processing_time_ms: Date.now() - startTime,
+          knowledge_used: relevantKnowledge.map(k => k.title),
+          conversation_history_count: conversationHistory.length,
+          openai_usage: openaiData.usage,
+          message_sent: messageSent,
+        }
+      })
+      .select('id')
+      .single();
+
+    if (logError) {
+      console.error('❌ [Log] Erro ao salvar em ai_notification_log:', logError);
+    } else {
+      console.log('✅ [Log] Log salvo com sucesso! ID:', logData?.id);
+    }
 
     const processingTime = Date.now() - startTime;
     console.log(`✅ Auto-reply completed in ${processingTime}ms, sent: ${messageSent}`);
