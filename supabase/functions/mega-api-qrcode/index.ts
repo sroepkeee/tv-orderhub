@@ -8,6 +8,115 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Normalize URL to ensure https protocol
+function normalizeUrl(url: string): string {
+  let normalized = url.trim();
+  if (!normalized.startsWith('http://') && !normalized.startsWith('https://')) {
+    normalized = `https://${normalized}`;
+  }
+  return normalized.replace(/\/+$/, '');
+}
+
+// Try multiple auth header formats
+async function tryApiCall(
+  baseUrl: string, 
+  endpoint: string, 
+  method: string, 
+  token: string,
+  body?: object
+): Promise<{ success: boolean; data?: any; status?: number; error?: string }> {
+  const authFormats = [
+    { 'apikey': token },
+    { 'Authorization': `Bearer ${token}` },
+    { 'Apikey': token },
+  ];
+
+  for (const authHeader of authFormats) {
+    try {
+      const url = `${baseUrl}${endpoint}`;
+      const headerName = Object.keys(authHeader)[0];
+      const headerValue = Object.values(authHeader)[0] as string;
+      console.log(`[API] ${method} ${url} with ${headerName}`);
+      
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+      headers[headerName] = headerValue;
+      
+      const fetchOptions: RequestInit = {
+        method,
+        headers,
+      };
+      
+      if (body && (method === 'POST' || method === 'PUT')) {
+        fetchOptions.body = JSON.stringify(body);
+      }
+      
+      const response = await fetch(url, fetchOptions);
+      console.log(`[API] Response: ${response.status} ${response.statusText}`);
+      
+      if (response.ok) {
+        const contentType = response.headers.get('content-type');
+        if (contentType?.includes('application/json')) {
+          const data = await response.json();
+          console.log('[API] Success, response keys:', Object.keys(data));
+          return { success: true, data, status: response.status };
+        } else {
+          // Some endpoints return image data directly
+          const text = await response.text();
+          return { success: true, data: { raw: text }, status: response.status };
+        }
+      } else if (response.status === 401 || response.status === 403) {
+        console.log(`[API] Auth failed with ${headerName}, trying next...`);
+        continue;
+      } else {
+        const errorText = await response.text().catch(() => 'No error body');
+        console.log(`[API] Failed: ${response.status} - ${errorText.substring(0, 200)}`);
+        return { success: false, status: response.status, error: errorText };
+      }
+    } catch (error) {
+      console.error(`[API] Network error:`, error);
+    }
+  }
+  
+  return { success: false, error: 'All auth formats failed' };
+}
+
+// Extract QR code from various response formats
+function extractQrCode(data: any): string | null {
+  if (!data) return null;
+  
+  // Direct fields
+  const directFields = ['qrcode', 'base64', 'qr', 'qrCode', 'code', 'pairingCode', 'qrcode_url'];
+  for (const field of directFields) {
+    if (data[field] && typeof data[field] === 'string') {
+      return data[field];
+    }
+  }
+  
+  // Nested in instance object
+  if (data.instance) {
+    const instance = Array.isArray(data.instance) ? data.instance[0] : data.instance;
+    for (const field of directFields) {
+      if (instance?.[field] && typeof instance[field] === 'string') {
+        return instance[field];
+      }
+    }
+  }
+  
+  // Nested in data object
+  if (data.data) {
+    const nestedData = Array.isArray(data.data) ? data.data[0] : data.data;
+    for (const field of directFields) {
+      if (nestedData?.[field] && typeof nestedData[field] === 'string') {
+        return nestedData[field];
+      }
+    }
+  }
+  
+  return null;
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -24,16 +133,17 @@ Deno.serve(async (req) => {
       }
     );
 
+    // Authenticate user
     const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
     if (userError || !user) {
-      console.error('Authentication error:', userError);
+      console.error('[Auth] Error:', userError);
       return new Response(
         JSON.stringify({ error: 'Não autorizado' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Verificar se o usuário está autorizado (whitelist, admin ou AI agent admin)
+    // Check authorization (whitelist, admin, or AI agent admin)
     const { data: authData } = await supabaseClient
       .from('whatsapp_authorized_users')
       .select('id')
@@ -41,7 +151,6 @@ Deno.serve(async (req) => {
       .eq('is_active', true)
       .maybeSingle();
 
-    // Se não está na whitelist, verificar se é admin ou AI agent admin
     if (!authData) {
       const { data: adminRole } = await supabaseClient
         .from('user_roles')
@@ -51,7 +160,6 @@ Deno.serve(async (req) => {
         .maybeSingle();
 
       if (!adminRole) {
-        // Verificar se é AI Agent admin
         const { data: aiAgentAdmin } = await supabaseClient
           .from('ai_agent_admins')
           .select('id')
@@ -60,50 +168,48 @@ Deno.serve(async (req) => {
           .maybeSingle();
 
         if (!aiAgentAdmin) {
-          console.error('User not authorized for WhatsApp - not in whitelist, not admin, not AI agent admin');
+          console.error('[Auth] User not authorized for WhatsApp');
           return new Response(
             JSON.stringify({ error: 'Usuário não autorizado para WhatsApp' }),
             { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           );
         }
-        console.log('User authorized via AI agent admin');
+        console.log('[Auth] Authorized via AI agent admin');
       } else {
-        console.log('User authorized via admin role');
+        console.log('[Auth] Authorized via admin role');
       }
     } else {
-      console.log('User authorized via whitelist');
+      console.log('[Auth] Authorized via whitelist');
     }
 
-    let megaApiUrl = Deno.env.get('MEGA_API_URL');
-    const megaApiToken = Deno.env.get('MEGA_API_TOKEN');
-    const megaApiInstance = Deno.env.get('MEGA_API_INSTANCE');
+    // Get Mega API configuration
+    const megaApiUrl = normalizeUrl(Deno.env.get('MEGA_API_URL') ?? '');
+    const megaApiToken = Deno.env.get('MEGA_API_TOKEN') ?? '';
+    const megaApiInstance = Deno.env.get('MEGA_API_INSTANCE') ?? '';
 
-    // Log configuration for debugging
-    console.log('Mega API Config:', {
+    console.log('[Config] Mega API:', {
       url: megaApiUrl,
       instance: megaApiInstance,
-      tokenPresent: !!megaApiToken,
+      tokenLength: megaApiToken.length,
     });
 
     if (!megaApiUrl || !megaApiToken || !megaApiInstance) {
-      console.error('Missing Mega API configuration');
+      console.error('[Config] Missing Mega API configuration');
       return new Response(
-        JSON.stringify({ error: 'Configuração da API incompleta' }),
+        JSON.stringify({ 
+          error: 'Configuração da API incompleta',
+          details: {
+            hasUrl: !!megaApiUrl,
+            hasToken: !!megaApiToken,
+            hasInstance: !!megaApiInstance,
+          }
+        }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Garantir que a URL tenha protocolo https
-    if (!megaApiUrl.startsWith('http://') && !megaApiUrl.startsWith('https://')) {
-      megaApiUrl = `https://${megaApiUrl}`;
-    }
-    
-    // Remover barra final
-    megaApiUrl = megaApiUrl.replace(/\/+$/, '');
-
-    console.log('Fetching QR code from cache for instance:', megaApiInstance);
-
-    // Buscar QR code do cache (salvo pelo webhook)
+    // Check cache first
+    console.log('[Cache] Checking for instance:', megaApiInstance);
     const { data: instanceData, error: cacheError } = await supabaseClient
       .from('whatsapp_instances')
       .select('qrcode, qrcode_updated_at, status, phone_number')
@@ -111,18 +217,18 @@ Deno.serve(async (req) => {
       .maybeSingle();
 
     if (cacheError) {
-      console.error('Error fetching from cache:', cacheError);
+      console.error('[Cache] Error:', cacheError);
     }
 
-    console.log('Cache data:', { 
+    console.log('[Cache] Data:', { 
       hasQrcode: !!instanceData?.qrcode, 
       status: instanceData?.status,
       updatedAt: instanceData?.qrcode_updated_at 
     });
 
-    // Se instância está conectada
+    // If instance is connected
     if (instanceData?.status === 'connected') {
-      console.log('Instance already connected');
+      console.log('[Status] Instance already connected');
       return new Response(
         JSON.stringify({
           success: true,
@@ -131,22 +237,17 @@ Deno.serve(async (req) => {
           phoneNumber: instanceData.phone_number,
           message: 'Instância já está conectada',
         }),
-        {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 200,
-        }
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
       );
     }
 
-    // Se tem QR code no cache e ainda está válido
+    // Check if cached QR code is still valid
     if (instanceData?.qrcode && instanceData?.qrcode_updated_at) {
       const updatedAt = new Date(instanceData.qrcode_updated_at);
-      const now = new Date();
-      const ageSeconds = (now.getTime() - updatedAt.getTime()) / 1000;
+      const ageSeconds = (Date.now() - updatedAt.getTime()) / 1000;
       
-      // QR codes expiram em ~180 segundos (3 minutos)
       if (ageSeconds < QR_CODE_VALIDITY_SECONDS) {
-        console.log('Returning cached QR code (age:', Math.floor(ageSeconds), 'seconds)');
+        console.log('[Cache] Returning valid QR code, age:', Math.floor(ageSeconds), 's');
         return new Response(
           JSON.stringify({
             success: true,
@@ -154,211 +255,158 @@ Deno.serve(async (req) => {
             expiresIn: Math.max(0, QR_CODE_VALIDITY_SECONDS - Math.floor(ageSeconds)),
             status: 'available',
           }),
-          {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 200,
-          }
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
         );
-      } else {
-        console.log('QR code expired (age:', Math.floor(ageSeconds), 'seconds)');
       }
+      console.log('[Cache] QR code expired, age:', Math.floor(ageSeconds), 's');
     }
 
-    // Tentar buscar QR code diretamente da API
-    console.log('Attempting to fetch QR code directly from Mega API');
+    // =========================================================================
+    // MEGA API START - QR CODE GENERATION ENDPOINTS
+    // =========================================================================
     
-    // Endpoints específicos da Mega API START
-    const qrcodeEndpoints = [
-      { path: `/rest/qrcode/image/${megaApiInstance}`, method: 'GET' },
-      { path: `/rest/instance/connect/${megaApiInstance}`, method: 'POST' },
-      { path: `/rest/instance/fetchInstances/${megaApiInstance}`, method: 'GET' },
-      { path: `/instance/connect/${megaApiInstance}`, method: 'POST' },
+    console.log('[API] Attempting to fetch QR code from Mega API START');
+    
+    // Primary endpoints for Mega API START (based on documentation)
+    const qrCodeEndpoints = [
+      // Connect/QR endpoints
+      { path: `/rest/instance/connect/${megaApiInstance}`, method: 'GET' },
       { path: `/rest/instance/qrcode/${megaApiInstance}`, method: 'GET' },
+      { path: `/rest/qrcode/image/${megaApiInstance}`, method: 'GET' },
+      // Alternative formats
+      { path: `/instance/connect/${megaApiInstance}`, method: 'GET' },
+      { path: `/instance/qrcode/${megaApiInstance}`, method: 'GET' },
+      // POST variants
+      { path: `/rest/instance/connect/${megaApiInstance}`, method: 'POST' },
+      { path: `/instance/connect/${megaApiInstance}`, method: 'POST' },
     ];
 
-    // Formatos de autenticação a tentar
-    const authHeaders = [
-      { 'Authorization': `Bearer ${megaApiToken}` },
-      { 'apikey': megaApiToken },
-      { 'Authorization': megaApiToken },
-      { 'Apikey': megaApiToken },
-    ];
-
-    for (const endpoint of qrcodeEndpoints) {
-      for (const authHeader of authHeaders) {
-        try {
-          const headerName = Object.keys(authHeader)[0];
-          console.log(`Trying ${endpoint.method} ${endpoint.path} with ${headerName}`);
+    for (const { path, method } of qrCodeEndpoints) {
+      const result = await tryApiCall(megaApiUrl, path, method, megaApiToken);
+      
+      if (result.success && result.data) {
+        const qrcode = extractQrCode(result.data);
+        
+        if (qrcode) {
+          console.log('[API] QR code found via:', path);
           
-          // Construir headers sem propriedades undefined
-          const headers: Record<string, string> = {
-            'Content-Type': 'application/json',
-          };
-          Object.assign(headers, authHeader);
-          
-          const response = await fetch(`${megaApiUrl}${endpoint.path}`, {
-            method: endpoint.method,
-            headers,
+          // Save to cache
+          await supabaseClient.from('whatsapp_instances').upsert({
+            instance_key: megaApiInstance,
+            qrcode: qrcode,
+            qrcode_updated_at: new Date().toISOString(),
+            status: 'waiting_scan',
           });
           
-          console.log(`Response: ${response.status} ${response.statusText}`);
-          
-          if (response.ok) {
-            const data = await response.json();
-            console.log('API response structure:', Object.keys(data));
-            
-            // O QR pode vir em diferentes formatos
-            const qrcode = data.qrcode || data.base64 || data.qr || data.qrCode || data.code || data.pairingCode;
-            
-            // Se é fetchInstances, o QR pode estar dentro de um array ou objeto
-            if (!qrcode && data.instance) {
-              const instance = Array.isArray(data.instance) ? data.instance[0] : data.instance;
-              const nestedQr = instance?.qrcode || instance?.base64 || instance?.qr;
-              if (nestedQr) {
-                console.log('QR code found in nested instance data');
-                
-                await supabaseClient.from('whatsapp_instances').upsert({
-                  instance_key: megaApiInstance,
-                  qrcode: nestedQr,
-                  qrcode_updated_at: new Date().toISOString(),
-                  status: 'waiting_scan',
-                });
-                
-                return new Response(
-                  JSON.stringify({
-                    success: true,
-                    qrcode: nestedQr,
-                    expiresIn: QR_CODE_VALIDITY_SECONDS,
-                    status: 'available',
-                  }),
-                  {
-                    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-                    status: 200,
-                  }
-                );
-              }
-            }
-            
-            if (qrcode) {
-              console.log('QR code found via direct API call');
-              
-              // Salvar no cache
-              await supabaseClient.from('whatsapp_instances').upsert({
-                instance_key: megaApiInstance,
-                qrcode: qrcode,
-                qrcode_updated_at: new Date().toISOString(),
-                status: 'waiting_scan',
-              });
-              
-              return new Response(
-                JSON.stringify({
-                  success: true,
-                  qrcode: qrcode,
-                  expiresIn: QR_CODE_VALIDITY_SECONDS,
-                  status: 'available',
-                }),
-                {
-                  headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-                  status: 200,
-                }
-              );
-            }
-          } else if (response.status === 401 || response.status === 403) {
-            console.log(`Auth failed with ${headerName}, trying next format...`);
-            continue; // Tentar próximo formato de auth
-          } else {
-            console.log(`Endpoint ${endpoint.path} returned ${response.status}`);
-          }
-        } catch (error) {
-          console.error(`Error calling ${endpoint.path} with ${Object.keys(authHeader)[0]}:`, error);
+          return new Response(
+            JSON.stringify({
+              success: true,
+              qrcode: qrcode,
+              expiresIn: QR_CODE_VALIDITY_SECONDS,
+              status: 'available',
+            }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+          );
+        }
+        
+        // Check if response indicates we need to wait
+        if (result.data.status === 'waiting' || result.data.state === 'connecting') {
+          console.log('[API] Instance is connecting, QR should arrive via webhook');
         }
       }
     }
 
-    // Não tem QR code no cache e não conseguiu via API - solicitar restart da instância
-    console.log('No QR code via direct API, requesting instance restart');
+    // =========================================================================
+    // RESTART/RECONNECT - Force new QR code generation
+    // =========================================================================
     
-    // Tentar diferentes endpoints para solicitar novo QR code
+    console.log('[API] No QR via direct endpoints, attempting restart/reconnect');
+    
     const restartEndpoints = [
-      `/rest/instance/restart/${megaApiInstance}`,
-      `/instance/restart/${megaApiInstance}`,
-      `/rest/instance/logout/${megaApiInstance}`,
+      // Logout to force new QR
+      { path: `/rest/instance/logout/${megaApiInstance}`, method: 'DELETE' },
+      { path: `/rest/instance/logout/${megaApiInstance}`, method: 'POST' },
+      // Restart instance
+      { path: `/rest/instance/restart/${megaApiInstance}`, method: 'PUT' },
+      { path: `/rest/instance/restart/${megaApiInstance}`, method: 'POST' },
+      // Reconnect
+      { path: `/rest/instance/reconnect/${megaApiInstance}`, method: 'POST' },
+      { path: `/instance/restart/${megaApiInstance}`, method: 'POST' },
     ];
 
-    let restartRequested = false;
-    for (const endpoint of restartEndpoints) {
-      try {
-        console.log('Trying restart endpoint:', `${megaApiUrl}${endpoint}`);
-        const restartResponse = await fetch(`${megaApiUrl}${endpoint}`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${megaApiToken}`,
-            'Content-Type': 'application/json',
-          },
+    let restartSuccess = false;
+    for (const { path, method } of restartEndpoints) {
+      const result = await tryApiCall(megaApiUrl, path, method, megaApiToken);
+      
+      if (result.success) {
+        console.log('[API] Restart/reconnect successful via:', path);
+        restartSuccess = true;
+        
+        // Update instance status
+        await supabaseClient.from('whatsapp_instances').upsert({
+          instance_key: megaApiInstance,
+          status: 'reconnecting',
+          qrcode: null,
+          qrcode_updated_at: null,
         });
         
-        if (restartResponse.ok) {
-          console.log('Instance restart requested successfully via', endpoint);
-          restartRequested = true;
-          break;
-        } else {
-          console.log('Endpoint failed:', endpoint, 'Status:', restartResponse.status);
-        }
-      } catch (error) {
-        console.error('Error calling restart endpoint:', endpoint, error);
+        break;
       }
     }
 
-    if (restartRequested) {
+    if (restartSuccess) {
       return new Response(
         JSON.stringify({
           success: true,
           qrcode: null,
           status: 'waiting',
-          message: 'QR Code solicitado. Aguarde alguns segundos...',
+          message: 'Reconectando instância. QR Code será enviado em alguns segundos...',
         }),
-        {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 200,
-        }
-      );
-    } else {
-      // Fallback: Return cached QR code even if "expired" when all attempts fail
-      if (instanceData?.qrcode) {
-        console.log('Returning cached QR code as fallback (may be expired)');
-        return new Response(
-          JSON.stringify({
-            success: true,
-            qrcode: instanceData.qrcode,
-            expiresIn: 0, // Indicate it may be expired
-            status: 'available',
-            warning: 'QR Code pode ter expirado. Escaneie rapidamente ou tente gerar novamente se não funcionar.',
-          }),
-          {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 200,
-          }
-        );
-      }
-      
-      return new Response(
-        JSON.stringify({
-          success: true,
-          qrcode: null,
-          status: 'waiting',
-          message: 'Aguardando QR Code do servidor...',
-        }),
-        {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 200,
-        }
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
       );
     }
+
+    // =========================================================================
+    // FALLBACK - Return cached or waiting status
+    // =========================================================================
+    
+    console.log('[Fallback] All API attempts failed');
+    
+    // Return cached QR code even if expired as last resort
+    if (instanceData?.qrcode) {
+      console.log('[Fallback] Returning cached QR code (may be expired)');
+      return new Response(
+        JSON.stringify({
+          success: true,
+          qrcode: instanceData.qrcode,
+          expiresIn: 0,
+          status: 'available',
+          warning: 'QR Code pode ter expirado. Tente escanear ou clique em "Gerar Novo" para solicitar outro.',
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+      );
+    }
+
+    // Final fallback - waiting for webhook delivery
+    return new Response(
+      JSON.stringify({
+        success: false,
+        qrcode: null,
+        status: 'error',
+        message: 'Não foi possível gerar o QR Code. Verifique a configuração do webhook no painel Mega API.',
+        webhookUrl: 'https://wejkyyjhckdlttieuyku.supabase.co/functions/v1/mega-api-webhook',
+        requiredEvents: ['qrcode', 'connection.update', 'messages.upsert'],
+      }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+    );
 
   } catch (error) {
-    console.error('Error in mega-api-qrcode:', error);
+    console.error('[Error] Unhandled:', error);
     return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : 'Erro desconhecido' }),
+      JSON.stringify({ 
+        error: error instanceof Error ? error.message : 'Erro desconhecido',
+        stack: error instanceof Error ? error.stack : undefined,
+      }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
