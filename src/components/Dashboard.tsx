@@ -1732,6 +1732,119 @@ export const Dashboard = () => {
       });
     }
   };
+  // 🔔 Função helper para disparar notificação proativa ao cliente
+  const triggerProactiveNotification = async (orderId: string, newStatus: string, orderNumber: string) => {
+    try {
+      console.log('🔔 [Notify] Iniciando verificação para status:', newStatus);
+      
+      // Mapear status para fases de notificação
+      const statusToPhase: Record<string, string> = {
+        // Fase: Pedido criado/recebido
+        'almox_ssm_pending': 'order_created',
+        'almox_ssm_received': 'order_created',
+        'almox_ssm_approved': 'order_created',
+        'order_generated': 'order_created',
+        // Fase: Em produção
+        'separation_started': 'in_production',
+        'in_production': 'in_production',
+        'awaiting_material': 'in_production',
+        // Fase: Produção concluída
+        'separation_completed': 'production_completed',
+        'production_completed': 'production_completed',
+        // Fase: Pronto para envio
+        'in_packaging': 'ready_for_shipping',
+        'ready_for_shipping': 'ready_for_shipping',
+        'awaiting_pickup': 'ready_for_shipping',
+        'pickup_scheduled': 'ready_for_shipping',
+        // Fase: Em trânsito
+        'in_transit': 'in_transit',
+        'collected': 'in_transit',
+        // Fase: Entregue
+        'delivered': 'delivered',
+        'completed': 'delivered',
+        // Fase: Atraso
+        'delayed': 'delayed',
+        // Fase: À Faturar
+        'ready_to_invoice': 'ready_to_invoice',
+        'pending_invoice_request': 'ready_to_invoice',
+        // Fase: Faturamento Solicitado
+        'invoice_requested': 'invoicing',
+        'awaiting_invoice': 'invoicing',
+        'invoice_issued': 'invoicing',
+        'invoice_sent': 'invoicing',
+        // Fase: Expedição
+        'released_for_shipping': 'ready_for_shipping',
+        'in_expedition': 'ready_for_shipping'
+      };
+      
+      const phase = statusToPhase[newStatus];
+      console.log('🔔 [Notify] Mapeamento:', newStatus, '→', phase || '(não mapeado)');
+      
+      if (!phase) {
+        console.log('⏭️ [Notify] Status não mapeado para notificação');
+        return;
+      }
+      
+      // Buscar configuração do agente customer
+      const { data: agentConfig, error: configError } = await supabase
+        .from('ai_agent_config')
+        .select('is_active, notification_phases, test_phone')
+        .eq('agent_type', 'customer')
+        .limit(1)
+        .single();
+      
+      if (configError) {
+        console.error('❌ [Notify] Erro ao buscar config:', configError);
+        return;
+      }
+      
+      console.log('🔔 [Notify] Config do agente:', {
+        is_active: agentConfig?.is_active,
+        notification_phases: agentConfig?.notification_phases,
+        test_phone: agentConfig?.test_phone
+      });
+      
+      if (!agentConfig?.is_active) {
+        console.log('⏭️ [Notify] Agente customer inativo');
+        return;
+      }
+      
+      if (!agentConfig?.notification_phases?.includes(phase)) {
+        console.log('⏭️ [Notify] Fase não habilitada:', phase, '| Habilitadas:', agentConfig.notification_phases);
+        return;
+      }
+      
+      // ✅ Disparar notificação!
+      console.log(`🚀 [Notify] Disparando notificação para fase: ${phase}`);
+      
+      const { data: notifyResult, error: notifyError } = await supabase.functions.invoke('ai-agent-notify', {
+        body: {
+          order_id: orderId,
+          new_status: newStatus,
+          trigger_type: 'status_change',
+          agent_type: 'customer'
+        }
+      });
+      
+      if (notifyError) {
+        console.error('❌ [Notify] Erro na edge function:', notifyError);
+        toast({
+          title: "Erro ao notificar cliente",
+          description: notifyError.message,
+          variant: "destructive"
+        });
+      } else {
+        console.log('✅ [Notify] Notificação enviada:', notifyResult);
+        toast({
+          title: "📱 Cliente notificado",
+          description: `Mensagem enviada sobre pedido ${orderNumber}`,
+        });
+      }
+    } catch (error: any) {
+      console.error('⚠️ [Notify] Exceção:', error);
+    }
+  };
+
   const handleStatusChange = async (orderId: string, newStatus: OrderStatus) => {
     if (!user) return;
     const order = orders.find(o => o.id === orderId);
@@ -1801,109 +1914,14 @@ export const Dashboard = () => {
           changed_by: user.id,
           change_category: 'status_change'
         }) : Promise.resolve(),
-        
-        // 🔔 DISPARO AUTOMÁTICO: Notificação ao cliente via AI Agent
-        (async () => {
-          try {
-            console.log('🔔 [Notify] Verificando config do agente para status:', newStatus);
-            
-            // Verificar se o novo status está nas fases de notificação habilitadas
-            // IMPORTANTE: Filtrar por agent_type='customer' para pegar o agente correto
-            const { data: agentConfig, error: configError } = await supabase
-              .from('ai_agent_config')
-              .select('is_active, notification_phases, test_phone')
-              .eq('agent_type', 'customer')
-              .limit(1)
-              .single();
-            
-            if (configError) {
-              console.error('❌ [Notify] Erro ao buscar config do agente:', configError);
-              return;
-            }
-            
-            console.log('🔔 [Notify] Config do agente customer:', {
-              is_active: agentConfig?.is_active,
-              notification_phases: agentConfig?.notification_phases,
-              test_phone: agentConfig?.test_phone
-            });
-            
-            if (agentConfig?.is_active && agentConfig?.notification_phases?.length > 0) {
-              // Mapear status para fases de notificação (expandido)
-              const statusToPhase: Record<string, string> = {
-                // Fase: Pedido criado/recebido
-                'almox_ssm_pending': 'order_created',
-                'almox_ssm_received': 'order_created',
-                'almox_ssm_approved': 'order_created',
-                'order_generated': 'order_created',
-                // Fase: Em produção
-                'separation_started': 'in_production',
-                'in_production': 'in_production',
-                'awaiting_material': 'in_production',
-                // Fase: Produção concluída
-                'separation_completed': 'production_completed',
-                'production_completed': 'production_completed',
-                // Fase: Pronto para envio
-                'in_packaging': 'ready_for_shipping',
-                'ready_for_shipping': 'ready_for_shipping',
-                'awaiting_pickup': 'ready_for_shipping',
-                'pickup_scheduled': 'ready_for_shipping',
-                // Fase: Em trânsito
-                'in_transit': 'in_transit',
-                'collected': 'in_transit',
-                // Fase: Entregue
-                'delivered': 'delivered',
-                'completed': 'delivered',
-                // Fase: Atraso
-                'delayed': 'delayed',
-                // Fase: À Faturar
-                'ready_to_invoice': 'ready_to_invoice',
-                'pending_invoice_request': 'ready_to_invoice',
-                // Fase: Faturamento Solicitado
-                'invoice_requested': 'invoicing',
-                'awaiting_invoice': 'invoicing',
-                'invoice_issued': 'invoicing',
-                'invoice_sent': 'invoicing',
-                // Fase: Expedição
-                'released_for_shipping': 'ready_for_shipping',
-                'in_expedition': 'ready_for_shipping'
-              };
-              
-              const phase = statusToPhase[newStatus];
-              console.log('🔔 [Notify] Mapeamento status → fase:', newStatus, '→', phase);
-              console.log('🔔 [Notify] Fases habilitadas:', agentConfig.notification_phases);
-              
-              if (phase && agentConfig.notification_phases.includes(phase)) {
-                console.log(`🔔 [Notify] ✅ Disparando notificação para fase: ${phase}`);
-                
-                const { data: notifyResult, error: notifyError } = await supabase.functions.invoke('ai-agent-notify', {
-                  body: {
-                    order_id: orderId,
-                    new_status: newStatus,
-                    trigger_type: 'status_change',
-                    agent_type: 'customer'
-                  }
-                });
-                
-                if (notifyError) {
-                  console.error('❌ [Notify] Erro na edge function:', notifyError);
-                } else {
-                  console.log('✅ [Notify] Notificação enviada com sucesso:', notifyResult);
-                }
-              } else {
-                console.log('⏭️ [Notify] Fase não habilitada para notificação:', phase, '| Habilitadas:', agentConfig.notification_phases);
-              }
-            } else {
-              console.log('⏭️ [Notify] Agente customer inativo ou sem fases configuradas');
-            }
-          } catch (notifyError) {
-            console.error('⚠️ [Notify] Exceção ao disparar notificação:', notifyError);
-          }
-        })()
       ]).then(() => {
         console.log('✅ Operações secundárias concluídas em background');
       }).catch((error) => {
         console.error('⚠️ Erro em operações secundárias (não crítico):', error);
       });
+
+      // 🔔 PASSO 4: Notificação PROATIVA ao cliente (executada FORA do Promise.all)
+      triggerProactiveNotification(orderId, newStatus, order?.orderNumber || '');
 
       const description = isMovingToOrderGeneration && updateData.delivery_date ? `Pedido ${order?.orderNumber} movido para ${getStatusLabel(newStatus)} - Prazo calculado automaticamente` : `Pedido ${order?.orderNumber} movido para ${getStatusLabel(newStatus)}`;
       toast({
