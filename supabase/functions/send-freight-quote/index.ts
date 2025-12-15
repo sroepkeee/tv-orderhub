@@ -94,60 +94,54 @@ async function sendViaMegaApi(
     
     console.log('Sending via Mega API to:', formattedNumber);
 
-    // Evolution API / Mega API usa /message/sendText/{instance}
-    // Ref: https://doc.evolution-api.com/v2/api-reference/message-controller/send-text
-    const endpoints = [
-      `/message/sendText/${megaApiInstance}`,
-      `/rest/message/sendText/${megaApiInstance}`,
-    ];
+    // Mega API START usa /rest/sendMessage/{instance}/text
+    // Ref: https://apistart02.megaapi.com.br/docs/
+    const endpoint = `/rest/sendMessage/${megaApiInstance}/text`;
+    const fullUrl = `${baseUrl}${endpoint}`;
 
-    // Evolution API usa header 'apikey' (não Bearer)
-    const authHeadersList: Array<Record<string, string>> = [
-      { 'apikey': megaApiToken, 'Content-Type': 'application/json' },
-      { 'Authorization': `Bearer ${megaApiToken}`, 'Content-Type': 'application/json' },
-    ];
+    console.log(`Sending to: ${fullUrl}`);
 
-    // Formato Evolution API: { number: "55XXX", text: "..." }
-    const bodyFormats = [
-      { number: formattedNumber, text: message },
-    ];
+    // Mega API START usa header 'Authorization: Bearer {token}'
+    const headers = {
+      'Authorization': `Bearer ${megaApiToken}`,
+      'Content-Type': 'application/json',
+    };
 
-    let lastError = '';
+    // Formato Mega API START: { messageData: { to: "55XXX", text: "...", linkPreview: false } }
+    const body = {
+      messageData: {
+        to: formattedNumber,
+        text: message,
+        linkPreview: false,
+      },
+    };
 
-    for (const endpoint of endpoints) {
-      for (const headers of authHeadersList) {
-        for (const body of bodyFormats) {
-          const fullUrl = `${baseUrl}${endpoint}`;
-          console.log(`Trying endpoint: ${fullUrl}`);
+    console.log('Request body:', JSON.stringify(body));
 
-          try {
-            const response = await fetch(fullUrl, {
-              method: 'POST',
-              headers,
-              body: JSON.stringify(body),
-            });
+    try {
+      const response = await fetch(fullUrl, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(body),
+      });
 
-            if (response.ok) {
-              const data = await response.json();
-              console.log(`✅ Success with endpoint: ${endpoint}`);
-              return { 
-                success: true, 
-                messageId: data.key?.id || data.message_id || data.id 
-              };
-            } else {
-              const errorText = await response.text();
-              lastError = `${response.status}: ${errorText}`;
-              console.log(`❌ Failed (${response.status})`);
-            }
-          } catch (err) {
-            lastError = err instanceof Error ? err.message : String(err);
-          }
-        }
+      if (response.ok) {
+        const data = await response.json();
+        console.log(`✅ Success`);
+        return { 
+          success: true, 
+          messageId: data.key?.id || data.message_id || data.id 
+        };
+      } else {
+        const errorText = await response.text();
+        console.log(`❌ Failed (${response.status}): ${errorText.substring(0, 150)}`);
+        return { success: false, error: `Mega API error: ${response.status}` };
       }
+    } catch (err) {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      console.error('Fetch error:', errMsg);
+      return { success: false, error: errMsg };
     }
-
-    console.error('All Mega API attempts failed. Last error:', lastError);
-    return { success: false, error: `Mega API error: ${lastError}` };
   } catch (error) {
     console.error('Error sending via Mega API:', error);
     return { 

@@ -126,91 +126,54 @@ Deno.serve(async (req) => {
       messagePreview: fullMessage.substring(0, 50)
     });
 
-    // Tentar múltiplos endpoints e formatos
-    // Observação: alguns tenants da Mega API/Evolution usam instance com/sem prefixos (ex: "megastart-")
-    const instanceCandidates = Array.from(
-      new Set(
-        [
-          megaApiInstance,
-          megaApiInstance.replace(/^megastart-/, ''),
-          megaApiInstance.replace(/^start-/, ''),
-          megaApiInstance.replace(/^mega-/, ''),
-        ]
-          .map((s) => (s ?? '').trim())
-          .filter((s) => s.length > 0)
-      )
-    );
 
-    console.log('Instance candidates:', instanceCandidates);
+    
 
-    // Evolution API / Mega API usa /message/sendText/{instance}
-    // Ref: https://doc.evolution-api.com/v2/api-reference/message-controller/send-text
-    const endpointTemplates = [
-      '/message/sendText/{instance}',
-      '/rest/message/sendText/{instance}',
-    ];
+    // Mega API START usa /rest/sendMessage/{instance}/text
+    // Ref: https://apistart02.megaapi.com.br/docs/
+    const endpoint = `/rest/sendMessage/${megaApiInstance}/text`;
+    const fullUrl = `${megaApiUrl}${endpoint}`;
 
-    const endpoints = instanceCandidates.flatMap((instance) =>
-      endpointTemplates.map((tpl) => tpl.replace('{instance}', instance))
-    );
+    console.log('Sending to:', fullUrl);
 
-    console.log('Endpoints to try:', endpoints);
+    // Mega API START usa header 'Authorization: Bearer {token}'
+    const headers = {
+      'Authorization': `Bearer ${megaApiToken}`,
+      'Content-Type': 'application/json',
+    };
 
-    // Evolution API usa header 'apikey' (não Bearer)
-    const authHeadersList: Array<Record<string, string>> = [
-      { 'apikey': megaApiToken, 'Content-Type': 'application/json' },
-      { 'Authorization': `Bearer ${megaApiToken}`, 'Content-Type': 'application/json' },
-    ];
+    // Formato Mega API START: { messageData: { to: "55XXX", text: "...", linkPreview: false } }
+    const body = {
+      messageData: {
+        to: phoneNumber,
+        text: fullMessage,
+        linkPreview: false,
+      },
+    };
 
-    // Formato Evolution API: { number: "55XXX", text: "..." }
-    const bodyFormats = [
-      { number: phoneNumber, text: fullMessage },
-    ];
+    console.log('Request body:', JSON.stringify(body));
 
-    let megaResponse: Response | null = null;
-    let lastError = '';
+    const megaResponse = await fetch(fullUrl, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(body),
+    });
 
-    // Tentar cada combinação de endpoint, header e body format
-    for (const endpoint of endpoints) {
-      for (const headers of authHeadersList) {
-        for (const body of bodyFormats) {
-          const fullUrl = `${megaApiUrl}${endpoint}`;
-          console.log(`Trying: ${fullUrl}`);
-          console.log(`Auth: ${Object.keys(headers).filter(k => k !== 'Content-Type')[0]}`);
-          console.log(`Body format: ${Object.keys(body).join(', ')}`);
+    const responseText = await megaResponse.text();
+    console.log('Response status:', megaResponse.status);
+    console.log('Response body:', responseText.substring(0, 300));
 
-          try {
-            const response = await fetch(fullUrl, {
-              method: 'POST',
-              headers,
-              body: JSON.stringify(body),
-            });
-
-            if (response.ok) {
-              megaResponse = response;
-              console.log(`✅ Success with: ${endpoint}`);
-              break;
-            } else {
-              const errorText = await response.text();
-              lastError = `${response.status}: ${errorText}`;
-              console.log(`❌ Failed (${response.status}): ${errorText.substring(0, 150)}`);
-            }
-          } catch (err) {
-            lastError = err instanceof Error ? err.message : String(err);
-            console.log(`❌ Request error: ${lastError}`);
-          }
-        }
-        if (megaResponse?.ok) break;
-      }
-      if (megaResponse?.ok) break;
+    if (!megaResponse.ok) {
+      throw new Error(`Mega API error: ${megaResponse.status} - ${responseText}`);
     }
 
-    if (!megaResponse || !megaResponse.ok) {
-      console.error('All Mega API attempts failed. Last error:', lastError);
-      throw new Error(`Failed to send message via Mega API: ${lastError}`);
+    let megaData;
+    try {
+      megaData = JSON.parse(responseText);
+    } catch {
+      megaData = { raw: responseText };
     }
 
-    const megaData = await megaResponse.json();
     console.log('Mega API response:', megaData);
 
     // Salvar conversa no banco

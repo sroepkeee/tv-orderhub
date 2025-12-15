@@ -87,67 +87,65 @@ async function sendAutoReplyMessage(
       formattedPhone = '55' + formattedPhone;
     }
 
-    // Evolution API / Mega API usa /message/sendText/{instance}
-    // Ref: https://doc.evolution-api.com/v2/api-reference/message-controller/send-text
-    const endpoints = [
-      `/message/sendText/${instance.instance_key}`,
-      `/rest/message/sendText/${instance.instance_key}`,
-    ];
+    // Mega API START usa /rest/sendMessage/{instance}/text
+    // Ref: https://apistart02.megaapi.com.br/docs/
+    const endpoint = `/rest/sendMessage/${instance.instance_key}/text`;
+    const sendUrl = `${normalizedUrl}${endpoint}`;
 
-    const authHeadersList: Record<string, string>[] = [
-      { 'apikey': megaApiToken, 'Content-Type': 'application/json' },
-      { 'Authorization': `Bearer ${megaApiToken}`, 'Content-Type': 'application/json' },
-    ];
+    // Mega API START usa header 'Authorization: Bearer {token}'
+    const headers = {
+      'Authorization': `Bearer ${megaApiToken}`,
+      'Content-Type': 'application/json',
+    };
 
-    // Formato Evolution API: { number: "55XXX", text: "..." }
-    const body = { number: formattedPhone, text: message };
+    // Formato Mega API START: { messageData: { to: "55XXX", text: "...", linkPreview: false } }
+    const body = {
+      messageData: {
+        to: formattedPhone,
+        text: message,
+        linkPreview: false,
+      },
+    };
 
-    let success = false;
-    for (const endpoint of endpoints) {
-      for (const headers of authHeadersList) {
-        try {
-          const sendUrl = `${normalizedUrl}${endpoint}`;
-          console.log(`📤 Trying auto-reply: ${sendUrl}`);
+    console.log(`📤 Sending auto-reply to: ${sendUrl}`);
 
-          const response = await fetch(sendUrl, {
-            method: 'POST',
-            headers,
-            body: JSON.stringify(body),
-          });
+    try {
+      const response = await fetch(sendUrl, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(body),
+      });
 
-          if (response.ok) {
-            console.log('✅ Auto-reply message sent successfully');
-            success = true;
-            break;
-          } else {
-            const errorText = await response.text();
-            console.log(`❌ Failed ${response.status}: ${errorText.substring(0, 100)}`);
-          }
-        } catch (err) {
-          console.error('❌ Fetch error:', err);
+      if (response.ok) {
+        console.log('✅ Auto-reply message sent successfully');
+        
+        if (carrierId) {
+          await supabase
+            .from('carrier_conversations')
+            .insert({
+              carrier_id: carrierId,
+              conversation_type: 'general',
+              message_direction: 'outbound',
+              message_content: message,
+              contact_type: 'customer',
+              message_metadata: {
+                sent_via: 'ai_auto_reply',
+                sent_at: new Date().toISOString(),
+              },
+              sent_at: new Date().toISOString(),
+            });
         }
+        
+        return true;
+      } else {
+        const errorText = await response.text();
+        console.log(`❌ Failed ${response.status}: ${errorText.substring(0, 100)}`);
+        return false;
       }
-      if (success) break;
+    } catch (err) {
+      console.error('❌ Fetch error:', err);
+      return false;
     }
-
-    if (success && carrierId) {
-      await supabase
-        .from('carrier_conversations')
-        .insert({
-          carrier_id: carrierId,
-          conversation_type: 'general',
-          message_direction: 'outbound',
-          message_content: message,
-          contact_type: 'customer',
-          message_metadata: {
-            sent_via: 'ai_auto_reply',
-            sent_at: new Date().toISOString(),
-          },
-          sent_at: new Date().toISOString(),
-        });
-    }
-
-    return success;
   } catch (error) {
     console.error('❌ Error sending auto-reply:', error);
     return false;
