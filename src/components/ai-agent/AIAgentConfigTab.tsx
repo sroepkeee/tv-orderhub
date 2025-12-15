@@ -7,7 +7,8 @@ import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Save, Bot, MessageSquare, Mail, Clock, Bell } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Save, Bot, MessageSquare, Mail, Clock, Bell, Sparkles, Zap, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { NOTIFICATION_PHASE_OPTIONS } from "@/lib/notificationPhases";
 
@@ -28,6 +29,13 @@ interface AgentConfig {
   signature: string;
   custom_instructions: string | null;
   notification_phases?: string[];
+  // Auto-reply with AI
+  auto_reply_enabled?: boolean;
+  llm_model?: string;
+  max_response_time_seconds?: number;
+  human_handoff_keywords?: string[];
+  auto_reply_delay_ms?: number;
+  auto_reply_contact_types?: string[];
 }
 
 interface Props {
@@ -168,6 +176,100 @@ export function AIAgentConfigTab({ config, onUpdate }: Props) {
               placeholder="Instruções adicionais para o agente..."
               rows={4}
             />
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Auto-Reply com IA */}
+      <Card className="border-2 border-primary/20 bg-gradient-to-br from-primary/5 to-transparent">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Sparkles className="h-5 w-5 text-primary" />
+            Resposta Automática com IA
+            <Badge variant="secondary" className="ml-2">
+              <Zap className="h-3 w-3 mr-1" />
+              OpenAI
+            </Badge>
+          </CardTitle>
+          <CardDescription>
+            Configure o agente de IA para responder automaticamente às mensagens recebidas via WhatsApp
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between p-4 rounded-lg bg-background border">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-primary/10 rounded-lg">
+                <Bot className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <Label className="text-base">Habilitar Auto-Resposta</Label>
+                <p className="text-sm text-muted-foreground">
+                  O agente responderá automaticamente usando IA
+                </p>
+              </div>
+            </div>
+            <Switch
+              checked={formData.auto_reply_enabled ?? config.auto_reply_enabled ?? false}
+              onCheckedChange={(checked) => updateField('auto_reply_enabled', checked)}
+            />
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-2">
+              <Label>Modelo de IA</Label>
+              <Select
+                value={formData.llm_model ?? config.llm_model ?? 'gpt-4o-mini'}
+                onValueChange={(value) => updateField('llm_model', value)}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="gpt-4o-mini">
+                    GPT-4o Mini (Rápido e Econômico)
+                  </SelectItem>
+                  <SelectItem value="gpt-4o">
+                    GPT-4o (Mais Capaz)
+                  </SelectItem>
+                  <SelectItem value="gpt-4-turbo">
+                    GPT-4 Turbo
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Delay antes de responder (ms)</Label>
+              <Input
+                type="number"
+                value={formData.auto_reply_delay_ms ?? config.auto_reply_delay_ms ?? 1000}
+                onChange={(e) => updateField('auto_reply_delay_ms', parseInt(e.target.value))}
+                min={0}
+                max={10000}
+                step={500}
+              />
+              <p className="text-xs text-muted-foreground">
+                Simula digitação natural. Recomendado: 1000-3000ms
+              </p>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-amber-500" />
+              <Label>Palavras-chave para Transferência Humana</Label>
+            </div>
+            <Textarea
+              value={(formData.human_handoff_keywords ?? config.human_handoff_keywords ?? []).join(', ')}
+              onChange={(e) => updateField('human_handoff_keywords', 
+                e.target.value.split(',').map(s => s.trim()).filter(s => s.length > 0)
+              )}
+              placeholder="humano, atendente, pessoa, falar com alguém..."
+              rows={2}
+            />
+            <p className="text-xs text-muted-foreground">
+              Separe por vírgulas. Quando detectadas, a IA não responderá e marcará para atendimento humano.
+            </p>
           </div>
         </CardContent>
       </Card>
