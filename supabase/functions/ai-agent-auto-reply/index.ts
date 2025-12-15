@@ -375,9 +375,9 @@ ${agentConfig.signature ? `\n\nAssinatura: ${agentConfig.signature}` : ''}`;
     const endpoint = `/rest/sendMessage/${megaApiInstance}/text`;
     const sendUrl = `${baseUrl}${endpoint}`;
 
-    // Mega API START usa header 'Authorization: Bearer {token}'
+    // Mega API START usa header 'apikey'
     const headers = {
-      'Authorization': `Bearer ${megaApiToken}`,
+      'apikey': megaApiToken,
       'Content-Type': 'application/json',
     };
 
