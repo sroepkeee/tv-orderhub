@@ -14,6 +14,310 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_agent_admins: {
+        Row: {
+          created_at: string | null
+          email: string
+          id: string
+          is_active: boolean
+        }
+        Insert: {
+          created_at?: string | null
+          email: string
+          id?: string
+          is_active?: boolean
+        }
+        Update: {
+          created_at?: string | null
+          email?: string
+          id?: string
+          is_active?: boolean
+        }
+        Relationships: []
+      }
+      ai_agent_config: {
+        Row: {
+          agent_name: string
+          created_at: string | null
+          custom_instructions: string | null
+          email_enabled: boolean
+          id: string
+          is_active: boolean
+          language: string
+          max_notifications_per_day: number | null
+          min_interval_minutes: number | null
+          personality: string
+          respect_working_hours: boolean
+          signature: string | null
+          tone_of_voice: string
+          updated_at: string | null
+          whatsapp_enabled: boolean
+          working_hours_end: string | null
+          working_hours_start: string | null
+        }
+        Insert: {
+          agent_name?: string
+          created_at?: string | null
+          custom_instructions?: string | null
+          email_enabled?: boolean
+          id?: string
+          is_active?: boolean
+          language?: string
+          max_notifications_per_day?: number | null
+          min_interval_minutes?: number | null
+          personality?: string
+          respect_working_hours?: boolean
+          signature?: string | null
+          tone_of_voice?: string
+          updated_at?: string | null
+          whatsapp_enabled?: boolean
+          working_hours_end?: string | null
+          working_hours_start?: string | null
+        }
+        Update: {
+          agent_name?: string
+          created_at?: string | null
+          custom_instructions?: string | null
+          email_enabled?: boolean
+          id?: string
+          is_active?: boolean
+          language?: string
+          max_notifications_per_day?: number | null
+          min_interval_minutes?: number | null
+          personality?: string
+          respect_working_hours?: boolean
+          signature?: string | null
+          tone_of_voice?: string
+          updated_at?: string | null
+          whatsapp_enabled?: boolean
+          working_hours_end?: string | null
+          working_hours_start?: string | null
+        }
+        Relationships: []
+      }
+      ai_knowledge_base: {
+        Row: {
+          category: string
+          content: string
+          created_at: string | null
+          created_by: string | null
+          id: string
+          is_active: boolean
+          keywords: string[] | null
+          priority: number | null
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          category?: string
+          content: string
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          keywords?: string[] | null
+          priority?: number | null
+          title: string
+          updated_at?: string | null
+        }
+        Update: {
+          category?: string
+          content?: string
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          keywords?: string[] | null
+          priority?: number | null
+          title?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_knowledge_base_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_notification_log: {
+        Row: {
+          channel: string
+          created_at: string | null
+          customer_contact_id: string | null
+          delivered_at: string | null
+          error_message: string | null
+          external_message_id: string | null
+          id: string
+          message_content: string
+          metadata: Json | null
+          order_id: string | null
+          read_at: string | null
+          recipient: string
+          rule_id: string | null
+          sent_at: string | null
+          status: string
+          subject: string | null
+          template_id: string | null
+        }
+        Insert: {
+          channel: string
+          created_at?: string | null
+          customer_contact_id?: string | null
+          delivered_at?: string | null
+          error_message?: string | null
+          external_message_id?: string | null
+          id?: string
+          message_content: string
+          metadata?: Json | null
+          order_id?: string | null
+          read_at?: string | null
+          recipient: string
+          rule_id?: string | null
+          sent_at?: string | null
+          status?: string
+          subject?: string | null
+          template_id?: string | null
+        }
+        Update: {
+          channel?: string
+          created_at?: string | null
+          customer_contact_id?: string | null
+          delivered_at?: string | null
+          error_message?: string | null
+          external_message_id?: string | null
+          id?: string
+          message_content?: string
+          metadata?: Json | null
+          order_id?: string | null
+          read_at?: string | null
+          recipient?: string
+          rule_id?: string | null
+          sent_at?: string | null
+          status?: string
+          subject?: string | null
+          template_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_notification_log_customer_contact_id_fkey"
+            columns: ["customer_contact_id"]
+            isOneToOne: false
+            referencedRelation: "customer_contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_notification_log_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_notification_log_rule_id_fkey"
+            columns: ["rule_id"]
+            isOneToOne: false
+            referencedRelation: "ai_notification_rules"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_notification_log_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "ai_notification_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_notification_rules: {
+        Row: {
+          channels: string[]
+          created_at: string | null
+          delay_minutes: number | null
+          description: string | null
+          id: string
+          is_active: boolean
+          name: string
+          priority: number | null
+          template_id: string | null
+          trigger_conditions: Json | null
+          trigger_status: string | null
+          trigger_type: string
+          updated_at: string | null
+        }
+        Insert: {
+          channels?: string[]
+          created_at?: string | null
+          delay_minutes?: number | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          priority?: number | null
+          template_id?: string | null
+          trigger_conditions?: Json | null
+          trigger_status?: string | null
+          trigger_type: string
+          updated_at?: string | null
+        }
+        Update: {
+          channels?: string[]
+          created_at?: string | null
+          delay_minutes?: number | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          priority?: number | null
+          template_id?: string | null
+          trigger_conditions?: Json | null
+          trigger_status?: string | null
+          trigger_type?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      ai_notification_templates: {
+        Row: {
+          category: string | null
+          channel: string
+          content: string
+          created_at: string | null
+          id: string
+          is_active: boolean
+          name: string
+          subject: string | null
+          updated_at: string | null
+          variables: string[] | null
+        }
+        Insert: {
+          category?: string | null
+          channel: string
+          content: string
+          created_at?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          subject?: string | null
+          updated_at?: string | null
+          variables?: string[] | null
+        }
+        Update: {
+          category?: string | null
+          channel?: string
+          content?: string
+          created_at?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          subject?: string | null
+          updated_at?: string | null
+          variables?: string[] | null
+        }
+        Relationships: []
+      }
       carrier_conversations: {
         Row: {
           carrier_id: string
@@ -145,6 +449,48 @@ export type Database = {
           phone?: string | null
           quote_email?: string | null
           service_states?: string[] | null
+          updated_at?: string | null
+          whatsapp?: string | null
+        }
+        Relationships: []
+      }
+      customer_contacts: {
+        Row: {
+          created_at: string | null
+          customer_document: string | null
+          customer_name: string
+          email: string | null
+          id: string
+          notes: string | null
+          opt_in_email: boolean | null
+          opt_in_whatsapp: boolean | null
+          preferred_channel: string | null
+          updated_at: string | null
+          whatsapp: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          customer_document?: string | null
+          customer_name: string
+          email?: string | null
+          id?: string
+          notes?: string | null
+          opt_in_email?: boolean | null
+          opt_in_whatsapp?: boolean | null
+          preferred_channel?: string | null
+          updated_at?: string | null
+          whatsapp?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          customer_document?: string | null
+          customer_name?: string
+          email?: string | null
+          id?: string
+          notes?: string | null
+          opt_in_email?: boolean | null
+          opt_in_whatsapp?: boolean | null
+          preferred_channel?: string | null
           updated_at?: string | null
           whatsapp?: string | null
         }
@@ -1953,6 +2299,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_ai_agent_admin: { Args: { _user_id: string }; Returns: boolean }
       is_user_approved: { Args: { _user_id: string }; Returns: boolean }
       log_user_activity: {
         Args: {
