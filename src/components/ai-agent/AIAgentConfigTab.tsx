@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { Save, Bot, MessageSquare, Mail, Clock, Bell, Sparkles, Zap, AlertTriangle, FlaskConical, Smartphone } from "lucide-react";
+import { Save, Bot, MessageSquare, Mail, Clock, Bell, Sparkles, Zap, AlertTriangle, FlaskConical, Smartphone, MessageCircle, Ban } from "lucide-react";
 import { toast } from "sonner";
 import { NOTIFICATION_PHASE_OPTIONS } from "@/lib/notificationPhases";
 
@@ -38,6 +38,12 @@ interface AgentConfig {
   auto_reply_contact_types?: string[];
   // Test mode
   test_phone?: string | null;
+  // Conversation style
+  use_signature?: boolean;
+  closing_style?: string;
+  conversation_style?: string;
+  avoid_repetition?: boolean;
+  forbidden_phrases?: string[];
 }
 
 interface Props {
@@ -272,6 +278,109 @@ export function AIAgentConfigTab({ config, onUpdate }: Props) {
             <p className="text-xs text-muted-foreground">
               Separe por vírgulas. Quando detectadas, a IA não responderá e marcará para atendimento humano.
             </p>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Estilo de Conversa */}
+      <Card className="border-2 border-purple-500/20 bg-gradient-to-br from-purple-500/5 to-transparent">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <MessageCircle className="h-5 w-5 text-purple-500" />
+            Estilo de Conversa
+            <Badge variant="outline" className="ml-2 border-purple-500/50 text-purple-600">
+              Anti-Robô
+            </Badge>
+          </CardTitle>
+          <CardDescription>
+            Configure como o agente deve conversar para evitar mensagens repetitivas e robóticas
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-2">
+              <Label>Estilo de Conversa</Label>
+              <Select
+                value={formData.conversation_style ?? config.conversation_style ?? 'chatty'}
+                onValueChange={(value) => updateField('conversation_style', value)}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="chatty">🗣️ Conversacional (natural, fluído)</SelectItem>
+                  <SelectItem value="concise">📝 Conciso (direto ao ponto)</SelectItem>
+                  <SelectItem value="formal">👔 Formal (profissional)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Estilo de Fechamento</Label>
+              <Select
+                value={formData.closing_style ?? config.closing_style ?? 'varied'}
+                onValueChange={(value) => updateField('closing_style', value)}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="varied">🎲 Variado (muda a cada mensagem)</SelectItem>
+                  <SelectItem value="fixed">📌 Fixo (sempre igual)</SelectItem>
+                  <SelectItem value="none">❌ Nenhum (sem fechamento)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between p-4 rounded-lg bg-background border">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-purple-500/10 rounded-lg">
+                <Ban className="h-5 w-5 text-purple-500" />
+              </div>
+              <div>
+                <Label className="text-base">Usar Assinatura</Label>
+                <p className="text-sm text-muted-foreground">
+                  Incluir assinatura formal no final das mensagens
+                </p>
+              </div>
+            </div>
+            <Switch
+              checked={formData.use_signature ?? config.use_signature ?? false}
+              onCheckedChange={(checked) => updateField('use_signature', checked)}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <Ban className="h-4 w-4 text-red-500" />
+              <Label>Frases Proibidas</Label>
+            </div>
+            <Textarea
+              value={(formData.forbidden_phrases ?? config.forbidden_phrases ?? []).join('\n')}
+              onChange={(e) => updateField('forbidden_phrases', 
+                e.target.value.split('\n').map(s => s.trim()).filter(s => s.length > 0)
+              )}
+              placeholder="Qualquer dúvida, estou à disposição&#10;Fico no aguardo&#10;Abraço, Equipe Imply"
+              rows={4}
+              className="font-mono text-sm"
+            />
+            <p className="text-xs text-muted-foreground">
+              Uma frase por linha. O agente NUNCA usará estas frases nas respostas.
+            </p>
+          </div>
+
+          <div className="flex items-center justify-between p-3 rounded-lg bg-green-500/10 border border-green-500/20">
+            <div className="flex items-center gap-2">
+              <Sparkles className="h-4 w-4 text-green-500" />
+              <span className="text-sm text-green-700 dark:text-green-400">
+                Evitar repetição ativa - o agente variará expressões automaticamente
+              </span>
+            </div>
+            <Switch
+              checked={formData.avoid_repetition ?? config.avoid_repetition ?? true}
+              onCheckedChange={(checked) => updateField('avoid_repetition', checked)}
+            />
           </div>
         </CardContent>
       </Card>
