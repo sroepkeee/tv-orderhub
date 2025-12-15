@@ -196,40 +196,55 @@ export type Database = {
       ai_knowledge_base: {
         Row: {
           agent_type: string
+          carrier_name: string | null
           category: string
           content: string
           created_at: string | null
           created_by: string | null
+          document_type: string | null
           id: string
           is_active: boolean
           keywords: string[] | null
+          occurrence_type: string | null
           priority: number | null
+          regions: string[] | null
+          sla_category: string | null
           title: string
           updated_at: string | null
         }
         Insert: {
           agent_type?: string
+          carrier_name?: string | null
           category?: string
           content: string
           created_at?: string | null
           created_by?: string | null
+          document_type?: string | null
           id?: string
           is_active?: boolean
           keywords?: string[] | null
+          occurrence_type?: string | null
           priority?: number | null
+          regions?: string[] | null
+          sla_category?: string | null
           title: string
           updated_at?: string | null
         }
         Update: {
           agent_type?: string
+          carrier_name?: string | null
           category?: string
           content?: string
           created_at?: string | null
           created_by?: string | null
+          document_type?: string | null
           id?: string
           is_active?: boolean
           keywords?: string[] | null
+          occurrence_type?: string | null
           priority?: number | null
+          regions?: string[] | null
+          sla_category?: string | null
           title?: string
           updated_at?: string | null
         }
@@ -1550,6 +1565,113 @@ export type Database = {
           },
         ]
       }
+      order_occurrences: {
+        Row: {
+          carrier_response: string | null
+          created_at: string | null
+          description: string | null
+          id: string
+          occurrence_type: string
+          order_id: string | null
+          resolved: boolean | null
+          resolved_at: string | null
+          resolved_by: string | null
+          severity: string | null
+          sla_breached: boolean | null
+          updated_at: string | null
+        }
+        Insert: {
+          carrier_response?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          occurrence_type: string
+          order_id?: string | null
+          resolved?: boolean | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          severity?: string | null
+          sla_breached?: boolean | null
+          updated_at?: string | null
+        }
+        Update: {
+          carrier_response?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          occurrence_type?: string
+          order_id?: string | null
+          resolved?: boolean | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          severity?: string | null
+          sla_breached?: boolean | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_occurrences_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_occurrences_resolved_by_fkey"
+            columns: ["resolved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      order_tracking_events: {
+        Row: {
+          carrier_code: string | null
+          created_at: string | null
+          event_code: string | null
+          event_datetime: string | null
+          event_description: string | null
+          id: string
+          location: string | null
+          order_id: string | null
+          raw_response: Json | null
+          tracking_code: string | null
+        }
+        Insert: {
+          carrier_code?: string | null
+          created_at?: string | null
+          event_code?: string | null
+          event_datetime?: string | null
+          event_description?: string | null
+          id?: string
+          location?: string | null
+          order_id?: string | null
+          raw_response?: Json | null
+          tracking_code?: string | null
+        }
+        Update: {
+          carrier_code?: string | null
+          created_at?: string | null
+          event_code?: string | null
+          event_datetime?: string | null
+          event_description?: string | null
+          id?: string
+          location?: string | null
+          order_id?: string | null
+          raw_response?: Json | null
+          tracking_code?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_tracking_events_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       order_type_config: {
         Row: {
           approval_required: boolean | null
@@ -1669,6 +1791,7 @@ export type Database = {
           business_area: string | null
           business_unit: string | null
           carrier_name: string | null
+          contracted_sla_days: number | null
           cost_center: string | null
           created_at: string
           customer_document: string | null
@@ -1709,6 +1832,8 @@ export type Database = {
           requires_image: boolean | null
           sender_company: string | null
           shipping_date: string | null
+          sla_deadline: string | null
+          sla_status: string | null
           status: string
           totvs_order_number: string | null
           tracking_code: string | null
@@ -1721,6 +1846,7 @@ export type Database = {
           business_area?: string | null
           business_unit?: string | null
           carrier_name?: string | null
+          contracted_sla_days?: number | null
           cost_center?: string | null
           created_at?: string
           customer_document?: string | null
@@ -1761,6 +1887,8 @@ export type Database = {
           requires_image?: boolean | null
           sender_company?: string | null
           shipping_date?: string | null
+          sla_deadline?: string | null
+          sla_status?: string | null
           status: string
           totvs_order_number?: string | null
           tracking_code?: string | null
@@ -1773,6 +1901,7 @@ export type Database = {
           business_area?: string | null
           business_unit?: string | null
           carrier_name?: string | null
+          contracted_sla_days?: number | null
           cost_center?: string | null
           created_at?: string
           customer_document?: string | null
@@ -1813,6 +1942,8 @@ export type Database = {
           requires_image?: boolean | null
           sender_company?: string | null
           shipping_date?: string | null
+          sla_deadline?: string | null
+          sla_status?: string | null
           status?: string
           totvs_order_number?: string | null
           tracking_code?: string | null
