@@ -33,7 +33,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Verificar se o usuário está autorizado (whitelist ou admin)
+    // Verificar se o usuário está autorizado (whitelist, admin ou AI agent admin)
     const { data: authData } = await supabaseClient
       .from('whatsapp_authorized_users')
       .select('id')
@@ -41,7 +41,7 @@ Deno.serve(async (req) => {
       .eq('is_active', true)
       .maybeSingle();
 
-    // Se não está na whitelist, verificar se é admin
+    // Se não está na whitelist, verificar se é admin ou AI agent admin
     if (!authData) {
       const { data: adminRole } = await supabaseClient
         .from('user_roles')
@@ -51,13 +51,25 @@ Deno.serve(async (req) => {
         .maybeSingle();
 
       if (!adminRole) {
-        console.error('User not authorized for WhatsApp - not in whitelist and not admin');
-        return new Response(
-          JSON.stringify({ error: 'Usuário não autorizado para WhatsApp' }),
-          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+        // Verificar se é AI Agent admin
+        const { data: aiAgentAdmin } = await supabaseClient
+          .from('ai_agent_admins')
+          .select('id')
+          .eq('email', user.email)
+          .eq('is_active', true)
+          .maybeSingle();
+
+        if (!aiAgentAdmin) {
+          console.error('User not authorized for WhatsApp - not in whitelist, not admin, not AI agent admin');
+          return new Response(
+            JSON.stringify({ error: 'Usuário não autorizado para WhatsApp' }),
+            { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+        console.log('User authorized via AI agent admin');
+      } else {
+        console.log('User authorized via admin role');
       }
-      console.log('User authorized via admin role');
     } else {
       console.log('User authorized via whitelist');
     }
