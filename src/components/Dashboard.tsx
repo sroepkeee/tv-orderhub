@@ -1839,7 +1839,15 @@ export const Dashboard = () => {
                 'delivered': 'delivered',
                 'completed': 'delivered',
                 // Fase: Atraso
-                'delayed': 'delayed'
+                'delayed': 'delayed',
+                // Fase: À Faturar
+                'ready_to_invoice': 'ready_to_invoice',
+                'pending_invoice_request': 'ready_to_invoice',
+                // Fase: Faturamento Solicitado
+                'invoice_requested': 'invoicing',
+                'awaiting_invoice': 'invoicing',
+                'invoice_issued': 'invoicing',
+                'invoice_sent': 'invoicing'
               };
               
               const phase = statusToPhase[newStatus];
