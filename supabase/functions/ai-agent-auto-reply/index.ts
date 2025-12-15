@@ -288,19 +288,15 @@ serve(async (req) => {
     // Build order context with FILTERED information (no sensitive data)
     if (foundOrder) {
       orderContext = `
-📦 INFORMAÇÕES DO PEDIDO (use estas informações para responder):
-- *Número do Pedido:* ${foundOrder.order_number}${foundOrder.totvs_order_number ? ` (TOTVS: ${foundOrder.totvs_order_number})` : ''}
-- *Status Atual:* ${translateStatus(foundOrder.status)}
-- *Data de Entrega Prevista:* ${formatDate(foundOrder.delivery_date)}
-- *Transportadora:* ${foundOrder.carrier_name || 'Ainda não definida'}
-- *Código de Rastreio:* ${foundOrder.tracking_code || 'Aguardando expedição'}
-- *Cidade de Destino:* ${foundOrder.municipality || 'Não informada'}
+📦 DADOS DO PEDIDO ENCONTRADO:
+Pedido: *${foundOrder.order_number}*
+Status: ${translateStatus(foundOrder.status)}
+Entrega: ${formatDate(foundOrder.delivery_date)}
+Transportadora: ${foundOrder.carrier_name || 'Pendente'}
+Rastreio: ${foundOrder.tracking_code || 'Aguardando'}
+Destino: ${foundOrder.municipality || '-'}
 
-⚠️ REGRAS DE SEGURANÇA:
-- NÃO informe valores, preços ou custos
-- NÃO informe CPF/CNPJ completo do cliente
-- NÃO informe endereço completo (apenas cidade/estado)
-- NÃO informe dados bancários ou de pagamento
+⚠️ NÃO revele: valores, CPF/CNPJ, endereço completo, dados bancários.
 `;
     }
 
@@ -369,29 +365,32 @@ VOCÊ ESTÁ ATENDENDO UMA TRANSPORTADORA.
 - Ajude com cotações e prazos de entrega
 `;
 
-    const systemPrompt = `Você é ${agentConfig.agent_name}, um assistente virtual da IMPLY Tecnologia.
-
-PERSONALIDADE: ${agentConfig.personality}
-TOM DE VOZ: ${agentConfig.tone_of_voice}
-IDIOMA: ${agentConfig.language}
+    const systemPrompt = `Você é ${agentConfig.agent_name}, assistente da IMPLY Tecnologia.
 
 ${agentConfig.custom_instructions || ''}
-
 ${contactTypeInstructions}
 ${orderContext}
 ${knowledgeContext}
 
-INSTRUÇÕES IMPORTANTES:
-1. Responda de forma clara e concisa
-2. Mantenha um tom ${agentConfig.tone_of_voice}
-3. Se não souber a resposta, ofereça transferir para um atendente humano
-4. Use WhatsApp formatting: *negrito*, _itálico_, ~riscado~
-5. Não invente informações sobre pedidos ou preços
-6. Se o cliente perguntar sobre um pedido e você tem as informações, forneça o status atual e data prevista
-7. Para cotações de frete, sempre confirme os dados antes de dar valores
-8. NUNCA revele informações sensíveis (valores, documentos completos, dados bancários)
+📝 FORMATAÇÃO OBRIGATÓRIA:
+- Respostas CURTAS (máximo 4-5 linhas)
+- Comece com saudação + emoji (Olá! 😊)
+- Use emojis no início de cada info: 📦 📍 📅 🚚 📋
+- NÃO use bullets (- ou •), use emoji + texto
+- Negrito com asterisco: *texto*
+- Finalize com despedida curta
 
-${agentConfig.signature ? `\n\nAssinatura: ${agentConfig.signature}` : ''}`;
+✅ EXEMPLO DE RESPOSTA IDEAL:
+Olá! 😊
+
+📦 Pedido *139955*
+📍 Em Produção
+📅 Entrega: 29/12/2025
+🚚 Aguardando expedição
+
+Qualquer dúvida, estou aqui! 🤝
+
+${agentConfig.signature || '_Equipe Imply_'}`;
 
     // 7. Call OpenAI API
     if (!openaiApiKey) {
@@ -422,8 +421,8 @@ ${agentConfig.signature ? `\n\nAssinatura: ${agentConfig.signature}` : ''}`;
             content: `Mensagem recebida de ${carrier_name || 'contato'} (${sender_phone}):\n\n${message_content}` 
           }
         ],
-        max_tokens: 500,
-        temperature: 0.7,
+        max_tokens: 200,
+        temperature: 0.5,
       }),
     });
 
