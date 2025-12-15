@@ -277,6 +277,11 @@ export const Dashboard = () => {
     }
   }, [columnVisibility, user]);
 
+  // 📦 Version indicator for debugging
+  useEffect(() => {
+    console.log('📦 Dashboard v2.1 - Notificações Proativas ATIVAS (com await + logs diagnóstico)');
+  }, []);
+
   // Load orders from Supabase
   useEffect(() => {
     if (user) {
@@ -1846,9 +1851,16 @@ export const Dashboard = () => {
   };
 
   const handleStatusChange = async (orderId: string, newStatus: OrderStatus) => {
-    if (!user) return;
+    console.log('🎯 [StatusChange] INÍCIO - orderId:', orderId, 'newStatus:', newStatus);
+    
+    if (!user) {
+      console.log('🎯 [StatusChange] ABORTADO - Sem usuário');
+      return;
+    }
+    
     const order = orders.find(o => o.id === orderId);
     const previousStatus = order?.status;
+    console.log('🎯 [StatusChange] Pedido encontrado:', order?.orderNumber, '| Status anterior:', previousStatus);
     
     // 🚀 PASSO 1: Atualizar estado local IMEDIATAMENTE (feedback instantâneo)
     setOrders(orders.map(o => 
@@ -1921,7 +1933,8 @@ export const Dashboard = () => {
       });
 
       // 🔔 PASSO 4: Notificação PROATIVA ao cliente (executada FORA do Promise.all)
-      triggerProactiveNotification(orderId, newStatus, order?.orderNumber || '');
+      console.log('🔔 [Notify] PASSO 4 - Chamando triggerProactiveNotification');
+      await triggerProactiveNotification(orderId, newStatus, order?.orderNumber || '');
 
       const description = isMovingToOrderGeneration && updateData.delivery_date ? `Pedido ${order?.orderNumber} movido para ${getStatusLabel(newStatus)} - Prazo calculado automaticamente` : `Pedido ${order?.orderNumber} movido para ${getStatusLabel(newStatus)}`;
       toast({
