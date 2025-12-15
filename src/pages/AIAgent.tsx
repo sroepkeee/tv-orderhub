@@ -1,14 +1,13 @@
 import { useAIAgentAdmin } from "@/hooks/useAIAgentAdmin";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Loader2, Bot, ShieldAlert, Settings, Book, Bell, FileText, Users, History, LayoutDashboard } from "lucide-react";
+import { Loader2, Bot, ShieldAlert, LayoutDashboard, Truck, Users, Link2, Book, History } from "lucide-react";
+import { AIAgentDashboardTab } from "@/components/ai-agent/AIAgentDashboardTab";
 import { AIAgentConfigTab } from "@/components/ai-agent/AIAgentConfigTab";
 import { AIAgentKnowledgeTab } from "@/components/ai-agent/AIAgentKnowledgeTab";
-import { AIAgentRulesTab } from "@/components/ai-agent/AIAgentRulesTab";
-import { AIAgentTemplatesTab } from "@/components/ai-agent/AIAgentTemplatesTab";
-import { AIAgentContactsTab } from "@/components/ai-agent/AIAgentContactsTab";
+import { AIAgentQuoteTab } from "@/components/ai-agent/AIAgentQuoteTab";
+import { AIAgentConnectionsTab } from "@/components/ai-agent/AIAgentConnectionsTab";
 import { AIAgentLogsTab } from "@/components/ai-agent/AIAgentLogsTab";
-import { AIAgentDashboardTab } from "@/components/ai-agent/AIAgentDashboardTab";
+import { AIAgentContactsTab } from "@/components/ai-agent/AIAgentContactsTab";
 
 export default function AIAgent() {
   const {
@@ -16,7 +15,6 @@ export default function AIAgent() {
     loading,
     config,
     knowledgeBase,
-    rules,
     templates,
     contacts,
     logs,
@@ -24,18 +22,10 @@ export default function AIAgent() {
     addKnowledge,
     updateKnowledge,
     deleteKnowledge,
-    addRule,
-    updateRule,
-    deleteRule,
-    addTemplate,
-    updateTemplate,
-    deleteTemplate,
     addContact,
     updateContact,
     deleteContact,
-    testNotification,
     loadLogs,
-    refresh,
   } = useAIAgentAdmin();
 
   if (loading) {
@@ -70,9 +60,9 @@ export default function AIAgent() {
           <Bot className="h-8 w-8 text-primary" />
         </div>
         <div>
-          <h1 className="text-2xl font-bold">Agente de IA - Notificações</h1>
+          <h1 className="text-2xl font-bold">Central de Agentes de IA</h1>
           <p className="text-muted-foreground">
-            Configure o comportamento e regras do agente de notificações automáticas
+            Gerencie os agentes de cotação e notificação de clientes
           </p>
         </div>
         {config && (
@@ -83,66 +73,34 @@ export default function AIAgent() {
                 : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
             }`}>
               <span className={`w-2 h-2 rounded-full ${config.is_active ? 'bg-green-500 animate-pulse' : 'bg-yellow-500'}`} />
-              {config.is_active ? 'Ativo' : 'Inativo'}
+              {config.is_active ? 'Sistema Ativo' : 'Sistema Inativo'}
             </span>
           </div>
         )}
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>Base de Conhecimento</CardDescription>
-            <CardTitle className="text-3xl">{knowledgeBase.length}</CardTitle>
-          </CardHeader>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>Regras Ativas</CardDescription>
-            <CardTitle className="text-3xl">{rules.filter(r => r.is_active).length}</CardTitle>
-          </CardHeader>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>Templates</CardDescription>
-            <CardTitle className="text-3xl">{templates.length}</CardTitle>
-          </CardHeader>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>Contatos</CardDescription>
-            <CardTitle className="text-3xl">{contacts.length}</CardTitle>
-          </CardHeader>
-        </Card>
-      </div>
-
-      {/* Main Tabs */}
+      {/* Main Tabs - Multi-Agent Structure */}
       <Tabs defaultValue="dashboard" className="space-y-4">
-        <TabsList className="grid grid-cols-7 w-full">
+        <TabsList className="grid grid-cols-6 w-full">
           <TabsTrigger value="dashboard" className="flex items-center gap-2">
             <LayoutDashboard className="h-4 w-4" />
-            <span className="hidden sm:inline">Dashboard</span>
+            <span className="hidden sm:inline">Visão Geral</span>
           </TabsTrigger>
-          <TabsTrigger value="config" className="flex items-center gap-2">
-            <Settings className="h-4 w-4" />
-            <span className="hidden sm:inline">Configuração</span>
+          <TabsTrigger value="quote-agent" className="flex items-center gap-2">
+            <Truck className="h-4 w-4" />
+            <span className="hidden sm:inline">Agente Cotação</span>
+          </TabsTrigger>
+          <TabsTrigger value="customer-agent" className="flex items-center gap-2">
+            <Users className="h-4 w-4" />
+            <span className="hidden sm:inline">Agente Clientes</span>
+          </TabsTrigger>
+          <TabsTrigger value="connections" className="flex items-center gap-2">
+            <Link2 className="h-4 w-4" />
+            <span className="hidden sm:inline">Conexões</span>
           </TabsTrigger>
           <TabsTrigger value="knowledge" className="flex items-center gap-2">
             <Book className="h-4 w-4" />
             <span className="hidden sm:inline">Conhecimento</span>
-          </TabsTrigger>
-          <TabsTrigger value="rules" className="flex items-center gap-2">
-            <Bell className="h-4 w-4" />
-            <span className="hidden sm:inline">Regras</span>
-          </TabsTrigger>
-          <TabsTrigger value="templates" className="flex items-center gap-2">
-            <FileText className="h-4 w-4" />
-            <span className="hidden sm:inline">Templates</span>
-          </TabsTrigger>
-          <TabsTrigger value="contacts" className="flex items-center gap-2">
-            <Users className="h-4 w-4" />
-            <span className="hidden sm:inline">Contatos</span>
           </TabsTrigger>
           <TabsTrigger value="logs" className="flex items-center gap-2">
             <History className="h-4 w-4" />
@@ -150,6 +108,7 @@ export default function AIAgent() {
           </TabsTrigger>
         </TabsList>
 
+        {/* Dashboard - Unified View */}
         <TabsContent value="dashboard">
           <AIAgentDashboardTab 
             config={config} 
@@ -157,10 +116,30 @@ export default function AIAgent() {
           />
         </TabsContent>
 
-        <TabsContent value="config">
-          <AIAgentConfigTab config={config} onUpdate={updateConfig} />
+        {/* Quote Agent - Carriers */}
+        <TabsContent value="quote-agent">
+          <AIAgentQuoteTab />
         </TabsContent>
 
+        {/* Customer Agent - Notifications */}
+        <TabsContent value="customer-agent">
+          <div className="space-y-6">
+            <AIAgentConfigTab config={config} onUpdate={updateConfig} />
+            <AIAgentContactsTab 
+              contacts={contacts}
+              onAdd={addContact}
+              onUpdate={updateContact}
+              onDelete={deleteContact}
+            />
+          </div>
+        </TabsContent>
+
+        {/* Connections - WhatsApp & API */}
+        <TabsContent value="connections">
+          <AIAgentConnectionsTab />
+        </TabsContent>
+
+        {/* Knowledge Base */}
         <TabsContent value="knowledge">
           <AIAgentKnowledgeTab 
             items={knowledgeBase} 
@@ -170,34 +149,7 @@ export default function AIAgent() {
           />
         </TabsContent>
 
-        <TabsContent value="rules">
-          <AIAgentRulesTab 
-            rules={rules}
-            templates={templates}
-            onAdd={addRule}
-            onUpdate={updateRule}
-            onDelete={deleteRule}
-          />
-        </TabsContent>
-
-        <TabsContent value="templates">
-          <AIAgentTemplatesTab 
-            templates={templates}
-            onAdd={addTemplate}
-            onUpdate={updateTemplate}
-            onDelete={deleteTemplate}
-          />
-        </TabsContent>
-
-        <TabsContent value="contacts">
-          <AIAgentContactsTab 
-            contacts={contacts}
-            onAdd={addContact}
-            onUpdate={updateContact}
-            onDelete={deleteContact}
-          />
-        </TabsContent>
-
+        {/* Logs */}
         <TabsContent value="logs">
           <AIAgentLogsTab logs={logs} onRefresh={loadLogs} />
         </TabsContent>

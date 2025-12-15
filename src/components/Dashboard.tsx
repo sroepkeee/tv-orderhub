@@ -1800,7 +1800,51 @@ export const Dashboard = () => {
           new_value: newStatus,
           changed_by: user.id,
           change_category: 'status_change'
-        }) : Promise.resolve()
+        }) : Promise.resolve(),
+        
+        // 🔔 DISPARO AUTOMÁTICO: Notificação ao cliente via AI Agent
+        (async () => {
+          try {
+            // Verificar se o novo status está nas fases de notificação habilitadas
+            const { data: agentConfig } = await supabase
+              .from('ai_agent_config')
+              .select('is_active, notification_phases')
+              .limit(1)
+              .single();
+            
+            if (agentConfig?.is_active && agentConfig?.notification_phases?.length > 0) {
+              // Mapear status para fases de notificação
+              const statusToPhase: Record<string, string> = {
+                'almox_ssm_approved': 'order_created',
+                'order_generated': 'order_created',
+                'separation_started': 'in_production',
+                'in_production': 'in_production',
+                'production_completed': 'production_completed',
+                'ready_for_shipping': 'ready_for_shipping',
+                'in_transit': 'in_transit',
+                'collected': 'in_transit',
+                'delivered': 'delivered',
+                'completed': 'delivered'
+              };
+              
+              const phase = statusToPhase[newStatus];
+              if (phase && agentConfig.notification_phases.includes(phase)) {
+                console.log(`🔔 Disparando notificação automática para fase: ${phase}`);
+                
+                await supabase.functions.invoke('ai-agent-notify', {
+                  body: {
+                    order_id: orderId,
+                    new_status: newStatus,
+                    trigger_type: 'status_change',
+                    agent_type: 'customer_agent'
+                  }
+                });
+              }
+            }
+          } catch (notifyError) {
+            console.error('⚠️ Erro ao disparar notificação (não crítico):', notifyError);
+          }
+        })()
       ]).then(() => {
         console.log('✅ Operações secundárias concluídas em background');
       }).catch((error) => {
