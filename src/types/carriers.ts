@@ -96,6 +96,9 @@ export interface CarrierConversation {
   message_content: string;
   message_metadata: Record<string, any>;
   contact_type?: 'carrier' | 'customer' | 'technician' | 'supplier';
+  is_group_message?: boolean;
+  group_id?: string;
+  group_name?: string;
   sent_at: string;
   delivered_at?: string;
   read_at?: string;

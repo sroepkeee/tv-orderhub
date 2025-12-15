@@ -442,7 +442,10 @@ export type Database = {
           created_at: string | null
           created_by: string | null
           delivered_at: string | null
+          group_id: string | null
+          group_name: string | null
           id: string
+          is_group_message: boolean | null
           message_content: string
           message_direction: string
           message_metadata: Json | null
@@ -459,7 +462,10 @@ export type Database = {
           created_at?: string | null
           created_by?: string | null
           delivered_at?: string | null
+          group_id?: string | null
+          group_name?: string | null
           id?: string
+          is_group_message?: boolean | null
           message_content: string
           message_direction: string
           message_metadata?: Json | null
@@ -476,7 +482,10 @@ export type Database = {
           created_at?: string | null
           created_by?: string | null
           delivered_at?: string | null
+          group_id?: string | null
+          group_name?: string | null
           id?: string
+          is_group_message?: boolean | null
           message_content?: string
           message_direction?: string
           message_metadata?: Json | null

@@ -28,7 +28,7 @@ export const useCarrierConversations = () => {
             customer_name
           )
         `)
-        .order('created_at', { ascending: false });
+        .order('sent_at', { ascending: false });
 
       if (error) throw error;
       
@@ -195,39 +195,54 @@ export const useCarrierConversations = () => {
   };
 
   const subscribeToNewMessages = (onSync?: () => void) => {
+    console.log('🔔 Setting up real-time subscription for carrier_conversations...');
+    
     const channel = supabase
       .channel('carrier-conversations-realtime')
       .on(
         'postgres_changes',
         {
-          event: '*',
+          event: 'INSERT',
           schema: 'public',
           table: 'carrier_conversations',
         },
         (payload) => {
-          console.log('Evento na tabela carrier_conversations:', payload.eventType, payload);
+          console.log('📩 New message received:', payload.eventType, payload.new);
           
-          if (payload.eventType === 'INSERT') {
-            // Chamar callback de sincronização
-            onSync?.();
-            
-            // Atualizar contagem de não lidas
-            getUnreadCount();
-            
-            // Recarregar conversas para atualizar a lista
-            loadConversations();
-            
-            // Tocar som apenas para mensagens inbound
-            if (payload.new && (payload.new as any).message_direction === 'inbound') {
-              const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSuBzvLZiTYIGWm98OScTgwOUKjl8bllHAU7k9nzzHkpBSh+zPLaizsKGGS54+ydUwYPVq/n77NYGws+k9bzzXcsBSh/zfPci0ELFGCu6PGlVBUIQ5zd8L9yIQUqf8/z24k5CBV');
-              audio.play().catch(() => {}); // Ignore errors
-            }
+          // Chamar callback de sincronização
+          onSync?.();
+          
+          // Atualizar contagem de não lidas
+          getUnreadCount();
+          
+          // Recarregar conversas para atualizar a lista
+          loadConversations();
+          
+          // Tocar som para mensagens inbound
+          if (payload.new && (payload.new as any).message_direction === 'inbound') {
+            const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSuBzvLZiTYIGWm98OScTgwOUKjl8bllHAU7k9nzzHkpBSh+zPLaizsKGGS54+ydUwYPVq/n77NYGws+k9bzzXcsBSh/zfPci0ELFGCu6PGlVBUIQ5zd8L9yIQUqf8/z24k5CBV');
+            audio.play().catch(() => {}); // Ignore errors
           }
         }
       )
-      .subscribe();
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'carrier_conversations',
+        },
+        (payload) => {
+          console.log('📝 Message updated:', payload.eventType);
+          loadConversations();
+        }
+      )
+      .subscribe((status) => {
+        console.log('🔔 Subscription status:', status);
+      });
 
     return () => {
+      console.log('🔕 Removing real-time subscription');
       supabase.removeChannel(channel);
     };
   };
