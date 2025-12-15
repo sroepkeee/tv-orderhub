@@ -38,3 +38,12 @@ verify_jwt = true
 
 [functions.mega-api-update-instance]
 verify_jwt = true
+
+[functions.ai-agent-notify]
+verify_jwt = true
+
+[functions.ai-agent-rag-search]
+verify_jwt = true
+
+[functions.ai-agent-generate-message]
+verify_jwt = true

@@ -44,6 +44,21 @@ serve(async (req) => {
       });
     }
 
+    // Verificar se o status está nas fases habilitadas
+    const enabledPhases = agentConfig.notification_phases || [];
+    if (payload.trigger_type === 'status_change' && payload.new_status) {
+      const shouldNotify = checkStatusInPhases(payload.new_status, enabledPhases);
+      if (!shouldNotify) {
+        console.log('Status not in enabled phases:', payload.new_status);
+        return new Response(JSON.stringify({ 
+          success: false, 
+          message: 'Status not configured for notifications' 
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+    }
+
     // Buscar pedido
     const { data: order } = await supabase
       .from('orders')
@@ -70,29 +85,20 @@ serve(async (req) => {
       notificationRule = rules?.[0];
     }
 
-    if (!notificationRule && payload.trigger_type !== 'manual') {
-      console.log('No matching notification rule found');
-      return new Response(JSON.stringify({ 
-        success: false, 
-        message: 'No matching notification rule' 
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
     // Buscar contato do cliente
     const { data: customerContact } = await supabase
       .from('customer_contacts')
       .select('*')
       .or(`customer_name.ilike.%${order.customer_name}%,customer_document.eq.${order.customer_document}`)
       .limit(1)
-      .single();
+      .maybeSingle();
 
-    // Se não encontrar contato, criar um baseado no pedido
+    // Se não encontrar contato, usar dados do pedido
     let contact = customerContact;
     if (!contact) {
       console.log('Customer contact not found, using order data');
       contact = {
+        id: null,
         customer_name: order.customer_name,
         email: null,
         whatsapp: null,
@@ -186,9 +192,14 @@ serve(async (req) => {
 
       // Enviar notificação
       try {
+        let externalMessageId = null;
+
         if (channel === 'whatsapp') {
           // Usar Mega API
-          await sendWhatsAppMessage(supabase, recipient, messageContent, logEntry.id);
+          externalMessageId = await sendWhatsAppMessage(supabase, recipient, messageContent, logEntry.id);
+          
+          // Registrar na tabela de conversas para visualização unificada
+          await registerConversation(supabase, order, recipient, messageContent, externalMessageId);
         } else if (channel === 'email') {
           // Usar Resend
           await sendEmailMessage(recipient, subject || 'Atualização do seu pedido', messageContent, logEntry.id, supabase);
@@ -227,12 +238,66 @@ serve(async (req) => {
   }
 });
 
+// Mapeamento de status para fases
+const STATUS_PHASE_MAP: Record<string, string[]> = {
+  order_created: ['almox_ssm_pending', 'almox_ssm_received'],
+  in_production: ['separation_started', 'in_production'],
+  production_completed: ['production_completed', 'separation_completed'],
+  ready_for_shipping: ['ready_for_shipping', 'awaiting_pickup', 'pickup_scheduled'],
+  in_transit: ['in_transit', 'collected'],
+  delivered: ['delivered', 'completed'],
+  delayed: ['delayed'],
+};
+
+function checkStatusInPhases(status: string, enabledPhases: string[]): boolean {
+  for (const phase of enabledPhases) {
+    const statuses = STATUS_PHASE_MAP[phase] || [];
+    if (statuses.includes(status)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+async function registerConversation(
+  supabase: any,
+  order: any,
+  phoneNumber: string,
+  message: string,
+  externalMessageId: string | null
+) {
+  try {
+    // Registrar como conversa com cliente (contact_type: 'customer')
+    await supabase
+      .from('carrier_conversations')
+      .insert({
+        carrier_id: order.id, // Usar order_id como referência (será usado para buscar conversas por pedido)
+        order_id: order.id,
+        message_content: message,
+        message_direction: 'outbound',
+        conversation_type: 'customer_notification',
+        contact_type: 'customer',
+        sent_at: new Date().toISOString(),
+        n8n_message_id: externalMessageId,
+        message_metadata: {
+          customer_name: order.customer_name,
+          customer_phone: phoneNumber,
+          notification_type: 'ai_agent',
+        },
+      });
+    console.log('Conversation registered successfully');
+  } catch (error) {
+    console.error('Error registering conversation:', error);
+    // Não falhar a notificação por erro no registro da conversa
+  }
+}
+
 async function sendWhatsAppMessage(
   supabase: any, 
   phone: string, 
   message: string, 
   logId: string
-) {
+): Promise<string | null> {
   // Buscar instância conectada
   const { data: instance } = await supabase
     .from('whatsapp_instances')
@@ -283,6 +348,7 @@ async function sendWhatsAppMessage(
   }
 
   const result = await response.json();
+  const externalMessageId = result.key?.id || result.messageId || null;
   
   // Atualizar log
   await supabase
@@ -290,11 +356,11 @@ async function sendWhatsAppMessage(
     .update({ 
       status: 'sent',
       sent_at: new Date().toISOString(),
-      external_message_id: result.key?.id || result.messageId,
+      external_message_id: externalMessageId,
     })
     .eq('id', logId);
 
-  return result;
+  return externalMessageId;
 }
 
 async function sendEmailMessage(
