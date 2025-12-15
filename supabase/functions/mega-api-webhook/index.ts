@@ -454,6 +454,45 @@ Deno.serve(async (req) => {
         // Don't throw - auto-reply failure shouldn't break webhook
       }
 
+      // 📊 Trigger sentiment analysis in background (fire and forget)
+      // Only analyze if we have enough messages (3+) or it's been a while since last analysis
+      try {
+        // Check if we should analyze
+        const { data: cachedSentiment } = await supabase
+          .from('conversation_sentiment_cache')
+          .select('last_analyzed_at, message_count')
+          .eq('carrier_id', carrierId)
+          .maybeSingle();
+
+        const shouldAnalyze = !cachedSentiment || 
+          !cachedSentiment.last_analyzed_at ||
+          (new Date().getTime() - new Date(cachedSentiment.last_analyzed_at).getTime() > 5 * 60 * 1000); // 5 min
+
+        if (shouldAnalyze && carrierId) {
+          console.log('📊 Triggering sentiment analysis...');
+          
+          fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/ai-agent-conversation-summary`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+            },
+            body: JSON.stringify({
+              carrierId: carrierId,
+              contactName: carrierName || 'Contato desconhecido',
+            }),
+          }).then(async (res) => {
+            const result = await res.json();
+            console.log('📊 Sentiment analysis result:', result.sentiment, result.score);
+          }).catch((err) => {
+            console.error('📊 Sentiment analysis error:', err);
+          });
+        }
+      } catch (sentimentError) {
+        console.error('📊 Failed to trigger sentiment analysis:', sentimentError);
+        // Don't throw - sentiment failure shouldn't break webhook
+      }
+
       return new Response(
         JSON.stringify({ 
           success: true, 

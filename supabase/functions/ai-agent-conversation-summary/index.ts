@@ -186,6 +186,33 @@ ${formattedMessages}`;
       last_interaction: lastMessage.created_at
     };
 
+    // Save to sentiment cache
+    try {
+      const { error: cacheError } = await supabase
+        .from("conversation_sentiment_cache")
+        .upsert({
+          carrier_id: carrierId,
+          contact_name: contactName || "Desconhecido",
+          sentiment: analysis.sentiment,
+          score: analysis.score,
+          summary: analysis.summary,
+          topics: analysis.topics,
+          pending_actions: analysis.pending_actions,
+          message_count: messages.length,
+          last_analyzed_at: new Date().toISOString(),
+          last_message_at: lastMessage.created_at,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: "carrier_id" });
+
+      if (cacheError) {
+        console.error("Error saving sentiment cache:", cacheError);
+      } else {
+        console.log("Sentiment cache updated for carrier:", carrierId);
+      }
+    } catch (cacheErr) {
+      console.error("Failed to update sentiment cache:", cacheErr);
+    }
+
     console.log("Conversation summary generated:", result);
 
     return new Response(
