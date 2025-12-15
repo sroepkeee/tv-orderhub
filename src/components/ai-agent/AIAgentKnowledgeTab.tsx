@@ -8,11 +8,12 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, Pencil, Trash2, Book, Search, Tag, Truck, Users, Globe, AlertTriangle, FileText, MapPin } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Plus, Pencil, Trash2, Book, Search, Tag, Truck, Users, Globe, AlertTriangle, FileText, MapPin, BarChart3, List } from "lucide-react";
 import { toast } from "sonner";
 import { AgentType, KnowledgeBase } from "@/hooks/useAIAgentAdmin";
 import { cn } from "@/lib/utils";
+import { AIAgentRAGPanel } from "./AIAgentRAGPanel";
 
 interface Props {
   items: KnowledgeBase[];
@@ -252,45 +253,65 @@ export function AIAgentKnowledgeTab({ items, allItems, selectedAgentType, onAdd,
 
   const isLogisticsCategory = ['logistica', 'frete', 'status_tracking', 'atraso', 'extravio', 'avaria', 'reentrega', 'devolucao', 'sla', 'excecao'].includes(formData.category);
 
+  const [viewMode, setViewMode] = useState<'stats' | 'list'>('list');
+
   return (
     <div className="space-y-4">
-      {/* Header */}
+      {/* Header with View Toggle */}
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-3 flex-1">
-          <div className="relative flex-1 max-w-sm">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Buscar conhecimento..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-9"
-            />
-          </div>
-          
-          {/* Agent Type Filter */}
-          <Tabs 
-            value={filterAgentType} 
-            onValueChange={setFilterAgentType}
-            className="w-auto"
-          >
+          {/* View Mode Toggle */}
+          <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as 'stats' | 'list')} className="w-auto">
             <TabsList className="h-9">
-              <TabsTrigger value="all" className="text-xs px-3">
-                Todos
+              <TabsTrigger value="stats" className="text-xs px-3">
+                <BarChart3 className="h-3 w-3 mr-1" />
+                Estatísticas
               </TabsTrigger>
-              <TabsTrigger value="carrier" className="text-xs px-3">
-                <Truck className="h-3 w-3 mr-1" />
-                Transp.
-              </TabsTrigger>
-              <TabsTrigger value="customer" className="text-xs px-3">
-                <Users className="h-3 w-3 mr-1" />
-                Clientes
-              </TabsTrigger>
-              <TabsTrigger value="general" className="text-xs px-3">
-                <Globe className="h-3 w-3 mr-1" />
-                Geral
+              <TabsTrigger value="list" className="text-xs px-3">
+                <List className="h-3 w-3 mr-1" />
+                Documentos
               </TabsTrigger>
             </TabsList>
           </Tabs>
+
+          {viewMode === 'list' && (
+            <>
+              <div className="relative flex-1 max-w-sm">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Buscar conhecimento..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
+              
+              {/* Agent Type Filter */}
+              <Tabs 
+                value={filterAgentType} 
+                onValueChange={setFilterAgentType}
+                className="w-auto"
+              >
+                <TabsList className="h-9">
+                  <TabsTrigger value="all" className="text-xs px-3">
+                    Todos
+                  </TabsTrigger>
+                  <TabsTrigger value="carrier" className="text-xs px-3">
+                    <Truck className="h-3 w-3 mr-1" />
+                    Transp.
+                  </TabsTrigger>
+                  <TabsTrigger value="customer" className="text-xs px-3">
+                    <Users className="h-3 w-3 mr-1" />
+                    Clientes
+                  </TabsTrigger>
+                  <TabsTrigger value="general" className="text-xs px-3">
+                    <Globe className="h-3 w-3 mr-1" />
+                    Geral
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
+            </>
+          )}
         </div>
 
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
@@ -560,6 +581,16 @@ export function AIAgentKnowledgeTab({ items, allItems, selectedAgentType, onAdd,
         </Badge>
       </div>
 
+      {/* Render Stats Panel or Document List based on viewMode */}
+      {viewMode === 'stats' ? (
+        <AIAgentRAGPanel 
+          items={allItems} 
+          selectedAgentType={selectedAgentType} 
+          onAddClick={() => handleOpenDialog()}
+        />
+      ) : (
+        <>
+
       {/* Items Grid */}
       <div className="grid gap-4 md:grid-cols-2">
         {filteredItems.map(item => {
@@ -659,12 +690,14 @@ export function AIAgentKnowledgeTab({ items, allItems, selectedAgentType, onAdd,
         })}
       </div>
 
-      {filteredItems.length === 0 && (
+      {filteredItems.length === 0 && viewMode === 'list' && (
         <div className="text-center py-12 text-muted-foreground">
           <Book className="h-12 w-12 mx-auto mb-4 opacity-50" />
           <p>Nenhum conhecimento encontrado</p>
           <p className="text-sm">Adicione conhecimento para o agente usar nas respostas</p>
         </div>
+      )}
+      </>
       )}
     </div>
   );
