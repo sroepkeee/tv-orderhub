@@ -25,17 +25,18 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     const payload: NotificationRequest = await req.json();
-    console.log('AI Agent Notify - Payload:', payload);
+    console.log('📬 AI Agent Notify - Payload:', payload);
 
-    // Buscar configuração do agente
+    // Buscar configuração do agente de clientes
     const { data: agentConfig } = await supabase
       .from('ai_agent_config')
       .select('*')
+      .eq('agent_type', 'customer')
       .limit(1)
       .single();
 
     if (!agentConfig?.is_active) {
-      console.log('AI Agent is not active');
+      console.log('❌ AI Agent (customer) is not active');
       return new Response(JSON.stringify({ 
         success: false, 
         message: 'AI Agent is not active' 
@@ -49,7 +50,7 @@ serve(async (req) => {
     if (payload.trigger_type === 'status_change' && payload.new_status) {
       const shouldNotify = checkStatusInPhases(payload.new_status, enabledPhases);
       if (!shouldNotify) {
-        console.log('Status not in enabled phases:', payload.new_status);
+        console.log('⏭️ Status not in enabled phases:', payload.new_status, 'Enabled:', enabledPhases);
         return new Response(JSON.stringify({ 
           success: false, 
           message: 'Status not configured for notifications' 
@@ -59,7 +60,7 @@ serve(async (req) => {
       }
     }
 
-    // Buscar pedido
+    // Buscar pedido com campo customer_whatsapp
     const { data: order } = await supabase
       .from('orders')
       .select('*, order_items:order_items(*)')
@@ -70,34 +71,63 @@ serve(async (req) => {
       throw new Error('Order not found');
     }
 
-    // Buscar regra de notificação aplicável
-    let notificationRule = null;
-    if (payload.trigger_type === 'status_change' && payload.new_status) {
-      const { data: rules } = await supabase
-        .from('ai_notification_rules')
-        .select('*, template:ai_notification_templates(*)')
-        .eq('trigger_type', 'status_change')
-        .eq('trigger_status', payload.new_status)
-        .eq('is_active', true)
-        .order('priority', { ascending: false })
-        .limit(1);
+    console.log('📦 Order found:', order.order_number, 'Customer:', order.customer_name);
 
-      notificationRule = rules?.[0];
+    // 🔍 BUSCA MELHORADA DO CLIENTE
+    let customerContact = null;
+    let contactSource = '';
+
+    // 1. Primeiro: buscar por documento (mais preciso)
+    if (order.customer_document) {
+      const { data: contactByDoc } = await supabase
+        .from('customer_contacts')
+        .select('*')
+        .eq('customer_document', order.customer_document)
+        .limit(1)
+        .maybeSingle();
+      
+      if (contactByDoc) {
+        customerContact = contactByDoc;
+        contactSource = 'document';
+        console.log('✅ Customer found by document:', contactByDoc.customer_name);
+      }
     }
 
-    // Buscar contato do cliente
-    const { data: customerContact } = await supabase
-      .from('customer_contacts')
-      .select('*')
-      .or(`customer_name.ilike.%${order.customer_name}%,customer_document.eq.${order.customer_document}`)
-      .limit(1)
-      .maybeSingle();
+    // 2. Segundo: buscar por nome (case-insensitive)
+    if (!customerContact && order.customer_name) {
+      const { data: contactByName } = await supabase
+        .from('customer_contacts')
+        .select('*')
+        .ilike('customer_name', `%${order.customer_name}%`)
+        .limit(1)
+        .maybeSingle();
+      
+      if (contactByName) {
+        customerContact = contactByName;
+        contactSource = 'name';
+        console.log('✅ Customer found by name:', contactByName.customer_name);
+      }
+    }
 
-    // Se não encontrar contato, usar dados do pedido
-    let contact = customerContact;
-    if (!contact) {
-      console.log('Customer contact not found, using order data');
-      contact = {
+    // 3. Fallback: usar customer_whatsapp do próprio pedido
+    if (!customerContact && order.customer_whatsapp) {
+      customerContact = {
+        id: null,
+        customer_name: order.customer_name,
+        email: null,
+        whatsapp: order.customer_whatsapp,
+        preferred_channel: 'whatsapp',
+        opt_in_whatsapp: true,
+        opt_in_email: true,
+      };
+      contactSource = 'order_whatsapp';
+      console.log('✅ Using customer_whatsapp from order:', order.customer_whatsapp);
+    }
+
+    // Se não encontrou nenhum contato
+    if (!customerContact) {
+      console.log('⚠️ No customer contact found for:', order.customer_name);
+      customerContact = {
         id: null,
         customer_name: order.customer_name,
         email: null,
@@ -106,6 +136,7 @@ serve(async (req) => {
         opt_in_whatsapp: true,
         opt_in_email: true,
       };
+      contactSource = 'none';
     }
 
     // Verificar opt-in
@@ -113,122 +144,134 @@ serve(async (req) => {
       ? ['whatsapp', 'email'] 
       : payload.channel 
         ? [payload.channel] 
-        : notificationRule?.channels || ['whatsapp'];
+        : ['whatsapp'];
 
     const results = [];
+    
+    // 🧪 MODO TESTE: Enviar cópia para número de teste
+    const testPhone = agentConfig.test_phone;
+    const recipientsToNotify = [];
+    
+    // Adicionar destinatário principal
+    if (customerContact.whatsapp) {
+      recipientsToNotify.push({
+        phone: customerContact.whatsapp,
+        name: customerContact.customer_name,
+        isTest: false
+      });
+    }
+    
+    // Adicionar número de teste (sempre recebe cópia)
+    if (testPhone) {
+      recipientsToNotify.push({
+        phone: testPhone,
+        name: `[TESTE] ${order.customer_name}`,
+        isTest: true
+      });
+      console.log('🧪 Test mode active - will also send to:', testPhone);
+    }
 
     for (const channel of channels) {
-      if (channel === 'whatsapp' && !contact.opt_in_whatsapp) continue;
-      if (channel === 'email' && !contact.opt_in_email) continue;
       if (channel === 'whatsapp' && !agentConfig.whatsapp_enabled) continue;
       if (channel === 'email' && !agentConfig.email_enabled) continue;
 
-      // Buscar template apropriado
-      let template = notificationRule?.template;
-      if (!template) {
-        const { data: templates } = await supabase
-          .from('ai_notification_templates')
-          .select('*')
-          .eq('channel', channel)
-          .eq('is_active', true)
-          .limit(1);
-        template = templates?.[0];
-      }
+      // Preparar mensagem formatada para WhatsApp
+      const statusEmoji = getStatusEmoji(payload.new_status || order.status);
+      const statusLabel = translateStatus(payload.new_status || order.status);
+      const deliveryDate = order.delivery_date 
+        ? new Date(order.delivery_date).toLocaleDateString('pt-BR') 
+        : 'A definir';
+      
+      // Contar itens
+      const itemsCount = order.order_items?.length || 0;
+      const itemsSummary = itemsCount > 0 
+        ? order.order_items.slice(0, 2).map((i: any) => i.item_code).join(', ') + (itemsCount > 2 ? ` +${itemsCount - 2}` : '')
+        : '';
 
-      if (!template) {
-        console.log(`No template found for channel: ${channel}`);
-        continue;
-      }
+      // Mensagem formatada para WhatsApp
+      const messageContent = payload.custom_message || `Olá, ${customerContact.customer_name?.split(' ')[0] || 'Cliente'}! 😊
 
-      // Preparar variáveis
-      const variables: Record<string, string> = {
-        customer_name: contact.customer_name || order.customer_name,
-        order_number: order.order_number,
-        items_count: String(order.order_items?.length || 0),
-        delivery_date: order.delivery_date ? new Date(order.delivery_date).toLocaleDateString('pt-BR') : 'A definir',
-        carrier_name: order.carrier_name || 'A definir',
-        tracking_code: order.tracking_code || 'Não disponível',
-        signature: agentConfig.signature || 'Equipe Imply',
-        status: order.status,
-      };
+📦 Pedido *#${order.order_number}*
+${statusEmoji} ${statusLabel}
+📅 Entrega: ${deliveryDate}
+${order.carrier_name ? `🚚 ${order.carrier_name}` : ''}
+${order.tracking_code ? `📋 Rastreio: ${order.tracking_code}` : ''}
+${itemsSummary ? `📋 Itens: ${itemsSummary}` : ''}
 
-      // Substituir variáveis no template
-      let messageContent = payload.custom_message || template.content;
-      for (const [key, value] of Object.entries(variables)) {
-        messageContent = messageContent.replace(new RegExp(`{{${key}}}`, 'g'), value);
-      }
+Qualquer dúvida, estou aqui! 🤝
 
-      let subject = template.subject;
-      if (subject) {
-        for (const [key, value] of Object.entries(variables)) {
-          subject = subject.replace(new RegExp(`{{${key}}}`, 'g'), value);
-        }
-      }
+_${agentConfig.signature || 'Equipe Imply'}_`;
 
-      // Determinar destinatário
-      const recipient = channel === 'whatsapp' ? contact.whatsapp : contact.email;
-      if (!recipient) {
-        console.log(`No ${channel} contact for customer`);
-        continue;
-      }
+      // Enviar para cada destinatário
+      for (const recipient of recipientsToNotify) {
+        if (channel === 'whatsapp' && !recipient.phone) continue;
 
-      // Registrar no log
-      const { data: logEntry } = await supabase
-        .from('ai_notification_log')
-        .insert({
-          order_id: order.id,
-          customer_contact_id: customerContact?.id,
-          rule_id: notificationRule?.id,
-          template_id: template.id,
-          channel,
-          recipient,
-          subject,
-          message_content: messageContent,
-          status: 'pending',
-          metadata: { variables, trigger_type: payload.trigger_type },
-        })
-        .select()
-        .single();
+        try {
+          // Registrar no log
+          const { data: logEntry } = await supabase
+            .from('ai_notification_log')
+            .insert({
+              order_id: order.id,
+              customer_contact_id: customerContact?.id,
+              channel,
+              recipient: recipient.phone,
+              message_content: recipient.isTest 
+                ? `[TESTE - Cliente: ${order.customer_name}]\n\n${messageContent}`
+                : messageContent,
+              status: 'pending',
+              metadata: { 
+                trigger_type: payload.trigger_type,
+                contact_source: contactSource,
+                is_test: recipient.isTest,
+                new_status: payload.new_status
+              },
+            })
+            .select()
+            .single();
 
-      // Enviar notificação
-      try {
-        let externalMessageId = null;
-
-        if (channel === 'whatsapp') {
-          // Usar Mega API
-          externalMessageId = await sendWhatsAppMessage(supabase, recipient, messageContent, logEntry.id);
-          
-          // Registrar na tabela de conversas para visualização unificada
-          await registerConversation(supabase, order, recipient, messageContent, externalMessageId);
-        } else if (channel === 'email') {
-          // Usar Resend
-          await sendEmailMessage(recipient, subject || 'Atualização do seu pedido', messageContent, logEntry.id, supabase);
-        }
-
-        results.push({ channel, status: 'sent', recipient });
-      } catch (sendError: any) {
-        console.error(`Error sending ${channel}:`, sendError);
-        await supabase
-          .from('ai_notification_log')
-          .update({ 
+          if (channel === 'whatsapp') {
+            const finalMessage = recipient.isTest 
+              ? `🧪 *[MODO TESTE]*\n👤 Cliente: ${order.customer_name}\n📱 Tel: ${customerContact.whatsapp || 'N/A'}\n\n${messageContent}`
+              : messageContent;
+            
+            const externalMessageId = await sendWhatsAppMessage(supabase, recipient.phone, finalMessage, logEntry.id);
+            
+            // Registrar na tabela de conversas
+            if (!recipient.isTest) {
+              await registerConversation(supabase, order, recipient.phone, messageContent, externalMessageId);
+            }
+            
+            results.push({ 
+              channel, 
+              status: 'sent', 
+              recipient: recipient.phone,
+              isTest: recipient.isTest 
+            });
+          }
+        } catch (sendError: any) {
+          console.error(`❌ Error sending ${channel} to ${recipient.phone}:`, sendError);
+          results.push({ 
+            channel, 
             status: 'failed', 
-            error_message: sendError?.message || 'Unknown error'
-          })
-          .eq('id', logEntry.id);
-        
-        results.push({ channel, status: 'failed', error: sendError?.message || 'Unknown error' });
+            recipient: recipient.phone,
+            error: sendError?.message 
+          });
+        }
       }
     }
 
+    console.log('📊 Notification results:', results);
+
     return new Response(JSON.stringify({ 
       success: true, 
-      results 
+      results,
+      contactSource
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
   } catch (error: any) {
-    console.error('AI Agent Notify Error:', error);
+    console.error('❌ AI Agent Notify Error:', error);
     return new Response(JSON.stringify({ 
       error: error?.message || 'Unknown error'
     }), {
@@ -238,12 +281,61 @@ serve(async (req) => {
   }
 });
 
+// Emoji por status
+function getStatusEmoji(status: string): string {
+  const emojis: Record<string, string> = {
+    'almox_ssm_pending': '📥',
+    'almox_ssm_received': '📥',
+    'almox_ssm_approved': '✅',
+    'order_generated': '📝',
+    'separation_started': '🔧',
+    'in_production': '⚙️',
+    'awaiting_material': '⏳',
+    'production_completed': '✅',
+    'in_packaging': '📦',
+    'ready_for_shipping': '📦',
+    'awaiting_pickup': '🚚',
+    'pickup_scheduled': '📅',
+    'in_transit': '🚚',
+    'collected': '🚚',
+    'delivered': '✅',
+    'completed': '🎉',
+    'delayed': '⚠️',
+  };
+  return emojis[status] || '📍';
+}
+
+// Traduzir status para português
+function translateStatus(status: string): string {
+  const labels: Record<string, string> = {
+    'almox_ssm_pending': 'Recebido no Almox SSM',
+    'almox_ssm_received': 'Recebido no Almoxarifado',
+    'almox_ssm_approved': 'Aprovado pelo Almox',
+    'order_generated': 'Ordem Gerada',
+    'separation_started': 'Separação Iniciada',
+    'in_production': 'Em Produção',
+    'awaiting_material': 'Aguardando Material',
+    'separation_completed': 'Separação Concluída',
+    'production_completed': 'Produção Concluída',
+    'in_packaging': 'Em Embalagem',
+    'ready_for_shipping': 'Pronto para Envio',
+    'awaiting_pickup': 'Aguardando Coleta',
+    'pickup_scheduled': 'Coleta Agendada',
+    'in_transit': 'Em Trânsito',
+    'collected': 'Coletado',
+    'delivered': 'Entregue',
+    'completed': 'Concluído',
+    'delayed': 'Atrasado',
+  };
+  return labels[status] || status;
+}
+
 // Mapeamento de status para fases
 const STATUS_PHASE_MAP: Record<string, string[]> = {
-  order_created: ['almox_ssm_pending', 'almox_ssm_received'],
-  in_production: ['separation_started', 'in_production'],
+  order_created: ['almox_ssm_pending', 'almox_ssm_received', 'almox_ssm_approved', 'order_generated'],
+  in_production: ['separation_started', 'in_production', 'awaiting_material'],
   production_completed: ['production_completed', 'separation_completed'],
-  ready_for_shipping: ['ready_for_shipping', 'awaiting_pickup', 'pickup_scheduled'],
+  ready_for_shipping: ['in_packaging', 'ready_for_shipping', 'awaiting_pickup', 'pickup_scheduled'],
   in_transit: ['in_transit', 'collected'],
   delivered: ['delivered', 'completed'],
   delayed: ['delayed'],
@@ -267,11 +359,10 @@ async function registerConversation(
   externalMessageId: string | null
 ) {
   try {
-    // Registrar como conversa com cliente (contact_type: 'customer')
     await supabase
       .from('carrier_conversations')
       .insert({
-        carrier_id: order.id, // Usar order_id como referência (será usado para buscar conversas por pedido)
+        carrier_id: order.id,
         order_id: order.id,
         message_content: message,
         message_direction: 'outbound',
@@ -282,13 +373,12 @@ async function registerConversation(
         message_metadata: {
           customer_name: order.customer_name,
           customer_phone: phoneNumber,
-          notification_type: 'ai_agent',
+          notification_type: 'status_change',
         },
       });
-    console.log('Conversation registered successfully');
+    console.log('✅ Conversation registered');
   } catch (error) {
-    console.error('Error registering conversation:', error);
-    // Não falhar a notificação por erro no registro da conversa
+    console.error('⚠️ Error registering conversation:', error);
   }
 }
 
@@ -324,11 +414,13 @@ async function sendWhatsAppMessage(
   }
   baseUrl = baseUrl.replace(/\/$/, '');
 
-  // Formatar número
+  // Formatar número (remover caracteres não numéricos e adicionar 55 se necessário)
   let formattedPhone = phone.replace(/\D/g, '');
   if (!formattedPhone.startsWith('55')) {
     formattedPhone = '55' + formattedPhone;
   }
+
+  console.log(`📱 Sending WhatsApp to: ${formattedPhone}`);
 
   const response = await fetch(`${baseUrl}/message/sendText/${instance.instance_key}`, {
     method: 'POST',
@@ -360,52 +452,7 @@ async function sendWhatsAppMessage(
     })
     .eq('id', logId);
 
+  console.log('✅ WhatsApp sent successfully, messageId:', externalMessageId);
+
   return externalMessageId;
-}
-
-async function sendEmailMessage(
-  to: string, 
-  subject: string, 
-  htmlContent: string, 
-  logId: string,
-  supabase: any
-) {
-  const resendApiKey = Deno.env.get('RESEND_API_KEY');
-  
-  if (!resendApiKey) {
-    throw new Error('Resend API key not configured');
-  }
-
-  const response = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${resendApiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      from: 'Imply Tecnologia <noreply@imply.com>',
-      to: [to],
-      subject,
-      html: htmlContent,
-    }),
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Resend API error: ${errorText}`);
-  }
-
-  const result = await response.json();
-  
-  // Atualizar log
-  await supabase
-    .from('ai_notification_log')
-    .update({ 
-      status: 'sent',
-      sent_at: new Date().toISOString(),
-      external_message_id: result.id,
-    })
-    .eq('id', logId);
-
-  return result;
 }

@@ -1813,18 +1813,33 @@ export const Dashboard = () => {
               .single();
             
             if (agentConfig?.is_active && agentConfig?.notification_phases?.length > 0) {
-              // Mapear status para fases de notificação
+              // Mapear status para fases de notificação (expandido)
               const statusToPhase: Record<string, string> = {
+                // Fase: Pedido criado/recebido
+                'almox_ssm_pending': 'order_created',
+                'almox_ssm_received': 'order_created',
                 'almox_ssm_approved': 'order_created',
                 'order_generated': 'order_created',
+                // Fase: Em produção
                 'separation_started': 'in_production',
                 'in_production': 'in_production',
+                'awaiting_material': 'in_production',
+                // Fase: Produção concluída
+                'separation_completed': 'production_completed',
                 'production_completed': 'production_completed',
+                // Fase: Pronto para envio
+                'in_packaging': 'ready_for_shipping',
                 'ready_for_shipping': 'ready_for_shipping',
+                'awaiting_pickup': 'ready_for_shipping',
+                'pickup_scheduled': 'ready_for_shipping',
+                // Fase: Em trânsito
                 'in_transit': 'in_transit',
                 'collected': 'in_transit',
+                // Fase: Entregue
                 'delivered': 'delivered',
-                'completed': 'delivered'
+                'completed': 'delivered',
+                // Fase: Atraso
+                'delayed': 'delayed'
               };
               
               const phase = statusToPhase[newStatus];

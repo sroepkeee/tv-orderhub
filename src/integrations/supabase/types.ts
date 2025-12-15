@@ -57,6 +57,7 @@ export type Database = {
           personality: string
           respect_working_hours: boolean
           signature: string | null
+          test_phone: string | null
           tone_of_voice: string
           updated_at: string | null
           whatsapp_enabled: boolean
@@ -84,6 +85,7 @@ export type Database = {
           personality?: string
           respect_working_hours?: boolean
           signature?: string | null
+          test_phone?: string | null
           tone_of_voice?: string
           updated_at?: string | null
           whatsapp_enabled?: boolean
@@ -111,6 +113,7 @@ export type Database = {
           personality?: string
           respect_working_hours?: boolean
           signature?: string | null
+          test_phone?: string | null
           tone_of_voice?: string
           updated_at?: string | null
           whatsapp_enabled?: boolean
@@ -1861,6 +1864,7 @@ export type Database = {
           created_at: string
           customer_document: string | null
           customer_name: string
+          customer_whatsapp: string | null
           delivery_address: string
           delivery_date: string
           driver_name: string | null
@@ -1916,6 +1920,7 @@ export type Database = {
           created_at?: string
           customer_document?: string | null
           customer_name: string
+          customer_whatsapp?: string | null
           delivery_address: string
           delivery_date: string
           driver_name?: string | null
@@ -1971,6 +1976,7 @@ export type Database = {
           created_at?: string
           customer_document?: string | null
           customer_name?: string
+          customer_whatsapp?: string | null
           delivery_address?: string
           delivery_date?: string
           driver_name?: string | null
