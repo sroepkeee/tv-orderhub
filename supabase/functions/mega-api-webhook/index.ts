@@ -244,17 +244,23 @@ Deno.serve(async (req) => {
       
       console.log('🔍 Extracted key:', JSON.stringify(key, null, 2));
       
-      // Filtrar mensagens de grupos - checar ambos os formatos
+      // Detectar se é mensagem de grupo
       const isGroupMessage = 
         payload.isGroup === true ||
         key?.remoteJid?.endsWith('@g.us');
       
+      // Extrair informações do grupo se for mensagem de grupo
+      let groupId: string | null = null;
+      let groupName: string | null = null;
+      
       if (isGroupMessage) {
-        console.log('⏭️ Skipping group message');
-        return new Response(
-          JSON.stringify({ success: true, message: 'Group message ignored' }),
-          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+        groupId = key?.remoteJid?.replace('@g.us', '') || null;
+        // Tentar obter nome do grupo dos metadados
+        groupName = payload.pushName || 
+                    payload.data?.pushName || 
+                    payload.groupMetadata?.subject || 
+                    `Grupo ${groupId?.slice(-4) || 'Desconhecido'}`;
+        console.log('📱 Processing GROUP message from:', groupId, '-', groupName);
       }
       
       // Ignorar mensagens enviadas por nós
@@ -525,6 +531,9 @@ Deno.serve(async (req) => {
           message_direction: 'inbound',
           message_content: messageText,
           contact_type: contactType,
+          is_group_message: isGroupMessage,
+          group_id: groupId,
+          group_name: groupName,
           message_metadata: {
             received_via: 'mega_api',
             phone_number: phoneNumber,
@@ -532,6 +541,9 @@ Deno.serve(async (req) => {
             message_timestamp: messageData.messageTimestamp,
             extracted_quote_data: hasQuoteData ? quoteData : null,
             auto_created_carrier: !carrier,
+            is_group: isGroupMessage,
+            group_id: groupId,
+            group_name: groupName,
           },
           sent_at: new Date().toISOString(),
           delivered_at: new Date().toISOString(),
