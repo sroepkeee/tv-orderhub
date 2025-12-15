@@ -179,31 +179,49 @@ Deno.serve(async (req) => {
         .replace(/@lid$/g, '')
         .replace(/\D/g, '');
       
-      // Normalize phone number - create multiple variations for flexible matching
-      // WhatsApp sends: 555199050190 (country 55 + area 51 + 999050190)
-      // Database may have: 51999050190 (11 digits) or 5199050190 (10 digits)
-      const phoneVariations = [phoneNumber]; // Original: 555199050190
+      // Normalize phone number - create ALL possible variations for flexible matching
+      // WhatsApp sends: 555199050190 (country 55 + area 51 + 99050190)
+      // Database may have: 51999050190, 5199050190, 999050190, etc.
+      const phoneVariations: string[] = [];
       
-      // Try removing country code (55)
-      if (phoneNumber.startsWith('55') && phoneNumber.length > 11) {
-        phoneVariations.push(phoneNumber.substring(2)); // 5199050190
+      // Always add original
+      phoneVariations.push(phoneNumber); // Ex: 555199050190
+      
+      // Remove country code 55 if present
+      let withoutCountry = phoneNumber;
+      if (phoneNumber.startsWith('55') && phoneNumber.length >= 12) {
+        withoutCountry = phoneNumber.substring(2); // Ex: 5199050190
+        phoneVariations.push(withoutCountry);
       }
       
-      // Try with mobile digit (9) inserted after area code
-      if (phoneNumber.startsWith('55') && phoneNumber.length === 12) {
-        // Format: 55 + area (2 digits) + mobile (9 digits)
-        const withoutCountry = phoneNumber.substring(2); // 5199050190
-        // Check if it needs the extra 9: area codes starting with 5 in RS
-        if (!withoutCountry.includes('9', 2)) {
-          const area = withoutCountry.substring(0, 2);
-          const number = withoutCountry.substring(2);
-          phoneVariations.push(area + '9' + number); // 51999050190
-        } else {
-          phoneVariations.push(withoutCountry);
-        }
+      // Generate variations with/without leading 9 (mobile prefix)
+      // Brazilian mobiles: DDD (2 digits) + 9 + number (8 digits) = 11 digits
+      if (withoutCountry.length === 10) {
+        // Has 10 digits: DDD + number without 9, add 9
+        const area = withoutCountry.substring(0, 2);
+        const number = withoutCountry.substring(2);
+        phoneVariations.push(area + '9' + number); // Ex: 51 + 9 + 99050190 = 51999050190
+      } else if (withoutCountry.length === 11 && withoutCountry.charAt(2) === '9') {
+        // Has 11 digits with 9: DDD + 9 + number, also try without 9
+        const area = withoutCountry.substring(0, 2);
+        const number = withoutCountry.substring(3);
+        phoneVariations.push(area + number); // Ex: 51 + 9050190 = 519050190
       }
       
-      console.log('📞 Phone variations for search:', phoneVariations);
+      // Try just the last 8-9 digits (number without area code)
+      if (withoutCountry.length >= 10) {
+        phoneVariations.push(withoutCountry.substring(2)); // Remove DDD: 99050190 or 999050190
+      }
+      
+      // Try with country code 55 added if not present
+      if (!phoneNumber.startsWith('55')) {
+        phoneVariations.push('55' + phoneNumber);
+      }
+      
+      // Remove duplicates
+      const uniqueVariations = [...new Set(phoneVariations)];
+      
+      console.log('📞 Phone variations for search:', uniqueVariations);
 
       // Extrair mensagem de texto - múltiplas fontes
       const message = payload.message || messageData.message;
@@ -226,10 +244,10 @@ Deno.serve(async (req) => {
       console.log('📝 Processing inbound message:', { phoneNumber, messageText });
 
       // Find carrier by phone number - search all variations
-      console.log('🔍 Looking for carrier with WhatsApp variations:', phoneVariations);
+      console.log('🔍 Looking for carrier with WhatsApp variations:', uniqueVariations);
       
       // Build OR query with all phone variations
-      const orConditions = phoneVariations
+      const orConditions = uniqueVariations
         .map(variation => `whatsapp.ilike.%${variation}%`)
         .join(',');
       
@@ -244,30 +262,52 @@ Deno.serve(async (req) => {
         throw carrierError;
       }
 
+      // Se não encontrou carrier, salvar como contato desconhecido
+      let carrierId: string | null = carrier?.id || null;
+      let carrierName: string | null = carrier?.name || null;
+      let contactType = 'carrier';
+      
       if (!carrier) {
-        console.warn('⚠️ Carrier not found for phone:', phoneNumber);
-        return new Response(
-          JSON.stringify({ 
-            success: true, 
-            warning: 'Carrier not found',
-            phoneNumber 
-          }),
-          {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 200,
-          }
-        );
+        console.log('⚠️ Carrier not found for phone:', phoneNumber, '- Saving as unknown contact');
+        
+        // Criar um carrier temporário para este número desconhecido
+        const unknownCarrierName = `Contato ${phoneNumber.slice(-4)}`;
+        
+        const { data: newCarrier, error: createError } = await supabase
+          .from('carriers')
+          .insert({
+            name: unknownCarrierName,
+            whatsapp: phoneNumber,
+            is_active: true,
+            notes: `Contato criado automaticamente via WhatsApp em ${new Date().toISOString()}`,
+          })
+          .select('id, name')
+          .single();
+        
+        if (createError) {
+          console.error('Error creating unknown carrier:', createError);
+          // Continuar mesmo com erro - apenas logar
+          contactType = 'unknown';
+        } else {
+          carrierId = newCarrier.id;
+          carrierName = newCarrier.name;
+          console.log('✅ Created new carrier for unknown contact:', newCarrier.id);
+        }
       }
 
-      // Buscar última cotação ativa desta transportadora (opcional)
-      const { data: lastQuote } = await supabase
-        .from('freight_quotes')
-        .select('id, order_id, status')
-        .eq('carrier_id', carrier.id)
-        .in('status', ['sent', 'pending'])
-        .order('requested_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
+      // Buscar última cotação ativa desta transportadora (opcional, apenas se temos carrier)
+      let lastQuote: { id: string; order_id: string; status: string } | null = null;
+      if (carrierId) {
+        const { data: quote } = await supabase
+          .from('freight_quotes')
+          .select('id, order_id, status')
+          .eq('carrier_id', carrierId)
+          .in('status', ['sent', 'pending'])
+          .order('requested_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        lastQuote = quote;
+      }
 
       // Tentar extrair dados de cotação da mensagem
       const quoteData = extractQuoteData(messageText);
@@ -277,12 +317,12 @@ Deno.serve(async (req) => {
 
       let orderId = lastQuote?.order_id || null;
 
-      // Se não encontrou cotação ativa, buscar última conversa
-      if (!orderId) {
+      // Se não encontrou cotação ativa, buscar última conversa (apenas se temos carrier)
+      if (!orderId && carrierId) {
         const { data: lastConversation } = await supabase
           .from('carrier_conversations')
           .select('order_id')
-          .eq('carrier_id', carrier.id)
+          .eq('carrier_id', carrierId)
           .not('order_id', 'is', null)
           .order('sent_at', { ascending: false })
           .limit(1)
@@ -293,23 +333,39 @@ Deno.serve(async (req) => {
 
       console.log('📦 Related order (optional):', orderId || 'none - general conversation');
 
-      // Salvar mensagem recebida (com ou sem order_id)
+      // Salvar mensagem recebida - SEMPRE, mesmo sem carrier (contactType = 'unknown')
+      if (!carrierId) {
+        console.log('⚠️ Skipping conversation save - no carrier ID available');
+        return new Response(
+          JSON.stringify({ 
+            success: true, 
+            warning: 'Message received but no carrier created',
+            phoneNumber 
+          }),
+          {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 200,
+          }
+        );
+      }
+      
       const { data: conversation, error: conversationError } = await supabase
         .from('carrier_conversations')
         .insert({
-          carrier_id: carrier.id,
+          carrier_id: carrierId,
           order_id: orderId,
           quote_id: lastQuote?.id || null,
-          conversation_type: hasQuoteData ? 'quote_request' : 'follow_up',
+          conversation_type: hasQuoteData ? 'quote_request' : 'general',
           message_direction: 'inbound',
           message_content: messageText,
-          contact_type: 'carrier',
+          contact_type: contactType,
           message_metadata: {
             received_via: 'mega_api',
             phone_number: phoneNumber,
             mega_message_id: messageData.key?.id || null,
             message_timestamp: messageData.messageTimestamp,
             extracted_quote_data: hasQuoteData ? quoteData : null,
+            auto_created_carrier: !carrier,
           },
           sent_at: new Date().toISOString(),
           delivered_at: new Date().toISOString(),
@@ -381,9 +437,10 @@ Deno.serve(async (req) => {
             conversation_id: conversation.id,
             message_content: messageText,
             sender_phone: phoneNumber,
-            carrier_id: carrier.id,
-            carrier_name: carrier.name,
+            carrier_id: carrierId,
+            carrier_name: carrierName || 'Contato desconhecido',
             order_id: orderId,
+            contact_type: contactType,
           }),
         }).then(async (res) => {
           const result = await res.json();
@@ -401,8 +458,11 @@ Deno.serve(async (req) => {
         JSON.stringify({ 
           success: true, 
           conversationId: conversation.id,
-          carrierId: carrier.id,
+          carrierId: carrierId,
+          carrierName: carrierName,
           orderId: orderId,
+          contactType: contactType,
+          autoCreatedCarrier: !carrier,
           quoteResponseCreated: hasQuoteData && !!lastQuote
         }),
         {
