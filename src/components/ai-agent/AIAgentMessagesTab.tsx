@@ -63,7 +63,11 @@ interface AINotification {
   created_at: string;
 }
 
-export function AIAgentMessagesTab() {
+interface Props {
+  selectedAgentType?: 'carrier' | 'customer';
+}
+
+export function AIAgentMessagesTab({ selectedAgentType = 'carrier' }: Props) {
   const [activeTab, setActiveTab] = useState("todas");
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [notifications, setNotifications] = useState<AINotification[]>([]);

@@ -8,24 +8,18 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Pencil, Trash2, Book, Search, Tag } from "lucide-react";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Plus, Pencil, Trash2, Book, Search, Tag, Truck, Users, Globe } from "lucide-react";
 import { toast } from "sonner";
-
-interface KnowledgeItem {
-  id: string;
-  title: string;
-  category: string;
-  content: string;
-  keywords: string[];
-  priority: number;
-  is_active: boolean;
-  created_at: string;
-}
+import { AgentType, KnowledgeBase } from "@/hooks/useAIAgentAdmin";
+import { cn } from "@/lib/utils";
 
 interface Props {
-  items: KnowledgeItem[];
-  onAdd: (item: Omit<KnowledgeItem, 'id' | 'created_at'>) => Promise<{ data: any; error: any }>;
-  onUpdate: (id: string, updates: Partial<KnowledgeItem>) => Promise<{ error: any }>;
+  items: KnowledgeBase[];
+  allItems: KnowledgeBase[];
+  selectedAgentType: AgentType;
+  onAdd: (item: Omit<KnowledgeBase, 'id' | 'created_at'>) => Promise<{ data: any; error: any }>;
+  onUpdate: (id: string, updates: Partial<KnowledgeBase>) => Promise<{ error: any }>;
   onDelete: (id: string) => Promise<{ error: any }>;
 }
 
@@ -37,12 +31,21 @@ const CATEGORIES = [
   { value: 'logistica', label: 'Logística' },
   { value: 'garantia', label: 'Garantia' },
   { value: 'tecnico', label: 'Técnico' },
+  { value: 'frete', label: 'Frete' },
+  { value: 'cotacao', label: 'Cotação' },
 ];
 
-export function AIAgentKnowledgeTab({ items, onAdd, onUpdate, onDelete }: Props) {
+const AGENT_TYPE_OPTIONS = [
+  { value: 'general', label: 'Geral (Ambos)', icon: <Globe className="h-4 w-4" />, color: 'text-purple-500' },
+  { value: 'carrier', label: 'Transportadoras', icon: <Truck className="h-4 w-4" />, color: 'text-amber-500' },
+  { value: 'customer', label: 'Clientes', icon: <Users className="h-4 w-4" />, color: 'text-blue-500' },
+];
+
+export function AIAgentKnowledgeTab({ items, allItems, selectedAgentType, onAdd, onUpdate, onDelete }: Props) {
   const [search, setSearch] = useState("");
+  const [filterAgentType, setFilterAgentType] = useState<string>('all');
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [editingItem, setEditingItem] = useState<KnowledgeItem | null>(null);
+  const [editingItem, setEditingItem] = useState<KnowledgeBase | null>(null);
   const [formData, setFormData] = useState({
     title: '',
     category: 'geral',
@@ -50,15 +53,24 @@ export function AIAgentKnowledgeTab({ items, onAdd, onUpdate, onDelete }: Props)
     keywords: '',
     priority: 0,
     is_active: true,
+    agent_type: selectedAgentType as string,
   });
 
-  const filteredItems = items.filter(item =>
-    item.title.toLowerCase().includes(search.toLowerCase()) ||
-    item.content.toLowerCase().includes(search.toLowerCase()) ||
-    item.keywords?.some(k => k.toLowerCase().includes(search.toLowerCase()))
-  );
+  // Filter items based on search and agent type filter
+  const filteredItems = (filterAgentType === 'all' ? allItems : items).filter(item => {
+    const matchesSearch = 
+      item.title.toLowerCase().includes(search.toLowerCase()) ||
+      item.content.toLowerCase().includes(search.toLowerCase()) ||
+      item.keywords?.some(k => k.toLowerCase().includes(search.toLowerCase()));
+    
+    const matchesFilter = filterAgentType === 'all' || 
+      item.agent_type === filterAgentType || 
+      item.agent_type === 'general';
+    
+    return matchesSearch && matchesFilter;
+  });
 
-  const handleOpenDialog = (item?: KnowledgeItem) => {
+  const handleOpenDialog = (item?: KnowledgeBase) => {
     if (item) {
       setEditingItem(item);
       setFormData({
@@ -68,6 +80,7 @@ export function AIAgentKnowledgeTab({ items, onAdd, onUpdate, onDelete }: Props)
         keywords: item.keywords?.join(', ') || '',
         priority: item.priority,
         is_active: item.is_active,
+        agent_type: item.agent_type || 'general',
       });
     } else {
       setEditingItem(null);
@@ -78,6 +91,7 @@ export function AIAgentKnowledgeTab({ items, onAdd, onUpdate, onDelete }: Props)
         keywords: '',
         priority: 0,
         is_active: true,
+        agent_type: selectedAgentType,
       });
     }
     setDialogOpen(true);
@@ -96,6 +110,7 @@ export function AIAgentKnowledgeTab({ items, onAdd, onUpdate, onDelete }: Props)
       keywords: keywordsArray,
       priority: formData.priority,
       is_active: formData.is_active,
+      agent_type: formData.agent_type,
     };
 
     if (editingItem) {
@@ -128,23 +143,66 @@ export function AIAgentKnowledgeTab({ items, onAdd, onUpdate, onDelete }: Props)
     }
   };
 
-  const handleToggleActive = async (item: KnowledgeItem) => {
+  const handleToggleActive = async (item: KnowledgeBase) => {
     await onUpdate(item.id, { is_active: !item.is_active });
+  };
+
+  const getAgentTypeBadge = (agentType: string) => {
+    const option = AGENT_TYPE_OPTIONS.find(o => o.value === agentType);
+    if (!option) return null;
+    
+    return (
+      <Badge 
+        variant="outline" 
+        className={cn("text-xs flex items-center gap-1", option.color)}
+      >
+        {option.icon}
+        {option.label}
+      </Badge>
+    );
   };
 
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="flex items-center justify-between gap-4">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Buscar conhecimento..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-9"
-          />
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <div className="flex items-center gap-3 flex-1">
+          <div className="relative flex-1 max-w-sm">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Buscar conhecimento..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-9"
+            />
+          </div>
+          
+          {/* Agent Type Filter */}
+          <Tabs 
+            value={filterAgentType} 
+            onValueChange={setFilterAgentType}
+            className="w-auto"
+          >
+            <TabsList className="h-9">
+              <TabsTrigger value="all" className="text-xs px-3">
+                Todos
+              </TabsTrigger>
+              <TabsTrigger value="carrier" className="text-xs px-3">
+                <Truck className="h-3 w-3 mr-1" />
+                Transp.
+              </TabsTrigger>
+              <TabsTrigger value="customer" className="text-xs px-3">
+                <Users className="h-3 w-3 mr-1" />
+                Clientes
+              </TabsTrigger>
+              <TabsTrigger value="general" className="text-xs px-3">
+                <Globe className="h-3 w-3 mr-1" />
+                Geral
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
         </div>
+
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
             <Button onClick={() => handleOpenDialog()}>
@@ -186,6 +244,32 @@ export function AIAgentKnowledgeTab({ items, onAdd, onUpdate, onDelete }: Props)
                     </SelectContent>
                   </Select>
                 </div>
+              </div>
+
+              {/* Agent Type Selector */}
+              <div className="space-y-2">
+                <Label>Agente que usará este conhecimento</Label>
+                <Select
+                  value={formData.agent_type}
+                  onValueChange={(value) => setFormData({ ...formData, agent_type: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {AGENT_TYPE_OPTIONS.map(option => (
+                      <SelectItem key={option.value} value={option.value}>
+                        <div className="flex items-center gap-2">
+                          <span className={option.color}>{option.icon}</span>
+                          {option.label}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  "Geral" será usado por ambos os agentes (Transportadoras e Clientes)
+                </p>
               </div>
 
               <div className="space-y-2">
@@ -240,6 +324,23 @@ export function AIAgentKnowledgeTab({ items, onAdd, onUpdate, onDelete }: Props)
         </Dialog>
       </div>
 
+      {/* Stats */}
+      <div className="flex gap-2 text-sm text-muted-foreground">
+        <Badge variant="secondary">{filteredItems.length} itens</Badge>
+        <Badge variant="outline" className="text-amber-600">
+          <Truck className="h-3 w-3 mr-1" />
+          {allItems.filter(i => i.agent_type === 'carrier').length} transp.
+        </Badge>
+        <Badge variant="outline" className="text-blue-600">
+          <Users className="h-3 w-3 mr-1" />
+          {allItems.filter(i => i.agent_type === 'customer').length} clientes
+        </Badge>
+        <Badge variant="outline" className="text-purple-600">
+          <Globe className="h-3 w-3 mr-1" />
+          {allItems.filter(i => i.agent_type === 'general').length} geral
+        </Badge>
+      </div>
+
       {/* Items Grid */}
       <div className="grid gap-4 md:grid-cols-2">
         {filteredItems.map(item => (
@@ -269,9 +370,10 @@ export function AIAgentKnowledgeTab({ items, onAdd, onUpdate, onDelete }: Props)
                   </Button>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <Badge variant="secondary">{item.category}</Badge>
                 <Badge variant="outline">Prioridade: {item.priority}</Badge>
+                {getAgentTypeBadge(item.agent_type)}
                 <Switch
                   checked={item.is_active}
                   onCheckedChange={() => handleToggleActive(item)}
@@ -300,6 +402,7 @@ export function AIAgentKnowledgeTab({ items, onAdd, onUpdate, onDelete }: Props)
         <div className="text-center py-12 text-muted-foreground">
           <Book className="h-12 w-12 mx-auto mb-4 opacity-50" />
           <p>Nenhum conhecimento encontrado</p>
+          <p className="text-sm">Adicione conhecimento para o agente usar nas respostas</p>
         </div>
       )}
     </div>

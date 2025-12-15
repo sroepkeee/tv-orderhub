@@ -2,8 +2,11 @@ import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
 
-interface AgentConfig {
+export type AgentType = 'carrier' | 'customer';
+
+export interface AgentConfig {
   id: string;
+  agent_type: AgentType;
   agent_name: string;
   personality: string;
   tone_of_voice: string;
@@ -18,9 +21,16 @@ interface AgentConfig {
   min_interval_minutes: number;
   signature: string;
   custom_instructions: string | null;
+  notification_phases?: string[];
+  auto_reply_enabled?: boolean;
+  llm_model?: string;
+  max_response_time_seconds?: number;
+  human_handoff_keywords?: string[];
+  auto_reply_delay_ms?: number;
+  auto_reply_contact_types?: string[];
 }
 
-interface KnowledgeBase {
+export interface KnowledgeBase {
   id: string;
   title: string;
   category: string;
@@ -28,6 +38,7 @@ interface KnowledgeBase {
   keywords: string[];
   priority: number;
   is_active: boolean;
+  agent_type: string;
   created_at: string;
 }
 
@@ -85,12 +96,19 @@ export function useAIAgentAdmin() {
   const { user } = useAuth();
   const [isAuthorized, setIsAuthorized] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [config, setConfig] = useState<AgentConfig | null>(null);
+  const [selectedAgentType, setSelectedAgentType] = useState<AgentType>('carrier');
+  const [configs, setConfigs] = useState<Record<AgentType, AgentConfig | null>>({
+    carrier: null,
+    customer: null,
+  });
   const [knowledgeBase, setKnowledgeBase] = useState<KnowledgeBase[]>([]);
   const [rules, setRules] = useState<NotificationRule[]>([]);
   const [templates, setTemplates] = useState<NotificationTemplate[]>([]);
   const [contacts, setContacts] = useState<CustomerContact[]>([]);
   const [logs, setLogs] = useState<NotificationLog[]>([]);
+
+  // Configuração atual baseada no agente selecionado
+  const config = configs[selectedAgentType];
 
   // Verificar se usuário é Super Admin do AI Agent
   const checkAuthorization = useCallback(async () => {
@@ -117,18 +135,28 @@ export function useAIAgentAdmin() {
     }
   }, [user?.email]);
 
-  // Carregar configuração do agente
-  const loadConfig = useCallback(async () => {
+  // Carregar configurações de ambos os agentes
+  const loadConfigs = useCallback(async () => {
     const { data } = await supabase
       .from('ai_agent_config')
-      .select('*')
-      .limit(1)
-      .single();
+      .select('*');
     
-    if (data) setConfig(data as AgentConfig);
+    if (data) {
+      const configMap: Record<AgentType, AgentConfig | null> = {
+        carrier: null,
+        customer: null,
+      };
+      
+      data.forEach((cfg: any) => {
+        const agentType = (cfg.agent_type as AgentType) || 'carrier';
+        configMap[agentType] = cfg as AgentConfig;
+      });
+      
+      setConfigs(configMap);
+    }
   }, []);
 
-  // Carregar base de conhecimento
+  // Carregar base de conhecimento (filtrada por tipo de agente ou geral)
   const loadKnowledgeBase = useCallback(async () => {
     const { data } = await supabase
       .from('ai_knowledge_base')
@@ -137,6 +165,13 @@ export function useAIAgentAdmin() {
     
     if (data) setKnowledgeBase(data as KnowledgeBase[]);
   }, []);
+
+  // Filtrar conhecimento por agente
+  const getKnowledgeForAgent = useCallback((agentType: AgentType) => {
+    return knowledgeBase.filter(k => 
+      k.agent_type === agentType || k.agent_type === 'general'
+    );
+  }, [knowledgeBase]);
 
   // Carregar regras
   const loadRules = useCallback(async () => {
@@ -184,26 +219,30 @@ export function useAIAgentAdmin() {
     if (!isAuthorized) return;
     
     await Promise.all([
-      loadConfig(),
+      loadConfigs(),
       loadKnowledgeBase(),
       loadRules(),
       loadTemplates(),
       loadContacts(),
       loadLogs(),
     ]);
-  }, [isAuthorized, loadConfig, loadKnowledgeBase, loadRules, loadTemplates, loadContacts, loadLogs]);
+  }, [isAuthorized, loadConfigs, loadKnowledgeBase, loadRules, loadTemplates, loadContacts, loadLogs]);
 
-  // Atualizar configuração
+  // Atualizar configuração do agente atual
   const updateConfig = async (updates: Partial<AgentConfig>) => {
-    if (!config?.id) return;
+    const currentConfig = configs[selectedAgentType];
+    if (!currentConfig?.id) return { error: new Error('No config found') };
     
     const { error } = await supabase
       .from('ai_agent_config')
       .update(updates)
-      .eq('id', config.id);
+      .eq('id', currentConfig.id);
     
     if (!error) {
-      setConfig({ ...config, ...updates });
+      setConfigs({
+        ...configs,
+        [selectedAgentType]: { ...currentConfig, ...updates },
+      });
     }
     return { error };
   };
@@ -378,25 +417,37 @@ export function useAIAgentAdmin() {
   return {
     isAuthorized,
     loading,
-    config,
+    // Agent selection
+    selectedAgentType,
+    setSelectedAgentType,
+    configs,
+    config, // Current selected config
+    // Data
     knowledgeBase,
+    getKnowledgeForAgent,
     rules,
     templates,
     contacts,
     logs,
+    // Config operations
     updateConfig,
+    // Knowledge operations
     addKnowledge,
     updateKnowledge,
     deleteKnowledge,
+    // Rule operations
     addRule,
     updateRule,
     deleteRule,
+    // Template operations
     addTemplate,
     updateTemplate,
     deleteTemplate,
+    // Contact operations
     addContact,
     updateContact,
     deleteContact,
+    // Other operations
     testNotification,
     loadLogs,
     refresh: loadAllData,

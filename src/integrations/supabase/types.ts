@@ -38,6 +38,7 @@ export type Database = {
       ai_agent_config: {
         Row: {
           agent_name: string
+          agent_type: string
           auto_reply_contact_types: string[] | null
           auto_reply_delay_ms: number
           auto_reply_enabled: boolean
@@ -64,6 +65,7 @@ export type Database = {
         }
         Insert: {
           agent_name?: string
+          agent_type?: string
           auto_reply_contact_types?: string[] | null
           auto_reply_delay_ms?: number
           auto_reply_enabled?: boolean
@@ -90,6 +92,7 @@ export type Database = {
         }
         Update: {
           agent_name?: string
+          agent_type?: string
           auto_reply_contact_types?: string[] | null
           auto_reply_delay_ms?: number
           auto_reply_enabled?: boolean
@@ -192,6 +195,7 @@ export type Database = {
       }
       ai_knowledge_base: {
         Row: {
+          agent_type: string
           category: string
           content: string
           created_at: string | null
@@ -204,6 +208,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          agent_type?: string
           category?: string
           content: string
           created_at?: string | null
@@ -216,6 +221,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          agent_type?: string
           category?: string
           content?: string
           created_at?: string | null

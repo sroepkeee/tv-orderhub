@@ -20,6 +20,8 @@ import {
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { subDays } from "date-fns";
+import { AgentType, AgentConfig } from "@/hooks/useAIAgentAdmin";
+import { cn } from "@/lib/utils";
 
 interface NotificationMetrics {
   total24h: number;
@@ -49,20 +51,21 @@ interface WhatsAppStatus {
 }
 
 interface Props {
-  config: {
-    is_active: boolean;
-    whatsapp_enabled: boolean;
-    email_enabled: boolean;
-  } | null;
+  config: AgentConfig | null;
+  configs: Record<AgentType, AgentConfig | null>;
+  selectedAgentType: AgentType;
   onToggleActive: (active: boolean) => Promise<void>;
 }
 
-export function AIAgentDashboardTab({ config, onToggleActive }: Props) {
+export function AIAgentDashboardTab({ config, configs, selectedAgentType, onToggleActive }: Props) {
   const [notificationMetrics, setNotificationMetrics] = useState<NotificationMetrics | null>(null);
   const [quoteMetrics, setQuoteMetrics] = useState<QuoteMetrics | null>(null);
   const [whatsappStatus, setWhatsappStatus] = useState<WhatsAppStatus>({ connected: false });
   const [loading, setLoading] = useState(true);
   const [toggling, setToggling] = useState(false);
+
+  const carrierConfig = configs.carrier;
+  const customerConfig = configs.customer;
 
   const loadMetrics = async () => {
     setLoading(true);
@@ -152,59 +155,57 @@ export function AIAgentDashboardTab({ config, onToggleActive }: Props) {
 
   return (
     <div className="space-y-6">
-      {/* Agent Cards - Overview */}
-      <div className="grid gap-4 md:grid-cols-3">
-        {/* System Status */}
-        <Card className={config?.is_active ? 'border-green-500/50' : 'border-yellow-500/50'}>
+      {/* Agent Status Cards */}
+      <div className="grid gap-4 md:grid-cols-2">
+        {/* Carrier Agent Card */}
+        <Card className={cn(
+          "relative overflow-hidden",
+          carrierConfig?.is_active ? 'border-amber-500/50' : 'border-border',
+          selectedAgentType === 'carrier' && 'ring-2 ring-amber-500/50'
+        )}>
+          <div className="absolute top-0 left-0 right-0 h-1 bg-amber-500" />
           <CardHeader className="pb-2">
             <CardDescription className="flex items-center gap-2">
-              <Bot className="h-4 w-4" />
-              Sistema de Agentes
+              <Truck className="h-4 w-4 text-amber-500" />
+              Agente de Transportadoras
             </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <span className={`w-3 h-3 rounded-full ${config?.is_active ? 'bg-green-500 animate-pulse' : 'bg-yellow-500'}`} />
+                <span className={cn(
+                  "w-3 h-3 rounded-full",
+                  carrierConfig?.is_active ? 'bg-green-500 animate-pulse' : 'bg-gray-400'
+                )} />
                 <span className="text-xl font-bold">
-                  {config?.is_active ? 'Ativo' : 'Inativo'}
+                  {carrierConfig?.is_active ? 'Ativo' : 'Inativo'}
                 </span>
               </div>
-              <Button 
-                size="sm" 
-                variant={config?.is_active ? 'destructive' : 'default'}
-                onClick={handleToggle}
-                disabled={toggling}
-              >
-                {toggling ? 'Aguarde...' : (config?.is_active ? 'Desativar' : 'Ativar')}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Quote Agent Status */}
-        <Card className="border-amber-500/30">
-          <CardHeader className="pb-2">
-            <CardDescription className="flex items-center gap-2">
-              <Truck className="h-4 w-4 text-amber-500" />
-              Agente de Cotação
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-2xl font-bold">{quoteMetrics?.totalSent || 0}</span>
-                <Badge variant="secondary">7 dias</Badge>
+              <div className="text-right">
+                <p className="text-2xl font-bold">{quoteMetrics?.totalSent || 0}</p>
+                <p className="text-xs text-muted-foreground">cotações (7d)</p>
               </div>
-              <p className="text-xs text-muted-foreground">
-                {quoteMetrics?.totalResponded || 0} respondidas ({quoteMetrics?.responseRate.toFixed(0) || 0}%)
-              </p>
+            </div>
+            <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
+              <Badge variant="outline" className="text-xs">
+                {quoteMetrics?.responseRate.toFixed(0) || 0}% respondidas
+              </Badge>
+              {carrierConfig?.auto_reply_enabled && (
+                <Badge className="bg-amber-500/20 text-amber-600 border-amber-500/30">
+                  Auto-reply ON
+                </Badge>
+              )}
             </div>
           </CardContent>
         </Card>
 
-        {/* Customer Agent Status */}
-        <Card className="border-blue-500/30">
+        {/* Customer Agent Card */}
+        <Card className={cn(
+          "relative overflow-hidden",
+          customerConfig?.is_active ? 'border-blue-500/50' : 'border-border',
+          selectedAgentType === 'customer' && 'ring-2 ring-blue-500/50'
+        )}>
+          <div className="absolute top-0 left-0 right-0 h-1 bg-blue-500" />
           <CardHeader className="pb-2">
             <CardDescription className="flex items-center gap-2">
               <Users className="h-4 w-4 text-blue-500" />
@@ -212,18 +213,77 @@ export function AIAgentDashboardTab({ config, onToggleActive }: Props) {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-2xl font-bold">{notificationMetrics?.total24h || 0}</span>
-                <Badge variant="secondary">24h</Badge>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className={cn(
+                  "w-3 h-3 rounded-full",
+                  customerConfig?.is_active ? 'bg-green-500 animate-pulse' : 'bg-gray-400'
+                )} />
+                <span className="text-xl font-bold">
+                  {customerConfig?.is_active ? 'Ativo' : 'Inativo'}
+                </span>
               </div>
-              <p className="text-xs text-muted-foreground">
-                {notificationMetrics?.successRate.toFixed(0) || 0}% taxa de sucesso
-              </p>
+              <div className="text-right">
+                <p className="text-2xl font-bold">{notificationMetrics?.total24h || 0}</p>
+                <p className="text-xs text-muted-foreground">notificações (24h)</p>
+              </div>
+            </div>
+            <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
+              <Badge variant="outline" className="text-xs">
+                {notificationMetrics?.successRate.toFixed(0) || 0}% sucesso
+              </Badge>
+              {customerConfig?.auto_reply_enabled && (
+                <Badge className="bg-blue-500/20 text-blue-600 border-blue-500/30">
+                  Auto-reply ON
+                </Badge>
+              )}
             </div>
           </CardContent>
         </Card>
       </div>
+
+      {/* Current Agent Control */}
+      <Card className={cn(
+        "border-2",
+        selectedAgentType === 'carrier' ? 'border-amber-500/30' : 'border-blue-500/30'
+      )}>
+        <CardHeader className="pb-2">
+          <CardDescription className="flex items-center gap-2">
+            <Bot className="h-4 w-4" />
+            Controle do Agente Selecionado
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-lg font-semibold flex items-center gap-2">
+                {selectedAgentType === 'carrier' ? (
+                  <>
+                    <Truck className="h-5 w-5 text-amber-500" />
+                    {config?.agent_name || 'Agente de Transportadoras'}
+                  </>
+                ) : (
+                  <>
+                    <Users className="h-5 w-5 text-blue-500" />
+                    {config?.agent_name || 'Agente de Clientes'}
+                  </>
+                )}
+              </h3>
+              <p className="text-sm text-muted-foreground mt-1">
+                {config?.personality?.slice(0, 100)}...
+              </p>
+            </div>
+            <Button 
+              size="lg" 
+              variant={config?.is_active ? 'destructive' : 'default'}
+              onClick={handleToggle}
+              disabled={toggling}
+            >
+              {toggling ? 'Aguarde...' : (config?.is_active ? 'Desativar' : 'Ativar')}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Connection Status */}
       <div className="grid gap-4 md:grid-cols-2">
@@ -269,7 +329,10 @@ export function AIAgentDashboardTab({ config, onToggleActive }: Props) {
           <CardContent>
             <div className="flex gap-4">
               <div className="flex items-center gap-2">
-                <MessageSquare className={`h-5 w-5 ${config?.whatsapp_enabled ? 'text-green-500' : 'text-muted-foreground'}`} />
+                <MessageSquare className={cn(
+                  "h-5 w-5",
+                  config?.whatsapp_enabled ? 'text-green-500' : 'text-muted-foreground'
+                )} />
                 <span className={config?.whatsapp_enabled ? 'font-medium' : 'text-muted-foreground'}>
                   WhatsApp
                 </span>
@@ -280,7 +343,10 @@ export function AIAgentDashboardTab({ config, onToggleActive }: Props) {
                 )}
               </div>
               <div className="flex items-center gap-2">
-                <Mail className={`h-5 w-5 ${config?.email_enabled ? 'text-blue-500' : 'text-muted-foreground'}`} />
+                <Mail className={cn(
+                  "h-5 w-5",
+                  config?.email_enabled ? 'text-blue-500' : 'text-muted-foreground'
+                )} />
                 <span className={config?.email_enabled ? 'font-medium' : 'text-muted-foreground'}>
                   E-mail
                 </span>
@@ -297,7 +363,7 @@ export function AIAgentDashboardTab({ config, onToggleActive }: Props) {
 
       {/* Detailed Metrics */}
       <div className="grid gap-4 md:grid-cols-2">
-        {/* Customer Notifications by Channel */}
+        {/* Notifications by Channel */}
         <Card>
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
@@ -377,7 +443,7 @@ export function AIAgentDashboardTab({ config, onToggleActive }: Props) {
       {/* Refresh Button */}
       <div className="flex justify-end">
         <Button variant="outline" onClick={loadMetrics} disabled={loading}>
-          <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+          <RefreshCw className={cn("h-4 w-4 mr-2", loading && 'animate-spin')} />
           Atualizar Métricas
         </Button>
       </div>
