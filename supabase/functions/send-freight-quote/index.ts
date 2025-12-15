@@ -101,9 +101,9 @@ async function sendViaMegaApi(
 
     console.log(`Sending to: ${fullUrl}`);
 
-    // Mega API START usa header 'Authorization: Bearer {token}'
+    // Mega API START usa header 'apikey'
     const headers = {
-      'Authorization': `Bearer ${megaApiToken}`,
+      'apikey': megaApiToken,
       'Content-Type': 'application/json',
     };
 

@@ -92,9 +92,9 @@ async function sendAutoReplyMessage(
     const endpoint = `/rest/sendMessage/${instance.instance_key}/text`;
     const sendUrl = `${normalizedUrl}${endpoint}`;
 
-    // Mega API START usa header 'Authorization: Bearer {token}'
+    // Mega API START usa header 'apikey'
     const headers = {
-      'Authorization': `Bearer ${megaApiToken}`,
+      'apikey': megaApiToken,
       'Content-Type': 'application/json',
     };
 
