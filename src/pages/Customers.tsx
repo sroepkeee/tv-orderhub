@@ -52,6 +52,7 @@ export default function Customers() {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterSource, setFilterSource] = useState("all");
   const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [newDialogOpen, setNewDialogOpen] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [formData, setFormData] = useState<Partial<Customer>>({});
 
@@ -74,6 +75,65 @@ export default function Customers() {
       toast.error('Erro ao carregar clientes');
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Métricas calculadas
+  const metrics = {
+    total: customers.length,
+    withWhatsApp: customers.filter(c => c.whatsapp).length,
+    withEmail: customers.filter(c => c.email).length,
+    optInWhatsApp: customers.filter(c => c.opt_in_whatsapp).length,
+    optInEmail: customers.filter(c => c.opt_in_email).length,
+  };
+
+  const handleNewCustomer = () => {
+    setFormData({
+      customer_name: '',
+      opt_in_whatsapp: true,
+      opt_in_email: true,
+      preferred_channel: 'whatsapp'
+    });
+    setNewDialogOpen(true);
+  };
+
+  const handleSaveNew = async () => {
+    if (!formData.customer_name) {
+      toast.error('Nome do cliente é obrigatório');
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('customer_contacts')
+        .insert({
+          customer_name: formData.customer_name,
+          customer_document: formData.customer_document,
+          email: formData.email,
+          whatsapp: formData.whatsapp,
+          phone: formData.phone,
+          contact_person: formData.contact_person,
+          address: formData.address,
+          neighborhood: formData.neighborhood,
+          city: formData.city,
+          state: formData.state,
+          zip_code: formData.zip_code,
+          preferred_channel: formData.preferred_channel || 'whatsapp',
+          opt_in_whatsapp: formData.opt_in_whatsapp ?? true,
+          opt_in_email: formData.opt_in_email ?? true,
+          notes: formData.notes,
+          source: 'manual'
+        });
+
+      if (error) throw error;
+
+      toast.success('Cliente criado com sucesso');
+      setNewDialogOpen(false);
+      setFormData({});
+      loadCustomers();
+    } catch (error) {
+      console.error('Erro ao criar cliente:', error);
+      toast.error('Erro ao criar cliente');
     }
   };
 
@@ -181,6 +241,10 @@ export default function Customers() {
                 <Download className="h-4 w-4 mr-2" />
                 Exportar
               </Button>
+              <Button onClick={handleNewCustomer}>
+                <Plus className="h-4 w-4 mr-2" />
+                Novo Cliente
+              </Button>
             </div>
           </div>
         </div>
@@ -188,6 +252,44 @@ export default function Customers() {
 
       {/* Main Content */}
       <main className="container mx-auto px-4 py-6">
+        {/* Metrics Cards */}
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+          <Card>
+            <CardContent className="pt-4 pb-4">
+              <div className="text-2xl font-bold">{metrics.total}</div>
+              <p className="text-xs text-muted-foreground">Total de Clientes</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-4 pb-4">
+              <div className="text-2xl font-bold text-green-600">{metrics.withWhatsApp}</div>
+              <p className="text-xs text-muted-foreground flex items-center gap-1">
+                <MessageSquare className="h-3 w-3" /> Com WhatsApp
+              </p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-4 pb-4">
+              <div className="text-2xl font-bold text-blue-600">{metrics.withEmail}</div>
+              <p className="text-xs text-muted-foreground flex items-center gap-1">
+                <Mail className="h-3 w-3" /> Com Email
+              </p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-4 pb-4">
+              <div className="text-2xl font-bold text-green-500">{metrics.optInWhatsApp}</div>
+              <p className="text-xs text-muted-foreground">Opt-in WhatsApp</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-4 pb-4">
+              <div className="text-2xl font-bold text-blue-500">{metrics.optInEmail}</div>
+              <p className="text-xs text-muted-foreground">Opt-in Email</p>
+            </CardContent>
+          </Card>
+        </div>
+
         {/* Filters */}
         <Card className="mb-6">
           <CardContent className="pt-4">
@@ -486,6 +588,180 @@ export default function Customers() {
             </Button>
             <Button onClick={handleSave}>
               Salvar Alterações
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* New Customer Dialog */}
+      <Dialog open={newDialogOpen} onOpenChange={setNewDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Plus className="h-5 w-5" />
+              Novo Cliente
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Nome/Razão Social *</Label>
+                <Input
+                  value={formData.customer_name || ''}
+                  onChange={(e) => setFormData({ ...formData, customer_name: e.target.value })}
+                  placeholder="Nome completo ou razão social"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>CPF/CNPJ</Label>
+                <Input
+                  value={formData.customer_document || ''}
+                  onChange={(e) => setFormData({ ...formData, customer_document: e.target.value })}
+                  placeholder="Documento"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Responsável pelo Contato</Label>
+                <Input
+                  value={formData.contact_person || ''}
+                  onChange={(e) => setFormData({ ...formData, contact_person: e.target.value })}
+                  placeholder="Nome de quem receberá notificações"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Telefone Fixo</Label>
+                <Input
+                  value={formData.phone || ''}
+                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">
+                  <MessageSquare className="h-4 w-4 text-green-600" />
+                  WhatsApp
+                </Label>
+                <Input
+                  value={formData.whatsapp || ''}
+                  onChange={(e) => setFormData({ ...formData, whatsapp: e.target.value })}
+                  placeholder="(00) 00000-0000"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">
+                  <Mail className="h-4 w-4 text-blue-600" />
+                  E-mail
+                </Label>
+                <Input
+                  type="email"
+                  value={formData.email || ''}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  placeholder="email@exemplo.com"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Endereço</Label>
+              <Input
+                value={formData.address || ''}
+                onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                placeholder="Rua, número, complemento"
+              />
+            </div>
+
+            <div className="grid grid-cols-4 gap-4">
+              <div className="space-y-2">
+                <Label>Bairro</Label>
+                <Input
+                  value={formData.neighborhood || ''}
+                  onChange={(e) => setFormData({ ...formData, neighborhood: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Cidade</Label>
+                <Input
+                  value={formData.city || ''}
+                  onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Estado</Label>
+                <Input
+                  value={formData.state || ''}
+                  onChange={(e) => setFormData({ ...formData, state: e.target.value })}
+                  maxLength={2}
+                  placeholder="UF"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>CEP</Label>
+                <Input
+                  value={formData.zip_code || ''}
+                  onChange={(e) => setFormData({ ...formData, zip_code: e.target.value })}
+                  placeholder="00000-000"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Canal Preferido</Label>
+              <Select
+                value={formData.preferred_channel || 'whatsapp'}
+                onValueChange={(value) => setFormData({ ...formData, preferred_channel: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="whatsapp">WhatsApp</SelectItem>
+                  <SelectItem value="email">E-mail</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-3 pt-2 border-t">
+              <Label>Consentimento para Notificações</Label>
+              <div className="flex items-center justify-between">
+                <span className="text-sm">Aceita receber WhatsApp</span>
+                <Switch
+                  checked={formData.opt_in_whatsapp ?? true}
+                  onCheckedChange={(checked) => setFormData({ ...formData, opt_in_whatsapp: checked })}
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm">Aceita receber E-mail</span>
+                <Switch
+                  checked={formData.opt_in_email ?? true}
+                  onCheckedChange={(checked) => setFormData({ ...formData, opt_in_email: checked })}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Observações</Label>
+              <Textarea
+                value={formData.notes || ''}
+                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                rows={3}
+                placeholder="Notas sobre o cliente..."
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setNewDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleSaveNew}>
+              <Plus className="h-4 w-4 mr-2" />
+              Criar Cliente
             </Button>
           </DialogFooter>
         </DialogContent>
