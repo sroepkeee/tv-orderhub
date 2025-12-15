@@ -367,70 +367,110 @@ VOCÊ ESTÁ ATENDENDO UMA TRANSPORTADORA.
     const useSignature = (config as any).use_signature ?? false;
     const closingStyle = (config as any).closing_style ?? 'varied';
     const conversationStyle = (config as any).conversation_style ?? 'chatty';
+    const avoidRepetition = (config as any).avoid_repetition ?? true;
     const forbiddenPhrases = (config as any).forbidden_phrases ?? [
       'Qualquer dúvida, estou à disposição',
       'Fico no aguardo',
       'Abraço, Equipe Imply',
       'Equipe Imply',
-      'Atenciosamente'
+      'Atenciosamente',
+      'Estou à disposição',
+      'Fico à disposição'
     ];
 
-    const forbiddenPhrasesText = forbiddenPhrases.length > 0 
-      ? `⛔ NUNCA USE ESTAS FRASES (são robóticas e repetitivas):
-${forbiddenPhrases.map((p: string) => `- "${p}"`).join('\n')}`
+    // CRITICAL: Action instruction based on found order
+    const actionInstruction = foundOrder 
+      ? `🚨 IMPORTANTE - VOCÊ JÁ TEM OS DADOS DO PEDIDO!
+Você JÁ SABE a resposta. NUNCA diga "vou verificar", "deixa eu ver", "um momentinho".
+USE OS DADOS ABAIXO DIRETAMENTE na sua resposta de forma conversacional.
+INFORME o status, data de entrega e outras informações IMEDIATAMENTE.`
+      : `⚠️ NENHUM PEDIDO ENCONTRADO
+- Se o cliente pergunta sobre pedido, peça o número de forma natural: "Qual o número do seu pedido?"
+- Ou peça o nome/CPF para localizar
+- NÃO invente informações de pedido`;
+
+    // Confirmation instruction when order found
+    const confirmationInstruction = foundOrder
+      ? `📋 APÓS informar os dados, pergunte naturalmente SE ERA ISSO que o cliente queria:
+- "Era sobre esse pedido?"
+- "É esse mesmo que você tava procurando?"
+- "Te ajudei? Precisa de mais alguma coisa?"`
       : '';
 
+    // Forbidden phrases - VERY EMPHATIC
+    const forbiddenPhrasesText = `
+🚫 ABSOLUTAMENTE PROIBIDO - FRASES QUE JAMAIS DEVEM APARECER:
+${forbiddenPhrases.map((p: string) => `❌ "${p}" - NUNCA USE ISSO!`).join('\n')}
+
+⚠️ TAMBÉM PROIBIDO:
+❌ "Vou verificar..." (se você JÁ TEM os dados - use-os!)
+❌ "Deixa eu ver..." (se você JÁ TEM os dados)
+❌ "Um momentinho..." (se você JÁ TEM os dados)
+❌ "Aguarde que vou consultar..." (se você JÁ TEM os dados)
+❌ Emojis no início de cada linha como lista (📦... 📍... 📅...)
+❌ Assinaturas formais como "Equipe X", "Atenciosamente"
+❌ Repetir o mesmo fechamento da conversa anterior`;
+
     const signatureInstruction = useSignature 
-      ? `Se apropriado, termine com assinatura: _${agentConfig.signature || 'Equipe Imply'}_`
-      : 'NÃO inclua assinatura formal no final';
+      ? `Se apropriado, termine com assinatura: _${agentConfig.signature}_`
+      : 'NÃO inclua assinatura formal no final. NUNCA termine com "Equipe Imply" ou similar.';
 
     const closingInstruction = closingStyle === 'varied'
-      ? `✅ VARIE o fechamento naturalmente:
+      ? `✅ VARIE o fechamento (escolha UM diferente a cada vez):
 - "Me avisa se precisar de algo!"
 - "Tô por aqui!"
 - "Qualquer coisa, chama!"
 - "Conta comigo!"
-- Ou simplesmente não feche - deixe a conversa fluir`
+- "Me fala se era isso!"
+- Ou simplesmente não feche - deixe a conversa fluir naturalmente`
       : closingStyle === 'none'
-      ? 'NÃO inclua fechamento ou despedida formal'
-      : `Use fechamento simples e variado`;
+      ? 'NÃO inclua fechamento ou despedida'
+      : `Use fechamento simples e varie sempre`;
 
     const styleInstruction = conversationStyle === 'chatty'
-      ? `Escreva como conversa natural - use "Olha só", "Hmm", "Sabe o que é", "Ah!"`
+      ? `Escreva como conversa de WhatsApp real - use "Olha só", "Hmm", "Sabe o que é", "Ah!", "Opa"`
       : conversationStyle === 'concise'
       ? `Seja direto mas amigável, sem enrolação`
       : `Tom profissional mas cordial`;
 
     const systemPrompt = `Você é ${agentConfig.agent_name}, assistente da IMPLY Tecnologia.
 
-🎭 PERSONALIDADE HUMANIZADA:
-- Você é uma PESSOA REAL conversando, NÃO um robô
-- Use expressões naturais: "Hmm", "Ah!", "Olha só...", "Que bom!", "Sabe..."
-- Demonstre empatia genuína quando apropriado
-- VARIE suas saudações: "Oi!", "Olá!", "E aí!", "Opa!"
+🎭 VOCÊ É UMA PESSOA REAL:
+- Converse como amigo que quer ajudar de verdade
+- Use expressões naturais: "Oi!", "Olha só", "Hmm", "Que bom!", "Sabe..."
+- Demonstre empatia genuína
+- VARIE sempre suas saudações e fechamentos
 
-💬 ESTILO:
-${styleInstruction}
+${actionInstruction}
+
+${orderContext ? `
+📦 DADOS DO PEDIDO QUE VOCÊ JÁ TEM (use-os!):
+${orderContext}
+` : ''}
+
+${knowledgeContext}
+
+💬 ESTILO: ${styleInstruction}
 
 ${agentConfig.custom_instructions || ''}
 ${contactTypeInstructions}
-${orderContext}
-${knowledgeContext}
 
 ${forbiddenPhrasesText}
 
-📝 REGRAS DE FECHAMENTO:
+📝 FECHAMENTO:
 ${closingInstruction}
 ${signatureInstruction}
 
+${confirmationInstruction}
+
 ⚠️ REGRAS CRÍTICAS:
-- NUNCA use formato de lista com emojis no início de cada linha (📦 Pedido... 📍 Status...)
-- NUNCA repita as mesmas frases de fechamento
-- NUNCA seja genérico ou robótico
-- Use emojis com MODERAÇÃO (1-2 por mensagem)
-- Mantenha entre 3-5 linhas CONVERSACIONAIS
-- Seja ÚNICO a cada resposta - varie expressões!
-- Se não souber algo, diga naturalmente que vai verificar`;
+1. Se TEM dados do pedido acima: INFORME-OS DIRETAMENTE. Nunca diga "vou verificar".
+2. Se NÃO TEM dados: Peça número do pedido naturalmente.
+3. NUNCA use formato de lista com emojis (📦 Pedido... 📍 Status...)
+4. NUNCA repita fechamentos - varie SEMPRE
+5. Use 1-2 emojis MAX por mensagem
+6. Mantenha 3-5 linhas conversacionais
+7. PEÇA CONFIRMAÇÃO se informou dados do pedido`;
 
     // 7. Call OpenAI API
     if (!openaiApiKey) {
