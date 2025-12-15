@@ -94,54 +94,64 @@ async function sendViaMegaApi(
     
     console.log('Sending via Mega API to:', formattedNumber);
 
-    // Mega API START usa /rest/sendMessage/{instance}/text
-    // Ref: https://apistart02.megaapi.com.br/docs/
-    const endpoint = `/rest/sendMessage/${megaApiInstance}/text`;
+    // Evolution API (Mega API START) usa /message/sendText/{instance}
+    const endpoint = `/message/sendText/${megaApiInstance}`;
     const fullUrl = `${baseUrl}${endpoint}`;
 
     console.log(`Sending to: ${fullUrl}`);
 
-    // Mega API START usa header 'apikey'
-    const headers = {
-      'apikey': megaApiToken,
-      'Content-Type': 'application/json',
-    };
-
-    // Formato Mega API START: { messageData: { to: "55XXX", text: "...", linkPreview: false } }
+    // Body formato Evolution API: { number, text, linkPreview }
     const body = {
-      messageData: {
-        to: formattedNumber,
-        text: message,
-        linkPreview: false,
-      },
+      number: formattedNumber,
+      text: message,
+      linkPreview: true,
     };
 
     console.log('Request body:', JSON.stringify(body));
 
-    try {
-      const response = await fetch(fullUrl, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(body),
-      });
+    // Multi-header fallback para compatibilidade
+    const authFormats: Record<string, string>[] = [
+      { 'apikey': megaApiToken },
+      { 'Authorization': `Bearer ${megaApiToken}` },
+      { 'Apikey': megaApiToken },
+    ];
 
-      if (response.ok) {
-        const data = await response.json();
-        console.log(`✅ Success`);
-        return { 
-          success: true, 
-          messageId: data.key?.id || data.message_id || data.id 
+    for (const authHeader of authFormats) {
+      try {
+        const headers: Record<string, string> = {
+          'Content-Type': 'application/json',
+          ...authHeader,
         };
-      } else {
-        const errorText = await response.text();
-        console.log(`❌ Failed (${response.status}): ${errorText.substring(0, 150)}`);
-        return { success: false, error: `Mega API error: ${response.status}` };
+
+        const response = await fetch(fullUrl, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(body),
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          console.log(`✅ Success`);
+          return { 
+            success: true, 
+            messageId: data.key?.id || data.message_id || data.id 
+          };
+        } else if (response.status === 401 || response.status === 403) {
+          console.log(`❌ Auth failed (${Object.keys(authHeader)[0]}): ${response.status} - trying next...`);
+          continue;
+        } else {
+          const errorText = await response.text();
+          console.log(`❌ Failed (${response.status}): ${errorText.substring(0, 150)}`);
+          return { success: false, error: `Mega API error: ${response.status}` };
+        }
+      } catch (err) {
+        const errMsg = err instanceof Error ? err.message : String(err);
+        console.error('Fetch error:', errMsg);
+        continue;
       }
-    } catch (err) {
-      const errMsg = err instanceof Error ? err.message : String(err);
-      console.error('Fetch error:', errMsg);
-      return { success: false, error: errMsg };
     }
+    
+    return { success: false, error: 'All auth methods failed' }
   } catch (error) {
     console.error('Error sending via Mega API:', error);
     return { 
