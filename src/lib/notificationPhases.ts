@@ -42,6 +42,18 @@ export const NOTIFICATION_PHASE_OPTIONS = [
     description: 'Quando o pedido está com atraso na entrega',
     status: ['delayed'] as string[],
   },
+  {
+    value: 'ready_to_invoice',
+    label: 'À Faturar',
+    description: 'Quando o pedido está pronto para faturamento',
+    status: ['ready_to_invoice', 'pending_invoice_request'] as string[],
+  },
+  {
+    value: 'invoicing',
+    label: 'Faturamento Solicitado',
+    description: 'Quando o faturamento do pedido foi solicitado',
+    status: ['invoice_requested', 'awaiting_invoice', 'invoice_issued', 'invoice_sent'] as string[],
+  },
 ];
 
 // Função para verificar se um status deve disparar notificação
