@@ -189,7 +189,7 @@ serve(async (req) => {
         'delivered': 'Entregue',
         'completed': 'Concluído',
         'cancelled': 'Cancelado',
-      };
+    };
       return statusLabels[status] || status;
     };
 
@@ -204,12 +204,42 @@ serve(async (req) => {
       }
     };
 
+    // Helper function to translate freight type
+    const translateFreightType = (type: string | null): string => {
+      if (!type) return 'Não informado';
+      const labels: Record<string, string> = {
+        'CIF': 'CIF (Frete por conta do remetente)',
+        'FOB': 'FOB (Frete por conta do destinatário)',
+        'cif': 'CIF (Frete por conta do remetente)',
+        'fob': 'FOB (Frete por conta do destinatário)',
+      };
+      return labels[type] || type;
+    };
+
+    // Helper function to translate shipping modality
+    const translateShippingModality = (modality: string | null): string => {
+      if (!modality) return 'Não definido';
+      const labels: Record<string, string> = {
+        'rodoviario': 'Rodoviário (Caminhão)',
+        'aereo': 'Aéreo',
+        'maritimo': 'Marítimo',
+        'correios': 'Correios',
+        'moto': 'Motoboy/Courier',
+        'retira': 'Cliente Retira',
+        'proprio': 'Veículo Próprio',
+        'sedex': 'Sedex',
+        'pac': 'PAC',
+      };
+      return labels[modality?.toLowerCase()] || modality;
+    };
+
     // Try to find order by extracted number
     if (extractedOrderNumber) {
       console.log(`🔍 Searching for order: ${extractedOrderNumber}`);
       const { data: order } = await supabase
         .from('orders')
         .select(`
+          id,
           order_number,
           totvs_order_number,
           status,
@@ -217,7 +247,16 @@ serve(async (req) => {
           carrier_name,
           tracking_code,
           customer_name,
-          municipality
+          municipality,
+          issue_date,
+          freight_type,
+          freight_modality,
+          package_volumes,
+          package_weight_kg,
+          package_height_m,
+          package_width_m,
+          package_length_m,
+          shipping_date
         `)
         .or(`order_number.eq.${extractedOrderNumber},totvs_order_number.eq.${extractedOrderNumber}`)
         .limit(1)
@@ -234,6 +273,7 @@ serve(async (req) => {
       const { data: order } = await supabase
         .from('orders')
         .select(`
+          id,
           order_number,
           totvs_order_number,
           status,
@@ -241,7 +281,16 @@ serve(async (req) => {
           carrier_name,
           tracking_code,
           customer_name,
-          municipality
+          municipality,
+          issue_date,
+          freight_type,
+          freight_modality,
+          package_volumes,
+          package_weight_kg,
+          package_height_m,
+          package_width_m,
+          package_length_m,
+          shipping_date
         `)
         .eq('id', order_id)
         .single();
@@ -267,6 +316,7 @@ serve(async (req) => {
         const { data: order } = await supabase
           .from('orders')
           .select(`
+            id,
             order_number,
             totvs_order_number,
             status,
@@ -274,7 +324,16 @@ serve(async (req) => {
             carrier_name,
             tracking_code,
             customer_name,
-            municipality
+            municipality,
+            issue_date,
+            freight_type,
+            freight_modality,
+            package_volumes,
+            package_weight_kg,
+            package_height_m,
+            package_width_m,
+            package_length_m,
+            shipping_date
           `)
           .eq('id', customerContact.last_order_id)
           .single();
@@ -285,18 +344,84 @@ serve(async (req) => {
       }
     }
 
-    // Build order context with FILTERED information (no sensitive data)
+    // FETCH ITEMS AND VOLUMES for found order
+    let itemsCount = 0;
+    let itemsTotalQuantity = 0;
+    let volumesDetails: any[] = [];
+
+    if (foundOrder?.id) {
+      console.log(`📦 Fetching items and volumes for order ${foundOrder.order_number}`);
+      
+      // Fetch items count
+      const { data: itemsData } = await supabase
+        .from('order_items')
+        .select('id, item_code, item_description, requested_quantity')
+        .eq('order_id', foundOrder.id);
+      
+      if (itemsData) {
+        itemsCount = itemsData.length;
+        itemsTotalQuantity = itemsData.reduce((sum, item) => 
+          sum + Number(item.requested_quantity || 0), 0);
+        console.log(`📋 Found ${itemsCount} items, total qty: ${itemsTotalQuantity}`);
+      }
+
+      // Fetch volumes
+      const { data: volumesData } = await supabase
+        .from('order_volumes')
+        .select('volume_number, quantity, weight_kg, length_cm, width_cm, height_cm, packaging_type')
+        .eq('order_id', foundOrder.id)
+        .order('volume_number');
+      
+      if (volumesData) {
+        volumesDetails = volumesData;
+        console.log(`📊 Found ${volumesData.length} volumes`);
+      }
+    }
+
+    // Build order context with ENRICHED information (no sensitive data)
     if (foundOrder) {
+      // Calculate cubagem if dimensions available
+      const cubagem = foundOrder.package_height_m && foundOrder.package_width_m && foundOrder.package_length_m
+        ? (foundOrder.package_height_m * foundOrder.package_width_m * foundOrder.package_length_m).toFixed(3)
+        : null;
+
+      // Calculate total weight from volumes if main weight not available
+      const totalWeight = foundOrder.package_weight_kg 
+        || volumesDetails.reduce((sum, v) => sum + Number(v.weight_kg || 0), 0);
+
+      // Format volumes details
+      const volumesInfo = volumesDetails.length > 0
+        ? volumesDetails.map((v: any) => 
+            `  - Volume ${v.volume_number}: ${v.weight_kg}kg, ${v.length_cm}x${v.width_cm}x${v.height_cm}cm (${v.packaging_type || 'caixa'})`
+          ).join('\n')
+        : null;
+
       orderContext = `
 📦 DADOS DO PEDIDO ENCONTRADO:
 Pedido: *${foundOrder.order_number}*
 Status: ${translateStatus(foundOrder.status)}
-Entrega: ${formatDate(foundOrder.delivery_date)}
-Transportadora: ${foundOrder.carrier_name || 'Pendente'}
-Rastreio: ${foundOrder.tracking_code || 'Aguardando'}
+Data de Emissão: ${formatDate(foundOrder.issue_date)}
+Data de Entrega Prevista: ${formatDate(foundOrder.delivery_date)}
+${foundOrder.shipping_date ? `Data de Expedição: ${formatDate(foundOrder.shipping_date)}` : ''}
+
+🚚 LOGÍSTICA:
+Transportadora: ${foundOrder.carrier_name || 'Pendente definição'}
+Tipo de Frete: ${translateFreightType(foundOrder.freight_type)}
+Modo de Envio: ${translateShippingModality(foundOrder.freight_modality)}
+Rastreio: ${foundOrder.tracking_code || 'Aguardando código'}
 Destino: ${foundOrder.municipality || '-'}
 
-⚠️ NÃO revele: valores, CPF/CNPJ, endereço completo, dados bancários.
+📊 VOLUMES E DIMENSÕES:
+Total de Volumes: ${foundOrder.package_volumes || volumesDetails.length || 'Não informado'}
+Peso Total: ${totalWeight ? totalWeight + ' kg' : 'Não calculado'}
+${cubagem ? `Cubagem: ${cubagem} m³` : ''}
+${volumesInfo ? `Detalhes:\n${volumesInfo}` : ''}
+
+📋 ITENS DO PEDIDO:
+Total de Itens: ${itemsCount} item(s) diferente(s)
+Quantidade Total: ${itemsTotalQuantity} unidade(s)
+
+⚠️ NÃO revele: valores monetários, CPF/CNPJ, endereço completo, dados bancários.
 `;
     }
 
@@ -451,6 +576,25 @@ ${orderContext}
 ${knowledgeContext}
 
 💬 ESTILO: ${styleInstruction}
+
+📦 INFORMAÇÕES QUE VOCÊ PODE FORNECER QUANDO PERGUNTADO:
+- Número do pedido
+- Status atual (traduzido para linguagem amigável)
+- Data de emissão (quando foi feito o pedido)
+- Data de entrega prevista
+- Nome da transportadora
+- Tipo de frete (CIF = remetente paga, FOB = destinatário paga)
+- Modo de envio (rodoviário, aéreo, correios, etc.)
+- Código de rastreio (se disponível)
+- Quantidade de volumes e peso total
+- Quantidade de itens no pedido
+
+💡 EXEMPLOS DE COMO RESPONDER:
+- "Quando foi emitido?" → "Seu pedido foi feito no dia [data de emissão]"
+- "Quem vai entregar?" → "Vai pela [transportadora]! O frete é [CIF/FOB]"
+- "O frete é CIF ou FOB?" → "É [CIF/FOB], então [quem paga]"
+- "Quantos volumes?" → "São [X] volumes, totalizando [Y] kg"
+- "Quantos itens tem?" → "Tem [X] itens diferentes, [Y] unidades no total"
 
 ${agentConfig.custom_instructions || ''}
 ${contactTypeInstructions}
