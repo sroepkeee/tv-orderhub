@@ -1,3 +1,4 @@
+import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -175,8 +176,7 @@ serve(async (req) => {
       if (channel === 'whatsapp' && !agentConfig.whatsapp_enabled) continue;
       if (channel === 'email' && !agentConfig.email_enabled) continue;
 
-      // Preparar mensagem formatada para WhatsApp
-      const statusEmoji = getStatusEmoji(payload.new_status || order.status);
+      // Preparar contexto para mensagem humanizada
       const statusLabel = translateStatus(payload.new_status || order.status);
       const deliveryDate = order.delivery_date 
         ? new Date(order.delivery_date).toLocaleDateString('pt-BR') 
@@ -184,23 +184,19 @@ serve(async (req) => {
       
       // Contar itens
       const itemsCount = order.order_items?.length || 0;
-      const itemsSummary = itemsCount > 0 
-        ? order.order_items.slice(0, 2).map((i: any) => i.item_code).join(', ') + (itemsCount > 2 ? ` +${itemsCount - 2}` : '')
-        : '';
+      const customerFirstName = customerContact.customer_name?.split(' ')[0] || 'Cliente';
 
-      // Mensagem formatada para WhatsApp
-      const messageContent = payload.custom_message || `Olá, ${customerContact.customer_name?.split(' ')[0] || 'Cliente'}! 😊
-
-📦 Pedido *#${order.order_number}*
-${statusEmoji} ${statusLabel}
-📅 Entrega: ${deliveryDate}
-${order.carrier_name ? `🚚 ${order.carrier_name}` : ''}
-${order.tracking_code ? `📋 Rastreio: ${order.tracking_code}` : ''}
-${itemsSummary ? `📋 Itens: ${itemsSummary}` : ''}
-
-Qualquer dúvida, estou aqui! 🤝
-
-_${agentConfig.signature || 'Equipe Imply'}_`;
+      // Gerar mensagem humanizada via LLM
+      const messageContent = payload.custom_message || await generateHumanizedMessage(
+        customerFirstName,
+        order.order_number,
+        statusLabel,
+        deliveryDate,
+        order.carrier_name,
+        order.tracking_code,
+        itemsCount,
+        agentConfig.signature || 'Equipe Imply'
+      );
 
       // Enviar para cada destinatário
       for (const recipient of recipientsToNotify) {
@@ -357,6 +353,139 @@ const STATUS_PHASE_MAP: Record<string, string[]> = {
   ready_to_invoice: ['ready_to_invoice', 'pending_invoice_request'],
   invoicing: ['invoice_requested', 'awaiting_invoice', 'invoice_issued', 'invoice_sent'],
 };
+
+// Gerar mensagem humanizada usando LLM
+async function generateHumanizedMessage(
+  customerName: string,
+  orderNumber: string,
+  status: string,
+  deliveryDate: string,
+  carrierName: string | null,
+  trackingCode: string | null,
+  itemsCount: number,
+  signature: string
+): Promise<string> {
+  const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
+  
+  if (!openaiApiKey) {
+    // Fallback para template básico se não tiver OpenAI
+    return `Oi, ${customerName}! 😊
+
+Tenho novidades do seu pedido *#${orderNumber}*!
+
+Seu pedido está em: ${status}
+${deliveryDate !== 'A definir' ? `Previsão de entrega: ${deliveryDate}` : ''}
+${carrierName ? `Transportadora: ${carrierName}` : ''}
+${trackingCode ? `Código de rastreio: ${trackingCode}` : ''}
+
+Qualquer dúvida, é só chamar! 🤝
+
+_${signature}_`;
+  }
+
+  const humanizedPrompt = `Você é um assistente humanizado da IMPLY Tecnologia. Gere uma mensagem de WhatsApp NATURAL e CONVERSACIONAL para notificar o cliente sobre uma atualização do pedido.
+
+🎭 PERSONALIDADE OBRIGATÓRIA:
+- Você é uma PESSOA REAL conversando, não um robô
+- Use expressões naturais: "Olha só...", "Tenho novidades!", "Que bom!", "Adivinha?"
+- Demonstre emppatia e entusiasmo genuíno
+- Varie saudações: "Oi!", "Olá!", "E aí!", "Fala!"
+- Use interjeições naturais: "Ufa!", "Opa!", "Maravilha!", "Legal!"
+
+💬 ESTILO DE CONVERSA:
+- Escreva como se estivesse conversando com um amigo
+- Faça perguntas retóricas: "Sabe aquele pedido que você fez?"
+- Use expressões coloquiais profissionais: "rapidinho", "já já", "numa boa"
+- Mostre entusiasmo: "Tenho ótimas notícias!"
+- Seja empático quando apropriado
+
+📦 DADOS DO PEDIDO:
+- Cliente: ${customerName}
+- Número: #${orderNumber}
+- Status atual: ${status}
+- Entrega: ${deliveryDate}
+${carrierName ? `- Transportadora: ${carrierName}` : ''}
+${trackingCode ? `- Rastreio: ${trackingCode}` : ''}
+${itemsCount > 0 ? `- Itens: ${itemsCount}` : ''}
+- Assinatura: ${signature}
+
+✅ EXEMPLO BOM:
+"Oi, João! 😊
+
+Olha só, tenho novidades do seu pedido *#139955*! 
+
+Ele já saiu da produção e está sendo preparado pra viagem. A previsão é chegar aí dia 05/01 - tá pertinho! 📦✨
+
+Se precisar de algo, é só chamar aqui, tá? Fico feliz em ajudar!
+
+_Abraço, Equipe Imply_ 🤝"
+
+❌ EXEMPLO RUIM (NÃO faça assim - muito robótico):
+"Olá! 😊
+📦 Pedido *140045*  
+📍 Em Produção  
+📅 Entrega: 05/01/2026
+Qualquer dúvida, estou à disposição!"
+
+⚠️ REGRAS IMPORTANTES:
+- NUNCA use formato de lista com emojis no início de cada linha
+- NUNCA seja genérico - personalize com o nome do cliente (primeiro nome)
+- NUNCA seja muito formal ou robótico
+- Use emojis com MODERAÇÃO (2-3 por mensagem, máximo)
+- Mantenha entre 4-6 linhas, mas CONVERSACIONAIS
+- Termine sempre com oferta de ajuda e assinatura
+
+Gere APENAS a mensagem, sem explicações adicionais.`;
+
+  try {
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${openaiApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [
+          { role: 'system', content: humanizedPrompt },
+          { role: 'user', content: `Gere uma mensagem humanizada para notificar ${customerName} sobre o pedido #${orderNumber} que está em "${status}".` }
+        ],
+        max_tokens: 300,
+        temperature: 0.7,
+      }),
+    });
+
+    if (!response.ok) {
+      console.error('❌ OpenAI API error in notification:', response.status);
+      throw new Error('OpenAI API error');
+    }
+
+    const data = await response.json();
+    const generatedMessage = data.choices?.[0]?.message?.content;
+    
+    if (generatedMessage) {
+      console.log('✅ Generated humanized message');
+      return generatedMessage;
+    }
+    
+    throw new Error('No message generated');
+  } catch (error) {
+    console.error('⚠️ Error generating humanized message, using fallback:', error);
+    // Fallback para template básico
+    return `Oi, ${customerName}! 😊
+
+Tenho novidades do seu pedido *#${orderNumber}*!
+
+Seu pedido está em: ${status}
+${deliveryDate !== 'A definir' ? `Previsão de entrega: ${deliveryDate}` : ''}
+${carrierName ? `Transportadora: ${carrierName}` : ''}
+${trackingCode ? `Código de rastreio: ${trackingCode}` : ''}
+
+Qualquer dúvida, é só chamar! 🤝
+
+_${signature}_`;
+  }
+}
 
 function checkStatusInPhases(status: string, enabledPhases: string[]): boolean {
   for (const phase of enabledPhases) {
