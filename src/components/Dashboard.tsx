@@ -1805,12 +1805,27 @@ export const Dashboard = () => {
         // 🔔 DISPARO AUTOMÁTICO: Notificação ao cliente via AI Agent
         (async () => {
           try {
+            console.log('🔔 [Notify] Verificando config do agente para status:', newStatus);
+            
             // Verificar se o novo status está nas fases de notificação habilitadas
-            const { data: agentConfig } = await supabase
+            // IMPORTANTE: Filtrar por agent_type='customer' para pegar o agente correto
+            const { data: agentConfig, error: configError } = await supabase
               .from('ai_agent_config')
-              .select('is_active, notification_phases')
+              .select('is_active, notification_phases, test_phone')
+              .eq('agent_type', 'customer')
               .limit(1)
               .single();
+            
+            if (configError) {
+              console.error('❌ [Notify] Erro ao buscar config do agente:', configError);
+              return;
+            }
+            
+            console.log('🔔 [Notify] Config do agente customer:', {
+              is_active: agentConfig?.is_active,
+              notification_phases: agentConfig?.notification_phases,
+              test_phone: agentConfig?.test_phone
+            });
             
             if (agentConfig?.is_active && agentConfig?.notification_phases?.length > 0) {
               // Mapear status para fases de notificação (expandido)
@@ -1847,25 +1862,41 @@ export const Dashboard = () => {
                 'invoice_requested': 'invoicing',
                 'awaiting_invoice': 'invoicing',
                 'invoice_issued': 'invoicing',
-                'invoice_sent': 'invoicing'
+                'invoice_sent': 'invoicing',
+                // Fase: Expedição
+                'released_for_shipping': 'ready_for_shipping',
+                'in_expedition': 'ready_for_shipping'
               };
               
               const phase = statusToPhase[newStatus];
+              console.log('🔔 [Notify] Mapeamento status → fase:', newStatus, '→', phase);
+              console.log('🔔 [Notify] Fases habilitadas:', agentConfig.notification_phases);
+              
               if (phase && agentConfig.notification_phases.includes(phase)) {
-                console.log(`🔔 Disparando notificação automática para fase: ${phase}`);
+                console.log(`🔔 [Notify] ✅ Disparando notificação para fase: ${phase}`);
                 
-                await supabase.functions.invoke('ai-agent-notify', {
+                const { data: notifyResult, error: notifyError } = await supabase.functions.invoke('ai-agent-notify', {
                   body: {
                     order_id: orderId,
                     new_status: newStatus,
                     trigger_type: 'status_change',
-                    agent_type: 'customer_agent'
+                    agent_type: 'customer'
                   }
                 });
+                
+                if (notifyError) {
+                  console.error('❌ [Notify] Erro na edge function:', notifyError);
+                } else {
+                  console.log('✅ [Notify] Notificação enviada com sucesso:', notifyResult);
+                }
+              } else {
+                console.log('⏭️ [Notify] Fase não habilitada para notificação:', phase, '| Habilitadas:', agentConfig.notification_phases);
               }
+            } else {
+              console.log('⏭️ [Notify] Agente customer inativo ou sem fases configuradas');
             }
           } catch (notifyError) {
-            console.error('⚠️ Erro ao disparar notificação (não crítico):', notifyError);
+            console.error('⚠️ [Notify] Exceção ao disparar notificação:', notifyError);
           }
         })()
       ]).then(() => {
