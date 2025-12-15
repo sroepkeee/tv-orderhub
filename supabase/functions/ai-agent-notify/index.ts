@@ -195,7 +195,8 @@ serve(async (req) => {
         order.carrier_name,
         order.tracking_code,
         itemsCount,
-        agentConfig.signature || 'Equipe Imply'
+        agentConfig.signature || 'Equipe Imply',
+        agentConfig
       );
 
       // Enviar para cada destinatário
@@ -363,79 +364,103 @@ async function generateHumanizedMessage(
   carrierName: string | null,
   trackingCode: string | null,
   itemsCount: number,
-  signature: string
+  signature: string,
+  agentConfig?: any
 ): Promise<string> {
   const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
   
+  // Get config options
+  const useSignature = agentConfig?.use_signature ?? false;
+  const closingStyle = agentConfig?.closing_style ?? 'varied';
+  const conversationStyle = agentConfig?.conversation_style ?? 'chatty';
+  const forbiddenPhrases = agentConfig?.forbidden_phrases ?? [
+    'Qualquer dúvida, estou à disposição',
+    'Fico no aguardo',
+    'Abraço, Equipe Imply',
+    'Equipe Imply',
+    'Atenciosamente'
+  ];
+  
   if (!openaiApiKey) {
-    // Fallback para template básico se não tiver OpenAI
+    // Fallback para template básico humanizado SEM assinatura repetitiva
+    const closings = [
+      'Me avisa se precisar de algo! 😊',
+      'Qualquer coisa, só chamar!',
+      'Tô por aqui se precisar! ✨',
+      'Conta comigo!',
+      ''
+    ];
+    const randomClosing = closings[Math.floor(Math.random() * closings.length)];
+    
     return `Oi, ${customerName}! 😊
 
-Tenho novidades do seu pedido *#${orderNumber}*!
+Olha só, tenho novidades do seu pedido *#${orderNumber}*!
 
-Seu pedido está em: ${status}
-${deliveryDate !== 'A definir' ? `Previsão de entrega: ${deliveryDate}` : ''}
+${status}${deliveryDate !== 'A definir' ? ` - previsão de entrega ${deliveryDate}` : ''}.
 ${carrierName ? `Transportadora: ${carrierName}` : ''}
-${trackingCode ? `Código de rastreio: ${trackingCode}` : ''}
+${trackingCode ? `Rastreio: ${trackingCode}` : ''}
 
-Qualquer dúvida, é só chamar! 🤝
-
-_${signature}_`;
+${randomClosing}`.trim();
   }
 
-  const humanizedPrompt = `Você é um assistente humanizado da IMPLY Tecnologia. Gere uma mensagem de WhatsApp NATURAL e CONVERSACIONAL para notificar o cliente sobre uma atualização do pedido.
+  const forbiddenPhrasesText = forbiddenPhrases.length > 0 
+    ? `⛔ NUNCA USE ESTAS FRASES (são robóticas e repetitivas):
+${forbiddenPhrases.map((p: string) => `- "${p}"`).join('\n')}`
+    : '';
 
-🎭 PERSONALIDADE OBRIGATÓRIA:
-- Você é uma PESSOA REAL conversando, não um robô
-- Use expressões naturais: "Olha só...", "Tenho novidades!", "Que bom!", "Adivinha?"
-- Demonstre emppatia e entusiasmo genuíno
-- Varie saudações: "Oi!", "Olá!", "E aí!", "Fala!"
-- Use interjeições naturais: "Ufa!", "Opa!", "Maravilha!", "Legal!"
+  const signatureInstruction = useSignature 
+    ? `Termine com assinatura: _${signature}_`
+    : 'NÃO inclua assinatura formal no final';
 
-💬 ESTILO DE CONVERSA:
-- Escreva como se estivesse conversando com um amigo
-- Faça perguntas retóricas: "Sabe aquele pedido que você fez?"
-- Use expressões coloquiais profissionais: "rapidinho", "já já", "numa boa"
-- Mostre entusiasmo: "Tenho ótimas notícias!"
-- Seja empático quando apropriado
+  const closingInstruction = closingStyle === 'varied'
+    ? `✅ VARIE o fechamento a cada mensagem. Exemplos:
+- "Me avisa se precisar de algo!"
+- "Tô por aqui se quiser saber algo!"
+- "Qualquer coisa, só chamar!"
+- "Conta comigo!"
+- (às vezes nem precisa fechar, só a informação já basta)`
+    : closingStyle === 'none'
+    ? 'NÃO inclua fechamento ou despedida'
+    : `Use sempre o mesmo fechamento: "Me avisa se precisar!"`;
+
+  const styleInstruction = conversationStyle === 'chatty'
+    ? `Escreva como conversa com amigo - natural, fluído, com expressões como "Olha só", "Sabe o que é", "Hmm"`
+    : conversationStyle === 'concise'
+    ? `Seja direto e conciso, mas ainda amigável`
+    : `Mantenha tom profissional mas cordial`;
+
+  const humanizedPrompt = `Você é um assistente humanizado da IMPLY Tecnologia. Gere uma mensagem de WhatsApp NATURAL e CONVERSACIONAL.
+
+🎭 PERSONALIDADE:
+- Você é uma PESSOA REAL conversando, NÃO um robô
+- Use expressões naturais: "Olha só...", "Hmm", "Ah!", "Veja bem", "Sabe..."
+- Demonstre empatia genuína
+- VARIE suas saudações: "Oi!", "Olá!", "E aí!", "Fala!"
+
+💬 ESTILO:
+${styleInstruction}
 
 📦 DADOS DO PEDIDO:
 - Cliente: ${customerName}
-- Número: #${orderNumber}
-- Status atual: ${status}
+- Pedido: #${orderNumber}
+- Status: ${status}
 - Entrega: ${deliveryDate}
 ${carrierName ? `- Transportadora: ${carrierName}` : ''}
 ${trackingCode ? `- Rastreio: ${trackingCode}` : ''}
-${itemsCount > 0 ? `- Itens: ${itemsCount}` : ''}
-- Assinatura: ${signature}
 
-✅ EXEMPLO BOM:
-"Oi, João! 😊
+${forbiddenPhrasesText}
 
-Olha só, tenho novidades do seu pedido *#139955*! 
+${closingInstruction}
+${signatureInstruction}
 
-Ele já saiu da produção e está sendo preparado pra viagem. A previsão é chegar aí dia 05/01 - tá pertinho! 📦✨
-
-Se precisar de algo, é só chamar aqui, tá? Fico feliz em ajudar!
-
-_Abraço, Equipe Imply_ 🤝"
-
-❌ EXEMPLO RUIM (NÃO faça assim - muito robótico):
-"Olá! 😊
-📦 Pedido *140045*  
-📍 Em Produção  
-📅 Entrega: 05/01/2026
-Qualquer dúvida, estou à disposição!"
-
-⚠️ REGRAS IMPORTANTES:
+⚠️ REGRAS CRÍTICAS:
 - NUNCA use formato de lista com emojis no início de cada linha
-- NUNCA seja genérico - personalize com o nome do cliente (primeiro nome)
-- NUNCA seja muito formal ou robótico
-- Use emojis com MODERAÇÃO (2-3 por mensagem, máximo)
-- Mantenha entre 4-6 linhas, mas CONVERSACIONAIS
-- Termine sempre com oferta de ajuda e assinatura
+- NUNCA repita a mesma frase de fechamento que usou antes
+- Use emojis com MODERAÇÃO (1-2 por mensagem)
+- Mantenha entre 3-5 linhas CONVERSACIONAIS
+- Seja ÚNICO a cada mensagem - varie expressões!
 
-Gere APENAS a mensagem, sem explicações adicionais.`;
+Gere APENAS a mensagem, sem explicações.`;
 
   try {
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -451,7 +476,7 @@ Gere APENAS a mensagem, sem explicações adicionais.`;
           { role: 'user', content: `Gere uma mensagem humanizada para notificar ${customerName} sobre o pedido #${orderNumber} que está em "${status}".` }
         ],
         max_tokens: 300,
-        temperature: 0.7,
+        temperature: 0.8,
       }),
     });
 
@@ -471,19 +496,24 @@ Gere APENAS a mensagem, sem explicações adicionais.`;
     throw new Error('No message generated');
   } catch (error) {
     console.error('⚠️ Error generating humanized message, using fallback:', error);
-    // Fallback para template básico
+    // Fallback humanizado SEM assinatura repetitiva
+    const closings = [
+      'Me avisa se precisar! 😊',
+      'Tô aqui se quiser saber mais!',
+      'Qualquer coisa, chama!',
+      ''
+    ];
+    const randomClosing = closings[Math.floor(Math.random() * closings.length)];
+    
     return `Oi, ${customerName}! 😊
 
 Tenho novidades do seu pedido *#${orderNumber}*!
 
-Seu pedido está em: ${status}
-${deliveryDate !== 'A definir' ? `Previsão de entrega: ${deliveryDate}` : ''}
-${carrierName ? `Transportadora: ${carrierName}` : ''}
-${trackingCode ? `Código de rastreio: ${trackingCode}` : ''}
+${status}${deliveryDate !== 'A definir' ? ` - previsão ${deliveryDate}` : ''}.
+${carrierName ? `Vai com ${carrierName}` : ''}
+${trackingCode ? `Rastreio: ${trackingCode}` : ''}
 
-Qualquer dúvida, é só chamar! 🤝
-
-_${signature}_`;
+${randomClosing}`.trim();
   }
 }
 

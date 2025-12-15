@@ -42,9 +42,13 @@ export type Database = {
           auto_reply_contact_types: string[] | null
           auto_reply_delay_ms: number
           auto_reply_enabled: boolean
+          avoid_repetition: boolean | null
+          closing_style: string | null
+          conversation_style: string | null
           created_at: string | null
           custom_instructions: string | null
           email_enabled: boolean
+          forbidden_phrases: string[] | null
           human_handoff_keywords: string[] | null
           id: string
           is_active: boolean
@@ -60,6 +64,7 @@ export type Database = {
           test_phone: string | null
           tone_of_voice: string
           updated_at: string | null
+          use_signature: boolean | null
           whatsapp_enabled: boolean
           working_hours_end: string | null
           working_hours_start: string | null
@@ -70,9 +75,13 @@ export type Database = {
           auto_reply_contact_types?: string[] | null
           auto_reply_delay_ms?: number
           auto_reply_enabled?: boolean
+          avoid_repetition?: boolean | null
+          closing_style?: string | null
+          conversation_style?: string | null
           created_at?: string | null
           custom_instructions?: string | null
           email_enabled?: boolean
+          forbidden_phrases?: string[] | null
           human_handoff_keywords?: string[] | null
           id?: string
           is_active?: boolean
@@ -88,6 +97,7 @@ export type Database = {
           test_phone?: string | null
           tone_of_voice?: string
           updated_at?: string | null
+          use_signature?: boolean | null
           whatsapp_enabled?: boolean
           working_hours_end?: string | null
           working_hours_start?: string | null
@@ -98,9 +108,13 @@ export type Database = {
           auto_reply_contact_types?: string[] | null
           auto_reply_delay_ms?: number
           auto_reply_enabled?: boolean
+          avoid_repetition?: boolean | null
+          closing_style?: string | null
+          conversation_style?: string | null
           created_at?: string | null
           custom_instructions?: string | null
           email_enabled?: boolean
+          forbidden_phrases?: string[] | null
           human_handoff_keywords?: string[] | null
           id?: string
           is_active?: boolean
@@ -116,6 +130,7 @@ export type Database = {
           test_phone?: string | null
           tone_of_voice?: string
           updated_at?: string | null
+          use_signature?: boolean | null
           whatsapp_enabled?: boolean
           working_hours_end?: string | null
           working_hours_start?: string | null
