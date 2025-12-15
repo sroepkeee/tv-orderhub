@@ -49,6 +49,94 @@ function extractQuoteData(messageText: string): {
   return { freight_value, delivery_time_days };
 }
 
+// Função para enviar mensagem de auto-reply via Mega API
+async function sendAutoReplyMessage(
+  phoneNumber: string, 
+  message: string, 
+  carrierId: string | null, 
+  supabase: any
+): Promise<boolean> {
+  try {
+    const megaApiUrl = Deno.env.get('MEGA_API_URL') || '';
+    const megaApiToken = Deno.env.get('MEGA_API_TOKEN') || '';
+    
+    // Buscar instância conectada
+    const { data: instance } = await supabase
+      .from('whatsapp_instances')
+      .select('instance_key')
+      .eq('status', 'connected')
+      .order('connected_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (!instance?.instance_key) {
+      console.error('❌ No connected WhatsApp instance found for auto-reply');
+      return false;
+    }
+
+    // Normalizar URL
+    let normalizedUrl = megaApiUrl.trim();
+    if (!normalizedUrl.startsWith('http://') && !normalizedUrl.startsWith('https://')) {
+      normalizedUrl = `https://${normalizedUrl}`;
+    }
+    normalizedUrl = normalizedUrl.replace(/\/+$/, '');
+
+    // Formatar número com @s.whatsapp.net
+    let formattedPhone = phoneNumber.replace(/\D/g, '');
+    if (!formattedPhone.startsWith('55')) {
+      formattedPhone = '55' + formattedPhone;
+    }
+    const toNumber = `${formattedPhone}@s.whatsapp.net`;
+
+    // Enviar mensagem
+    const sendUrl = `${normalizedUrl}/rest/sendMessage/${instance.instance_key}/text`;
+    
+    const response = await fetch(sendUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${megaApiToken}`,
+      },
+      body: JSON.stringify({
+        messageData: {
+          to: toNumber,
+          text: message,
+        },
+      }),
+    });
+
+    if (response.ok) {
+      console.log('✅ Auto-reply message sent successfully');
+      
+      // Salvar mensagem enviada no banco
+      if (carrierId) {
+        await supabase
+          .from('carrier_conversations')
+          .insert({
+            carrier_id: carrierId,
+            conversation_type: 'general',
+            message_direction: 'outbound',
+            message_content: message,
+            contact_type: 'customer',
+            message_metadata: {
+              sent_via: 'ai_auto_reply',
+              sent_at: new Date().toISOString(),
+            },
+            sent_at: new Date().toISOString(),
+          });
+      }
+      return true;
+    } else {
+      const errorText = await response.text();
+      console.error('❌ Failed to send auto-reply:', response.status, errorText);
+      return false;
+    }
+  } catch (error) {
+    console.error('❌ Error sending auto-reply:', error);
+    return false;
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -486,31 +574,62 @@ Deno.serve(async (req) => {
       console.log('✅ Message saved successfully:', conversation.id);
 
       // 🤖 Trigger AI Agent auto-reply (fire and forget)
+      // Para CLIENTES: usar ai-agent-logistics-reply (busca multi-estratégia + contexto rico)
+      // Para TRANSPORTADORAS: usar ai-agent-auto-reply (resposta genérica)
       try {
-        console.log('🤖 Triggering AI Agent auto-reply...');
+        console.log('🤖 Triggering AI Agent reply for:', contactType);
         
-        // Call the auto-reply function asynchronously
-        fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/ai-agent-auto-reply`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
-          },
-          body: JSON.stringify({
-            conversation_id: conversation.id,
-            message_content: messageText,
-            sender_phone: phoneNumber,
-            carrier_id: carrierId,
-            carrier_name: carrierName || 'Contato desconhecido',
-            order_id: orderId,
-            contact_type: contactType,
-          }),
-        }).then(async (res) => {
-          const result = await res.json();
-          console.log('🤖 AI auto-reply result:', JSON.stringify(result, null, 2));
-        }).catch((err) => {
-          console.error('🤖 AI auto-reply error:', err);
-        });
+        if (contactType === 'customer') {
+          // CLIENTES: Usar logistics-reply para contexto completo com busca de pedidos
+          fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/ai-agent-logistics-reply`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+            },
+            body: JSON.stringify({
+              message: messageText,
+              from_phone: phoneNumber,
+              carrier_id: carrierId,
+              contact_type: 'customer',
+              customer_id: customerId,
+              conversation_id: conversation.id,
+            }),
+          }).then(async (res) => {
+            const result = await res.json();
+            console.log('🤖 Customer logistics-reply result:', JSON.stringify(result, null, 2));
+            
+            // Se gerou mensagem, enviar via Mega API
+            if (result.success && result.message) {
+              await sendAutoReplyMessage(phoneNumber, result.message, carrierId, supabase);
+            }
+          }).catch((err) => {
+            console.error('🤖 Customer logistics-reply error:', err);
+          });
+        } else {
+          // TRANSPORTADORAS: Usar auto-reply padrão
+          fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/ai-agent-auto-reply`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+            },
+            body: JSON.stringify({
+              conversation_id: conversation.id,
+              message_content: messageText,
+              sender_phone: phoneNumber,
+              carrier_id: carrierId,
+              carrier_name: carrierName || 'Contato desconhecido',
+              order_id: orderId,
+              contact_type: contactType,
+            }),
+          }).then(async (res) => {
+            const result = await res.json();
+            console.log('🤖 Carrier auto-reply result:', JSON.stringify(result, null, 2));
+          }).catch((err) => {
+            console.error('🤖 Carrier auto-reply error:', err);
+          });
+        }
         
       } catch (autoReplyError) {
         console.error('🤖 Failed to trigger auto-reply:', autoReplyError);
