@@ -301,6 +301,13 @@ function getStatusEmoji(status: string): string {
     'delivered': '✅',
     'completed': '🎉',
     'delayed': '⚠️',
+    // Faturamento
+    'ready_to_invoice': '📋',
+    'pending_invoice_request': '📋',
+    'invoice_requested': '🧾',
+    'awaiting_invoice': '📄',
+    'invoice_issued': '✅',
+    'invoice_sent': '📤',
   };
   return emojis[status] || '📍';
 }
@@ -326,6 +333,13 @@ function translateStatus(status: string): string {
     'delivered': 'Entregue',
     'completed': 'Concluído',
     'delayed': 'Atrasado',
+    // Faturamento
+    'ready_to_invoice': 'Pronto para Faturar',
+    'pending_invoice_request': 'Aguardando Solicitação de Faturamento',
+    'invoice_requested': 'Faturamento Solicitado',
+    'awaiting_invoice': 'Aguardando Nota Fiscal',
+    'invoice_issued': 'Nota Fiscal Emitida',
+    'invoice_sent': 'Nota Fiscal Enviada',
   };
   return labels[status] || status;
 }
@@ -339,6 +353,9 @@ const STATUS_PHASE_MAP: Record<string, string[]> = {
   in_transit: ['in_transit', 'collected'],
   delivered: ['delivered', 'completed'],
   delayed: ['delayed'],
+  // Fases de faturamento
+  ready_to_invoice: ['ready_to_invoice', 'pending_invoice_request'],
+  invoicing: ['invoice_requested', 'awaiting_invoice', 'invoice_issued', 'invoice_sent'],
 };
 
 function checkStatusInPhases(status: string, enabledPhases: string[]): boolean {
