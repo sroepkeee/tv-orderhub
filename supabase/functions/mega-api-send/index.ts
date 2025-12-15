@@ -137,44 +137,50 @@ Deno.serve(async (req) => {
       { 'apikey': megaApiToken, 'Content-Type': 'application/json' },
       { 'Apikey': megaApiToken, 'Content-Type': 'application/json' },
       { 'Authorization': `Bearer ${megaApiToken}`, 'Content-Type': 'application/json' },
-      { 'Authorization': `ApiKey ${megaApiToken}`, 'Content-Type': 'application/json' },
     ];
 
-    // Body no formato Evolution API v1
-    const body = { 
-      number: phoneNumber, 
-      textMessage: { text: fullMessage } 
-    };
+    // Body formats: Evolution API v2 e v1
+    const bodyFormats = [
+      // Evolution API v2 format (latest)
+      { number: phoneNumber, text: fullMessage },
+      // Evolution API v1 format
+      { number: phoneNumber, textMessage: { text: fullMessage } },
+    ];
 
     let megaResponse: Response | null = null;
     let lastError = '';
 
+    // Tentar cada combinação de endpoint, header e body format
     for (const endpoint of endpoints) {
       for (const headers of authHeadersList) {
-        const fullUrl = `${megaApiUrl}${endpoint}`;
-        console.log(`Trying endpoint: ${fullUrl}`);
-        console.log(`Auth header type:`, Object.keys(headers).filter(k => k !== 'Content-Type')[0]);
+        for (const body of bodyFormats) {
+          const fullUrl = `${megaApiUrl}${endpoint}`;
+          console.log(`Trying: ${fullUrl}`);
+          console.log(`Auth: ${Object.keys(headers).filter(k => k !== 'Content-Type')[0]}`);
+          console.log(`Body format: ${Object.keys(body).join(', ')}`);
 
-        try {
-          const response = await fetch(fullUrl, {
-            method: 'POST',
-            headers,
-            body: JSON.stringify(body),
-          });
+          try {
+            const response = await fetch(fullUrl, {
+              method: 'POST',
+              headers,
+              body: JSON.stringify(body),
+            });
 
-          if (response.ok) {
-            megaResponse = response;
-            console.log(`✅ Success with endpoint: ${endpoint}`);
-            break;
-          } else {
-            const errorText = await response.text();
-            lastError = `${response.status}: ${errorText}`;
-            console.log(`❌ Failed (${response.status}): ${errorText.substring(0, 200)}`);
+            if (response.ok) {
+              megaResponse = response;
+              console.log(`✅ Success with: ${endpoint}`);
+              break;
+            } else {
+              const errorText = await response.text();
+              lastError = `${response.status}: ${errorText}`;
+              console.log(`❌ Failed (${response.status}): ${errorText.substring(0, 150)}`);
+            }
+          } catch (err) {
+            lastError = err instanceof Error ? err.message : String(err);
+            console.log(`❌ Request error: ${lastError}`);
           }
-        } catch (err) {
-          lastError = err instanceof Error ? err.message : String(err);
-          console.log(`❌ Request failed: ${lastError}`);
         }
+        if (megaResponse?.ok) break;
       }
       if (megaResponse?.ok) break;
     }
