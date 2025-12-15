@@ -14,6 +14,8 @@ interface AutoReplyRequest {
   carrier_id?: string;
   carrier_name?: string;
   order_id?: string;
+  contact_type?: string; // 'carrier' | 'customer' | 'unknown'
+  customer_id?: string;
 }
 
 interface AgentConfig {
@@ -53,8 +55,12 @@ serve(async (req) => {
       sender_phone, 
       carrier_id, 
       carrier_name,
-      order_id 
+      order_id,
+      contact_type = 'carrier',
+      customer_id,
     } = requestData;
+
+    console.log('📞 Contact type:', contact_type);
 
     // 1. Fetch agent configuration
     const { data: config, error: configError } = await supabase
@@ -175,12 +181,49 @@ Contexto do Pedido:
       }
     }
 
-    // 6. Build system prompt
+    // 5.1 Fetch customer context if contact_type is 'customer'
+    let customerContext = '';
+    if (contact_type === 'customer' && sender_phone) {
+      // Search for customer's recent orders by phone match
+      const phoneDigits = sender_phone.replace(/\D/g, '').slice(-8);
+      
+      const { data: customerOrders } = await supabase
+        .from('orders')
+        .select('order_number, status, delivery_date, customer_name')
+        .or(`customer_document.ilike.%${phoneDigits}%`)
+        .order('created_at', { ascending: false })
+        .limit(3);
+      
+      if (customerOrders && customerOrders.length > 0) {
+        customerContext = `
+Pedidos Recentes do Cliente:
+${customerOrders.map((o, i) => `${i + 1}. Pedido ${o.order_number} - Status: ${o.status} - Entrega: ${o.delivery_date}`).join('\n')}
+`;
+      }
+    }
+
+    // 6. Build system prompt based on contact type
     const knowledgeContext = relevantKnowledge.length > 0
       ? `\n\nBase de Conhecimento Relevante:\n${relevantKnowledge.map(k => 
           `### ${k.title}\n${k.content}`
         ).join('\n\n')}`
       : '';
+
+    const contactTypeInstructions = contact_type === 'customer' 
+      ? `
+VOCÊ ESTÁ ATENDENDO UM CLIENTE (não transportadora).
+- Seja cordial e prestativo
+- Informe sobre status de pedidos se perguntado
+- Ofereça ajuda para dúvidas sobre produtos e serviços
+- Se não souber o status exato, ofereça verificar com a equipe
+${customerContext}
+`
+      : `
+VOCÊ ESTÁ ATENDENDO UMA TRANSPORTADORA.
+- Foque em informações logísticas e de frete
+- Ajude com cotações e prazos de entrega
+- Seja objetivo e profissional
+`;
 
     const systemPrompt = `Você é ${agentConfig.agent_name}, um assistente virtual da IMPLY Tecnologia.
 
@@ -190,6 +233,7 @@ IDIOMA: ${agentConfig.language}
 
 ${agentConfig.custom_instructions || ''}
 
+${contactTypeInstructions}
 ${orderContext}
 ${knowledgeContext}
 
@@ -339,30 +383,24 @@ ${agentConfig.signature ? `\n\nAssinatura: ${agentConfig.signature}` : ''}`;
 
     console.log('📤 Instance candidates:', instanceCandidates);
 
-    // Endpoint templates to try
+    // Mega API Plan Code usa /rest/sendMessage/{instance}/text
     const endpointTemplates = [
-      '/message/sendText/{instance}',
-      '/rest/message/sendText/{instance}',
       '/rest/sendMessage/{instance}/text',
-      '/sendMessage/{instance}/text',
     ];
 
     const endpoints = instanceCandidates.flatMap((inst) =>
       endpointTemplates.map((tpl) => tpl.replace('{instance}', inst))
     );
 
-    // Authentication header variations
+    // Mega API usa Authorization Bearer
     const authHeadersList: Array<Record<string, string>> = [
-      { 'apikey': megaApiToken, 'Content-Type': 'application/json' },
-      { 'Apikey': megaApiToken, 'Content-Type': 'application/json' },
       { 'Authorization': `Bearer ${megaApiToken}`, 'Content-Type': 'application/json' },
     ];
 
-    // Body format variations
+    // Formato correto: messageData com @s.whatsapp.net
+    const phoneWithSuffix = `${formattedPhone}@s.whatsapp.net`;
     const bodyFormats = [
-      { number: formattedPhone, text: generatedMessage },
-      { number: formattedPhone, textMessage: { text: generatedMessage } },
-      { number: formattedPhone, message: generatedMessage },
+      { messageData: { to: phoneWithSuffix, text: generatedMessage } },
     ];
 
     let megaResponse: Response | null = null;
