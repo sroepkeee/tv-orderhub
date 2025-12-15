@@ -38,13 +38,19 @@ export type Database = {
       ai_agent_config: {
         Row: {
           agent_name: string
+          auto_reply_contact_types: string[] | null
+          auto_reply_delay_ms: number
+          auto_reply_enabled: boolean
           created_at: string | null
           custom_instructions: string | null
           email_enabled: boolean
+          human_handoff_keywords: string[] | null
           id: string
           is_active: boolean
           language: string
+          llm_model: string
           max_notifications_per_day: number | null
+          max_response_time_seconds: number
           min_interval_minutes: number | null
           notification_phases: string[] | null
           personality: string
@@ -58,13 +64,19 @@ export type Database = {
         }
         Insert: {
           agent_name?: string
+          auto_reply_contact_types?: string[] | null
+          auto_reply_delay_ms?: number
+          auto_reply_enabled?: boolean
           created_at?: string | null
           custom_instructions?: string | null
           email_enabled?: boolean
+          human_handoff_keywords?: string[] | null
           id?: string
           is_active?: boolean
           language?: string
+          llm_model?: string
           max_notifications_per_day?: number | null
+          max_response_time_seconds?: number
           min_interval_minutes?: number | null
           notification_phases?: string[] | null
           personality?: string
@@ -78,13 +90,19 @@ export type Database = {
         }
         Update: {
           agent_name?: string
+          auto_reply_contact_types?: string[] | null
+          auto_reply_delay_ms?: number
+          auto_reply_enabled?: boolean
           created_at?: string | null
           custom_instructions?: string | null
           email_enabled?: boolean
+          human_handoff_keywords?: string[] | null
           id?: string
           is_active?: boolean
           language?: string
+          llm_model?: string
           max_notifications_per_day?: number | null
+          max_response_time_seconds?: number
           min_interval_minutes?: number | null
           notification_phases?: string[] | null
           personality?: string

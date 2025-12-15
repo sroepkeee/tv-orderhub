@@ -366,6 +366,37 @@ Deno.serve(async (req) => {
 
       console.log('✅ Message saved successfully:', conversation.id);
 
+      // 🤖 Trigger AI Agent auto-reply (fire and forget)
+      try {
+        console.log('🤖 Triggering AI Agent auto-reply...');
+        
+        // Call the auto-reply function asynchronously
+        fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/ai-agent-auto-reply`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+          },
+          body: JSON.stringify({
+            conversation_id: conversation.id,
+            message_content: messageText,
+            sender_phone: phoneNumber,
+            carrier_id: carrier.id,
+            carrier_name: carrier.name,
+            order_id: orderId,
+          }),
+        }).then(async (res) => {
+          const result = await res.json();
+          console.log('🤖 AI auto-reply result:', JSON.stringify(result, null, 2));
+        }).catch((err) => {
+          console.error('🤖 AI auto-reply error:', err);
+        });
+        
+      } catch (autoReplyError) {
+        console.error('🤖 Failed to trigger auto-reply:', autoReplyError);
+        // Don't throw - auto-reply failure shouldn't break webhook
+      }
+
       return new Response(
         JSON.stringify({ 
           success: true, 
