@@ -259,18 +259,82 @@ Deno.serve(async (req) => {
 
       if (carrierError) {
         console.error('Error finding carrier:', carrierError);
-        throw carrierError;
       }
 
-      // Se não encontrou carrier, salvar como contato desconhecido
+      // Se não encontrou carrier, buscar em customer_contacts
       let carrierId: string | null = carrier?.id || null;
       let carrierName: string | null = carrier?.name || null;
       let contactType = 'carrier';
+      let customerId: string | null = null;
+      let customerName: string | null = null;
       
       if (!carrier) {
-        console.log('⚠️ Carrier not found for phone:', phoneNumber, '- Saving as unknown contact');
+        console.log('🔍 Carrier not found, searching customer_contacts...');
         
-        // Criar um carrier temporário para este número desconhecido
+        // Build OR query for customer_contacts - search by whatsapp and phone
+        const customerOrConditions = uniqueVariations
+          .flatMap(variation => [
+            `whatsapp.ilike.%${variation}%`,
+            `phone.ilike.%${variation}%`
+          ])
+          .join(',');
+        
+        const { data: customer, error: customerError } = await supabase
+          .from('customer_contacts')
+          .select('id, customer_name, whatsapp, phone, last_order_id')
+          .or(customerOrConditions)
+          .maybeSingle();
+        
+        if (customerError) {
+          console.error('Error finding customer:', customerError);
+        }
+        
+        if (customer) {
+          console.log('✅ Found customer contact:', customer.customer_name);
+          customerId = customer.id;
+          customerName = customer.customer_name;
+          contactType = 'customer';
+          
+          // Para clientes, precisamos criar um "carrier" temporário para manter compatibilidade
+          // ou usar um carrier genérico para clientes
+          const customerCarrierName = `Cliente: ${customer.customer_name}`;
+          
+          // Buscar se já existe um carrier para este cliente
+          const { data: existingCarrier } = await supabase
+            .from('carriers')
+            .select('id, name')
+            .eq('whatsapp', phoneNumber)
+            .maybeSingle();
+          
+          if (existingCarrier) {
+            carrierId = existingCarrier.id;
+            carrierName = existingCarrier.name;
+          } else {
+            // Criar carrier para o cliente
+            const { data: newCarrier, error: createError } = await supabase
+              .from('carriers')
+              .insert({
+                name: customerCarrierName,
+                whatsapp: phoneNumber,
+                is_active: true,
+                notes: `Contato de cliente criado automaticamente - Customer ID: ${customer.id}`,
+              })
+              .select('id, name')
+              .single();
+            
+            if (!createError && newCarrier) {
+              carrierId = newCarrier.id;
+              carrierName = newCarrier.name;
+              console.log('✅ Created carrier for customer:', newCarrier.id);
+            }
+          }
+        }
+      }
+      
+      // Se ainda não encontrou, criar contato desconhecido
+      if (!carrierId) {
+        console.log('⚠️ Contact not found anywhere for phone:', phoneNumber, '- Creating unknown contact');
+        
         const unknownCarrierName = `Contato ${phoneNumber.slice(-4)}`;
         
         const { data: newCarrier, error: createError } = await supabase
@@ -286,7 +350,6 @@ Deno.serve(async (req) => {
         
         if (createError) {
           console.error('Error creating unknown carrier:', createError);
-          // Continuar mesmo com erro - apenas logar
           contactType = 'unknown';
         } else {
           carrierId = newCarrier.id;

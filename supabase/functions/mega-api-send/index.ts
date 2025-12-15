@@ -143,10 +143,10 @@ Deno.serve(async (req) => {
 
     console.log('Instance candidates:', instanceCandidates);
 
-    // Mega API START usa /message/sendText/{instance} como endpoint principal
+    // Mega API Plan Code usa /rest/sendMessage/{instance}/text
+    // Formato: { messageData: { to: "55XXX@s.whatsapp.net", text: "msg" } }
     const endpointTemplates = [
-      '/message/sendText/{instance}',
-      '/rest/message/sendText/{instance}',
+      '/rest/sendMessage/{instance}/text',
     ];
 
     const endpoints = instanceCandidates.flatMap((instance) =>
@@ -155,16 +155,15 @@ Deno.serve(async (req) => {
 
     console.log('Endpoints to try:', endpoints);
 
-    // Headers - Mega API START usa 'apikey' header
+    // Headers - Mega API usa Authorization Bearer
     const authHeadersList: Array<Record<string, string>> = [
-      { 'apikey': megaApiToken, 'Content-Type': 'application/json' },
       { 'Authorization': `Bearer ${megaApiToken}`, 'Content-Type': 'application/json' },
     ];
 
-    // Body format: Evolution API v1 format (usado pelo Mega API START)
+    // Formato correto: messageData com @s.whatsapp.net
+    const phoneWithSuffix = `${phoneNumber}@s.whatsapp.net`;
     const bodyFormats = [
-      { number: phoneNumber, textMessage: { text: fullMessage } },
-      { number: phoneNumber, text: fullMessage },
+      { messageData: { to: phoneWithSuffix, text: fullMessage } },
     ];
 
     let megaResponse: Response | null = null;
