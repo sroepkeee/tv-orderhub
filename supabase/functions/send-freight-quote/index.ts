@@ -94,19 +94,22 @@ async function sendViaMegaApi(
     
     console.log('Sending via Mega API to:', formattedNumber);
 
-    // Mega API Plan Code usa /rest/sendMessage/{instance}/text
+    // Evolution API / Mega API usa /message/sendText/{instance}
+    // Ref: https://doc.evolution-api.com/v2/api-reference/message-controller/send-text
     const endpoints = [
-      `/rest/sendMessage/${megaApiInstance}/text`,
+      `/message/sendText/${megaApiInstance}`,
+      `/rest/message/sendText/${megaApiInstance}`,
     ];
 
+    // Evolution API usa header 'apikey' (não Bearer)
     const authHeadersList: Array<Record<string, string>> = [
+      { 'apikey': megaApiToken, 'Content-Type': 'application/json' },
       { 'Authorization': `Bearer ${megaApiToken}`, 'Content-Type': 'application/json' },
     ];
 
-    // Formato correto: messageData com @s.whatsapp.net
-    const phoneWithSuffix = `${formattedNumber}@s.whatsapp.net`;
+    // Formato Evolution API: { number: "55XXX", text: "..." }
     const bodyFormats = [
-      { messageData: { to: phoneWithSuffix, text: message } },
+      { number: formattedNumber, text: message },
     ];
 
     let lastError = '';

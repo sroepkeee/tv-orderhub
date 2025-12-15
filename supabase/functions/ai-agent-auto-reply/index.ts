@@ -383,24 +383,26 @@ ${agentConfig.signature ? `\n\nAssinatura: ${agentConfig.signature}` : ''}`;
 
     console.log('📤 Instance candidates:', instanceCandidates);
 
-    // Mega API Plan Code usa /rest/sendMessage/{instance}/text
+    // Evolution API / Mega API usa /message/sendText/{instance}
+    // Ref: https://doc.evolution-api.com/v2/api-reference/message-controller/send-text
     const endpointTemplates = [
-      '/rest/sendMessage/{instance}/text',
+      '/message/sendText/{instance}',
+      '/rest/message/sendText/{instance}',
     ];
 
     const endpoints = instanceCandidates.flatMap((inst) =>
       endpointTemplates.map((tpl) => tpl.replace('{instance}', inst))
     );
 
-    // Mega API usa Authorization Bearer
+    // Evolution API usa header 'apikey' (não Bearer)
     const authHeadersList: Array<Record<string, string>> = [
+      { 'apikey': megaApiToken, 'Content-Type': 'application/json' },
       { 'Authorization': `Bearer ${megaApiToken}`, 'Content-Type': 'application/json' },
     ];
 
-    // Formato correto: messageData com @s.whatsapp.net
-    const phoneWithSuffix = `${formattedPhone}@s.whatsapp.net`;
+    // Formato Evolution API: { number: "55XXX", text: "..." }
     const bodyFormats = [
-      { messageData: { to: phoneWithSuffix, text: generatedMessage } },
+      { number: formattedPhone, text: generatedMessage },
     ];
 
     let megaResponse: Response | null = null;
