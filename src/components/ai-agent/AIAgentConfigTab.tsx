@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { Save, Bot, MessageSquare, Mail, Clock, Bell, Sparkles, Zap, AlertTriangle } from "lucide-react";
+import { Save, Bot, MessageSquare, Mail, Clock, Bell, Sparkles, Zap, AlertTriangle, FlaskConical, Smartphone } from "lucide-react";
 import { toast } from "sonner";
 import { NOTIFICATION_PHASE_OPTIONS } from "@/lib/notificationPhases";
 
@@ -36,6 +36,8 @@ interface AgentConfig {
   human_handoff_keywords?: string[];
   auto_reply_delay_ms?: number;
   auto_reply_contact_types?: string[];
+  // Test mode
+  test_phone?: string | null;
 }
 
 interface Props {
@@ -318,6 +320,50 @@ export function AIAgentConfigTab({ config, onUpdate }: Props) {
           <p className="mt-4 text-xs text-muted-foreground">
             {currentPhases.length} fase(s) selecionada(s)
           </p>
+        </CardContent>
+      </Card>
+
+      {/* Modo Teste */}
+      <Card className="border-2 border-amber-500/30 bg-gradient-to-br from-amber-500/5 to-transparent">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <FlaskConical className="h-5 w-5 text-amber-500" />
+            Modo Teste
+            <Badge variant="outline" className="ml-2 border-amber-500/50 text-amber-600">
+              Debug
+            </Badge>
+          </CardTitle>
+          <CardDescription>
+            Configure um número de teste para receber cópia de todas as notificações enviadas
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-start gap-3 p-4 rounded-lg bg-amber-500/10 border border-amber-500/20">
+            <Smartphone className="h-5 w-5 text-amber-500 mt-0.5" />
+            <div className="space-y-2 flex-1">
+              <Label>Número de Teste (WhatsApp)</Label>
+              <Input
+                type="tel"
+                value={formData.test_phone ?? config.test_phone ?? ''}
+                onChange={(e) => updateField('test_phone', e.target.value || null)}
+                placeholder="Ex: 5551999050190"
+                className="bg-background"
+              />
+              <p className="text-xs text-muted-foreground">
+                Se configurado, este número receberá uma cópia de TODAS as notificações enviadas aos clientes, 
+                com informações de debug (nome do cliente real, telefone, etc.)
+              </p>
+            </div>
+          </div>
+          
+          {(formData.test_phone ?? config.test_phone) && (
+            <div className="flex items-center gap-2 p-3 rounded-lg bg-green-500/10 border border-green-500/20">
+              <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
+              <span className="text-sm text-green-700 dark:text-green-400">
+                Modo teste ativo! Notificações serão enviadas para: {formData.test_phone ?? config.test_phone}
+              </span>
+            </div>
+          )}
         </CardContent>
       </Card>
 
