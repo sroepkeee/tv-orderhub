@@ -46,6 +46,7 @@ export type Database = {
           language: string
           max_notifications_per_day: number | null
           min_interval_minutes: number | null
+          notification_phases: string[] | null
           personality: string
           respect_working_hours: boolean
           signature: string | null
@@ -65,6 +66,7 @@ export type Database = {
           language?: string
           max_notifications_per_day?: number | null
           min_interval_minutes?: number | null
+          notification_phases?: string[] | null
           personality?: string
           respect_working_hours?: boolean
           signature?: string | null
@@ -84,6 +86,7 @@ export type Database = {
           language?: string
           max_notifications_per_day?: number | null
           min_interval_minutes?: number | null
+          notification_phases?: string[] | null
           personality?: string
           respect_working_hours?: boolean
           signature?: string | null

@@ -1,13 +1,14 @@
 import { useAIAgentAdmin } from "@/hooks/useAIAgentAdmin";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Loader2, Bot, ShieldAlert, Settings, Book, Bell, FileText, Users, History } from "lucide-react";
+import { Loader2, Bot, ShieldAlert, Settings, Book, Bell, FileText, Users, History, LayoutDashboard } from "lucide-react";
 import { AIAgentConfigTab } from "@/components/ai-agent/AIAgentConfigTab";
 import { AIAgentKnowledgeTab } from "@/components/ai-agent/AIAgentKnowledgeTab";
 import { AIAgentRulesTab } from "@/components/ai-agent/AIAgentRulesTab";
 import { AIAgentTemplatesTab } from "@/components/ai-agent/AIAgentTemplatesTab";
 import { AIAgentContactsTab } from "@/components/ai-agent/AIAgentContactsTab";
 import { AIAgentLogsTab } from "@/components/ai-agent/AIAgentLogsTab";
+import { AIAgentDashboardTab } from "@/components/ai-agent/AIAgentDashboardTab";
 
 export default function AIAgent() {
   const {
@@ -56,6 +57,10 @@ export default function AIAgent() {
       </div>
     );
   }
+
+  const handleToggleActive = async (active: boolean) => {
+    await updateConfig({ is_active: active });
+  };
 
   return (
     <div className="container mx-auto py-6 space-y-6">
@@ -113,8 +118,12 @@ export default function AIAgent() {
       </div>
 
       {/* Main Tabs */}
-      <Tabs defaultValue="config" className="space-y-4">
-        <TabsList className="grid grid-cols-6 w-full">
+      <Tabs defaultValue="dashboard" className="space-y-4">
+        <TabsList className="grid grid-cols-7 w-full">
+          <TabsTrigger value="dashboard" className="flex items-center gap-2">
+            <LayoutDashboard className="h-4 w-4" />
+            <span className="hidden sm:inline">Dashboard</span>
+          </TabsTrigger>
           <TabsTrigger value="config" className="flex items-center gap-2">
             <Settings className="h-4 w-4" />
             <span className="hidden sm:inline">Configuração</span>
@@ -140,6 +149,13 @@ export default function AIAgent() {
             <span className="hidden sm:inline">Logs</span>
           </TabsTrigger>
         </TabsList>
+
+        <TabsContent value="dashboard">
+          <AIAgentDashboardTab 
+            config={config} 
+            onToggleActive={handleToggleActive} 
+          />
+        </TabsContent>
 
         <TabsContent value="config">
           <AIAgentConfigTab config={config} onUpdate={updateConfig} />

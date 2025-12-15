@@ -6,8 +6,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Save, Bot, MessageSquare, Mail, Clock } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Save, Bot, MessageSquare, Mail, Clock, Bell } from "lucide-react";
 import { toast } from "sonner";
+import { NOTIFICATION_PHASE_OPTIONS } from "@/lib/notificationPhases";
 
 interface AgentConfig {
   id: string;
@@ -25,6 +27,7 @@ interface AgentConfig {
   min_interval_minutes: number;
   signature: string;
   custom_instructions: string | null;
+  notification_phases?: string[];
 }
 
 interface Props {
@@ -54,6 +57,19 @@ export function AIAgentConfigTab({ config, onUpdate }: Props) {
 
   const updateField = <K extends keyof AgentConfig>(key: K, value: AgentConfig[K]) => {
     setFormData(prev => ({ ...prev, [key]: value }));
+  };
+
+  const currentPhases = formData.notification_phases ?? config.notification_phases ?? [];
+
+  const togglePhase = (phaseValue: string) => {
+    const phases = [...currentPhases];
+    const index = phases.indexOf(phaseValue);
+    if (index > -1) {
+      phases.splice(index, 1);
+    } else {
+      phases.push(phaseValue);
+    }
+    updateField('notification_phases', phases);
   };
 
   return (
@@ -153,6 +169,53 @@ export function AIAgentConfigTab({ config, onUpdate }: Props) {
               rows={4}
             />
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Fases de Notificação */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Bell className="h-5 w-5" />
+            Fases de Notificação ao Cliente
+          </CardTitle>
+          <CardDescription>
+            Selecione em quais mudanças de status o cliente receberá notificação automática
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-3 md:grid-cols-2">
+            {NOTIFICATION_PHASE_OPTIONS.map((phase) => (
+              <div
+                key={phase.value}
+                className={`flex items-start space-x-3 p-3 rounded-lg border transition-colors ${
+                  currentPhases.includes(phase.value) 
+                    ? 'bg-primary/5 border-primary/30' 
+                    : 'bg-muted/30 border-border'
+                }`}
+              >
+                <Checkbox
+                  id={phase.value}
+                  checked={currentPhases.includes(phase.value)}
+                  onCheckedChange={() => togglePhase(phase.value)}
+                />
+                <div className="space-y-1">
+                  <label
+                    htmlFor={phase.value}
+                    className="text-sm font-medium leading-none cursor-pointer"
+                  >
+                    {phase.label}
+                  </label>
+                  <p className="text-xs text-muted-foreground">
+                    {phase.description}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+          <p className="mt-4 text-xs text-muted-foreground">
+            {currentPhases.length} fase(s) selecionada(s)
+          </p>
         </CardContent>
       </Card>
 
