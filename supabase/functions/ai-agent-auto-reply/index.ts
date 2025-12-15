@@ -322,26 +322,97 @@ ${agentConfig.signature ? `\n\nAssinatura: ${agentConfig.signature}` : ''}`;
       formattedPhone = '55' + formattedPhone;
     }
 
-    // Send message
-    const sendUrl = `${baseUrl}/message/sendText/${instance.instance_key}`;
-    console.log('📤 Sending to:', sendUrl);
+    // Generate instance key candidates (with/without prefixes)
+    const megaApiInstance = instance.instance_key;
+    const instanceCandidates = Array.from(
+      new Set(
+        [
+          megaApiInstance,
+          megaApiInstance.replace(/^megastart-/, ''),
+          megaApiInstance.replace(/^start-/, ''),
+          megaApiInstance.replace(/^mega-/, ''),
+        ]
+          .map((s) => (s ?? '').trim())
+          .filter((s) => s.length > 0)
+      )
+    );
 
-    const sendResponse = await fetch(sendUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'apikey': megaApiToken,
-      },
-      body: JSON.stringify({
-        number: formattedPhone,
-        textMessage: { text: generatedMessage }
-      }),
-    });
+    console.log('📤 Instance candidates:', instanceCandidates);
 
-    const sendResult = await sendResponse.json();
-    console.log('📤 Send result:', JSON.stringify(sendResult, null, 2));
+    // Endpoint templates to try
+    const endpointTemplates = [
+      '/message/sendText/{instance}',
+      '/rest/message/sendText/{instance}',
+      '/rest/sendMessage/{instance}/text',
+      '/sendMessage/{instance}/text',
+    ];
 
-    const messageSent = sendResponse.ok;
+    const endpoints = instanceCandidates.flatMap((inst) =>
+      endpointTemplates.map((tpl) => tpl.replace('{instance}', inst))
+    );
+
+    // Authentication header variations
+    const authHeadersList: Array<Record<string, string>> = [
+      { 'apikey': megaApiToken, 'Content-Type': 'application/json' },
+      { 'Apikey': megaApiToken, 'Content-Type': 'application/json' },
+      { 'Authorization': `Bearer ${megaApiToken}`, 'Content-Type': 'application/json' },
+    ];
+
+    // Body format variations
+    const bodyFormats = [
+      { number: formattedPhone, text: generatedMessage },
+      { number: formattedPhone, textMessage: { text: generatedMessage } },
+      { number: formattedPhone, message: generatedMessage },
+    ];
+
+    let megaResponse: Response | null = null;
+    let megaResponseBody: any = null;
+    let lastError = '';
+
+    // Try all combinations until one works
+    outerLoop:
+    for (const endpoint of endpoints) {
+      for (const authHeaders of authHeadersList) {
+        for (const body of bodyFormats) {
+          try {
+            const sendUrl = `${baseUrl}${endpoint}`;
+            console.log(`📤 Trying: ${sendUrl}`);
+
+            const response = await fetch(sendUrl, {
+              method: 'POST',
+              headers: authHeaders,
+              body: JSON.stringify(body),
+            });
+
+            const responseText = await response.text();
+            console.log(`📤 Response: ${response.status} - ${responseText.substring(0, 200)}`);
+
+            if (response.ok) {
+              megaResponse = response;
+              try {
+                megaResponseBody = JSON.parse(responseText);
+              } catch {
+                megaResponseBody = { raw: responseText };
+              }
+              console.log('✅ Message sent successfully via:', sendUrl);
+              break outerLoop;
+            }
+
+            lastError = `${response.status}: ${responseText.substring(0, 200)}`;
+          } catch (fetchError) {
+            lastError = fetchError instanceof Error ? fetchError.message : 'Unknown fetch error';
+            console.error(`❌ Fetch error for ${endpoint}:`, lastError);
+          }
+        }
+      }
+    }
+
+    const messageSent = megaResponse !== null && megaResponse.ok;
+    const sendResult = megaResponseBody || { error: lastError };
+    
+    if (!messageSent) {
+      console.error('❌ Failed to send message after trying all endpoints:', lastError);
+    }
 
     // 9. Save outbound message to carrier_conversations
     if (carrier_id) {
