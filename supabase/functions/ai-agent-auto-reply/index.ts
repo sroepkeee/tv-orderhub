@@ -126,7 +126,67 @@ serve(async (req) => {
       });
     }
 
-    // 4. EXTRACT ORDER NUMBER FROM MESSAGE
+    // 4. FETCH CONVERSATION HISTORY (last 20 messages for context)
+    console.log('📜 Fetching conversation history...');
+    let conversationHistory: Array<{role: 'user' | 'assistant', content: string}> = [];
+
+    if (carrier_id) {
+      // Fetch by carrier_id
+      const { data: historyData } = await supabase
+        .from('carrier_conversations')
+        .select('message_content, message_direction, sent_at')
+        .eq('carrier_id', carrier_id)
+        .order('sent_at', { ascending: false })
+        .limit(20);
+
+      if (historyData && historyData.length > 0) {
+        // Reverse to chronological order (oldest first)
+        const reversedHistory = [...historyData].reverse();
+        
+        conversationHistory = reversedHistory
+          .filter(msg => msg.message_content && msg.message_content.trim())
+          .map(msg => ({
+            role: msg.message_direction === 'inbound' ? 'user' as const : 'assistant' as const,
+            content: msg.message_content
+          }));
+        
+        console.log(`📜 Loaded ${conversationHistory.length} previous messages for context`);
+      }
+    } else if (sender_phone) {
+      // Fallback: search by phone number across carriers
+      const phoneDigits = sender_phone.replace(/\D/g, '').slice(-8);
+      
+      const { data: carrierMatch } = await supabase
+        .from('carriers')
+        .select('id')
+        .ilike('whatsapp', `%${phoneDigits}%`)
+        .limit(1)
+        .single();
+
+      if (carrierMatch) {
+        const { data: historyData } = await supabase
+          .from('carrier_conversations')
+          .select('message_content, message_direction, sent_at')
+          .eq('carrier_id', carrierMatch.id)
+          .order('sent_at', { ascending: false })
+          .limit(20);
+
+        if (historyData && historyData.length > 0) {
+          const reversedHistory = [...historyData].reverse();
+          
+          conversationHistory = reversedHistory
+            .filter(msg => msg.message_content && msg.message_content.trim())
+            .map(msg => ({
+              role: msg.message_direction === 'inbound' ? 'user' as const : 'assistant' as const,
+              content: msg.message_content
+            }));
+          
+          console.log(`📜 Loaded ${conversationHistory.length} previous messages (by phone) for context`);
+        }
+      }
+    }
+
+    // 5. EXTRACT ORDER NUMBER FROM MESSAGE
     console.log('🔍 Extracting order number from message...');
     const orderPatterns = [
       /pedido\s*(?:n[°º]?|numero|#)?\s*[:\-]?\s*(\d{4,})/i,
@@ -629,6 +689,37 @@ ${confirmationInstruction}
     }
 
     console.log('🤖 Calling OpenAI API with model:', agentConfig.llm_model);
+    console.log(`📜 Including ${conversationHistory.length} previous messages in context`);
+
+    // Build messages array with conversation history
+    const messagesForLLM: Array<{role: 'system' | 'user' | 'assistant', content: string}> = [
+      { role: 'system', content: systemPrompt },
+    ];
+
+    // Add conversation history context (if exists)
+    if (conversationHistory.length > 0) {
+      // Add a context marker for the AI
+      messagesForLLM.push({
+        role: 'system',
+        content: `📜 HISTÓRICO DA CONVERSA (${conversationHistory.length} mensagens anteriores):
+Use este contexto para:
+- Entender o que já foi perguntado/respondido
+- Não repetir informações já dadas
+- Manter consistência e continuidade
+- Saber quais pedidos/temas já foram mencionados`
+      });
+
+      // Add previous messages
+      for (const historyMsg of conversationHistory) {
+        messagesForLLM.push(historyMsg);
+      }
+    }
+
+    // Add current message
+    messagesForLLM.push({ 
+      role: 'user', 
+      content: `Mensagem recebida de ${carrier_name || 'contato'} (${sender_phone}):\n\n${message_content}` 
+    });
 
     const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -638,13 +729,7 @@ ${confirmationInstruction}
       },
       body: JSON.stringify({
         model: agentConfig.llm_model || 'gpt-4o-mini',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { 
-            role: 'user', 
-            content: `Mensagem recebida de ${carrier_name || 'contato'} (${sender_phone}):\n\n${message_content}` 
-          }
-        ],
+        messages: messagesForLLM,
         max_tokens: 300,
         temperature: 0.7,
       }),
@@ -848,6 +933,7 @@ ${confirmationInstruction}
         model: agentConfig.llm_model,
         processing_time_ms: Date.now() - startTime,
         knowledge_used: relevantKnowledge.map(k => k.title),
+        conversation_history_count: conversationHistory.length,
         openai_usage: openaiData.usage,
       }
     });
