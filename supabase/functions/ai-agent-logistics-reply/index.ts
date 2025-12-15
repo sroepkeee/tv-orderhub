@@ -10,6 +10,8 @@ interface LogisticsReplyRequest {
   message: string;
   from_phone: string;
   carrier_id?: string;
+  customer_id?: string;
+  conversation_id?: string;
   contact_type?: string; // 'carrier' | 'customer'
 }
 
@@ -23,6 +25,7 @@ interface OrderContext {
     days_remaining: number;
     is_breached: boolean;
   };
+  source: string; // how the order was found
 }
 
 // Extract order number from message using multiple patterns
@@ -134,17 +137,24 @@ serve(async (req) => {
     
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const { message, from_phone, carrier_id, contact_type = 'customer' }: LogisticsReplyRequest = await req.json();
-    console.log('📦 Logistics Reply - Message:', message, 'From:', from_phone, 'Type:', contact_type);
+    const { message, from_phone, carrier_id, customer_id, conversation_id, contact_type = 'customer' }: LogisticsReplyRequest = await req.json();
+    console.log('📦 Logistics Reply - Message:', message, 'From:', from_phone, 'Type:', contact_type, 'Customer:', customer_id);
 
     // 1. FETCH AGENT CONFIG
     const { data: agentConfig } = await supabase
       .from('ai_agent_config')
       .select('*')
       .eq('agent_type', contact_type)
-      .single();
+      .maybeSingle();
 
-    if (!agentConfig?.is_active) {
+    // Fallback para config geral se não encontrar específico
+    const config = agentConfig || (await supabase
+      .from('ai_agent_config')
+      .select('*')
+      .eq('agent_type', 'carrier')
+      .single()).data;
+
+    if (!config?.is_active) {
       console.log('⚠️ Agent not active for type:', contact_type);
       return new Response(JSON.stringify({ 
         success: false, 
@@ -155,15 +165,18 @@ serve(async (req) => {
       });
     }
 
-    // 2. EXTRACT ORDER NUMBER FROM MESSAGE
+    // 2. MULTI-STRATEGY ORDER SEARCH
+    // Prioridade: 1) Número na mensagem, 2) last_order_id, 3) customer_name match, 4) customer_document
     const orderNumber = extractOrderNumber(message);
     console.log('🔍 Extracted order number:', orderNumber);
 
     let orderContext: OrderContext | null = null;
     let shouldAskForOrder = false;
+    let multipleOrdersFound: any[] = [];
 
+    // ESTRATÉGIA 1: Número do pedido na mensagem
     if (orderNumber) {
-      // 3. FETCH STRUCTURED DATA (Order + Items + Tracking + Occurrences)
+      console.log('🔍 Strategy 1: Searching by order number in message...');
       const { data: order, error: orderError } = await supabase
         .from('orders')
         .select(`
@@ -173,7 +186,7 @@ serve(async (req) => {
           order_occurrences(*)
         `)
         .or(`order_number.eq.${orderNumber},totvs_order_number.eq.${orderNumber}`)
-        .single();
+        .maybeSingle();
 
       if (order && !orderError) {
         const slaStatus = calculateSlaStatus(order);
@@ -182,17 +195,128 @@ serve(async (req) => {
           items: order.order_items || [],
           trackingEvents: order.order_tracking_events || [],
           occurrences: order.order_occurrences || [],
-          slaStatus
+          slaStatus,
+          source: 'message_extract'
         };
-        console.log('✅ Order found:', order.order_number, 'SLA:', slaStatus.status);
-      } else {
-        console.log('❌ Order not found for number:', orderNumber);
+        console.log('✅ Order found by number in message:', order.order_number);
       }
-    } else {
-      // Check if message seems to be asking about an order
+    }
+
+    // ESTRATÉGIA 2: last_order_id do customer_contacts
+    if (!orderContext && customer_id) {
+      console.log('🔍 Strategy 2: Searching by customer last_order_id...');
+      const { data: customer } = await supabase
+        .from('customer_contacts')
+        .select('last_order_id, customer_name, customer_document')
+        .eq('id', customer_id)
+        .single();
+      
+      if (customer?.last_order_id) {
+        const { data: order } = await supabase
+          .from('orders')
+          .select(`
+            *,
+            order_items(*),
+            order_tracking_events(*),
+            order_occurrences(*)
+          `)
+          .eq('id', customer.last_order_id)
+          .single();
+
+        if (order) {
+          const slaStatus = calculateSlaStatus(order);
+          orderContext = {
+            order,
+            items: order.order_items || [],
+            trackingEvents: order.order_tracking_events || [],
+            occurrences: order.order_occurrences || [],
+            slaStatus,
+            source: 'last_order_id'
+          };
+          console.log('✅ Order found by last_order_id:', order.order_number);
+        }
+      }
+      
+      // ESTRATÉGIA 3: Buscar por customer_name similar
+      if (!orderContext && customer?.customer_name) {
+        console.log('🔍 Strategy 3: Searching by customer_name match...');
+        const firstName = customer.customer_name.split(' ')[0];
+        
+        const { data: orders } = await supabase
+          .from('orders')
+          .select(`
+            *,
+            order_items(*),
+            order_tracking_events(*),
+            order_occurrences(*)
+          `)
+          .ilike('customer_name', `%${firstName}%`)
+          .order('created_at', { ascending: false })
+          .limit(5);
+
+        if (orders && orders.length > 0) {
+          if (orders.length === 1) {
+            const order = orders[0];
+            const slaStatus = calculateSlaStatus(order);
+            orderContext = {
+              order,
+              items: order.order_items || [],
+              trackingEvents: order.order_tracking_events || [],
+              occurrences: order.order_occurrences || [],
+              slaStatus,
+              source: 'customer_name_match'
+            };
+            console.log('✅ Order found by customer_name:', order.order_number);
+          } else {
+            // Múltiplos pedidos encontrados - listar para o cliente escolher
+            multipleOrdersFound = orders;
+            console.log('📋 Multiple orders found:', orders.length);
+          }
+        }
+      }
+      
+      // ESTRATÉGIA 4: Buscar por customer_document
+      if (!orderContext && !multipleOrdersFound.length && customer?.customer_document) {
+        console.log('🔍 Strategy 4: Searching by customer_document...');
+        const { data: orders } = await supabase
+          .from('orders')
+          .select(`
+            *,
+            order_items(*),
+            order_tracking_events(*),
+            order_occurrences(*)
+          `)
+          .eq('customer_document', customer.customer_document)
+          .order('created_at', { ascending: false })
+          .limit(5);
+
+        if (orders && orders.length > 0) {
+          if (orders.length === 1) {
+            const order = orders[0];
+            const slaStatus = calculateSlaStatus(order);
+            orderContext = {
+              order,
+              items: order.order_items || [],
+              trackingEvents: order.order_tracking_events || [],
+              occurrences: order.order_occurrences || [],
+              slaStatus,
+              source: 'customer_document_match'
+            };
+            console.log('✅ Order found by customer_document:', order.order_number);
+          } else {
+            multipleOrdersFound = orders;
+            console.log('📋 Multiple orders found by document:', orders.length);
+          }
+        }
+      }
+    }
+
+    // Se não encontrou e parece estar perguntando sobre pedido
+    if (!orderContext && !multipleOrdersFound.length) {
       const orderRelatedPatterns = [
         /onde\s*está/i, /cadê/i, /status/i, /situação/i,
-        /entrega/i, /previsão/i, /rastreio/i, /tracking/i
+        /entrega/i, /previsão/i, /rastreio/i, /tracking/i,
+        /meu\s*pedido/i, /minha\s*compra/i, /minha\s*encomenda/i
       ];
       shouldAskForOrder = orderRelatedPatterns.some(p => p.test(message));
     }
@@ -299,7 +423,7 @@ serve(async (req) => {
     console.log('🚨 Escalation check:', shouldEscalate, escalationReason);
 
     // 6. BUILD LLM PROMPT
-    const systemPrompt = `Você é o ${agentConfig.agent_name}, Agente de Logística da IMPLY Tecnologia.
+    const systemPrompt = `Você é o ${config.agent_name}, Agente de Logística da IMPLY Tecnologia.
 
 PAPEL: Atendimento automático de pedidos, envios, atrasos, entregas e SLA.
 
@@ -311,62 +435,86 @@ REGRAS CRÍTICAS:
 5. Sempre diga o PRÓXIMO PASSO esperado
 6. Se não houver número de pedido, peça educadamente
 
-TOM DE VOZ: ${agentConfig.tone_of_voice}
-PERSONALIDADE: ${agentConfig.personality}
-IDIOMA: ${agentConfig.language}
+TOM DE VOZ: ${config.tone_of_voice}
+PERSONALIDADE: ${config.personality}
+IDIOMA: ${config.language}
 
 FORMATAÇÃO: WhatsApp (*negrito*, _itálico_, emojis moderados)
 
-${agentConfig.custom_instructions || ''}`;
+${config.custom_instructions || ''}`;
 
     let userPrompt = '';
 
-    if (shouldAskForOrder && !orderNumber) {
+    // CENÁRIO: Múltiplos pedidos encontrados - listar para escolha
+    if (multipleOrdersFound.length > 1) {
+      const ordersList = multipleOrdersFound.map((o, i) => 
+        `${i + 1}. *#${o.order_number}* - ${translateStatus(o.status)} - ${formatDate(o.delivery_date)}`
+      ).join('\n');
+      
       userPrompt = `MENSAGEM DO CLIENTE:
 ${message}
 
-O cliente parece estar perguntando sobre um pedido, mas não informou o número.
+Encontrei ${multipleOrdersFound.length} pedidos associados a este contato:
+${ordersList}
+
+Gere uma resposta amigável listando esses pedidos e pedindo para o cliente informar sobre qual pedido deseja informações. Use formatação WhatsApp.`;
+    } else if (shouldAskForOrder && !orderNumber && !orderContext) {
+      userPrompt = `MENSAGEM DO CLIENTE:
+${message}
+
+O cliente parece estar perguntando sobre um pedido, mas não informou o número e não encontrei pedidos vinculados a este contato.
 Responda pedindo o número do pedido de forma educada e prestativa.`;
     } else if (orderContext) {
       const lastEvent = orderContext.trackingEvents
         .sort((a: any, b: any) => new Date(b.event_datetime).getTime() - new Date(a.event_datetime).getTime())[0];
       
       const activeOccurrences = orderContext.occurrences.filter((o: any) => !o.resolved);
+      
+      // Gerar lista de itens formatada
+      const itemsList = orderContext.items.slice(0, 5).map((item: any) => 
+        `• ${item.requested_quantity}x ${item.item_description || item.item_code}`
+      ).join('\n');
 
-      userPrompt = `DADOS DO PEDIDO:
-- Número: ${orderContext.order.order_number}
-- Cliente: ${orderContext.order.customer_name}
-- Status: ${translateStatus(orderContext.order.status)}
-- Transportadora: ${orderContext.order.carrier_name || 'Não definida'}
-- Tracking: ${orderContext.order.tracking_code || 'Não disponível'}
-- Data de Envio: ${formatDate(orderContext.order.shipping_date)}
-- Previsão de Entrega: ${formatDate(orderContext.order.delivery_date)}
-- SLA: ${orderContext.slaStatus.days_remaining} dias ${orderContext.slaStatus.days_remaining >= 0 ? 'restantes' : 'em atraso'} (${orderContext.slaStatus.status})
-- Itens: ${orderContext.items.length} produto(s)
+      userPrompt = `DADOS DO PEDIDO (encontrado via: ${orderContext.source}):
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📦 *Pedido #${orderContext.order.order_number}*
+👤 Cliente: ${orderContext.order.customer_name}
+📍 Status: ${translateStatus(orderContext.order.status)}
+🚚 Transportadora: ${orderContext.order.carrier_name || 'Não definida'}
+📋 Código de Rastreio: ${orderContext.order.tracking_code || 'Aguardando'}
+📅 Data de Envio: ${formatDate(orderContext.order.shipping_date)}
+📆 Previsão de Entrega: ${formatDate(orderContext.order.delivery_date)}
+⏱️ SLA: ${orderContext.slaStatus.days_remaining >= 0 ? `${orderContext.slaStatus.days_remaining} dias restantes` : `${Math.abs(orderContext.slaStatus.days_remaining)} dias em atraso`}
 
-ÚLTIMO EVENTO DE RASTREIO:
-${lastEvent ? `${formatDate(lastEvent.event_datetime)} - ${lastEvent.event_description || lastEvent.event_code} (${lastEvent.location || 'Local não informado'})` : 'Sem eventos de rastreio registrados'}
+ITENS DO PEDIDO:
+${itemsList || 'Sem itens registrados'}
+${orderContext.items.length > 5 ? `... e mais ${orderContext.items.length - 5} item(s)` : ''}
 
-OCORRÊNCIAS ATIVAS:
+HISTÓRICO DE RASTREIO:
+${lastEvent 
+  ? `📍 ${formatDate(lastEvent.event_datetime)} - ${lastEvent.event_description || lastEvent.event_code}\n   Local: ${lastEvent.location || 'Não informado'}`
+  : '⏳ Aguardando movimentação'}
+
 ${activeOccurrences.length > 0 
-  ? activeOccurrences.map((o: any) => `- ${o.occurrence_type}: ${o.description || 'Sem descrição'} (Severidade: ${o.severity})`).join('\n')
-  : 'Nenhuma ocorrência ativa'}
+  ? `\n⚠️ OCORRÊNCIAS ATIVAS:\n${activeOccurrences.map((o: any) => `• ${o.occurrence_type}: ${o.description || 'Sem descrição'}`).join('\n')}`
+  : ''}
 
 DOCUMENTOS LOGÍSTICOS RELEVANTES:
 ${ragContext || 'Nenhum documento específico encontrado'}
 
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 MENSAGEM DO CLIENTE:
 ${message}
 
 ${shouldEscalate 
   ? `⚠️ ATENÇÃO: Este caso requer escalonamento (${escalationReason}). Informe o cliente que um atendente humano entrará em contato em breve.`
-  : 'INSTRUÇÕES:\n- Seja objetivo e tranquilizador\n- Explique o que está acontecendo\n- Informe o próximo passo esperado'}`;
+  : 'INSTRUÇÕES:\n- Gere uma resposta completa e informativa usando os dados acima\n- Use formatação WhatsApp (*negrito*, emojis)\n- Seja objetivo e tranquilizador\n- Informe o próximo passo esperado baseado no status atual'}`;
     } else if (orderNumber) {
       userPrompt = `MENSAGEM DO CLIENTE:
 ${message}
 
 O cliente mencionou o pedido número ${orderNumber}, mas este pedido não foi encontrado em nossa base.
-Informe educadamente que não encontrou o pedido e peça para confirmar o número.`;
+Informe educadamente que não encontrou o pedido e peça para confirmar o número ou fornecer mais detalhes (como CPF/CNPJ ou nome completo).`;
     } else {
       userPrompt = `DOCUMENTOS RELEVANTES:
 ${ragContext || 'Nenhum documento específico'}
@@ -396,12 +544,12 @@ Responda de forma prestativa. Se a pergunta for sobre um pedido específico, pe�
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: agentConfig.llm_model || 'gpt-4o-mini',
+        model: config.llm_model || 'gpt-4o-mini',
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt }
         ],
-        max_tokens: 500,
+        max_tokens: 700,
         temperature: 0.7,
       }),
     });
@@ -416,8 +564,8 @@ Responda de forma prestativa. Se a pergunta for sobre um pedido específico, pe�
     let generatedMessage = llmData.choices?.[0]?.message?.content || '';
 
     // Add signature if configured
-    if (agentConfig.signature && !generatedMessage.includes(agentConfig.signature)) {
-      generatedMessage += `\n\n${agentConfig.signature}`;
+    if (config.signature && !generatedMessage.includes(config.signature)) {
+      generatedMessage += `\n\n${config.signature}`;
     }
 
     console.log('💬 Generated response:', generatedMessage.substring(0, 200));
@@ -433,12 +581,15 @@ Responda de forma prestativa. Se a pergunta for sobre um pedido específico, pe�
         status: 'generated',
         metadata: {
           original_message: message,
-          order_number: orderNumber,
+          order_number: orderNumber || orderContext?.order?.order_number,
           contact_type,
+          customer_id,
+          order_search_source: orderContext?.source || (multipleOrdersFound.length > 1 ? 'multiple_found' : 'not_found'),
           should_escalate: shouldEscalate,
           escalation_reason: escalationReason,
           rag_docs_used: ragDocs?.length || 0,
           sla_status: orderContext?.slaStatus,
+          multiple_orders_count: multipleOrdersFound.length,
         }
       });
 
@@ -446,7 +597,9 @@ Responda de forma prestativa. Se a pergunta for sobre um pedido específico, pe�
       success: true,
       message: generatedMessage,
       orderFound: !!orderContext,
-      orderNumber,
+      orderNumber: orderNumber || orderContext?.order?.order_number,
+      orderSearchSource: orderContext?.source,
+      multipleOrdersFound: multipleOrdersFound.length,
       shouldEscalate,
       escalationReason,
       slaStatus: orderContext?.slaStatus,
