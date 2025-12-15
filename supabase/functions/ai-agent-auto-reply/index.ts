@@ -126,7 +126,185 @@ serve(async (req) => {
       });
     }
 
-    // 4. Fetch knowledge base for RAG
+    // 4. EXTRACT ORDER NUMBER FROM MESSAGE
+    console.log('🔍 Extracting order number from message...');
+    const orderPatterns = [
+      /pedido\s*(?:n[°º]?|numero|#)?\s*[:\-]?\s*(\d{4,})/i,
+      /ordem\s*(?:n[°º]?|numero|#)?\s*[:\-]?\s*(\d{4,})/i,
+      /n[°º]?\s*(\d{5,})/i,
+      /#\s*(\d{4,})/,
+      /\b(\d{6})\b/,  // 6+ digits as order number
+    ];
+    
+    let extractedOrderNumber: string | null = null;
+    for (const pattern of orderPatterns) {
+      const match = message_content.match(pattern);
+      if (match) {
+        extractedOrderNumber = match[1];
+        console.log(`📦 Extracted order number: ${extractedOrderNumber}`);
+        break;
+      }
+    }
+
+    // 5. LOOKUP ORDER IN DATABASE (with sensitive data filtering)
+    let orderContext = '';
+    let foundOrder: any = null;
+
+    // Helper function to translate status to Portuguese
+    const translateStatus = (status: string): string => {
+      const statusLabels: Record<string, string> = {
+        'almox_ssm_pending': 'Aguardando Almoxarifado SSM',
+        'almox_ssm_received': 'Recebido Almox SSM',
+        'order_generation_pending': 'Aguardando Geração de Ordem',
+        'order_in_creation': 'Ordem em Criação',
+        'order_generated': 'Ordem Gerada',
+        'almox_general_received': 'Recebido Almox Geral',
+        'almox_general_separating': 'Em Separação',
+        'almox_general_ready': 'Pronto para Produção',
+        'separation_started': 'Separação Iniciada',
+        'in_production': 'Em Produção',
+        'awaiting_material': 'Aguardando Material',
+        'separation_completed': 'Separação Concluída',
+        'production_completed': 'Produção Concluída',
+        'awaiting_lab': 'Aguardando Laboratório',
+        'in_lab_analysis': 'Em Análise no Laboratório',
+        'lab_completed': 'Laboratório Concluído',
+        'in_quality_check': 'Em Verificação de Qualidade',
+        'in_packaging': 'Em Embalagem',
+        'ready_for_shipping': 'Pronto para Expedição',
+        'freight_quote_requested': 'Cotação de Frete Solicitada',
+        'freight_quote_received': 'Cotação de Frete Recebida',
+        'freight_approved': 'Frete Aprovado',
+        'ready_to_invoice': 'Pronto para Faturar',
+        'invoice_requested': 'Faturamento Solicitado',
+        'awaiting_invoice': 'Aguardando Fatura',
+        'invoice_issued': 'Nota Fiscal Emitida',
+        'invoice_sent': 'Nota Fiscal Enviada',
+        'released_for_shipping': 'Liberado para Expedição',
+        'in_expedition': 'Em Expedição',
+        'pickup_scheduled': 'Coleta Agendada',
+        'awaiting_pickup': 'Aguardando Coleta',
+        'in_transit': 'Em Trânsito',
+        'collected': 'Coletado',
+        'delivered': 'Entregue',
+        'completed': 'Concluído',
+        'cancelled': 'Cancelado',
+      };
+      return statusLabels[status] || status;
+    };
+
+    // Helper function to format date
+    const formatDate = (dateStr: string | null): string => {
+      if (!dateStr) return 'Não definida';
+      try {
+        const date = new Date(dateStr);
+        return date.toLocaleDateString('pt-BR');
+      } catch {
+        return dateStr;
+      }
+    };
+
+    // Try to find order by extracted number
+    if (extractedOrderNumber) {
+      console.log(`🔍 Searching for order: ${extractedOrderNumber}`);
+      const { data: order } = await supabase
+        .from('orders')
+        .select(`
+          order_number,
+          totvs_order_number,
+          status,
+          delivery_date,
+          carrier_name,
+          tracking_code,
+          customer_name,
+          municipality
+        `)
+        .or(`order_number.eq.${extractedOrderNumber},totvs_order_number.eq.${extractedOrderNumber}`)
+        .limit(1)
+        .single();
+
+      if (order) {
+        foundOrder = order;
+        console.log(`✅ Found order: ${order.order_number}`);
+      }
+    }
+
+    // If no order found by number, try by order_id or customer context
+    if (!foundOrder && order_id) {
+      const { data: order } = await supabase
+        .from('orders')
+        .select(`
+          order_number,
+          totvs_order_number,
+          status,
+          delivery_date,
+          carrier_name,
+          tracking_code,
+          customer_name,
+          municipality
+        `)
+        .eq('id', order_id)
+        .single();
+
+      if (order) {
+        foundOrder = order;
+      }
+    }
+
+    // If customer contact, try to find their last order
+    if (!foundOrder && contact_type === 'customer' && sender_phone) {
+      const phoneDigits = sender_phone.replace(/\D/g, '').slice(-8);
+      
+      // Search by customer_contacts.last_order_id
+      const { data: customerContact } = await supabase
+        .from('customer_contacts')
+        .select('last_order_id, customer_name')
+        .or(`whatsapp.ilike.%${phoneDigits}%,phone.ilike.%${phoneDigits}%`)
+        .limit(1)
+        .single();
+
+      if (customerContact?.last_order_id) {
+        const { data: order } = await supabase
+          .from('orders')
+          .select(`
+            order_number,
+            totvs_order_number,
+            status,
+            delivery_date,
+            carrier_name,
+            tracking_code,
+            customer_name,
+            municipality
+          `)
+          .eq('id', customerContact.last_order_id)
+          .single();
+
+        if (order) {
+          foundOrder = order;
+        }
+      }
+    }
+
+    // Build order context with FILTERED information (no sensitive data)
+    if (foundOrder) {
+      orderContext = `
+📦 INFORMAÇÕES DO PEDIDO (use estas informações para responder):
+- *Número do Pedido:* ${foundOrder.order_number}${foundOrder.totvs_order_number ? ` (TOTVS: ${foundOrder.totvs_order_number})` : ''}
+- *Status Atual:* ${translateStatus(foundOrder.status)}
+- *Data de Entrega Prevista:* ${formatDate(foundOrder.delivery_date)}
+- *Transportadora:* ${foundOrder.carrier_name || 'Ainda não definida'}
+- *Código de Rastreio:* ${foundOrder.tracking_code || 'Aguardando expedição'}
+- *Cidade de Destino:* ${foundOrder.municipality || 'Não informada'}
+
+⚠️ REGRAS DE SEGURANÇA:
+- NÃO informe valores, preços ou custos
+- NÃO informe CPF/CNPJ completo do cliente
+- NÃO informe endereço completo (apenas cidade/estado)
+- NÃO informe dados bancários ou de pagamento
+`;
+    }
+
+    // 6. Fetch knowledge base for RAG
     console.log('🔍 Searching knowledge base...');
     const queryTokens = message_content.toLowerCase()
       .split(/\s+/)
@@ -135,9 +313,10 @@ serve(async (req) => {
 
     const { data: knowledge } = await supabase
       .from('ai_knowledge_base')
-      .select('title, content, category, keywords')
+      .select('title, content, category, keywords, carrier_name, occurrence_type, sla_category')
       .eq('is_active', true)
-      .limit(5);
+      .or(`agent_type.eq.${contact_type},agent_type.eq.general`)
+      .limit(10);
 
     // Score and filter relevant knowledge
     const relevantKnowledge = (knowledge || [])
@@ -152,6 +331,14 @@ serve(async (req) => {
           if (titleLower.includes(token)) score += 5;
           if (contentLower.includes(token)) score += 2;
         }
+        
+        // Boost if carrier matches
+        if (foundOrder?.carrier_name && item.carrier_name) {
+          if (foundOrder.carrier_name.toLowerCase().includes(item.carrier_name.toLowerCase())) {
+            score += 15;
+          }
+        }
+        
         return { ...item, score };
       })
       .filter(item => item.score > 0)
@@ -160,49 +347,7 @@ serve(async (req) => {
 
     console.log(`📚 Found ${relevantKnowledge.length} relevant knowledge items`);
 
-    // 5. Fetch order context if available
-    let orderContext = '';
-    if (order_id) {
-      const { data: order } = await supabase
-        .from('orders')
-        .select('order_number, customer_name, status, delivery_date, delivery_address')
-        .eq('id', order_id)
-        .single();
-
-      if (order) {
-        orderContext = `
-Contexto do Pedido:
-- Número: ${order.order_number}
-- Cliente: ${order.customer_name}
-- Status: ${order.status}
-- Data de Entrega: ${order.delivery_date}
-- Endereço: ${order.delivery_address}
-`;
-      }
-    }
-
-    // 5.1 Fetch customer context if contact_type is 'customer'
-    let customerContext = '';
-    if (contact_type === 'customer' && sender_phone) {
-      // Search for customer's recent orders by phone match
-      const phoneDigits = sender_phone.replace(/\D/g, '').slice(-8);
-      
-      const { data: customerOrders } = await supabase
-        .from('orders')
-        .select('order_number, status, delivery_date, customer_name')
-        .or(`customer_document.ilike.%${phoneDigits}%`)
-        .order('created_at', { ascending: false })
-        .limit(3);
-      
-      if (customerOrders && customerOrders.length > 0) {
-        customerContext = `
-Pedidos Recentes do Cliente:
-${customerOrders.map((o, i) => `${i + 1}. Pedido ${o.order_number} - Status: ${o.status} - Entrega: ${o.delivery_date}`).join('\n')}
-`;
-      }
-    }
-
-    // 6. Build system prompt based on contact type
+    // 7. Build system prompt based on contact type
     const knowledgeContext = relevantKnowledge.length > 0
       ? `\n\nBase de Conhecimento Relevante:\n${relevantKnowledge.map(k => 
           `### ${k.title}\n${k.content}`
@@ -214,15 +359,14 @@ ${customerOrders.map((o, i) => `${i + 1}. Pedido ${o.order_number} - Status: ${o
 VOCÊ ESTÁ ATENDENDO UM CLIENTE (não transportadora).
 - Seja cordial e prestativo
 - Informe sobre status de pedidos se perguntado
-- Ofereça ajuda para dúvidas sobre produtos e serviços
+- Use linguagem simples e amigável
 - Se não souber o status exato, ofereça verificar com a equipe
-${customerContext}
 `
       : `
 VOCÊ ESTÁ ATENDENDO UMA TRANSPORTADORA.
 - Foque em informações logísticas e de frete
-- Ajude com cotações e prazos de entrega
 - Seja objetivo e profissional
+- Ajude com cotações e prazos de entrega
 `;
 
     const systemPrompt = `Você é ${agentConfig.agent_name}, um assistente virtual da IMPLY Tecnologia.
@@ -243,7 +387,9 @@ INSTRUÇÕES IMPORTANTES:
 3. Se não souber a resposta, ofereça transferir para um atendente humano
 4. Use WhatsApp formatting: *negrito*, _itálico_, ~riscado~
 5. Não invente informações sobre pedidos ou preços
-6. Para cotações de frete, sempre confirme os dados antes de dar valores
+6. Se o cliente perguntar sobre um pedido e você tem as informações, forneça o status atual e data prevista
+7. Para cotações de frete, sempre confirme os dados antes de dar valores
+8. NUNCA revele informações sensíveis (valores, documentos completos, dados bancários)
 
 ${agentConfig.signature ? `\n\nAssinatura: ${agentConfig.signature}` : ''}`;
 
