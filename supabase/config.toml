@@ -1,5 +1,8 @@
 project_id = "wejkyyjhckdlttieuyku"
 
+[functions.ai-agent-conversation-summary]
+verify_jwt = true
+
 [functions.notify-lab]
 verify_jwt = false
 
