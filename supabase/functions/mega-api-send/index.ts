@@ -143,32 +143,28 @@ Deno.serve(async (req) => {
 
     console.log('Instance candidates:', instanceCandidates);
 
+    // Mega API START usa /message/sendText/{instance} como endpoint principal
     const endpointTemplates = [
       '/message/sendText/{instance}',
       '/rest/message/sendText/{instance}',
-      '/rest/sendMessage/{instance}/text',
-      '/sendMessage/{instance}/text',
     ];
 
     const endpoints = instanceCandidates.flatMap((instance) =>
       endpointTemplates.map((tpl) => tpl.replace('{instance}', instance))
     );
 
-    // Headers com diferentes formatos de autenticação
+    console.log('Endpoints to try:', endpoints);
+
+    // Headers - Mega API START usa 'apikey' header
     const authHeadersList: Array<Record<string, string>> = [
       { 'apikey': megaApiToken, 'Content-Type': 'application/json' },
-      { 'Apikey': megaApiToken, 'Content-Type': 'application/json' },
       { 'Authorization': `Bearer ${megaApiToken}`, 'Content-Type': 'application/json' },
     ];
 
-    // Body formats: variações comuns entre versões
+    // Body format: Evolution API v1 format (usado pelo Mega API START)
     const bodyFormats = [
-      // Evolution API v2 format
-      { number: phoneNumber, text: fullMessage },
-      // Evolution API v1 format
       { number: phoneNumber, textMessage: { text: fullMessage } },
-      // Algumas implementações aceitam "message" direto
-      { number: phoneNumber, message: fullMessage },
+      { number: phoneNumber, text: fullMessage },
     ];
 
     let megaResponse: Response | null = null;
