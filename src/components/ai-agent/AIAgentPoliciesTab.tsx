@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import Papa from "papaparse";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -311,40 +312,32 @@ export function AIAgentPoliciesTab() {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const text = e.target?.result as string;
-      const lines = text.split("\n").filter((line) => line.trim());
-      
-      if (lines.length < 2) {
-        toast.error("Arquivo CSV vazio ou inválido");
-        return;
-      }
-
-      // Parse headers
-      const headers = lines[0].split(",").map((h) => h.trim().toLowerCase().replace(/"/g, ""));
-      
-      // Parse rows
-      const parsedRows: CSVRow[] = [];
-      for (let i = 1; i < lines.length; i++) {
-        const values = lines[i].match(/("([^"]|"")*"|[^,]*)/g) || [];
-        const row: Record<string, string> = {};
+    Papa.parse(file, {
+      header: true,
+      skipEmptyLines: true,
+      transformHeader: (header) => header.trim().toLowerCase().replace(/[""]/g, ""),
+      complete: (results) => {
+        console.log("CSV parsed:", results);
         
-        headers.forEach((header, idx) => {
-          let value = values[idx] || "";
-          // Remove surrounding quotes and unescape double quotes
-          value = value.replace(/^"|"$/g, "").replace(/""/g, '"').trim();
-          row[header] = value;
-        });
+        if (!results.data || results.data.length === 0) {
+          toast.error("Arquivo CSV vazio ou inválido");
+          return;
+        }
 
-        parsedRows.push(validateRow(row, i));
+        const parsedRows: CSVRow[] = results.data.map((row: any, idx: number) => 
+          validateRow(row, idx)
+        );
+
+        console.log("Validated rows:", parsedRows);
+        setCsvData(parsedRows);
+        setImportDialogOpen(true);
+      },
+      error: (error) => {
+        console.error("CSV parse error:", error);
+        toast.error("Erro ao processar CSV: " + error.message);
       }
+    });
 
-      setCsvData(parsedRows);
-      setImportDialogOpen(true);
-    };
-
-    reader.readAsText(file);
     event.target.value = "";
   };
 
