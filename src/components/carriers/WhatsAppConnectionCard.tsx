@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { MessageCircle, QrCode, RefreshCw, MoreVertical, Pencil } from 'lucide-react';
+import { MessageCircle, QrCode, RefreshCw, MoreVertical, Pencil, RotateCcw } from 'lucide-react';
 import { useWhatsAppStatus } from '@/hooks/useWhatsAppStatus';
 import { WhatsAppQRCodeDialog } from './WhatsAppQRCodeDialog';
 import { format } from 'date-fns';
@@ -12,6 +12,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
@@ -39,13 +40,15 @@ export function WhatsAppConnectionCard() {
     connected, status, loading, isAuthorized, 
     refresh, getQRCode, startFastPolling, stopFastPolling,
     phoneNumber, connectedAt, instanceName,
-    disconnect, updateInstanceName
+    disconnect, updateInstanceName, restartInstance
   } = useWhatsAppStatus();
   const [qrDialogOpen, setQrDialogOpen] = useState(false);
   const [disconnectDialogOpen, setDisconnectDialogOpen] = useState(false);
+  const [restartDialogOpen, setRestartDialogOpen] = useState(false);
   const [editNameDialogOpen, setEditNameDialogOpen] = useState(false);
   const [editingName, setEditingName] = useState('');
   const [isDisconnecting, setIsDisconnecting] = useState(false);
+  const [isRestarting, setIsRestarting] = useState(false);
   const [isSavingName, setIsSavingName] = useState(false);
   const { toast } = useToast();
 
@@ -84,6 +87,21 @@ export function WhatsAppConnectionCard() {
   const handleEditNameClick = () => {
     setEditingName(instanceName || 'Imply Frete');
     setEditNameDialogOpen(true);
+  };
+
+  const handleRestartClick = () => {
+    setRestartDialogOpen(true);
+  };
+
+  const handleRestartConfirm = async () => {
+    setIsRestarting(true);
+    const success = await restartInstance();
+    setIsRestarting(false);
+    if (success) {
+      setRestartDialogOpen(false);
+      // Abrir dialog de QR code automaticamente
+      setTimeout(() => setQrDialogOpen(true), 1000);
+    }
   };
 
   const handleSaveName = async () => {
@@ -132,15 +150,24 @@ export function WhatsAppConnectionCard() {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem 
-                  onClick={handleDisconnectClick} 
-                  disabled={!connected || isDisconnecting}
-                >
-                  Desconectar
-                </DropdownMenuItem>
                 <DropdownMenuItem onClick={handleEditNameClick}>
                   <Pencil className="h-4 w-4 mr-2" />
                   Editar nome
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem 
+                  onClick={handleRestartClick}
+                  className="text-amber-600 focus:text-amber-600"
+                >
+                  <RotateCcw className="h-4 w-4 mr-2" />
+                  Forçar Reinício
+                </DropdownMenuItem>
+                <DropdownMenuItem 
+                  onClick={handleDisconnectClick} 
+                  disabled={!connected || isDisconnecting}
+                  className="text-destructive focus:text-destructive"
+                >
+                  Desconectar
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -217,6 +244,7 @@ export function WhatsAppConnectionCard() {
         getQRCode={getQRCode}
         checkStatus={refresh}
         isConnected={connected}
+        onRestartInstance={restartInstance}
       />
 
       <AlertDialog open={disconnectDialogOpen} onOpenChange={setDisconnectDialogOpen}>
@@ -236,6 +264,40 @@ export function WhatsAppConnectionCard() {
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               {isDisconnecting ? 'Desconectando...' : 'Desconectar'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={restartDialogOpen} onOpenChange={setRestartDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <RotateCcw className="h-5 w-5 text-amber-500" />
+              Forçar Reinício da Instância?
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                <p>Isso irá:</p>
+                <ol className="list-decimal ml-4 space-y-1 text-sm">
+                  <li>Desconectar a sessão atual no WhatsApp</li>
+                  <li>Limpar o cache de QR Code</li>
+                  <li>Solicitar um novo QR Code automaticamente</li>
+                </ol>
+                <p className="text-sm text-muted-foreground mt-2">
+                  Use quando o QR Code não estiver sendo gerado corretamente.
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isRestarting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleRestartConfirm}
+              disabled={isRestarting}
+              className="bg-amber-500 text-white hover:bg-amber-600"
+            >
+              {isRestarting ? 'Reiniciando...' : 'Forçar Reinício'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

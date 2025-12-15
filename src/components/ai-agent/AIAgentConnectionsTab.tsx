@@ -18,7 +18,8 @@ import {
   MessageCircle,
   QrCode,
   Wifi,
-  WifiOff
+  WifiOff,
+  RotateCcw
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -56,7 +57,8 @@ export function AIAgentConnectionsTab() {
     instanceName,
     refresh: refreshWhatsApp,
     getQRCode,
-    disconnect
+    disconnect,
+    restartInstance
   } = useWhatsAppStatus();
 
   // Carregar instância do banco
@@ -204,7 +206,7 @@ export function AIAgentConnectionsTab() {
             </div>
           )}
 
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             {!whatsappConnected && (
               <Button onClick={() => setQrDialogOpen(true)} className="gap-2">
                 <QrCode className="h-4 w-4" />
@@ -219,6 +221,15 @@ export function AIAgentConnectionsTab() {
             >
               <RefreshCw className={`h-4 w-4 ${whatsappLoading ? 'animate-spin' : ''}`} />
               Atualizar
+            </Button>
+            <Button 
+              variant="outline" 
+              onClick={restartInstance}
+              disabled={whatsappLoading}
+              className="gap-2 text-amber-600 border-amber-300 hover:bg-amber-50 hover:text-amber-700"
+            >
+              <RotateCcw className="h-4 w-4" />
+              Forçar Reinício
             </Button>
             {whatsappConnected && (
               <Button 
@@ -390,6 +401,7 @@ export function AIAgentConnectionsTab() {
         getQRCode={getQRCode}
         checkStatus={refreshWhatsApp}
         isConnected={whatsappConnected}
+        onRestartInstance={restartInstance}
       />
     </div>
   );

@@ -180,6 +180,58 @@ export function useWhatsAppStatus() {
     }
   }, [toast]);
 
+  const restartInstance = useCallback(async () => {
+    try {
+      setStatus(prev => ({
+        ...prev,
+        loading: true,
+        status: 'restarting',
+      }));
+
+      const { data, error } = await supabase.functions.invoke('mega-api-restart-instance');
+
+      if (error) {
+        console.error('Error restarting instance:', error);
+        toast({
+          title: 'Erro ao reiniciar',
+          description: 'Não foi possível reiniciar a instância',
+          variant: 'destructive',
+        });
+        setStatus(prev => ({ ...prev, loading: false }));
+        return false;
+      }
+
+      // Atualizar estado local
+      setStatus(prev => ({
+        ...prev,
+        connected: false,
+        status: 'reconnecting',
+        phoneNumber: undefined,
+        connectedAt: undefined,
+        loading: false,
+      }));
+
+      // Iniciar polling rápido para detectar novo QR code
+      startFastPolling();
+
+      toast({
+        title: 'Reiniciando instância...',
+        description: data?.message || 'Aguarde o novo QR Code',
+      });
+
+      return true;
+    } catch (error) {
+      console.error('Error in restartInstance:', error);
+      toast({
+        title: 'Erro ao reiniciar',
+        description: 'Ocorreu um erro inesperado',
+        variant: 'destructive',
+      });
+      setStatus(prev => ({ ...prev, loading: false }));
+      return false;
+    }
+  }, [toast, startFastPolling]);
+
   const updateInstanceName = useCallback(async (name: string) => {
     try {
       const { data, error } = await supabase.functions.invoke('mega-api-update-instance', {
@@ -236,5 +288,6 @@ export function useWhatsAppStatus() {
     stopFastPolling,
     disconnect,
     updateInstanceName,
+    restartInstance,
   };
 }

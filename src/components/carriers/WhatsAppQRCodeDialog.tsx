@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Loader2, RefreshCw, CheckCircle2, Smartphone } from 'lucide-react';
+import { Loader2, RefreshCw, CheckCircle2, Smartphone, RotateCcw, AlertTriangle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 interface WhatsAppQRCodeDialogProps {
   open: boolean;
@@ -11,6 +12,7 @@ interface WhatsAppQRCodeDialogProps {
   getQRCode: () => Promise<{ qrcode: string; expiresIn: number } | null>;
   checkStatus: () => Promise<void>;
   isConnected: boolean;
+  onRestartInstance?: () => Promise<boolean>;
 }
 
 export function WhatsAppQRCodeDialog({
@@ -20,11 +22,13 @@ export function WhatsAppQRCodeDialog({
   getQRCode,
   checkStatus,
   isConnected,
+  onRestartInstance,
 }: WhatsAppQRCodeDialogProps) {
   const [qrCode, setQrCode] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [expiresIn, setExpiresIn] = useState(60);
   const [status, setStatus] = useState<'loading' | 'waiting' | 'available' | 'scanning' | 'connected' | 'expired' | 'error'>('loading');
+  const [isRestarting, setIsRestarting] = useState(false);
   const { toast } = useToast();
 
   const loadQRCode = async () => {
@@ -172,6 +176,21 @@ export function WhatsAppQRCodeDialog({
     loadQRCode();
   };
 
+  const handleForceRestart = async () => {
+    if (!onRestartInstance) return;
+    
+    setIsRestarting(true);
+    const success = await onRestartInstance();
+    setIsRestarting(false);
+    
+    if (success) {
+      // Aguardar um pouco e tentar carregar QR novamente
+      setTimeout(() => {
+        loadQRCode();
+      }, 2000);
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
@@ -234,35 +253,32 @@ export function WhatsAppQRCodeDialog({
             )}
 
             {status === 'error' && (
-              <div className="flex flex-col items-center gap-4">
+              <div className="flex flex-col items-center gap-4 p-2">
                 <div className="flex items-center justify-center w-16 h-16 rounded-full bg-destructive/10">
-                  <RefreshCw className="h-8 w-8 text-destructive" />
+                  <AlertTriangle className="h-8 w-8 text-destructive" />
                 </div>
                 <div className="text-center space-y-2">
                   <p className="text-sm font-medium">Não foi possível gerar o QR Code</p>
-                  <p className="text-xs text-muted-foreground">
-                    Verifique se o webhook está configurado no painel Mega API
-                  </p>
-                  <div className="mt-4 p-3 bg-muted rounded-lg text-left space-y-2">
-                    <div>
-                      <p className="text-xs font-medium mb-1">URL do Webhook:</p>
-                      <code className="text-xs break-all block bg-background p-2 rounded border">
-                        https://wejkyyjhckdlttieuyku.supabase.co/functions/v1/mega-api-webhook
-                      </code>
-                    </div>
-                    <div>
-                      <p className="text-xs font-medium mb-1">Eventos necessários:</p>
-                      <div className="flex gap-2">
-                        <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded">qrcode</span>
-                        <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded">connection.update</span>
-                      </div>
-                    </div>
-                  </div>
                 </div>
-                <Button onClick={handleRefresh} variant="outline" size="sm">
-                  <RefreshCw className="h-4 w-4 mr-2" />
-                  Tentar Novamente
-                </Button>
+                
+                <div className="flex gap-2">
+                  <Button onClick={handleRefresh} variant="outline" size="sm">
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                    Tentar Novamente
+                  </Button>
+                  {onRestartInstance && (
+                    <Button 
+                      onClick={handleForceRestart} 
+                      variant="default" 
+                      size="sm"
+                      disabled={isRestarting}
+                      className="bg-amber-500 hover:bg-amber-600"
+                    >
+                      <RotateCcw className={`h-4 w-4 mr-2 ${isRestarting ? 'animate-spin' : ''}`} />
+                      {isRestarting ? 'Reiniciando...' : 'Forçar Reinício'}
+                    </Button>
+                  )}
+                </div>
               </div>
             )}
           </div>
@@ -294,6 +310,27 @@ export function WhatsAppQRCodeDialog({
                 Atualizar QR Code
               </Button>
             </>
+          )}
+
+          {/* Troubleshooting Alert */}
+          {(status === 'error' || status === 'expired') && (
+            <Alert variant="default" className="mt-4 text-left">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertTitle className="text-sm">QR Code não disponível?</AlertTitle>
+              <AlertDescription className="text-xs space-y-2">
+                <ol className="list-decimal ml-4 space-y-1">
+                  <li>Clique em <strong>"Forçar Reinício"</strong> para limpar cache</li>
+                  <li>Verifique webhook no painel Mega API</li>
+                  <li>Confirme eventos: <code className="bg-muted px-1 rounded">qrcode</code>, <code className="bg-muted px-1 rounded">connection.update</code></li>
+                </ol>
+                <div className="mt-2 p-2 bg-muted rounded text-xs">
+                  <p className="font-medium mb-1">Webhook URL:</p>
+                  <code className="break-all text-[10px]">
+                    https://wejkyyjhckdlttieuyku.supabase.co/functions/v1/mega-api-webhook
+                  </code>
+                </div>
+              </AlertDescription>
+            </Alert>
           )}
         </div>
       </DialogContent>
