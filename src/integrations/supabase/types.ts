@@ -452,6 +452,42 @@ export type Database = {
         }
         Relationships: []
       }
+      ai_rules: {
+        Row: {
+          action: string
+          created_at: string
+          id: string
+          is_active: boolean
+          policy: string
+          rule: string
+          rule_description: string
+          rule_risk: string
+          updated_at: string
+        }
+        Insert: {
+          action?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          policy: string
+          rule: string
+          rule_description: string
+          rule_risk: string
+          updated_at?: string
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          policy?: string
+          rule?: string
+          rule_description?: string
+          rule_risk?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       carrier_conversations: {
         Row: {
           carrier_id: string
