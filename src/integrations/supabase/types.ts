@@ -533,45 +533,83 @@ export type Database = {
       }
       customer_contacts: {
         Row: {
+          address: string | null
+          city: string | null
+          contact_person: string | null
           created_at: string | null
           customer_document: string | null
           customer_name: string
           email: string | null
           id: string
+          last_order_id: string | null
+          neighborhood: string | null
           notes: string | null
           opt_in_email: boolean | null
           opt_in_whatsapp: boolean | null
+          orders_count: number | null
+          phone: string | null
           preferred_channel: string | null
+          source: string | null
+          state: string | null
           updated_at: string | null
           whatsapp: string | null
+          zip_code: string | null
         }
         Insert: {
+          address?: string | null
+          city?: string | null
+          contact_person?: string | null
           created_at?: string | null
           customer_document?: string | null
           customer_name: string
           email?: string | null
           id?: string
+          last_order_id?: string | null
+          neighborhood?: string | null
           notes?: string | null
           opt_in_email?: boolean | null
           opt_in_whatsapp?: boolean | null
+          orders_count?: number | null
+          phone?: string | null
           preferred_channel?: string | null
+          source?: string | null
+          state?: string | null
           updated_at?: string | null
           whatsapp?: string | null
+          zip_code?: string | null
         }
         Update: {
+          address?: string | null
+          city?: string | null
+          contact_person?: string | null
           created_at?: string | null
           customer_document?: string | null
           customer_name?: string
           email?: string | null
           id?: string
+          last_order_id?: string | null
+          neighborhood?: string | null
           notes?: string | null
           opt_in_email?: boolean | null
           opt_in_whatsapp?: boolean | null
+          orders_count?: number | null
+          phone?: string | null
           preferred_channel?: string | null
+          source?: string | null
+          state?: string | null
           updated_at?: string | null
           whatsapp?: string | null
+          zip_code?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "customer_contacts_last_order_id_fkey"
+            columns: ["last_order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       delivery_date_changes: {
         Row: {

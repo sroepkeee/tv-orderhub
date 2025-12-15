@@ -56,7 +56,12 @@ export function AIAgentComplianceTab() {
       ]);
       if (rulesRes.error) throw rulesRes.error;
       if (policiesRes.error) throw policiesRes.error;
-      setRules(rulesRes.data || []);
+      // Cast risk_level to union type
+      const typedRules = (rulesRes.data || []).map(rule => ({
+        ...rule,
+        risk_level: (rule.risk_level || 'medium') as 'low' | 'medium' | 'high'
+      }));
+      setRules(typedRules);
       setPolicies(policiesRes.data || []);
     } catch (error) {
       console.error('Error loading data:', error);

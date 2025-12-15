@@ -16,6 +16,7 @@ import Admin from "./pages/Admin";
 import Purchases from "./pages/Purchases";
 import WhatsAppSettings from "./pages/WhatsAppSettings";
 import AIAgent from "./pages/AIAgent";
+import Customers from "./pages/Customers";
 import { CarriersChatRoute } from "./components/CarriersChatRoute";
 import { useAuth } from "./hooks/useAuth";
 import { useAdminAuth } from "./hooks/useAdminAuth";
@@ -181,6 +182,11 @@ const App = () => {
               <Route path="/ai-agent" element={
                 <ProtectedRoute>
                   <AIAgent />
+                </ProtectedRoute>
+              } />
+              <Route path="/customers" element={
+                <ProtectedRoute>
+                  <Customers />
                 </ProtectedRoute>
               } />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

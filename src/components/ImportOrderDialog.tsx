@@ -15,6 +15,7 @@ import { useDuplicateOrderCheck } from "@/hooks/useDuplicateOrderCheck";
 import { DuplicateOrderWarningDialog } from "@/components/DuplicateOrderWarningDialog";
 import { OrderItemsReviewTable } from "@/components/OrderItemsReviewTable";
 import { enrichWithRateioProject, RateioProject } from "@/lib/rateioEnrichment";
+import { CustomerWhatsAppDialog } from "@/components/CustomerWhatsAppDialog";
 interface ImportOrderDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -45,6 +46,13 @@ export const ImportOrderDialog = ({
   const [parseStatus, setParseStatus] = useState('');
   const [canAnalyzeComplete, setCanAnalyzeComplete] = useState(false);
   const [abortController, setAbortController] = useState<AbortController | null>(null);
+  
+  // Estado para diálogo de WhatsApp do cliente
+  const [whatsAppDialogData, setWhatsAppDialogData] = useState<{
+    open: boolean;
+    customerId: string;
+    customerName: string;
+  } | null>(null);
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
     if (!selectedFile) return;
@@ -357,6 +365,10 @@ export const ImportOrderDialog = ({
       if (itemsError) throw itemsError;
       
       console.log('✅ [executeImport] Items inseridos:', itemsToInsert.length);
+      
+      // 🆕 Auto-cadastrar cliente na tabela customer_contacts
+      const customerData = await saveCustomerFromOrder(data, order.id, user.id);
+      
       // Mensagem de sucesso diferenciada para importações com PDF
       if (file?.name.endsWith('.pdf')) {
         toast.success(
@@ -377,6 +389,15 @@ export const ImportOrderDialog = ({
       setParsedData(null);
       setValidation(null);
       setStep('upload');
+      
+      // 🆕 Mostrar diálogo para cadastrar WhatsApp do cliente (se cliente foi criado/atualizado sem WhatsApp)
+      if (customerData?.id && !customerData.hasWhatsApp) {
+        setWhatsAppDialogData({
+          open: true,
+          customerId: customerData.id,
+          customerName: data.orderInfo.customerName
+        });
+      }
     } catch (error: any) {
       console.error('❌ [executeImport] Erro:', error);
       toast.error(`Erro ao importar: ${error.message}`);
@@ -387,6 +408,100 @@ export const ImportOrderDialog = ({
       setStep('preview');
     } finally {
       setIsProcessing(false);
+    }
+  };
+
+  // 🆕 Função para salvar/atualizar cliente automaticamente
+  const saveCustomerFromOrder = async (data: ParsedOrderData, orderId: string, userId: string): Promise<{ id: string; hasWhatsApp: boolean } | null> => {
+    try {
+      const customerDocument = data.orderInfo.customerDocument;
+      const customerName = data.orderInfo.customerName;
+      
+      if (!customerName) return null;
+      
+      // Extrair cidade/estado do endereço se disponível
+      const municipality = data.orderInfo.municipality || '';
+      const address = data.orderInfo.deliveryAddress || '';
+      
+      // Verificar se cliente já existe por documento
+      if (customerDocument) {
+        const { data: existingCustomer } = await supabase
+          .from('customer_contacts')
+          .select('id, whatsapp, orders_count')
+          .eq('customer_document', customerDocument)
+          .maybeSingle();
+        
+        if (existingCustomer) {
+          // Atualizar cliente existente
+          await supabase
+            .from('customer_contacts')
+            .update({
+              address: address || undefined,
+              city: municipality || undefined,
+              last_order_id: orderId,
+              orders_count: (existingCustomer.orders_count || 0) + 1,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', existingCustomer.id);
+          
+          console.log('✅ Cliente existente atualizado:', existingCustomer.id);
+          return { id: existingCustomer.id, hasWhatsApp: !!existingCustomer.whatsapp };
+        }
+      }
+      
+      // Verificar se cliente existe pelo nome (fallback)
+      const { data: existingByName } = await supabase
+        .from('customer_contacts')
+        .select('id, whatsapp, orders_count')
+        .eq('customer_name', customerName)
+        .maybeSingle();
+      
+      if (existingByName) {
+        // Atualizar cliente existente
+        await supabase
+          .from('customer_contacts')
+          .update({
+            customer_document: customerDocument || undefined,
+            address: address || undefined,
+            city: municipality || undefined,
+            last_order_id: orderId,
+            orders_count: (existingByName.orders_count || 0) + 1,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', existingByName.id);
+        
+        console.log('✅ Cliente existente (por nome) atualizado:', existingByName.id);
+        return { id: existingByName.id, hasWhatsApp: !!existingByName.whatsapp };
+      }
+      
+      // Criar novo cliente
+      const { data: newCustomer, error } = await supabase
+        .from('customer_contacts')
+        .insert({
+          customer_name: customerName,
+          customer_document: customerDocument || null,
+          address: address || null,
+          city: municipality || null,
+          source: 'import',
+          last_order_id: orderId,
+          orders_count: 1,
+          opt_in_whatsapp: true,
+          opt_in_email: true,
+          preferred_channel: 'whatsapp'
+        })
+        .select('id')
+        .single();
+      
+      if (error) {
+        console.error('Erro ao criar cliente:', error);
+        return null;
+      }
+      
+      console.log('✅ Novo cliente criado:', newCustomer.id);
+      return { id: newCustomer.id, hasWhatsApp: false };
+    } catch (error) {
+      console.error('Erro ao salvar cliente:', error);
+      return null;
     }
   };
 
@@ -749,6 +864,17 @@ export const ImportOrderDialog = ({
           onConfirm={handleConfirmDuplicate}
           onViewExisting={handleViewExistingOrder}
         />
+        {/* Dialog de Cadastro de WhatsApp do Cliente */}
+        {whatsAppDialogData && (
+          <CustomerWhatsAppDialog
+            open={whatsAppDialogData.open}
+            onOpenChange={(open) => {
+              if (!open) setWhatsAppDialogData(null);
+            }}
+            customerId={whatsAppDialogData.customerId}
+            customerName={whatsAppDialogData.customerName}
+          />
+        )}
       </DialogContent>
     </Dialog>;
 };
