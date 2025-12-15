@@ -87,15 +87,17 @@ async function sendAutoReplyMessage(
       formattedPhone = '55' + formattedPhone;
     }
 
-    // Evolution API (Mega API START) usa /message/sendText/{instance}
-    const endpoint = `/message/sendText/${instance.instance_key}`;
+    // Mega API START usa /rest/sendMessage/{instance}/text
+    const endpoint = `/rest/sendMessage/${instance.instance_key}/text`;
     const sendUrl = `${normalizedUrl}${endpoint}`;
 
-    // Body formato Evolution API: { number, text, linkPreview }
+    // Body formato Mega API: { messageData: { to, text, linkPreview } }
     const body = {
-      number: formattedPhone,
-      text: message,
-      linkPreview: true,
+      messageData: {
+        to: formattedPhone,
+        text: message,
+        linkPreview: false,
+      }
     };
 
     console.log(`📤 Sending auto-reply to: ${sendUrl}`);

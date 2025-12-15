@@ -129,17 +129,19 @@ Deno.serve(async (req) => {
 
     
 
-    // Evolution API (Mega API START) usa /message/sendText/{instance}
-    const endpoint = `/message/sendText/${megaApiInstance}`;
+    // Mega API START usa /rest/sendMessage/{instance}/text
+    const endpoint = `/rest/sendMessage/${megaApiInstance}/text`;
     const fullUrl = `${megaApiUrl}${endpoint}`;
 
     console.log('Sending to:', fullUrl);
 
-    // Body formato Evolution API: { number, text, linkPreview }
+    // Body formato Mega API: { messageData: { to, text, linkPreview } }
     const body = {
-      number: phoneNumber,
-      text: fullMessage,
-      linkPreview: true,
+      messageData: {
+        to: phoneNumber,
+        text: fullMessage,
+        linkPreview: false,
+      }
     };
 
     console.log('Request body:', JSON.stringify(body));
