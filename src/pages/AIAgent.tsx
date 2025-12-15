@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useAIAgentAdmin } from "@/hooks/useAIAgentAdmin";
 import { cn } from "@/lib/utils";
-import { Loader2, Bot, ShieldAlert, BarChart3, MessageSquare, CalendarDays, FolderOpen, Shield, Users, Link2, Book, ChevronLeft, ChevronRight } from "lucide-react";
+import { Loader2, Bot, ShieldAlert, BarChart3, MessageSquare, CalendarDays, FolderOpen, Shield, Users, Link2, Book, ChevronLeft, ChevronRight, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -14,6 +14,7 @@ import { AIAgentContactsTab } from "@/components/ai-agent/AIAgentContactsTab";
 import { AIAgentMessagesTab } from "@/components/ai-agent/AIAgentMessagesTab";
 import { AIAgentFilesTab } from "@/components/ai-agent/AIAgentFilesTab";
 import { AIAgentComplianceTab } from "@/components/ai-agent/AIAgentComplianceTab";
+import { AIAgentConfigTab } from "@/components/ai-agent/AIAgentConfigTab";
 
 interface NavItem {
   id: string;
@@ -24,6 +25,7 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { id: 'dashboard', label: 'Indicadores', icon: <BarChart3 className="h-5 w-5" />, description: 'Visão geral e métricas' },
+  { id: 'config', label: 'Configuração', icon: <Settings className="h-5 w-5" />, description: 'Configurações do agente' },
   { id: 'messages', label: 'Mensagens', icon: <MessageSquare className="h-5 w-5" />, description: 'Conversas dos agentes' },
   { id: 'logs', label: 'Eventos', icon: <CalendarDays className="h-5 w-5" />, description: 'Log de eventos' },
   { id: 'files', label: 'Arquivos', icon: <FolderOpen className="h-5 w-5" />, description: 'Arquivos enviados' },
@@ -82,6 +84,8 @@ export default function AIAgent() {
     switch (activeTab) {
       case 'dashboard':
         return <AIAgentDashboardTab config={config} onToggleActive={handleToggleActive} />;
+      case 'config':
+        return <AIAgentConfigTab config={config} onUpdate={updateConfig} />;
       case 'messages':
         return <AIAgentMessagesTab />;
       case 'quote':
