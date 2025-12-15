@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useAIAgentAdmin, AgentType } from "@/hooks/useAIAgentAdmin";
 import { cn } from "@/lib/utils";
-import { Loader2, Bot, ShieldAlert, BarChart3, MessageSquare, CalendarDays, FolderOpen, Shield, Users, Link2, Book, ChevronLeft, ChevronRight, Settings, Truck } from "lucide-react";
+import { Loader2, Bot, ShieldAlert, BarChart3, MessageSquare, CalendarDays, FolderOpen, Shield, Users, Link2, Book, ChevronLeft, ChevronRight, Settings, Truck, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -16,6 +16,7 @@ import { AIAgentMessagesTab } from "@/components/ai-agent/AIAgentMessagesTab";
 import { AIAgentFilesTab } from "@/components/ai-agent/AIAgentFilesTab";
 import { AIAgentComplianceTab } from "@/components/ai-agent/AIAgentComplianceTab";
 import { AIAgentConfigTab } from "@/components/ai-agent/AIAgentConfigTab";
+import { AIAgentPoliciesTab } from "@/components/ai-agent/AIAgentPoliciesTab";
 
 interface NavItem {
   id: string;
@@ -30,7 +31,8 @@ const NAV_ITEMS: NavItem[] = [
   { id: 'messages', label: 'Mensagens', icon: <MessageSquare className="h-5 w-5" />, description: 'Conversas dos agentes' },
   { id: 'logs', label: 'Eventos', icon: <CalendarDays className="h-5 w-5" />, description: 'Log de eventos' },
   { id: 'files', label: 'Arquivos', icon: <FolderOpen className="h-5 w-5" />, description: 'Arquivos enviados' },
-  { id: 'rules', label: 'Regras', icon: <Shield className="h-5 w-5" />, description: 'Políticas de compliance' },
+  { id: 'rules', label: 'Regras', icon: <Shield className="h-5 w-5" />, description: 'Regras de compliance (Regex)' },
+  { id: 'policies', label: 'Políticas', icon: <FileText className="h-5 w-5" />, description: 'Políticas de negócio' },
   { id: 'contacts', label: 'Contatos', icon: <Users className="h-5 w-5" />, description: 'Gerenciar contatos' },
   { id: 'connections', label: 'Conexões', icon: <Link2 className="h-5 w-5" />, description: 'WhatsApp e API' },
   { id: 'knowledge', label: 'Conhecimento', icon: <Book className="h-5 w-5" />, description: 'Base de conhecimento (RAG)' },
@@ -125,6 +127,8 @@ export default function AIAgent() {
         return <AIAgentFilesTab />;
       case 'rules':
         return <AIAgentComplianceTab />;
+      case 'policies':
+        return <AIAgentPoliciesTab />;
       case 'contacts':
         return (
           <AIAgentContactsTab 
