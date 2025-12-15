@@ -81,56 +81,73 @@ async function sendAutoReplyMessage(
     }
     normalizedUrl = normalizedUrl.replace(/\/+$/, '');
 
-    // Formatar número com @s.whatsapp.net
+    // Formatar número
     let formattedPhone = phoneNumber.replace(/\D/g, '');
     if (!formattedPhone.startsWith('55')) {
       formattedPhone = '55' + formattedPhone;
     }
-    const toNumber = `${formattedPhone}@s.whatsapp.net`;
 
-    // Enviar mensagem
-    const sendUrl = `${normalizedUrl}/rest/sendMessage/${instance.instance_key}/text`;
-    
-    const response = await fetch(sendUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${megaApiToken}`,
-      },
-      body: JSON.stringify({
-        messageData: {
-          to: toNumber,
-          text: message,
-        },
-      }),
-    });
+    // Evolution API / Mega API usa /message/sendText/{instance}
+    // Ref: https://doc.evolution-api.com/v2/api-reference/message-controller/send-text
+    const endpoints = [
+      `/message/sendText/${instance.instance_key}`,
+      `/rest/message/sendText/${instance.instance_key}`,
+    ];
 
-    if (response.ok) {
-      console.log('✅ Auto-reply message sent successfully');
-      
-      // Salvar mensagem enviada no banco
-      if (carrierId) {
-        await supabase
-          .from('carrier_conversations')
-          .insert({
-            carrier_id: carrierId,
-            conversation_type: 'general',
-            message_direction: 'outbound',
-            message_content: message,
-            contact_type: 'customer',
-            message_metadata: {
-              sent_via: 'ai_auto_reply',
-              sent_at: new Date().toISOString(),
-            },
-            sent_at: new Date().toISOString(),
+    const authHeadersList: Record<string, string>[] = [
+      { 'apikey': megaApiToken, 'Content-Type': 'application/json' },
+      { 'Authorization': `Bearer ${megaApiToken}`, 'Content-Type': 'application/json' },
+    ];
+
+    // Formato Evolution API: { number: "55XXX", text: "..." }
+    const body = { number: formattedPhone, text: message };
+
+    let success = false;
+    for (const endpoint of endpoints) {
+      for (const headers of authHeadersList) {
+        try {
+          const sendUrl = `${normalizedUrl}${endpoint}`;
+          console.log(`📤 Trying auto-reply: ${sendUrl}`);
+
+          const response = await fetch(sendUrl, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify(body),
           });
+
+          if (response.ok) {
+            console.log('✅ Auto-reply message sent successfully');
+            success = true;
+            break;
+          } else {
+            const errorText = await response.text();
+            console.log(`❌ Failed ${response.status}: ${errorText.substring(0, 100)}`);
+          }
+        } catch (err) {
+          console.error('❌ Fetch error:', err);
+        }
       }
-      return true;
-    } else {
-      const errorText = await response.text();
-      console.error('❌ Failed to send auto-reply:', response.status, errorText);
-      return false;
+      if (success) break;
     }
+
+    if (success && carrierId) {
+      await supabase
+        .from('carrier_conversations')
+        .insert({
+          carrier_id: carrierId,
+          conversation_type: 'general',
+          message_direction: 'outbound',
+          message_content: message,
+          contact_type: 'customer',
+          message_metadata: {
+            sent_via: 'ai_auto_reply',
+            sent_at: new Date().toISOString(),
+          },
+          sent_at: new Date().toISOString(),
+        });
+    }
+
+    return success;
   } catch (error) {
     console.error('❌ Error sending auto-reply:', error);
     return false;
