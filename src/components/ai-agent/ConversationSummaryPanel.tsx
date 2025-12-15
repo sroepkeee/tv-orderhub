@@ -44,10 +44,41 @@ export function ConversationSummaryPanel({ carrierId, contactName, onClose }: Pr
   const [summary, setSummary] = useState<ConversationSummary | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fromCache, setFromCache] = useState(false);
 
+  // Try to load from cache first, then allow fresh analysis
+  const loadFromCache = async () => {
+    try {
+      const { data } = await supabase
+        .from('conversation_sentiment_cache')
+        .select('*')
+        .eq('carrier_id', carrierId)
+        .maybeSingle();
+
+      if (data && data.sentiment) {
+        setSummary({
+          sentiment: data.sentiment as ConversationSummary['sentiment'],
+          score: data.score || 5,
+          summary: data.summary || '',
+          topics: data.topics || [],
+          pending_actions: data.pending_actions || [],
+          message_count: data.message_count || 0,
+          inbound_count: 0,
+          outbound_count: 0,
+          last_interaction: data.last_message_at,
+        });
+        setFromCache(true);
+      }
+    } catch (err) {
+      console.error('Error loading from cache:', err);
+    }
+  };
+
+  // Load fresh summary from AI
   const loadSummary = async () => {
     setLoading(true);
     setError(null);
+    setFromCache(false);
     
     try {
       const { data, error: fnError } = await supabase.functions.invoke('ai-agent-conversation-summary', {
@@ -66,6 +97,11 @@ export function ConversationSummaryPanel({ carrierId, contactName, onClose }: Pr
       setLoading(false);
     }
   };
+
+  // Load cache on mount
+  useState(() => {
+    loadFromCache();
+  });
 
   const getSentimentConfig = (sentiment: string) => {
     switch (sentiment) {

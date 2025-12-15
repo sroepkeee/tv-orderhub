@@ -570,6 +570,62 @@ export type Database = {
         }
         Relationships: []
       }
+      conversation_sentiment_cache: {
+        Row: {
+          carrier_id: string
+          contact_name: string | null
+          created_at: string | null
+          id: string
+          last_analyzed_at: string | null
+          last_message_at: string | null
+          message_count: number | null
+          pending_actions: string[] | null
+          score: number | null
+          sentiment: string | null
+          summary: string | null
+          topics: string[] | null
+          updated_at: string | null
+        }
+        Insert: {
+          carrier_id: string
+          contact_name?: string | null
+          created_at?: string | null
+          id?: string
+          last_analyzed_at?: string | null
+          last_message_at?: string | null
+          message_count?: number | null
+          pending_actions?: string[] | null
+          score?: number | null
+          sentiment?: string | null
+          summary?: string | null
+          topics?: string[] | null
+          updated_at?: string | null
+        }
+        Update: {
+          carrier_id?: string
+          contact_name?: string | null
+          created_at?: string | null
+          id?: string
+          last_analyzed_at?: string | null
+          last_message_at?: string | null
+          message_count?: number | null
+          pending_actions?: string[] | null
+          score?: number | null
+          sentiment?: string | null
+          summary?: string | null
+          topics?: string[] | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversation_sentiment_cache_carrier_id_fkey"
+            columns: ["carrier_id"]
+            isOneToOne: true
+            referencedRelation: "carriers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       customer_contacts: {
         Row: {
           address: string | null
