@@ -366,86 +366,63 @@ ${agentConfig.signature ? `\n\nAssinatura: ${agentConfig.signature}` : ''}`;
       formattedPhone = '55' + formattedPhone;
     }
 
-    // Generate instance key candidates (with/without prefixes)
     const megaApiInstance = instance.instance_key;
-    const instanceCandidates = Array.from(
-      new Set(
-        [
-          megaApiInstance,
-          megaApiInstance.replace(/^megastart-/, ''),
-          megaApiInstance.replace(/^start-/, ''),
-          megaApiInstance.replace(/^mega-/, ''),
-        ]
-          .map((s) => (s ?? '').trim())
-          .filter((s) => s.length > 0)
-      )
-    );
 
-    console.log('📤 Instance candidates:', instanceCandidates);
+    console.log('📤 Using instance:', megaApiInstance);
 
-    // Evolution API / Mega API usa /message/sendText/{instance}
-    // Ref: https://doc.evolution-api.com/v2/api-reference/message-controller/send-text
-    const endpointTemplates = [
-      '/message/sendText/{instance}',
-      '/rest/message/sendText/{instance}',
-    ];
+    // Mega API START usa /rest/sendMessage/{instance}/text
+    // Ref: https://apistart02.megaapi.com.br/docs/
+    const endpoint = `/rest/sendMessage/${megaApiInstance}/text`;
+    const sendUrl = `${baseUrl}${endpoint}`;
 
-    const endpoints = instanceCandidates.flatMap((inst) =>
-      endpointTemplates.map((tpl) => tpl.replace('{instance}', inst))
-    );
+    // Mega API START usa header 'Authorization: Bearer {token}'
+    const headers = {
+      'Authorization': `Bearer ${megaApiToken}`,
+      'Content-Type': 'application/json',
+    };
 
-    // Evolution API usa header 'apikey' (não Bearer)
-    const authHeadersList: Array<Record<string, string>> = [
-      { 'apikey': megaApiToken, 'Content-Type': 'application/json' },
-      { 'Authorization': `Bearer ${megaApiToken}`, 'Content-Type': 'application/json' },
-    ];
+    // Formato Mega API START: { messageData: { to: "55XXX", text: "...", linkPreview: false } }
+    const body = {
+      messageData: {
+        to: formattedPhone,
+        text: generatedMessage,
+        linkPreview: false,
+      },
+    };
 
-    // Formato Evolution API: { number: "55XXX", text: "..." }
-    const bodyFormats = [
-      { number: formattedPhone, text: generatedMessage },
-    ];
+    console.log(`📤 Sending to: ${sendUrl}`);
+    console.log('📤 Body:', JSON.stringify(body));
 
     let megaResponse: Response | null = null;
     let megaResponseBody: any = null;
     let lastError = '';
 
-    // Try all combinations until one works
-    outerLoop:
-    for (const endpoint of endpoints) {
-      for (const authHeaders of authHeadersList) {
-        for (const body of bodyFormats) {
-          try {
-            const sendUrl = `${baseUrl}${endpoint}`;
-            console.log(`📤 Trying: ${sendUrl}`);
+    try {
+      const response = await fetch(sendUrl, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(body),
+      });
 
-            const response = await fetch(sendUrl, {
-              method: 'POST',
-              headers: authHeaders,
-              body: JSON.stringify(body),
-            });
+      const responseText = await response.text();
+      console.log(`📤 Response: ${response.status} - ${responseText.substring(0, 200)}`);
 
-            const responseText = await response.text();
-            console.log(`📤 Response: ${response.status} - ${responseText.substring(0, 200)}`);
-
-            if (response.ok) {
-              megaResponse = response;
-              try {
-                megaResponseBody = JSON.parse(responseText);
-              } catch {
-                megaResponseBody = { raw: responseText };
-              }
-              console.log('✅ Message sent successfully via:', sendUrl);
-              break outerLoop;
-            }
-
-            lastError = `${response.status}: ${responseText.substring(0, 200)}`;
-          } catch (fetchError) {
-            lastError = fetchError instanceof Error ? fetchError.message : 'Unknown fetch error';
-            console.error(`❌ Fetch error for ${endpoint}:`, lastError);
-          }
+      if (response.ok) {
+        megaResponse = response;
+        try {
+          megaResponseBody = JSON.parse(responseText);
+        } catch {
+          megaResponseBody = { raw: responseText };
         }
+        console.log('✅ Message sent successfully');
+      } else {
+        lastError = `${response.status}: ${responseText.substring(0, 200)}`;
       }
+    } catch (fetchError) {
+      lastError = fetchError instanceof Error ? fetchError.message : 'Unknown fetch error';
+      console.error(`❌ Fetch error:`, lastError);
     }
+
 
     const messageSent = megaResponse !== null && megaResponse.ok;
     const sendResult = megaResponseBody || { error: lastError };
