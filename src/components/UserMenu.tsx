@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { User, Sun, Moon, LogOut, KeyRound, Shield } from "lucide-react";
+import { User, Sun, Moon, LogOut, KeyRound, Shield, Bot } from "lucide-react";
 import { useTheme } from "next-themes";
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
@@ -24,7 +24,20 @@ export const UserMenu = () => {
   const { isAdmin } = useAdminAuth();
   const navigate = useNavigate();
   const [pendingCount, setPendingCount] = useState(0);
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   
+  useEffect(() => {
+    if (!user?.email) return;
+    
+    supabase
+      .from('ai_agent_admins')
+      .select('id')
+      .eq('email', user.email)
+      .eq('is_active', true)
+      .maybeSingle()
+      .then(({ data }) => setIsSuperAdmin(!!data));
+  }, [user?.email]);
+
   useEffect(() => {
     if (!isAdmin) return;
     
@@ -112,6 +125,16 @@ export const UserMenu = () => {
               </DropdownMenuItem>
             }
           />
+
+          {isSuperAdmin && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => navigate('/ai-agent')}>
+                <Bot className="mr-2 h-4 w-4" />
+                <span>Agente de IA</span>
+              </DropdownMenuItem>
+            </>
+          )}
 
           {isAdmin && (
             <>
