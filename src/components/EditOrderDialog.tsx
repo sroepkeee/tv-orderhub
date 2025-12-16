@@ -588,7 +588,8 @@ export const EditOrderDialog = ({
         carrier_name: (order as any).carrier_name,
         freight_type: (order as any).freight_type,
         freight_value: (order as any).freight_value,
-        tracking_code: (order as any).tracking_code
+        tracking_code: (order as any).tracking_code,
+        customer_whatsapp: (order as any).customer_whatsapp || ''
       };
       reset(orderData);
 
@@ -2095,12 +2096,26 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-3 gap-3">
                   <div>
                     <Label htmlFor="client">Cliente</Label>
                     <Input {...register("client", {
                       required: true
                     })} />
+                  </div>
+                  <div>
+                    <Label htmlFor="customer_whatsapp" className="flex items-center gap-1">
+                      📱 WhatsApp do Cliente
+                    </Label>
+                    <Input 
+                      {...register("customer_whatsapp" as any)} 
+                      placeholder="51999999999"
+                      maxLength={20}
+                      type="tel"
+                    />
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Para notificações automáticas
+                    </p>
                   </div>
                   <div>
                     <Label htmlFor="deskTicket">Nº Chamado Desk</Label>

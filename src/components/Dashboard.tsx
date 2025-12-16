@@ -111,6 +111,8 @@ export interface Order {
   rateio_project_code?: string;
   // ✨ Campo de empresa emissora
   sender_company?: string;
+  // ✨ Campo WhatsApp do cliente para notificações
+  customer_whatsapp?: string;
 }
 
 // Mock data
@@ -862,6 +864,7 @@ export const Dashboard = () => {
           business_area,
           rateio_project_code,
           sender_company,
+          customer_whatsapp,
           order_items (
             id,
             item_code,
@@ -959,7 +962,8 @@ export const Dashboard = () => {
             freight_modality,
             shipping_date,
             vehicle_plate,
-            driver_name
+            driver_name,
+            customer_whatsapp
           `)
           .range(0, 99)
           .order('created_at', { ascending: false })
@@ -1041,7 +1045,8 @@ export const Dashboard = () => {
               shipping_date: dbOrder.shipping_date || null,
               vehicle_plate: dbOrder.vehicle_plate || null,
               driver_name: dbOrder.driver_name || null,
-              updatedAt: dbOrder.updated_at || undefined
+              updatedAt: dbOrder.updated_at || undefined,
+              customer_whatsapp: dbOrder.customer_whatsapp || null
             };
           })
         );
@@ -1139,7 +1144,9 @@ export const Dashboard = () => {
           business_area: dbOrder.business_area || null,
           rateio_project_code: dbOrder.rateio_project_code || null,
           // Campo empresa emissora
-          sender_company: dbOrder.sender_company || null
+          sender_company: dbOrder.sender_company || null,
+          // Campo WhatsApp cliente
+          customer_whatsapp: dbOrder.customer_whatsapp || null
         };
       });
 
@@ -1417,6 +1424,7 @@ export const Dashboard = () => {
         user_id: user.id,
         order_number: orderNumber,
         customer_name: orderData.client,
+        customer_whatsapp: orderData.customerWhatsapp || null,
         delivery_address: orderData.client,
         delivery_date: orderData.deliveryDeadline,
         status: "almox_ssm_pending",
@@ -1554,7 +1562,9 @@ export const Dashboard = () => {
         cost_center: (updatedOrder as any).cost_center || null,
         account_item: (updatedOrder as any).account_item || null,
         // Campo empresa emissora
-        sender_company: (updatedOrder as any).sender_company || null
+        sender_company: (updatedOrder as any).sender_company || null,
+        // Campo WhatsApp do cliente
+        customer_whatsapp: (updatedOrder as any).customer_whatsapp || null
       }).eq('id', updatedOrder.id).select('id').single();
       if (orderError) throw orderError;
       if (!updatedRow) throw new Error("Sem permissão para atualizar este pedido.");
