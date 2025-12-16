@@ -88,7 +88,7 @@ export interface FreightQuoteResponse {
 
 export interface CarrierConversation {
   id: string;
-  order_id: string | null; // Nullable - for general conversations
+  order_id: string | null;
   carrier_id: string;
   quote_id?: string;
   conversation_type: 'quote_request' | 'follow_up' | 'negotiation' | 'general';
@@ -99,6 +99,9 @@ export interface CarrierConversation {
   is_group_message?: boolean;
   group_id?: string;
   group_name?: string;
+  has_media?: boolean;
+  media_type?: 'image' | 'audio' | 'document' | 'video' | 'sticker';
+  compliance_flags?: Record<string, any>;
   sent_at: string;
   delivered_at?: string;
   read_at?: string;
@@ -106,6 +109,47 @@ export interface CarrierConversation {
   created_by?: string;
   created_at: string;
   carrier?: Carrier;
+  media?: WhatsAppMedia[];
+}
+
+export interface WhatsAppMedia {
+  id: string;
+  conversation_id: string;
+  media_type: 'image' | 'audio' | 'document' | 'video' | 'sticker';
+  mime_type?: string;
+  file_name?: string;
+  file_size_bytes?: number;
+  base64_data?: string;
+  storage_path?: string;
+  thumbnail_base64?: string;
+  duration_seconds?: number;
+  caption?: string;
+  media_key?: string;
+  direct_path?: string;
+  file_sha256?: string;
+  ai_analysis?: {
+    tipo?: string;
+    detalhes?: string;
+    relevante_para_pedido?: boolean;
+    detectou_problema?: boolean;
+    resumo?: string;
+  };
+  compliance_check?: {
+    has_violations?: boolean;
+    highest_risk?: string;
+    flags?: ComplianceFlag[];
+    requires_human_review?: boolean;
+  };
+  created_at: string;
+  updated_at?: string;
+}
+
+export interface ComplianceFlag {
+  rule_id: string;
+  policy: string;
+  keyword_matched: string;
+  risk_level: 'low' | 'moderate' | 'high' | 'critical';
+  action: 'log' | 'warn' | 'block' | 'escalate';
 }
 
 export interface WhatsAppStatus {

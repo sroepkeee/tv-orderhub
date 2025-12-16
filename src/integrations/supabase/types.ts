@@ -491,6 +491,7 @@ export type Database = {
       carrier_conversations: {
         Row: {
           carrier_id: string
+          compliance_flags: Json | null
           contact_type: string | null
           conversation_type: string
           created_at: string | null
@@ -498,8 +499,10 @@ export type Database = {
           delivered_at: string | null
           group_id: string | null
           group_name: string | null
+          has_media: boolean | null
           id: string
           is_group_message: boolean | null
+          media_type: string | null
           message_content: string
           message_direction: string
           message_metadata: Json | null
@@ -511,6 +514,7 @@ export type Database = {
         }
         Insert: {
           carrier_id: string
+          compliance_flags?: Json | null
           contact_type?: string | null
           conversation_type: string
           created_at?: string | null
@@ -518,8 +522,10 @@ export type Database = {
           delivered_at?: string | null
           group_id?: string | null
           group_name?: string | null
+          has_media?: boolean | null
           id?: string
           is_group_message?: boolean | null
+          media_type?: string | null
           message_content: string
           message_direction: string
           message_metadata?: Json | null
@@ -531,6 +537,7 @@ export type Database = {
         }
         Update: {
           carrier_id?: string
+          compliance_flags?: Json | null
           contact_type?: string | null
           conversation_type?: string
           created_at?: string | null
@@ -538,8 +545,10 @@ export type Database = {
           delivered_at?: string | null
           group_id?: string | null
           group_name?: string | null
+          has_media?: boolean | null
           id?: string
           is_group_message?: boolean | null
+          media_type?: string | null
           message_content?: string
           message_direction?: string
           message_metadata?: Json | null
@@ -2614,6 +2623,77 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      whatsapp_media: {
+        Row: {
+          ai_analysis: Json | null
+          base64_data: string | null
+          caption: string | null
+          compliance_check: Json | null
+          conversation_id: string | null
+          created_at: string | null
+          direct_path: string | null
+          duration_seconds: number | null
+          file_name: string | null
+          file_sha256: string | null
+          file_size_bytes: number | null
+          id: string
+          media_key: string | null
+          media_type: string
+          mime_type: string | null
+          storage_path: string | null
+          thumbnail_base64: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          ai_analysis?: Json | null
+          base64_data?: string | null
+          caption?: string | null
+          compliance_check?: Json | null
+          conversation_id?: string | null
+          created_at?: string | null
+          direct_path?: string | null
+          duration_seconds?: number | null
+          file_name?: string | null
+          file_sha256?: string | null
+          file_size_bytes?: number | null
+          id?: string
+          media_key?: string | null
+          media_type: string
+          mime_type?: string | null
+          storage_path?: string | null
+          thumbnail_base64?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          ai_analysis?: Json | null
+          base64_data?: string | null
+          caption?: string | null
+          compliance_check?: Json | null
+          conversation_id?: string | null
+          created_at?: string | null
+          direct_path?: string | null
+          duration_seconds?: number | null
+          file_name?: string | null
+          file_sha256?: string | null
+          file_size_bytes?: number | null
+          id?: string
+          media_key?: string | null
+          media_type?: string
+          mime_type?: string | null
+          storage_path?: string | null
+          thumbnail_base64?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_media_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "carrier_conversations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       whatsapp_message_log: {
         Row: {
