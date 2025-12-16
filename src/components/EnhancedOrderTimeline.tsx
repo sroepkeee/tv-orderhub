@@ -124,36 +124,31 @@ export const EnhancedOrderTimeline: React.FC<EnhancedOrderTimelineProps> = ({ or
   const loadUnifiedTimeline = async () => {
     setLoading(true);
     try {
-      // 1. Mudanças gerais do pedido (order_changes)
-      const { data: orderChanges } = await supabase
-        .from('order_changes')
-        .select('*')
-        .eq('order_id', orderId)
-        .order('changed_at', { ascending: false });
+      // Executar todas as queries em PARALELO para reduzir tempo de carregamento
+      const [orderChangesRes, statusHistoryRes, itemHistoryRes] = await Promise.all([
+        supabase
+          .from('order_changes')
+          .select('*')
+          .eq('order_id', orderId)
+          .order('changed_at', { ascending: false }),
+        supabase
+          .from('order_history')
+          .select('*')
+          .eq('order_id', orderId)
+          .order('changed_at', { ascending: false }),
+        supabase
+          .from('order_item_history')
+          .select('*, order_items(item_code, item_description)')
+          .eq('order_id', orderId)
+          .order('changed_at', { ascending: false })
+      ]);
 
-      console.log('📊 Order Changes carregados:', orderChanges?.length || 0);
+      const orderChanges = orderChangesRes.data;
+      const statusHistory = statusHistoryRes.data;
+      const itemHistory = itemHistoryRes.data;
 
-      // 2. Mudanças de status (order_history)
-      const { data: statusHistory } = await supabase
-        .from('order_history')
-        .select('*')
-        .eq('order_id', orderId)
-        .order('changed_at', { ascending: false });
-
-      console.log('📈 Status History carregados:', statusHistory?.length || 0);
-
-      // 3. Mudanças nos itens (order_item_history)
-      const { data: itemHistory } = await supabase
-        .from('order_item_history')
-        .select('*, order_items(item_code, item_description)')
-        .eq('order_id', orderId)
-        .order('changed_at', { ascending: false });
-
-      console.log('📦 Item History carregados:', itemHistory?.length || 0);
-
-      // 4. Buscar perfis de usuários separadamente
+      // Coletar todos os user IDs para buscar perfis
       const allUserIds = new Set<string>();
-      
       orderChanges?.forEach(c => c.changed_by && allUserIds.add(c.changed_by));
       statusHistory?.forEach(h => h.user_id && allUserIds.add(h.user_id));
       itemHistory?.forEach(i => i.user_id && allUserIds.add(i.user_id));
@@ -172,8 +167,6 @@ export const EnhancedOrderTimeline: React.FC<EnhancedOrderTimelineProps> = ({ or
           profilesMap.set(p.id, p.full_name || p.email || 'Usuário');
         });
       }
-
-      console.log('👤 Perfis carregados:', profilesMap.size);
 
       // Helper para obter nome do usuário
       const getUserName = (userId: string): string => {

@@ -110,7 +110,7 @@ export const OrderComments = ({ orderId }: OrderCommentsProps) => {
     try {
       setError(null);
       
-      // 1. Buscar comentários
+      // 1. Buscar comentários primeiro
       const { data: commentsData, error: commentsError } = await supabase
         .from('order_comments')
         .select('*')
@@ -124,30 +124,30 @@ export const OrderComments = ({ orderId }: OrderCommentsProps) => {
         return;
       }
 
-      // 2. Buscar perfis dos autores
+      // 2. Buscar perfis e mention_tags em PARALELO
       const userIds = [...new Set(commentsData.map(c => c.user_id))];
-      const { data: profilesData, error: profilesError } = await supabase
-        .from('profiles')
-        .select('id, full_name, email')
-        .in('id', userIds);
+      const commentIds = commentsData.map(c => c.id);
 
-      if (profilesError) throw profilesError;
+      const [profilesRes, mentionsRes] = await Promise.all([
+        supabase
+          .from('profiles')
+          .select('id, full_name, email')
+          .in('id', userIds),
+        supabase
+          .from('mention_tags')
+          .select('comment_id, mentioned_user_id')
+          .in('comment_id', commentIds)
+      ]);
+
+      if (profilesRes.error) throw profilesRes.error;
+      if (mentionsRes.error) throw mentionsRes.error;
 
       const profilesMap = new Map(
-        profilesData?.map(p => [p.id, p]) || []
+        profilesRes.data?.map(p => [p.id, p]) || []
       );
 
-      // 3. Buscar mention_tags
-      const commentIds = commentsData.map(c => c.id);
-      const { data: mentionsData, error: mentionsError } = await supabase
-        .from('mention_tags')
-        .select('comment_id, mentioned_user_id')
-        .in('comment_id', commentIds);
-
-      if (mentionsError) throw mentionsError;
-
-      // 4. Buscar perfis dos mencionados
-      const mentionedUserIds = [...new Set(mentionsData?.map(m => m.mentioned_user_id) || [])];
+      // 3. Buscar perfis dos mencionados (se houver)
+      const mentionedUserIds = [...new Set(mentionsRes.data?.map(m => m.mentioned_user_id) || [])];
       let mentionedProfilesMap = new Map();
       
       if (mentionedUserIds.length > 0) {
@@ -163,11 +163,11 @@ export const OrderComments = ({ orderId }: OrderCommentsProps) => {
         );
       }
 
-      // 5. Combinar tudo
+      // 4. Combinar tudo
       const enrichedComments: Comment[] = commentsData.map(comment => ({
         ...comment,
         profiles: profilesMap.get(comment.user_id),
-        mention_tags: mentionsData
+        mention_tags: mentionsRes.data
           ?.filter(m => m.comment_id === comment.id)
           .map(m => ({
             mentioned_user_id: m.mentioned_user_id,
