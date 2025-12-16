@@ -34,7 +34,55 @@ export default function Production() {
     warehouse: '',
     searchTerm: '',
     productionOrderNumber: '',
+    orderPhase: '',
   });
+
+  // Helper para mapear status para fase
+  const getPhaseFromStatus = (status: string | undefined, orderCategory?: string): string => {
+    if (!status) return '';
+    const statusPhaseMap: Record<string, string> = {
+      'almox_ssm_pending': 'almox_ssm',
+      'almox_ssm_received': 'almox_ssm',
+      'order_generation_pending': 'order_generation',
+      'order_issued': 'order_generation',
+      'almox_pending': 'almox_general',
+      'almox_received': 'almox_general',
+      'separation_started': orderCategory === 'vendas' ? 'production_client' : 'production_stock',
+      'in_production': orderCategory === 'vendas' ? 'production_client' : 'production_stock',
+      'awaiting_material': orderCategory === 'vendas' ? 'production_client' : 'production_stock',
+      'separation_completed': orderCategory === 'vendas' ? 'production_client' : 'production_stock',
+      'production_completed': orderCategory === 'vendas' ? 'production_client' : 'production_stock',
+      'purchase_pending': 'purchases',
+      'purchase_quoted': 'purchases',
+      'purchase_ordered': 'purchases',
+      'purchase_received': 'purchases',
+      'balance_pending': 'balance_generation',
+      'balance_generated': 'balance_generation',
+      'lab_pending': 'laboratory',
+      'lab_in_progress': 'laboratory',
+      'lab_completed': 'laboratory',
+      'packaging_pending': 'packaging',
+      'in_packaging': 'packaging',
+      'packaging_completed': 'packaging',
+      'freight_quote_pending': 'freight_quote',
+      'freight_quoted': 'freight_quote',
+      'ready_to_invoice': 'ready_to_invoice',
+      'pending_invoice_request': 'ready_to_invoice',
+      'invoice_requested': 'invoicing',
+      'awaiting_invoice': 'invoicing',
+      'invoice_issued': 'invoicing',
+      'invoice_sent': 'invoicing',
+      'logistics_pending': 'logistics',
+      'ready_for_shipping': 'logistics',
+      'shipped': 'in_transit',
+      'in_transit': 'in_transit',
+      'out_for_delivery': 'in_transit',
+      'delivered': 'completion',
+      'completed': 'completion',
+      'cancelled': 'exceptions',
+    };
+    return statusPhaseMap[status] || '';
+  };
   
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [showEditDialog, setShowEditDialog] = useState(false);
@@ -76,10 +124,18 @@ export default function Production() {
       // Filtro de busca (código ou descrição)
       if (filters.searchTerm) {
         const search = filters.searchTerm.toLowerCase();
-        return (
-          item.itemCode.toLowerCase().includes(search) ||
-          item.itemDescription.toLowerCase().includes(search)
-        );
+        if (!item.itemCode.toLowerCase().includes(search) && 
+            !item.itemDescription.toLowerCase().includes(search)) {
+          return false;
+        }
+      }
+
+      // Filtro de fase do pedido
+      if (filters.orderPhase) {
+        const itemPhase = getPhaseFromStatus(item.orderStatus);
+        if (itemPhase !== filters.orderPhase) {
+          return false;
+        }
       }
 
       return true;

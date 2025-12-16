@@ -10,6 +10,24 @@ interface ProductionFiltersProps {
   warehouses: string[];
 }
 
+const ORDER_PHASES = [
+  { value: 'almox_ssm', label: 'Almox SSM' },
+  { value: 'order_generation', label: 'Gerar Ordem' },
+  { value: 'purchases', label: 'Compras' },
+  { value: 'almox_general', label: 'Almox Geral' },
+  { value: 'production_client', label: 'Produção Clientes' },
+  { value: 'production_stock', label: 'Produção Estoque' },
+  { value: 'balance_generation', label: 'Gerar Saldo' },
+  { value: 'laboratory', label: 'Laboratório' },
+  { value: 'packaging', label: 'Embalagem' },
+  { value: 'freight_quote', label: 'Cotação de Frete' },
+  { value: 'ready_to_invoice', label: 'À Faturar' },
+  { value: 'invoicing', label: 'Solicitado Faturamento' },
+  { value: 'logistics', label: 'Expedição' },
+  { value: 'in_transit', label: 'Em Trânsito' },
+  { value: 'completion', label: 'Conclusão' },
+];
+
 export const ProductionFilters = ({ filters, onFiltersChange, warehouses }: ProductionFiltersProps) => {
   const handleReset = () => {
     onFiltersChange({
@@ -18,6 +36,7 @@ export const ProductionFilters = ({ filters, onFiltersChange, warehouses }: Prod
       warehouse: '',
       searchTerm: '',
       productionOrderNumber: '',
+      orderPhase: '',
     });
   };
 
@@ -31,7 +50,7 @@ export const ProductionFilters = ({ filters, onFiltersChange, warehouses }: Prod
         </Button>
       </div>
       
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
         {/* Busca geral */}
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -57,6 +76,24 @@ export const ProductionFilters = ({ filters, onFiltersChange, warehouses }: Prod
           onChange={(e) => onFiltersChange({ ...filters, productionOrderNumber: e.target.value })}
           className="font-mono"
         />
+
+        {/* Fase do Pedido */}
+        <Select
+          value={filters.orderPhase || 'all'}
+          onValueChange={(value) => onFiltersChange({ ...filters, orderPhase: value === 'all' ? '' : value })}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="Todas as fases" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todas as fases</SelectItem>
+            {ORDER_PHASES.map((phase) => (
+              <SelectItem key={phase.value} value={phase.value}>
+                {phase.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
 
         {/* Situação */}
         <Select
