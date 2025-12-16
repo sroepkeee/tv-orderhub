@@ -347,7 +347,7 @@ export function AIAgentMessagesTab({ selectedAgentType = 'carrier' }: Props) {
         body: {
           carrierId: selectedConversation.carrier_id,
           message: newMessage.trim(),
-          conversationType: 'direct'
+          conversationType: 'general'
         }
       });
 
