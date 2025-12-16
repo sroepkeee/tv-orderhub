@@ -647,11 +647,14 @@ export type Database = {
           carrier_id: string
           contact_name: string | null
           created_at: string | null
+          handoff_detected_at: string | null
+          handoff_reason: string | null
           id: string
           last_analyzed_at: string | null
           last_message_at: string | null
           message_count: number | null
           pending_actions: string[] | null
+          requires_human_handoff: boolean | null
           score: number | null
           sentiment: string | null
           summary: string | null
@@ -662,11 +665,14 @@ export type Database = {
           carrier_id: string
           contact_name?: string | null
           created_at?: string | null
+          handoff_detected_at?: string | null
+          handoff_reason?: string | null
           id?: string
           last_analyzed_at?: string | null
           last_message_at?: string | null
           message_count?: number | null
           pending_actions?: string[] | null
+          requires_human_handoff?: boolean | null
           score?: number | null
           sentiment?: string | null
           summary?: string | null
@@ -677,11 +683,14 @@ export type Database = {
           carrier_id?: string
           contact_name?: string | null
           created_at?: string | null
+          handoff_detected_at?: string | null
+          handoff_reason?: string | null
           id?: string
           last_analyzed_at?: string | null
           last_message_at?: string | null
           message_count?: number | null
           pending_actions?: string[] | null
+          requires_human_handoff?: boolean | null
           score?: number | null
           sentiment?: string | null
           summary?: string | null

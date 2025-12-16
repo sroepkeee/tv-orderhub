@@ -95,12 +95,37 @@ serve(async (req) => {
 
     // 3. Check for human handoff keywords
     const lowerMessage = message_content.toLowerCase();
-    const needsHumanHandoff = agentConfig.human_handoff_keywords?.some(
+    const triggerKeywords = agentConfig.human_handoff_keywords?.filter(
       keyword => lowerMessage.includes(keyword.toLowerCase())
-    );
+    ) || [];
+    const needsHumanHandoff = triggerKeywords.length > 0;
 
     if (needsHumanHandoff) {
-      console.log('🧑 Human handoff triggered, skipping auto-reply');
+      console.log('🧑 Human handoff triggered by keywords:', triggerKeywords);
+      
+      // Mark handoff in conversation_sentiment_cache
+      const handoffReason = triggerKeywords.join(', ');
+      
+      if (carrier_id) {
+        // Upsert to mark requires_human_handoff
+        const { error: cacheError } = await supabase
+          .from('conversation_sentiment_cache')
+          .upsert({
+            carrier_id,
+            requires_human_handoff: true,
+            handoff_reason: handoffReason,
+            handoff_detected_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          }, {
+            onConflict: 'carrier_id'
+          });
+
+        if (cacheError) {
+          console.error('❌ Error marking handoff in cache:', cacheError);
+        } else {
+          console.log('✅ Marked requires_human_handoff=true in sentiment cache');
+        }
+      }
       
       // Log that human intervention is needed
       await supabase.from('ai_notification_log').insert({
@@ -112,15 +137,77 @@ serve(async (req) => {
           conversation_id,
           carrier_id,
           carrier_name,
-          trigger_keywords: agentConfig.human_handoff_keywords.filter(
-            k => lowerMessage.includes(k.toLowerCase())
-          )
+          trigger_keywords: triggerKeywords
         }
       });
 
+      // Send confirmation message to customer that we're transferring
+      const handoffMessage = "Entendi que você prefere falar com uma pessoa. Estou transferindo para nosso time agora mesmo! 🧑‍💼 Alguém vai te atender em breve.";
+      
+      // Get connected WhatsApp instance
+      const { data: instanceData } = await supabase
+        .from('whatsapp_instances')
+        .select('instance_key')
+        .eq('status', 'connected')
+        .limit(1)
+        .single();
+
+      if (instanceData?.instance_key) {
+        const megaApiUrl = Deno.env.get('MEGA_API_URL') || '';
+        const megaApiToken = Deno.env.get('MEGA_API_TOKEN') || '';
+        
+        // Normalize URL
+        let baseUrl = megaApiUrl.trim();
+        if (!baseUrl.startsWith('http://') && !baseUrl.startsWith('https://')) {
+          baseUrl = 'https://' + baseUrl;
+        }
+        baseUrl = baseUrl.replace(/\/$/, '');
+        
+        // Format phone number
+        const phoneNumber = sender_phone.replace(/\D/g, '');
+        const formattedPhone = phoneNumber.startsWith('55') ? phoneNumber : `55${phoneNumber}`;
+        
+        try {
+          const sendResponse = await fetch(`${baseUrl}/message/sendText/${instanceData.instance_key}`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'apikey': megaApiToken
+            },
+            body: JSON.stringify({
+              number: formattedPhone,
+              textMessage: { text: handoffMessage }
+            })
+          });
+
+          if (sendResponse.ok) {
+            console.log('✅ Handoff confirmation message sent');
+            
+            // Save outbound message to database
+            await supabase.from('carrier_conversations').insert({
+              carrier_id,
+              message_content: handoffMessage,
+              message_direction: 'outbound',
+              conversation_type: 'general',
+              contact_type,
+              sent_at: new Date().toISOString(),
+              message_metadata: {
+                is_ai_generated: true,
+                sent_via: 'ai-agent-handoff',
+                handoff_keywords: triggerKeywords
+              }
+            });
+          }
+        } catch (sendError) {
+          console.error('❌ Error sending handoff message:', sendError);
+        }
+      }
+
       return new Response(JSON.stringify({ 
         success: false, 
-        reason: 'human_handoff_required' 
+        reason: 'human_handoff_required',
+        handoff_keywords: triggerKeywords,
+        handoff_message_sent: true
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
