@@ -34,7 +34,8 @@ export default function CarriersChat() {
     subscribeToNewMessages,
     unreadCount,
     deleteConversation,
-    deleteAllCarrierConversations
+    deleteAllCarrierConversations,
+    deleteAllConversations
   } = useCarrierConversations();
   const [selectedWhatsApp, setSelectedWhatsApp] = useState<string | null>(null);
   const [selectedCarrierId, setSelectedCarrierId] = useState<string | null>(null);
@@ -197,6 +198,41 @@ export default function CarriersChat() {
                 </AlertDialogContent>
               </AlertDialog>
             )}
+            {/* Botão para limpar todas as conversas de teste */}
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  className="gap-2 text-orange-600 hover:text-orange-700 hover:bg-orange-50 dark:hover:bg-orange-900/40"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Limpar Tudo
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Limpar todas as conversas?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Esta ação irá excluir TODAS as conversas do sistema (útil para limpar testes).
+                    Esta ação não pode ser desfeita.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction 
+                    onClick={async () => {
+                      await deleteAllConversations();
+                      setSelectedCarrierId(null);
+                      setSelectedWhatsApp(null);
+                    }} 
+                    className="bg-orange-600 hover:bg-orange-700"
+                  >
+                    Limpar Tudo
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
             {isAuthorized && (
               <Button 
                 variant="outline" 

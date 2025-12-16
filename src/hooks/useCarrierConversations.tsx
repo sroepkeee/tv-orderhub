@@ -285,6 +285,9 @@ export const useCarrierConversations = () => {
       
       setConversations(prev => prev.filter(c => c.id !== conversationId));
       
+      // ✅ Recalcular contador de não lidas
+      await getUnreadCount();
+      
       toast({
         title: 'Mensagem excluída',
         description: 'A mensagem foi removida.',
@@ -311,9 +314,41 @@ export const useCarrierConversations = () => {
       
       setConversations(prev => prev.filter(c => c.carrier_id !== carrierId));
       
+      // ✅ Recalcular contador de não lidas
+      await getUnreadCount();
+      
       toast({
         title: 'Conversas excluídas',
         description: 'Todas as mensagens com esta transportadora foram removidas.',
+      });
+      return true;
+    } catch (error: any) {
+      toast({
+        title: 'Erro ao excluir conversas',
+        description: error.message,
+        variant: 'destructive',
+      });
+      return false;
+    }
+  };
+
+  // Função para limpar TODAS as conversas (útil para testes)
+  const deleteAllConversations = async () => {
+    try {
+      const { error } = await supabase
+        .from('carrier_conversations')
+        .delete()
+        .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete ALL
+
+      if (error) throw error;
+      
+      // Reset imediato do estado local
+      setConversations([]);
+      setUnreadCount(0);
+      
+      toast({
+        title: 'Todas as conversas excluídas',
+        description: 'O histórico foi limpo completamente.',
       });
       return true;
     } catch (error: any) {
@@ -340,5 +375,6 @@ export const useCarrierConversations = () => {
     subscribeToNewMessages,
     deleteConversation,
     deleteAllCarrierConversations,
+    deleteAllConversations,
   };
 };
