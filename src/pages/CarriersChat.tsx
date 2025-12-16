@@ -26,7 +26,8 @@ import {
   Settings,
   Package,
   Trash2,
-  BarChart3
+  BarChart3,
+  UserRound
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { format, formatDistanceToNow } from "date-fns";
@@ -48,6 +49,9 @@ interface SentimentCache {
   carrier_id: string;
   sentiment: 'positive' | 'neutral' | 'negative' | 'critical' | null;
   score: number | null;
+  requires_human_handoff?: boolean;
+  handoff_reason?: string;
+  handoff_detected_at?: string;
 }
 
 interface Conversation {
@@ -62,6 +66,9 @@ interface Conversation {
   message_direction: string;
   sentiment?: 'positive' | 'neutral' | 'negative' | 'critical' | null;
   score?: number | null;
+  requires_human_handoff?: boolean;
+  handoff_reason?: string;
+  handoff_detected_at?: string;
 }
 
 interface MessageMetadata {
@@ -94,7 +101,7 @@ const parseMessageMetadata = (metadata: unknown): MessageMetadata | null => {
   };
 };
 
-type SentimentFilter = 'all' | 'critical' | 'negative' | 'neutral' | 'positive';
+type SentimentFilter = 'all' | 'critical' | 'negative' | 'neutral' | 'positive' | 'human_handoff';
 
 const SENTIMENT_CONFIG = {
   critical: { icon: AlertTriangle, color: 'text-red-500', bg: 'bg-red-100 dark:bg-red-950/50', border: 'border-red-300 dark:border-red-800', label: 'Crítico' },
@@ -142,7 +149,7 @@ export default function CarriersChat() {
     try {
       const { data, error } = await supabase
         .from('conversation_sentiment_cache')
-        .select('carrier_id, sentiment, score');
+        .select('carrier_id, sentiment, score, requires_human_handoff, handoff_reason, handoff_detected_at');
 
       if (error) throw error;
       
@@ -204,11 +211,19 @@ export default function CarriersChat() {
         ...conv,
         sentiment: sentimentCache[conv.carrier_id]?.sentiment,
         score: sentimentCache[conv.carrier_id]?.score,
+        requires_human_handoff: sentimentCache[conv.carrier_id]?.requires_human_handoff,
+        handoff_reason: sentimentCache[conv.carrier_id]?.handoff_reason,
+        handoff_detected_at: sentimentCache[conv.carrier_id]?.handoff_detected_at,
       }));
 
-      setConversations(conversationsWithSentiment.sort((a, b) => 
-        new Date(b.last_message_at).getTime() - new Date(a.last_message_at).getTime()
-      ));
+      // Sort: human handoff first, then by last message time
+      setConversations(conversationsWithSentiment.sort((a, b) => {
+        // Human handoff always first
+        if (a.requires_human_handoff && !b.requires_human_handoff) return -1;
+        if (!a.requires_human_handoff && b.requires_human_handoff) return 1;
+        // Then by time
+        return new Date(b.last_message_at).getTime() - new Date(a.last_message_at).getTime();
+      }));
     } catch (error) {
       console.error('Error loading conversations:', error);
     } finally {
@@ -442,7 +457,9 @@ export default function CarriersChat() {
       filtered = filtered.filter(c => c.message_direction === 'inbound');
     }
 
-    if (sentimentFilter !== 'all') {
+    if (sentimentFilter === 'human_handoff') {
+      filtered = filtered.filter(c => c.requires_human_handoff === true);
+    } else if (sentimentFilter !== 'all') {
       filtered = filtered.filter(c => c.sentiment === sentimentFilter);
     }
 
@@ -510,6 +527,7 @@ export default function CarriersChat() {
 
   const sentimentCounts = {
     all: conversations.length,
+    human_handoff: conversations.filter(c => c.requires_human_handoff === true).length,
     critical: conversations.filter(c => c.sentiment === 'critical').length,
     negative: conversations.filter(c => c.sentiment === 'negative').length,
     neutral: conversations.filter(c => c.sentiment === 'neutral').length,
@@ -710,6 +728,25 @@ export default function CarriersChat() {
               >
                 Todas ({sentimentCounts.all})
               </Button>
+              {/* Human Handoff Filter - Priority */}
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant={sentimentFilter === 'human_handoff' ? 'default' : 'outline'}
+                      size="sm"
+                      className={`h-6 text-[10px] px-2 ${sentimentFilter !== 'human_handoff' ? 'border-purple-400 text-purple-600 hover:bg-purple-50 dark:border-purple-700 dark:hover:bg-purple-950/30' : 'bg-purple-500 hover:bg-purple-600'}`}
+                      onClick={() => setSentimentFilter('human_handoff')}
+                    >
+                      <UserRound className="h-3 w-3 mr-0.5" />
+                      {sentimentCounts.human_handoff}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom">
+                    <p>🧑‍💼 Aguardando Atendente Humano</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -812,6 +849,7 @@ export default function CarriersChat() {
                   {filteredConversations.map(conversation => {
                     const sentimentConfig = conversation.sentiment ? SENTIMENT_CONFIG[conversation.sentiment as keyof typeof SENTIMENT_CONFIG] : null;
                     const isCritical = conversation.sentiment === 'critical';
+                    const needsHumanHandoff = conversation.requires_human_handoff === true;
                     
                     return (
                       <button
@@ -820,23 +858,53 @@ export default function CarriersChat() {
                         className={`w-full flex items-start gap-2.5 p-2.5 text-left transition-colors ${
                           selectedConversation?.carrier_id === conversation.carrier_id
                             ? 'bg-primary/10'
+                            : needsHumanHandoff
+                            ? 'bg-purple-50/70 dark:bg-purple-950/30 hover:bg-purple-100/70 dark:hover:bg-purple-950/50'
                             : isCritical
                             ? 'bg-red-50/50 dark:bg-red-950/20 hover:bg-red-100/50 dark:hover:bg-red-950/30'
                             : 'hover:bg-muted/50'
-                        } ${isCritical ? 'border-l-2 border-l-red-500' : ''}`}
+                        } ${needsHumanHandoff ? 'border-l-3 border-l-purple-500' : isCritical ? 'border-l-2 border-l-red-500' : ''}`}
                       >
-                        <Avatar className={`h-9 w-9 ${getAvatarColor(conversation.contact_name)}`}>
-                          <AvatarFallback className="text-white text-xs">
-                            {getInitials(conversation.contact_name)}
-                          </AvatarFallback>
-                        </Avatar>
+                        <div className="relative">
+                          <Avatar className={`h-9 w-9 ${getAvatarColor(conversation.contact_name)}`}>
+                            <AvatarFallback className="text-white text-xs">
+                              {getInitials(conversation.contact_name)}
+                            </AvatarFallback>
+                          </Avatar>
+                          {needsHumanHandoff && (
+                            <div className="absolute -top-1 -right-1 bg-purple-500 rounded-full p-0.5">
+                              <UserRound className="h-2.5 w-2.5 text-white" />
+                            </div>
+                          )}
+                        </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between gap-1">
                             <div className="flex items-center gap-1.5 min-w-0">
                               <p className="font-medium text-sm truncate">
                                 {conversation.contact_name}
                               </p>
-                              {getSentimentBadge(conversation.sentiment, conversation.score)}
+                              {needsHumanHandoff && (
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Badge 
+                                        variant="outline" 
+                                        className="h-4 text-[9px] px-1 bg-purple-100 dark:bg-purple-950/50 border-purple-400 text-purple-700 dark:text-purple-300 gap-0.5 animate-pulse"
+                                      >
+                                        <UserRound className="h-2.5 w-2.5" />
+                                        Humano
+                                      </Badge>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="top" className="text-xs max-w-[200px]">
+                                      <p className="font-semibold">🧑‍💼 Aguardando Atendente</p>
+                                      {conversation.handoff_reason && (
+                                        <p className="text-muted-foreground mt-1">Motivo: "{conversation.handoff_reason}"</p>
+                                      )}
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              )}
+                              {!needsHumanHandoff && getSentimentBadge(conversation.sentiment, conversation.score)}
                             </div>
                             <span className="text-[10px] text-muted-foreground flex-shrink-0">
                               {format(new Date(conversation.last_message_at), 'HH:mm', { locale: ptBR })}
@@ -879,7 +947,16 @@ export default function CarriersChat() {
                     <div>
                       <div className="flex items-center gap-2">
                         <CardTitle className="text-sm">{selectedConversation.contact_name}</CardTitle>
-                        {getSentimentBadge(selectedConversation.sentiment, selectedConversation.score)}
+                        {selectedConversation.requires_human_handoff && (
+                          <Badge 
+                            variant="outline" 
+                            className="text-[10px] h-5 px-1.5 bg-purple-100 dark:bg-purple-950/50 border-purple-400 text-purple-700 dark:text-purple-300 gap-1 animate-pulse"
+                          >
+                            <UserRound className="h-3 w-3" />
+                            🧑‍💼 Aguardando Humano
+                          </Badge>
+                        )}
+                        {!selectedConversation.requires_human_handoff && getSentimentBadge(selectedConversation.sentiment, selectedConversation.score)}
                       </div>
                       <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
                         {selectedConversation.contact_phone && (
@@ -888,6 +965,9 @@ export default function CarriersChat() {
                         <Badge variant="outline" className="text-[10px] h-4">
                           {selectedConversation.contact_type === 'carrier' ? 'Transportadora' : 'Cliente'}
                         </Badge>
+                        {selectedConversation.requires_human_handoff && selectedConversation.handoff_reason && (
+                          <span className="text-purple-600 dark:text-purple-400">• Motivo: "{selectedConversation.handoff_reason}"</span>
+                        )}
                       </div>
                     </div>
                   </div>
