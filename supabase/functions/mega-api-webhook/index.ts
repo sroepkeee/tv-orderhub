@@ -5,6 +5,160 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Tipos para mídia
+interface MediaData {
+  type: 'image' | 'audio' | 'document' | 'video' | 'sticker';
+  mime_type: string | null;
+  file_name: string | null;
+  file_size: number | null;
+  caption: string | null;
+  base64_data: string | null;
+  thumbnail_base64: string | null;
+  duration_seconds: number | null;
+  media_key: string | null;
+  direct_path: string | null;
+  file_sha256: string | null;
+}
+
+// Função para extrair mídia da mensagem
+function extractMediaFromMessage(message: any): MediaData | null {
+  if (!message) return null;
+
+  // Imagem
+  if (message.imageMessage) {
+    return {
+      type: 'image',
+      mime_type: message.imageMessage.mimetype || 'image/jpeg',
+      file_name: message.imageMessage.fileName || 'image.jpg',
+      file_size: message.imageMessage.fileLength ? parseInt(message.imageMessage.fileLength) : null,
+      caption: message.imageMessage.caption || null,
+      base64_data: message.imageMessage.base64 || null,
+      thumbnail_base64: message.imageMessage.jpegThumbnail || null,
+      duration_seconds: null,
+      media_key: message.imageMessage.mediaKey || null,
+      direct_path: message.imageMessage.directPath || null,
+      file_sha256: message.imageMessage.fileSha256 || null,
+    };
+  }
+
+  // Áudio
+  if (message.audioMessage) {
+    return {
+      type: 'audio',
+      mime_type: message.audioMessage.mimetype || 'audio/ogg',
+      file_name: message.audioMessage.ptt ? 'voice_message.ogg' : 'audio.ogg',
+      file_size: message.audioMessage.fileLength ? parseInt(message.audioMessage.fileLength) : null,
+      caption: null,
+      base64_data: message.audioMessage.base64 || null,
+      thumbnail_base64: null,
+      duration_seconds: message.audioMessage.seconds || null,
+      media_key: message.audioMessage.mediaKey || null,
+      direct_path: message.audioMessage.directPath || null,
+      file_sha256: message.audioMessage.fileSha256 || null,
+    };
+  }
+
+  // Documento/PDF
+  if (message.documentMessage) {
+    return {
+      type: 'document',
+      mime_type: message.documentMessage.mimetype || 'application/pdf',
+      file_name: message.documentMessage.fileName || 'document.pdf',
+      file_size: message.documentMessage.fileLength ? parseInt(message.documentMessage.fileLength) : null,
+      caption: message.documentMessage.caption || null,
+      base64_data: message.documentMessage.base64 || null,
+      thumbnail_base64: message.documentMessage.jpegThumbnail || null,
+      duration_seconds: null,
+      media_key: message.documentMessage.mediaKey || null,
+      direct_path: message.documentMessage.directPath || null,
+      file_sha256: message.documentMessage.fileSha256 || null,
+    };
+  }
+
+  // Vídeo
+  if (message.videoMessage) {
+    return {
+      type: 'video',
+      mime_type: message.videoMessage.mimetype || 'video/mp4',
+      file_name: message.videoMessage.fileName || 'video.mp4',
+      file_size: message.videoMessage.fileLength ? parseInt(message.videoMessage.fileLength) : null,
+      caption: message.videoMessage.caption || null,
+      base64_data: message.videoMessage.base64 || null,
+      thumbnail_base64: message.videoMessage.jpegThumbnail || null,
+      duration_seconds: message.videoMessage.seconds || null,
+      media_key: message.videoMessage.mediaKey || null,
+      direct_path: message.videoMessage.directPath || null,
+      file_sha256: message.videoMessage.fileSha256 || null,
+    };
+  }
+
+  // Sticker
+  if (message.stickerMessage) {
+    return {
+      type: 'sticker',
+      mime_type: message.stickerMessage.mimetype || 'image/webp',
+      file_name: 'sticker.webp',
+      file_size: message.stickerMessage.fileLength ? parseInt(message.stickerMessage.fileLength) : null,
+      caption: null,
+      base64_data: message.stickerMessage.base64 || null,
+      thumbnail_base64: null,
+      duration_seconds: null,
+      media_key: message.stickerMessage.mediaKey || null,
+      direct_path: message.stickerMessage.directPath || null,
+      file_sha256: message.stickerMessage.fileSha256 || null,
+    };
+  }
+
+  return null;
+}
+
+// Função para salvar mídia no banco de dados
+async function saveMediaToDatabase(
+  supabase: any,
+  conversationId: string,
+  mediaData: MediaData
+): Promise<{ id: string } | null> {
+  try {
+    console.log('💾 Saving media to database:', {
+      type: mediaData.type,
+      mime_type: mediaData.mime_type,
+      file_name: mediaData.file_name,
+      has_base64: !!mediaData.base64_data,
+      has_thumbnail: !!mediaData.thumbnail_base64,
+    });
+
+    const { data, error } = await supabase
+      .from('whatsapp_media')
+      .insert({
+        conversation_id: conversationId,
+        media_type: mediaData.type,
+        mime_type: mediaData.mime_type,
+        file_name: mediaData.file_name,
+        file_size_bytes: mediaData.file_size,
+        base64_data: mediaData.base64_data,
+        thumbnail_base64: mediaData.thumbnail_base64,
+        duration_seconds: mediaData.duration_seconds,
+        caption: mediaData.caption,
+        media_key: mediaData.media_key,
+        direct_path: mediaData.direct_path,
+        file_sha256: mediaData.file_sha256,
+      })
+      .select('id')
+      .single();
+
+    if (error) {
+      console.error('❌ Error saving media:', error);
+      return null;
+    }
+
+    console.log('✅ Media saved successfully:', data.id);
+    return data;
+  } catch (err) {
+    console.error('❌ Exception saving media:', err);
+    return null;
+  }
+}
+
 // Função para extrair dados de cotação da mensagem
 function extractQuoteData(messageText: string): {
   freight_value: number | null;
@@ -47,6 +201,33 @@ function extractQuoteData(messageText: string): {
   }
 
   return { freight_value, delivery_time_days };
+}
+
+// Função para obter texto descritivo da mídia
+function getMediaDisplayText(mediaData: MediaData): string {
+  const typeLabels: Record<string, string> = {
+    image: '📷 Imagem',
+    audio: '🎵 Áudio',
+    document: '📄 Documento',
+    video: '🎬 Vídeo',
+    sticker: '🎭 Sticker',
+  };
+
+  const typeLabel = typeLabels[mediaData.type] || '📎 Mídia';
+  
+  if (mediaData.caption) {
+    return `${typeLabel}: ${mediaData.caption}`;
+  }
+  
+  if (mediaData.file_name && mediaData.type === 'document') {
+    return `${typeLabel}: ${mediaData.file_name}`;
+  }
+  
+  if (mediaData.duration_seconds && (mediaData.type === 'audio' || mediaData.type === 'video')) {
+    return `${typeLabel} (${mediaData.duration_seconds}s)`;
+  }
+  
+  return typeLabel;
 }
 
 // Função para enviar mensagem de auto-reply via Mega API
@@ -249,14 +430,47 @@ Deno.serve(async (req) => {
     const messageType = payload.messageType || payload.event;
     console.log('📩 Processing event type:', messageType);
     
-    if (payload.event === 'messages.upsert' || messageType === 'conversation' || messageType === 'extendedTextMessage') {
-      console.log('📩 Processing message event');
+    // Detectar mensagens de mídia
+    const isMediaMessage = 
+      messageType === 'imageMessage' ||
+      messageType === 'audioMessage' ||
+      messageType === 'documentMessage' ||
+      messageType === 'videoMessage' ||
+      messageType === 'stickerMessage' ||
+      payload.message?.imageMessage ||
+      payload.message?.audioMessage ||
+      payload.message?.documentMessage ||
+      payload.message?.videoMessage ||
+      payload.message?.stickerMessage ||
+      payload.data?.message?.imageMessage ||
+      payload.data?.message?.audioMessage ||
+      payload.data?.message?.documentMessage ||
+      payload.data?.message?.videoMessage ||
+      payload.data?.message?.stickerMessage;
+    
+    if (payload.event === 'messages.upsert' || messageType === 'conversation' || messageType === 'extendedTextMessage' || isMediaMessage) {
+      console.log('📩 Processing message event (text or media)');
       
       // Aceitar payload direto ou aninhado em .data
       const messageData = payload.data || payload;
       const key = payload.key || messageData?.key;
+      const message = payload.message || messageData?.message;
       
       console.log('🔍 Extracted key:', JSON.stringify(key, null, 2));
+      
+      // Extrair mídia da mensagem
+      const mediaData = extractMediaFromMessage(message);
+      const hasMedia = mediaData !== null;
+      
+      if (hasMedia) {
+        console.log('📎 Media detected:', {
+          type: mediaData!.type,
+          mime_type: mediaData!.mime_type,
+          has_caption: !!mediaData!.caption,
+          has_base64: !!mediaData!.base64_data,
+          has_thumbnail: !!mediaData!.thumbnail_base64,
+        });
+      }
       
       // Detectar se é mensagem de grupo
       const isGroupMessage = 
@@ -347,24 +561,22 @@ Deno.serve(async (req) => {
       console.log('📞 Phone variations for search:', uniqueVariations);
 
       // Extrair mensagem de texto - múltiplas fontes
-      const message = payload.message || messageData.message;
       let messageText = '';
       
       if (message?.conversation) {
         messageText = message.conversation;
       } else if (message?.extendedTextMessage?.text) {
         messageText = message.extendedTextMessage.text;
-      } else if (message?.imageMessage?.caption) {
-        messageText = `[Imagem] ${message.imageMessage.caption}`;
-      } else if (message?.documentMessage?.caption) {
-        messageText = `[Documento] ${message.documentMessage.caption}`;
+      } else if (hasMedia) {
+        // Para mídia, usar texto descritivo
+        messageText = getMediaDisplayText(mediaData!);
       } else if (payload.text) {
         messageText = payload.text;
       } else {
-        messageText = '[Mensagem de mídia]';
+        messageText = '[Mensagem recebida]';
       }
 
-      console.log('📝 Processing inbound message:', { phoneNumber, messageText });
+      console.log('📝 Processing inbound message:', { phoneNumber, messageText, hasMedia });
 
       // Find carrier by phone number - search all variations
       console.log('🔍 Looking for carrier with WhatsApp variations:', uniqueVariations);
@@ -495,7 +707,7 @@ Deno.serve(async (req) => {
         lastQuote = quote;
       }
 
-      // Tentar extrair dados de cotação da mensagem
+      // Tentar extrair dados de cotação da mensagem (apenas texto)
       const quoteData = extractQuoteData(messageText);
       const hasQuoteData = quoteData.freight_value !== null || quoteData.delivery_time_days !== null;
 
@@ -535,6 +747,7 @@ Deno.serve(async (req) => {
         );
       }
       
+      // Inserir conversa com flags de mídia
       const { data: conversation, error: conversationError } = await supabase
         .from('carrier_conversations')
         .insert({
@@ -548,6 +761,8 @@ Deno.serve(async (req) => {
           is_group_message: isGroupMessage,
           group_id: groupId,
           group_name: groupName,
+          has_media: hasMedia,
+          media_type: hasMedia ? mediaData!.type : null,
           message_metadata: {
             received_via: 'mega_api',
             phone_number: phoneNumber,
@@ -558,6 +773,9 @@ Deno.serve(async (req) => {
             is_group: isGroupMessage,
             group_id: groupId,
             group_name: groupName,
+            has_media: hasMedia,
+            media_type: hasMedia ? mediaData!.type : null,
+            media_caption: hasMedia ? mediaData!.caption : null,
           },
           sent_at: new Date().toISOString(),
           delivered_at: new Date().toISOString(),
@@ -568,6 +786,18 @@ Deno.serve(async (req) => {
       if (conversationError) {
         console.error('Error saving conversation:', conversationError);
         throw conversationError;
+      }
+
+      console.log('✅ Conversation saved:', conversation.id);
+
+      // Salvar mídia se houver
+      let savedMedia = null;
+      if (hasMedia && conversation.id) {
+        savedMedia = await saveMediaToDatabase(supabase, conversation.id, mediaData!);
+        
+        if (savedMedia) {
+          console.log('📎 Media saved with ID:', savedMedia.id);
+        }
       }
 
       // Se detectou dados de cotação E há cotação ativa, criar resposta automaticamente
@@ -617,8 +847,9 @@ Deno.serve(async (req) => {
       // 🤖 Trigger AI Agent auto-reply (fire and forget)
       // Para CLIENTES: usar ai-agent-logistics-reply (busca multi-estratégia + contexto rico)
       // Para TRANSPORTADORAS: usar ai-agent-auto-reply (resposta genérica)
+      // Nota: Para mídia, informar o agente que há mídia anexada
       try {
-        console.log('🤖 Triggering AI Agent reply for:', contactType);
+        console.log('🤖 Triggering AI Agent reply for:', contactType, hasMedia ? '(with media)' : '');
         
         if (contactType === 'customer') {
           // CLIENTES: Usar logistics-reply para contexto completo com busca de pedidos
@@ -635,6 +866,9 @@ Deno.serve(async (req) => {
               contact_type: 'customer',
               customer_id: customerId,
               conversation_id: conversation.id,
+              has_media: hasMedia,
+              media_type: hasMedia ? mediaData!.type : null,
+              media_caption: hasMedia ? mediaData!.caption : null,
             }),
           }).then(async (res) => {
             const result = await res.json();
@@ -663,6 +897,9 @@ Deno.serve(async (req) => {
               carrier_name: carrierName || 'Contato desconhecido',
               order_id: orderId,
               contact_type: contactType,
+              has_media: hasMedia,
+              media_type: hasMedia ? mediaData!.type : null,
+              media_caption: hasMedia ? mediaData!.caption : null,
             }),
           }).then(async (res) => {
             const result = await res.json();
@@ -725,7 +962,10 @@ Deno.serve(async (req) => {
           orderId: orderId,
           contactType: contactType,
           autoCreatedCarrier: !carrier,
-          quoteResponseCreated: hasQuoteData && !!lastQuote
+          quoteResponseCreated: hasQuoteData && !!lastQuote,
+          hasMedia: hasMedia,
+          mediaType: hasMedia ? mediaData!.type : null,
+          mediaId: savedMedia?.id || null,
         }),
         {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
