@@ -37,51 +37,81 @@ export default function Production() {
     orderPhase: '',
   });
 
-  // Helper para mapear status para fase
+  // Helper para mapear status para fase (usando os mesmos status do Dashboard.tsx)
   const getPhaseFromStatus = (status: string | undefined, orderCategory?: string): string => {
     if (!status) return '';
-    const statusPhaseMap: Record<string, string> = {
-      'almox_ssm_pending': 'almox_ssm',
-      'almox_ssm_received': 'almox_ssm',
-      'order_generation_pending': 'order_generation',
-      'order_issued': 'order_generation',
-      'almox_pending': 'almox_general',
-      'almox_received': 'almox_general',
-      'separation_started': orderCategory === 'vendas' ? 'production_client' : 'production_stock',
-      'in_production': orderCategory === 'vendas' ? 'production_client' : 'production_stock',
-      'awaiting_material': orderCategory === 'vendas' ? 'production_client' : 'production_stock',
-      'separation_completed': orderCategory === 'vendas' ? 'production_client' : 'production_stock',
-      'production_completed': orderCategory === 'vendas' ? 'production_client' : 'production_stock',
-      'purchase_pending': 'purchases',
-      'purchase_quoted': 'purchases',
-      'purchase_ordered': 'purchases',
-      'purchase_received': 'purchases',
-      'balance_pending': 'balance_generation',
-      'balance_generated': 'balance_generation',
-      'lab_pending': 'laboratory',
-      'lab_in_progress': 'laboratory',
-      'lab_completed': 'laboratory',
-      'packaging_pending': 'packaging',
-      'in_packaging': 'packaging',
-      'packaging_completed': 'packaging',
-      'freight_quote_pending': 'freight_quote',
-      'freight_quoted': 'freight_quote',
-      'ready_to_invoice': 'ready_to_invoice',
-      'pending_invoice_request': 'ready_to_invoice',
-      'invoice_requested': 'invoicing',
-      'awaiting_invoice': 'invoicing',
-      'invoice_issued': 'invoicing',
-      'invoice_sent': 'invoicing',
-      'logistics_pending': 'logistics',
-      'ready_for_shipping': 'logistics',
-      'shipped': 'in_transit',
-      'in_transit': 'in_transit',
-      'out_for_delivery': 'in_transit',
-      'delivered': 'completion',
-      'completed': 'completion',
-      'cancelled': 'exceptions',
-    };
-    return statusPhaseMap[status] || '';
+    
+    // Almox SSM
+    if (['almox_ssm_pending', 'almox_ssm_received', 'almox_ssm_in_review', 'almox_ssm_approved'].includes(status)) {
+      return 'almox_ssm';
+    }
+    
+    // Gerar Ordem
+    if (['order_generation_pending', 'order_in_creation', 'order_generated'].includes(status)) {
+      return 'order_generation';
+    }
+    
+    // Compras
+    if (['purchase_pending', 'purchase_quoted', 'purchase_ordered', 'purchase_received'].includes(status)) {
+      return 'purchases';
+    }
+    
+    // Almox Geral
+    if (['almox_general_received', 'almox_general_separating', 'almox_general_ready'].includes(status)) {
+      return 'almox_general';
+    }
+    
+    // Produção (split por category)
+    if (['separation_started', 'in_production', 'awaiting_material', 'separation_completed', 'production_completed'].includes(status)) {
+      return orderCategory === 'vendas' ? 'production_client' : 'production_stock';
+    }
+    
+    // Gerar Saldo
+    if (['balance_calculation', 'balance_review', 'balance_approved'].includes(status)) {
+      return 'balance_generation';
+    }
+    
+    // Laboratório
+    if (['awaiting_lab', 'in_lab_analysis', 'lab_completed'].includes(status)) {
+      return 'laboratory';
+    }
+    
+    // Embalagem
+    if (['in_quality_check', 'in_packaging', 'ready_for_shipping', 'packaging_pending', 'packaging_completed'].includes(status)) {
+      return 'packaging';
+    }
+    
+    // Cotação de Frete
+    if (['freight_quote_requested', 'freight_quote_received', 'freight_approved'].includes(status)) {
+      return 'freight_quote';
+    }
+    
+    // À Faturar
+    if (['ready_to_invoice', 'pending_invoice_request'].includes(status)) {
+      return 'ready_to_invoice';
+    }
+    
+    // Solicitado Faturamento
+    if (['invoice_requested', 'awaiting_invoice', 'invoice_issued', 'invoice_sent'].includes(status)) {
+      return 'invoicing';
+    }
+    
+    // Expedição/Logística
+    if (['released_for_shipping', 'in_expedition', 'pickup_scheduled', 'awaiting_pickup', 'collected'].includes(status)) {
+      return 'logistics';
+    }
+    
+    // Em Trânsito
+    if (['shipped', 'in_transit', 'out_for_delivery'].includes(status)) {
+      return 'in_transit';
+    }
+    
+    // Conclusão
+    if (['delivered', 'completed'].includes(status)) {
+      return 'completion';
+    }
+    
+    return '';
   };
   
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
@@ -132,7 +162,7 @@ export default function Production() {
 
       // Filtro de fase do pedido
       if (filters.orderPhase) {
-        const itemPhase = getPhaseFromStatus(item.orderStatus);
+        const itemPhase = getPhaseFromStatus(item.orderStatus, item.orderCategory);
         if (itemPhase !== filters.orderPhase) {
           return false;
         }

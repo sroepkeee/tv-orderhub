@@ -25,6 +25,7 @@ export interface ProductionItem {
   production_order_number?: string;
   production_released_at?: string;
   phase_started_at?: string;
+  orderCategory?: string;
 }
 
 export interface ProductionStats {
