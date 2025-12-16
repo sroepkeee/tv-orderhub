@@ -26,6 +26,19 @@ export const useCarrierConversations = () => {
           orders (
             order_number,
             customer_name
+          ),
+          whatsapp_media (
+            id,
+            media_type,
+            mime_type,
+            file_name,
+            file_size_bytes,
+            base64_data,
+            thumbnail_base64,
+            duration_seconds,
+            caption,
+            ai_analysis,
+            compliance_check
           )
         `)
         .order('sent_at', { ascending: false });
@@ -37,6 +50,7 @@ export const useCarrierConversations = () => {
         ...conv,
         carrier: conv.carriers || null,
         order: conv.orders || null,
+        media: conv.whatsapp_media || [],
       }));
       
       setConversations(parsedData as CarrierConversation[]);
@@ -70,6 +84,19 @@ export const useCarrierConversations = () => {
           orders (
             order_number,
             customer_name
+          ),
+          whatsapp_media (
+            id,
+            media_type,
+            mime_type,
+            file_name,
+            file_size_bytes,
+            base64_data,
+            thumbnail_base64,
+            duration_seconds,
+            caption,
+            ai_analysis,
+            compliance_check
           )
         `)
         .eq('carrier_id', carrierId)
@@ -81,6 +108,7 @@ export const useCarrierConversations = () => {
         ...conv,
         carrier: conv.carriers || null,
         order: conv.orders || null,
+        media: conv.whatsapp_media || [],
       }));
       
       setConversations(parsedData as CarrierConversation[]);
@@ -116,6 +144,19 @@ export const useCarrierConversations = () => {
           orders (
             order_number,
             customer_name
+          ),
+          whatsapp_media (
+            id,
+            media_type,
+            mime_type,
+            file_name,
+            file_size_bytes,
+            base64_data,
+            thumbnail_base64,
+            duration_seconds,
+            caption,
+            ai_analysis,
+            compliance_check
           )
         `)
         .eq('order_id', orderId)
@@ -127,6 +168,7 @@ export const useCarrierConversations = () => {
         ...conv,
         carrier: conv.carriers || null,
         order: conv.orders || null,
+        media: conv.whatsapp_media || [],
       }));
       
       setConversations(parsedData as CarrierConversation[]);
