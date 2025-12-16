@@ -670,6 +670,109 @@ export default function CarriersChat() {
         </Button>
       </div>
 
+      {/* Sentiment Filters Bar */}
+      <div className="flex items-center gap-2 px-4 py-2 border-b bg-muted/30">
+        <span className="text-xs text-muted-foreground font-medium mr-1">Filtros:</span>
+        <Button
+          variant={sentimentFilter === 'all' ? 'default' : 'outline'}
+          size="sm"
+          className="h-6 text-[10px] px-2"
+          onClick={() => setSentimentFilter('all')}
+        >
+          Todas ({sentimentCounts.all})
+        </Button>
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant={sentimentFilter === 'human_handoff' ? 'default' : 'outline'}
+                size="sm"
+                className={`h-6 text-[10px] px-2 ${sentimentFilter !== 'human_handoff' ? 'border-purple-400 text-purple-600 hover:bg-purple-50 dark:border-purple-700 dark:hover:bg-purple-950/30' : 'bg-purple-500 hover:bg-purple-600'}`}
+                onClick={() => setSentimentFilter('human_handoff')}
+              >
+                <UserRound className="h-3 w-3 mr-0.5" />
+                Humano ({sentimentCounts.human_handoff})
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">
+              <p>🧑‍💼 Aguardando Atendente Humano</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant={sentimentFilter === 'critical' ? 'default' : 'outline'}
+                size="sm"
+                className={`h-6 text-[10px] px-2 ${sentimentFilter !== 'critical' ? 'border-red-300 text-red-600 hover:bg-red-50 dark:border-red-800 dark:hover:bg-red-950/30' : 'bg-red-500 hover:bg-red-600'}`}
+                onClick={() => setSentimentFilter('critical')}
+              >
+                <AlertTriangle className="h-3 w-3 mr-0.5" />
+                Crítico ({sentimentCounts.critical})
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">
+              <p>Crítico (1-3): Atenção urgente</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant={sentimentFilter === 'negative' ? 'default' : 'outline'}
+                size="sm"
+                className={`h-6 text-[10px] px-2 ${sentimentFilter !== 'negative' ? 'border-orange-300 text-orange-600 hover:bg-orange-50 dark:border-orange-800 dark:hover:bg-orange-950/30' : 'bg-orange-500 hover:bg-orange-600'}`}
+                onClick={() => setSentimentFilter('negative')}
+              >
+                <Frown className="h-3 w-3 mr-0.5" />
+                Negativo ({sentimentCounts.negative})
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">
+              <p>Negativo (4-5): Requer cuidado</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant={sentimentFilter === 'neutral' ? 'default' : 'outline'}
+                size="sm"
+                className={`h-6 text-[10px] px-2 ${sentimentFilter !== 'neutral' ? 'border-gray-300 text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800/30' : ''}`}
+                onClick={() => setSentimentFilter('neutral')}
+              >
+                <Meh className="h-3 w-3 mr-0.5" />
+                Neutro ({sentimentCounts.neutral})
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">
+              <p>Neutro (6-7): Normal</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant={sentimentFilter === 'positive' ? 'default' : 'outline'}
+                size="sm"
+                className={`h-6 text-[10px] px-2 ${sentimentFilter !== 'positive' ? 'border-green-300 text-green-600 hover:bg-green-50 dark:border-green-800 dark:hover:bg-green-950/30' : 'bg-green-500 hover:bg-green-600'}`}
+                onClick={() => setSentimentFilter('positive')}
+              >
+                <Smile className="h-3 w-3 mr-0.5" />
+                Positivo ({sentimentCounts.positive})
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">
+              <p>Positivo (8-10): Satisfatório</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      </div>
+
       {/* Main Content */}
       <div className="flex flex-1 gap-3 p-3 overflow-hidden min-h-0">
         {/* Conversations List */}
@@ -717,109 +820,6 @@ export default function CarriersChat() {
                 </TooltipProvider>
               </TabsList>
             </Tabs>
-
-            {/* Sentiment Filters */}
-            <div className="flex gap-1 flex-wrap">
-              <Button
-                variant={sentimentFilter === 'all' ? 'default' : 'outline'}
-                size="sm"
-                className="h-6 text-[10px] px-2"
-                onClick={() => setSentimentFilter('all')}
-              >
-                Todas ({sentimentCounts.all})
-              </Button>
-              {/* Human Handoff Filter - Priority */}
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant={sentimentFilter === 'human_handoff' ? 'default' : 'outline'}
-                      size="sm"
-                      className={`h-6 text-[10px] px-2 ${sentimentFilter !== 'human_handoff' ? 'border-purple-400 text-purple-600 hover:bg-purple-50 dark:border-purple-700 dark:hover:bg-purple-950/30' : 'bg-purple-500 hover:bg-purple-600'}`}
-                      onClick={() => setSentimentFilter('human_handoff')}
-                    >
-                      <UserRound className="h-3 w-3 mr-0.5" />
-                      {sentimentCounts.human_handoff}
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="bottom">
-                    <p>🧑‍💼 Aguardando Atendente Humano</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant={sentimentFilter === 'critical' ? 'default' : 'outline'}
-                      size="sm"
-                      className={`h-6 text-[10px] px-2 ${sentimentFilter !== 'critical' ? 'border-red-300 text-red-600 hover:bg-red-50 dark:border-red-800 dark:hover:bg-red-950/30' : 'bg-red-500 hover:bg-red-600'}`}
-                      onClick={() => setSentimentFilter('critical')}
-                    >
-                      <AlertTriangle className="h-3 w-3 mr-0.5" />
-                      {sentimentCounts.critical}
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="bottom">
-                    <p>Crítico (1-3): Atenção urgente</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant={sentimentFilter === 'negative' ? 'default' : 'outline'}
-                      size="sm"
-                      className={`h-6 text-[10px] px-2 ${sentimentFilter !== 'negative' ? 'border-orange-300 text-orange-600 hover:bg-orange-50 dark:border-orange-800 dark:hover:bg-orange-950/30' : 'bg-orange-500 hover:bg-orange-600'}`}
-                      onClick={() => setSentimentFilter('negative')}
-                    >
-                      <Frown className="h-3 w-3 mr-0.5" />
-                      {sentimentCounts.negative}
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="bottom">
-                    <p>Negativo (4-5): Requer cuidado</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant={sentimentFilter === 'neutral' ? 'default' : 'outline'}
-                      size="sm"
-                      className={`h-6 text-[10px] px-2 ${sentimentFilter !== 'neutral' ? 'border-gray-300 text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800/30' : ''}`}
-                      onClick={() => setSentimentFilter('neutral')}
-                    >
-                      <Meh className="h-3 w-3 mr-0.5" />
-                      {sentimentCounts.neutral}
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="bottom">
-                    <p>Neutro (6-7): Normal</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant={sentimentFilter === 'positive' ? 'default' : 'outline'}
-                      size="sm"
-                      className={`h-6 text-[10px] px-2 ${sentimentFilter !== 'positive' ? 'border-green-300 text-green-600 hover:bg-green-50 dark:border-green-800 dark:hover:bg-green-950/30' : 'bg-green-500 hover:bg-green-600'}`}
-                      onClick={() => setSentimentFilter('positive')}
-                    >
-                      <Smile className="h-3 w-3 mr-0.5" />
-                      {sentimentCounts.positive}
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="bottom">
-                    <p>Positivo (8-10): Satisfatório</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            </div>
 
             {/* Search */}
             <div className="relative">
