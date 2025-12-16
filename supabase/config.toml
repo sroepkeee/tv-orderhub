@@ -59,3 +59,9 @@ verify_jwt = true
 
 [functions.ai-agent-logistics-reply]
 verify_jwt = true
+
+[functions.ai-agent-analyze-image]
+verify_jwt = true
+
+[functions.mega-api-send-media]
+verify_jwt = true

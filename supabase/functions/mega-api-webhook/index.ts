@@ -203,6 +203,109 @@ function extractQuoteData(messageText: string): {
   return { freight_value, delivery_time_days };
 }
 
+// Interface para flags de compliance
+interface ComplianceFlag {
+  rule_id: string;
+  policy: string;
+  keyword_matched: string;
+  risk_level: string;
+  action: string;
+  description: string;
+}
+
+interface ComplianceResult {
+  has_violations: boolean;
+  highest_risk: string;
+  flags: ComplianceFlag[];
+  requires_human_review: boolean;
+}
+
+// Função para verificar compliance de mensagens contra regras ai_rules
+async function checkCompliance(
+  supabase: any,
+  messageText: string
+): Promise<ComplianceResult> {
+  const riskOrder: Record<string, number> = {
+    'low': 1,
+    'moderate': 2,
+    'high': 3,
+    'critical': 4,
+  };
+
+  const result: ComplianceResult = {
+    has_violations: false,
+    highest_risk: 'low',
+    flags: [],
+    requires_human_review: false,
+  };
+
+  try {
+    // Buscar regras ativas do banco
+    const { data: rules, error } = await supabase
+      .from('ai_rules')
+      .select('*')
+      .eq('is_active', true);
+
+    if (error) {
+      console.error('❌ Error fetching compliance rules:', error);
+      return result;
+    }
+
+    if (!rules || rules.length === 0) {
+      console.log('ℹ️ No active compliance rules found');
+      return result;
+    }
+
+    const messageLower = messageText.toLowerCase();
+    console.log(`🔍 Checking message against ${rules.length} compliance rules`);
+
+    for (const rule of rules) {
+      // Keywords são separados por vírgula na coluna 'rule'
+      const keywords = (rule.rule || '').split(',').map((k: string) => k.trim().toLowerCase()).filter(Boolean);
+      
+      for (const keyword of keywords) {
+        if (keyword && messageLower.includes(keyword)) {
+          const flag: ComplianceFlag = {
+            rule_id: rule.id,
+            policy: rule.policy || 'Geral',
+            keyword_matched: keyword,
+            risk_level: rule.rule_risk || 'low',
+            action: rule.action || 'log',
+            description: rule.rule_description || '',
+          };
+          
+          result.flags.push(flag);
+          result.has_violations = true;
+
+          // Atualizar maior risco
+          if (riskOrder[flag.risk_level] > riskOrder[result.highest_risk]) {
+            result.highest_risk = flag.risk_level;
+          }
+
+          // Verificar se precisa review humano
+          if (flag.action === 'block' || flag.action === 'warn' || flag.risk_level === 'high' || flag.risk_level === 'critical') {
+            result.requires_human_review = true;
+          }
+
+          console.log(`⚠️ Compliance flag: ${flag.policy} - ${keyword} (${flag.risk_level})`);
+          break; // Não continuar verificando keywords desta regra
+        }
+      }
+    }
+
+    if (result.has_violations) {
+      console.log(`🚨 Compliance check: ${result.flags.length} violations found, highest risk: ${result.highest_risk}`);
+    } else {
+      console.log('✅ Compliance check: No violations found');
+    }
+
+  } catch (err) {
+    console.error('❌ Exception in compliance check:', err);
+  }
+
+  return result;
+}
+
 // Função para obter texto descritivo da mídia
 function getMediaDisplayText(mediaData: MediaData): string {
   const typeLabels: Record<string, string> = {
