@@ -948,112 +948,123 @@ Deno.serve(async (req) => {
       console.log('✅ Message saved successfully:', conversation.id);
 
       // 🤖 Trigger AI Agent auto-reply (fire and forget)
+      // ⚠️ SKIP GROUPS - Only respond to individual contacts (economia de tokens)
       // Para CLIENTES: usar ai-agent-logistics-reply (busca multi-estratégia + contexto rico)
       // Para TRANSPORTADORAS: usar ai-agent-auto-reply (resposta genérica)
       // Nota: Para mídia, informar o agente que há mídia anexada
-      try {
-        console.log('🤖 Triggering AI Agent reply for:', contactType, hasMedia ? '(with media)' : '');
-        
-        if (contactType === 'customer') {
-          // CLIENTES: Usar logistics-reply para contexto completo com busca de pedidos
-          fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/ai-agent-logistics-reply`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
-            },
-            body: JSON.stringify({
-              message: messageText,
-              from_phone: phoneNumber,
-              carrier_id: carrierId,
-              contact_type: 'customer',
-              customer_id: customerId,
-              conversation_id: conversation.id,
-              has_media: hasMedia,
-              media_type: hasMedia ? mediaData!.type : null,
-              media_caption: hasMedia ? mediaData!.caption : null,
-            }),
-          }).then(async (res) => {
-            const result = await res.json();
-            console.log('🤖 Customer logistics-reply result:', JSON.stringify(result, null, 2));
-            
-            // Se gerou mensagem, enviar via Mega API
-            if (result.success && result.message) {
-              await sendAutoReplyMessage(phoneNumber, result.message, carrierId, supabase);
-            }
-          }).catch((err) => {
-            console.error('🤖 Customer logistics-reply error:', err);
-          });
-        } else {
-          // TRANSPORTADORAS: Usar auto-reply padrão
-          fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/ai-agent-auto-reply`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
-            },
-            body: JSON.stringify({
-              conversation_id: conversation.id,
-              message_content: messageText,
-              sender_phone: phoneNumber,
-              carrier_id: carrierId,
-              carrier_name: carrierName || 'Contato desconhecido',
-              order_id: orderId,
-              contact_type: contactType,
-              has_media: hasMedia,
-              media_type: hasMedia ? mediaData!.type : null,
-              media_caption: hasMedia ? mediaData!.caption : null,
-            }),
-          }).then(async (res) => {
-            const result = await res.json();
-            console.log('🤖 Carrier auto-reply result:', JSON.stringify(result, null, 2));
-          }).catch((err) => {
-            console.error('🤖 Carrier auto-reply error:', err);
-          });
+      if (isGroupMessage) {
+        console.log('⏭️ Skipping AI Agent for group message:', groupName || groupId || 'unknown group');
+        console.log('📝 Group messages are saved but NOT auto-replied to (token economy)');
+      } else {
+        try {
+          console.log('🤖 Triggering AI Agent reply for:', contactType, hasMedia ? '(with media)' : '');
+          
+          if (contactType === 'customer') {
+            // CLIENTES: Usar logistics-reply para contexto completo com busca de pedidos
+            fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/ai-agent-logistics-reply`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+              },
+              body: JSON.stringify({
+                message: messageText,
+                from_phone: phoneNumber,
+                carrier_id: carrierId,
+                contact_type: 'customer',
+                customer_id: customerId,
+                conversation_id: conversation.id,
+                has_media: hasMedia,
+                media_type: hasMedia ? mediaData!.type : null,
+                media_caption: hasMedia ? mediaData!.caption : null,
+              }),
+            }).then(async (res) => {
+              const result = await res.json();
+              console.log('🤖 Customer logistics-reply result:', JSON.stringify(result, null, 2));
+              
+              // Se gerou mensagem, enviar via Mega API
+              if (result.success && result.message) {
+                await sendAutoReplyMessage(phoneNumber, result.message, carrierId, supabase);
+              }
+            }).catch((err) => {
+              console.error('🤖 Customer logistics-reply error:', err);
+            });
+          } else {
+            // TRANSPORTADORAS: Usar auto-reply padrão
+            fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/ai-agent-auto-reply`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+              },
+              body: JSON.stringify({
+                conversation_id: conversation.id,
+                message_content: messageText,
+                sender_phone: phoneNumber,
+                carrier_id: carrierId,
+                carrier_name: carrierName || 'Contato desconhecido',
+                order_id: orderId,
+                contact_type: contactType,
+                has_media: hasMedia,
+                media_type: hasMedia ? mediaData!.type : null,
+                media_caption: hasMedia ? mediaData!.caption : null,
+              }),
+            }).then(async (res) => {
+              const result = await res.json();
+              console.log('🤖 Carrier auto-reply result:', JSON.stringify(result, null, 2));
+            }).catch((err) => {
+              console.error('🤖 Carrier auto-reply error:', err);
+            });
+          }
+          
+        } catch (autoReplyError) {
+          console.error('🤖 Failed to trigger auto-reply:', autoReplyError);
+          // Don't throw - auto-reply failure shouldn't break webhook
         }
-        
-      } catch (autoReplyError) {
-        console.error('🤖 Failed to trigger auto-reply:', autoReplyError);
-        // Don't throw - auto-reply failure shouldn't break webhook
       }
 
       // 📊 Trigger sentiment analysis in background (fire and forget)
+      // ⚠️ SKIP GROUPS - Only analyze individual conversations (token economy)
       // Only analyze if we have enough messages (3+) or it's been a while since last analysis
-      try {
-        // Check if we should analyze
-        const { data: cachedSentiment } = await supabase
-          .from('conversation_sentiment_cache')
-          .select('last_analyzed_at, message_count')
-          .eq('carrier_id', carrierId)
-          .maybeSingle();
+      if (isGroupMessage) {
+        console.log('⏭️ Skipping sentiment analysis for group message');
+      } else {
+        try {
+          // Check if we should analyze
+          const { data: cachedSentiment } = await supabase
+            .from('conversation_sentiment_cache')
+            .select('last_analyzed_at, message_count')
+            .eq('carrier_id', carrierId)
+            .maybeSingle();
 
-        const shouldAnalyze = !cachedSentiment || 
-          !cachedSentiment.last_analyzed_at ||
-          (new Date().getTime() - new Date(cachedSentiment.last_analyzed_at).getTime() > 5 * 60 * 1000); // 5 min
+          const shouldAnalyze = !cachedSentiment || 
+            !cachedSentiment.last_analyzed_at ||
+            (new Date().getTime() - new Date(cachedSentiment.last_analyzed_at).getTime() > 5 * 60 * 1000); // 5 min
 
-        if (shouldAnalyze && carrierId) {
-          console.log('📊 Triggering sentiment analysis...');
-          
-          fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/ai-agent-conversation-summary`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
-            },
-            body: JSON.stringify({
-              carrierId: carrierId,
-              contactName: carrierName || 'Contato desconhecido',
-            }),
-          }).then(async (res) => {
-            const result = await res.json();
-            console.log('📊 Sentiment analysis result:', result.sentiment, result.score);
-          }).catch((err) => {
-            console.error('📊 Sentiment analysis error:', err);
-          });
+          if (shouldAnalyze && carrierId) {
+            console.log('📊 Triggering sentiment analysis...');
+            
+            fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/ai-agent-conversation-summary`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+              },
+              body: JSON.stringify({
+                carrierId: carrierId,
+                contactName: carrierName || 'Contato desconhecido',
+              }),
+            }).then(async (res) => {
+              const result = await res.json();
+              console.log('📊 Sentiment analysis result:', result.sentiment, result.score);
+            }).catch((err) => {
+              console.error('📊 Sentiment analysis error:', err);
+            });
+          }
+        } catch (sentimentError) {
+          console.error('📊 Failed to trigger sentiment analysis:', sentimentError);
+          // Don't throw - sentiment failure shouldn't break webhook
         }
-      } catch (sentimentError) {
-        console.error('📊 Failed to trigger sentiment analysis:', sentimentError);
-        // Don't throw - sentiment failure shouldn't break webhook
       }
 
       return new Response(
