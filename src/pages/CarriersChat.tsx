@@ -519,7 +519,7 @@ export default function CarriersChat() {
   const unreadCount = conversations.reduce((sum, c) => sum + (c.unread_count || 0), 0);
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="h-screen bg-background flex flex-col overflow-hidden">
       {/* Header */}
       <header className="border-b bg-background sticky top-0 z-10">
         <div className="flex items-center justify-between gap-4 p-4">
@@ -653,9 +653,9 @@ export default function CarriersChat() {
       </div>
 
       {/* Main Content */}
-      <div className="flex flex-1 gap-3 p-3 overflow-hidden">
+      <div className="flex flex-1 gap-3 p-3 overflow-hidden min-h-0">
         {/* Conversations List */}
-        <Card className="w-80 flex-shrink-0 flex flex-col">
+        <Card className="w-80 flex-shrink-0 flex flex-col min-h-0">
           <CardHeader className="pb-2 px-3 pt-3 space-y-2">
             {/* Type Tabs */}
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
@@ -795,7 +795,7 @@ export default function CarriersChat() {
               />
             </div>
           </CardHeader>
-          <CardContent className="p-0 flex-1 overflow-hidden">
+          <CardContent className="p-0 flex-1 overflow-hidden min-h-0">
             <ScrollArea className="h-full">
               {loading ? (
                 <div className="p-4 text-center text-muted-foreground">
@@ -864,7 +864,7 @@ export default function CarriersChat() {
         </Card>
 
         {/* Conversation Details */}
-        <Card className="flex-1 flex flex-col overflow-hidden">
+        <Card className="flex-1 flex flex-col overflow-hidden min-h-0">
           {selectedConversation ? (
             <>
               {/* Header */}
@@ -935,8 +935,8 @@ export default function CarriersChat() {
 
               <div className="flex-1 flex overflow-hidden">
                 {/* Messages */}
-                <CardContent className={`p-0 flex-1 overflow-hidden flex flex-col ${showSummary ? 'border-r' : ''}`}>
-                  <ScrollArea className="flex-1 p-3">
+              <CardContent className={`p-0 flex-1 overflow-hidden flex flex-col min-h-0 ${showSummary ? 'border-r' : ''}`}>
+                  <ScrollArea className="flex-1 p-3 min-h-0">
                     <div className="space-y-2">
                       {messages.length === 0 ? (
                         <div className="text-center text-muted-foreground py-8">
