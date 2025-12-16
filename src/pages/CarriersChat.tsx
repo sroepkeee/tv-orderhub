@@ -260,8 +260,74 @@ export default function CarriersChat() {
     }
   }, []);
 
+  // State for handoff notifications
+  const [handoffAlert, setHandoffAlert] = useState<{ carrierId: string; carrierName: string } | null>(null);
+
+  // Play differentiated sounds
+  const playSound = useCallback((type: 'normal' | 'alert' | 'urgent') => {
+    try {
+      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const oscillator = audioContext.createOscillator();
+      const gainNode = audioContext.createGain();
+      
+      oscillator.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+      
+      if (type === 'normal') {
+        oscillator.frequency.value = 800;
+        oscillator.type = 'sine';
+        gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.2);
+        oscillator.start();
+        oscillator.stop(audioContext.currentTime + 0.2);
+      } else if (type === 'alert') {
+        oscillator.frequency.value = 1200;
+        oscillator.type = 'sine';
+        gainNode.gain.setValueAtTime(0.4, audioContext.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.15);
+        oscillator.start();
+        oscillator.stop(audioContext.currentTime + 0.15);
+        setTimeout(() => {
+          const osc2 = audioContext.createOscillator();
+          const gain2 = audioContext.createGain();
+          osc2.connect(gain2);
+          gain2.connect(audioContext.destination);
+          osc2.frequency.value = 1400;
+          osc2.type = 'sine';
+          gain2.gain.setValueAtTime(0.4, audioContext.currentTime);
+          gain2.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.15);
+          osc2.start();
+          osc2.stop(audioContext.currentTime + 0.15);
+        }, 200);
+      } else if (type === 'urgent') {
+        oscillator.frequency.value = 1600;
+        oscillator.type = 'square';
+        gainNode.gain.setValueAtTime(0.5, audioContext.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
+        oscillator.start();
+        oscillator.stop(audioContext.currentTime + 0.1);
+        [150, 300].forEach((delay) => {
+          setTimeout(() => {
+            const osc = audioContext.createOscillator();
+            const gain = audioContext.createGain();
+            osc.connect(gain);
+            gain.connect(audioContext.destination);
+            osc.frequency.value = 1600;
+            osc.type = 'square';
+            gain.gain.setValueAtTime(0.5, audioContext.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
+            osc.start();
+            osc.stop(audioContext.currentTime + 0.1);
+          }, delay);
+        });
+      }
+    } catch (error) {
+      console.log('Audio not supported:', error);
+    }
+  }, []);
+
   // Real-time update handler
-  const handleRealtimeUpdate = useCallback((payload: any) => {
+  const handleRealtimeUpdate = useCallback(async (payload: any) => {
     const { eventType, new: newRecord } = payload;
     
     setSyncing(true);
@@ -273,6 +339,44 @@ export default function CarriersChat() {
 
     if (eventType === 'INSERT') {
       const carrierId = newRecord?.carrier_id;
+      
+      // Check if this is a handoff or critical message
+      if (newRecord?.message_direction === 'inbound') {
+        const { data: sentimentData } = await supabase
+          .from('conversation_sentiment_cache')
+          .select('requires_human_handoff, sentiment')
+          .eq('carrier_id', carrierId)
+          .single();
+
+        if (sentimentData?.requires_human_handoff) {
+          playSound('urgent');
+          // Get carrier name for notification
+          const { data: carrier } = await supabase
+            .from('carriers')
+            .select('name')
+            .eq('id', carrierId)
+            .single();
+          
+          setHandoffAlert({ carrierId, carrierName: carrier?.name || 'Cliente' });
+          toast.warning(`🧑‍💼 ${carrier?.name || 'Cliente'} pediu atendimento humano!`, {
+            duration: 10000,
+            action: {
+              label: 'Ver conversa',
+              onClick: () => {
+                const conv = conversations.find(c => c.carrier_id === carrierId);
+                if (conv) setSelectedConversation(conv);
+              }
+            }
+          });
+          
+          // Clear handoff alert after 10 seconds
+          setTimeout(() => setHandoffAlert(null), 10000);
+        } else if (sentimentData?.sentiment === 'critical' || sentimentData?.sentiment === 'negative') {
+          playSound('alert');
+        } else {
+          playSound('normal');
+        }
+      }
       
       setConversations(prev => {
         const existing = prev.find(c => c.carrier_id === carrierId);
@@ -311,7 +415,10 @@ export default function CarriersChat() {
         setMessages(prev => [...prev, mappedMessage]);
       }
     }
-  }, [selectedConversation, loadConversations]);
+    
+    // Reload sentiment cache to update counters
+    loadSentimentCache();
+  }, [selectedConversation, loadConversations, loadSentimentCache, playSound, conversations]);
 
   // Initial load
   useEffect(() => {
@@ -669,6 +776,36 @@ export default function CarriersChat() {
           <RefreshCw className={`h-3.5 w-3.5 ${whatsappLoading ? 'animate-spin' : ''}`} />
         </Button>
       </div>
+
+      {/* Handoff Alert Banner */}
+      {handoffAlert && (
+        <div className="flex items-center gap-2 px-4 py-2 bg-purple-500/20 border-b border-purple-500 animate-pulse">
+          <UserRound className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+          <span className="text-sm font-medium text-purple-700 dark:text-purple-300">
+            🧑‍💼 {handoffAlert.carrierName} pediu atendimento humano!
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-6 text-xs ml-auto border-purple-500 text-purple-600 hover:bg-purple-100 dark:hover:bg-purple-950"
+            onClick={() => {
+              const conv = conversations.find(c => c.carrier_id === handoffAlert.carrierId);
+              if (conv) setSelectedConversation(conv);
+              setHandoffAlert(null);
+            }}
+          >
+            Ver conversa
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-6 text-xs text-purple-500"
+            onClick={() => setHandoffAlert(null)}
+          >
+            ✕
+          </Button>
+        </div>
+      )}
 
       {/* Sentiment Filters Bar */}
       <div className="flex items-center gap-2 px-4 py-2 border-b bg-muted/30">

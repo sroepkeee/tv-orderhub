@@ -236,7 +236,98 @@ export const useCarrierConversations = () => {
     }
   };
 
-  const subscribeToNewMessages = (onSync?: () => void) => {
+  // Sound generators using Web Audio API
+  const playSound = (type: 'normal' | 'alert' | 'urgent') => {
+    try {
+      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const oscillator = audioContext.createOscillator();
+      const gainNode = audioContext.createGain();
+      
+      oscillator.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+      
+      if (type === 'normal') {
+        // Som suave - único beep curto
+        oscillator.frequency.value = 800;
+        oscillator.type = 'sine';
+        gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.2);
+        oscillator.start();
+        oscillator.stop(audioContext.currentTime + 0.2);
+      } else if (type === 'alert') {
+        // Som de alerta - dois beeps agudos
+        oscillator.frequency.value = 1200;
+        oscillator.type = 'sine';
+        gainNode.gain.setValueAtTime(0.4, audioContext.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.15);
+        oscillator.start();
+        oscillator.stop(audioContext.currentTime + 0.15);
+        
+        // Segundo beep
+        setTimeout(() => {
+          const osc2 = audioContext.createOscillator();
+          const gain2 = audioContext.createGain();
+          osc2.connect(gain2);
+          gain2.connect(audioContext.destination);
+          osc2.frequency.value = 1400;
+          osc2.type = 'sine';
+          gain2.gain.setValueAtTime(0.4, audioContext.currentTime);
+          gain2.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.15);
+          osc2.start();
+          osc2.stop(audioContext.currentTime + 0.15);
+        }, 200);
+      } else if (type === 'urgent') {
+        // Som urgente - três beeps rápidos e agudos
+        oscillator.frequency.value = 1600;
+        oscillator.type = 'square';
+        gainNode.gain.setValueAtTime(0.5, audioContext.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
+        oscillator.start();
+        oscillator.stop(audioContext.currentTime + 0.1);
+        
+        // Beeps adicionais
+        [150, 300].forEach((delay) => {
+          setTimeout(() => {
+            const osc = audioContext.createOscillator();
+            const gain = audioContext.createGain();
+            osc.connect(gain);
+            gain.connect(audioContext.destination);
+            osc.frequency.value = 1600;
+            osc.type = 'square';
+            gain.gain.setValueAtTime(0.5, audioContext.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
+            osc.start();
+            osc.stop(audioContext.currentTime + 0.1);
+          }, delay);
+        });
+      }
+    } catch (error) {
+      console.log('Audio not supported:', error);
+    }
+  };
+
+  // Check message priority from sentiment cache
+  const checkMessagePriority = async (carrierId: string): Promise<{ soundType: 'normal' | 'alert' | 'urgent', isHandoff: boolean }> => {
+    try {
+      const { data } = await supabase
+        .from('conversation_sentiment_cache')
+        .select('requires_human_handoff, sentiment')
+        .eq('carrier_id', carrierId)
+        .single();
+
+      if (data?.requires_human_handoff) {
+        return { soundType: 'urgent', isHandoff: true };
+      }
+      if (data?.sentiment === 'critical' || data?.sentiment === 'negative') {
+        return { soundType: 'alert', isHandoff: false };
+      }
+      return { soundType: 'normal', isHandoff: false };
+    } catch {
+      return { soundType: 'normal', isHandoff: false };
+    }
+  };
+
+  const subscribeToNewMessages = (onSync?: () => void, onHandoff?: (carrierId: string, carrierName?: string) => void) => {
     console.log('🔔 Setting up real-time subscription for carrier_conversations...');
     
     const channel = supabase
@@ -248,7 +339,7 @@ export const useCarrierConversations = () => {
           schema: 'public',
           table: 'carrier_conversations',
         },
-        (payload) => {
+        async (payload) => {
           console.log('📩 New message received:', payload.eventType, payload.new);
           
           // Chamar callback de sincronização
@@ -260,10 +351,25 @@ export const useCarrierConversations = () => {
           // Recarregar conversas para atualizar a lista
           loadConversations();
           
-          // Tocar som para mensagens inbound
+          // Tocar som diferenciado para mensagens inbound
           if (payload.new && (payload.new as any).message_direction === 'inbound') {
-            const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSuBzvLZiTYIGWm98OScTgwOUKjl8bllHAU7k9nzzHkpBSh+zPLaizsKGGS54+ydUwYPVq/n77NYGws+k9bzzXcsBSh/zfPci0ELFGCu6PGlVBUIQ5zd8L9yIQUqf8/z24k5CBV');
-            audio.play().catch(() => {}); // Ignore errors
+            const carrierId = (payload.new as any).carrier_id;
+            
+            // Verificar prioridade e tocar som apropriado
+            const { soundType, isHandoff } = await checkMessagePriority(carrierId);
+            playSound(soundType);
+            
+            // Callback para handoff (notificação visual)
+            if (isHandoff && onHandoff) {
+              // Buscar nome do carrier
+              const { data: carrier } = await supabase
+                .from('carriers')
+                .select('name')
+                .eq('id', carrierId)
+                .single();
+              
+              onHandoff(carrierId, carrier?.name);
+            }
           }
         }
       )
