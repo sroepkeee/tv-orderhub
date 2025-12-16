@@ -210,6 +210,11 @@ export const KanbanCard = ({
             {isEcommerce && !isMinimal && <span className="text-xs">🛒</span>}
             <span className="font-bold text-[10px]">#{order.orderNumber}</span>
             
+            {/* WhatsApp indicator */}
+            {(order as any).customer_whatsapp && (
+              <span className="text-[9px]" title="Cliente com WhatsApp cadastrado">📱</span>
+            )}
+            
             {order.business_area && BUSINESS_AREA_CONFIG[order.business_area] && (
               <Badge 
                 variant="outline" 
@@ -296,6 +301,20 @@ export const KanbanCard = ({
           <span className="font-bold text-xs flex items-center gap-1 flex-wrap">
             {isEcommerce && !isMinimal && <span className="text-base animate-pulse">🛒</span>}
             #{order.orderNumber}
+            
+            {/* WhatsApp indicator */}
+            {(order as any).customer_whatsapp && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="text-xs cursor-help">📱</span>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">
+                    <p className="text-xs">WhatsApp: {(order as any).customer_whatsapp}</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
             
             {/* Badge de Área de Negócio */}
             {order.business_area && BUSINESS_AREA_CONFIG[order.business_area] && (

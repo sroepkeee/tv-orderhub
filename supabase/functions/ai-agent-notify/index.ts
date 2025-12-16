@@ -153,7 +153,7 @@ serve(async (req) => {
     const testPhone = agentConfig.test_phone;
     const recipientsToNotify = [];
     
-    // Adicionar destinatário principal
+    // Adicionar destinatário principal (apenas se tiver WhatsApp)
     if (customerContact.whatsapp) {
       recipientsToNotify.push({
         phone: customerContact.whatsapp,
@@ -162,14 +162,26 @@ serve(async (req) => {
       });
     }
     
-    // Adicionar número de teste (sempre recebe cópia)
+    // ✅ IMPORTANTE: Número de teste SEMPRE recebe cópia (mesmo sem cliente)
     if (testPhone) {
       recipientsToNotify.push({
         phone: testPhone,
         name: `[TESTE] ${order.customer_name}`,
         isTest: true
       });
-      console.log('🧪 Test mode active - will also send to:', testPhone);
+      console.log('🧪 Test mode active - will send to test phone:', testPhone);
+    }
+    
+    // ⚠️ Se não há nenhum destinatário, logar e retornar
+    if (recipientsToNotify.length === 0) {
+      console.log('❌ No recipients to notify - no customer whatsapp and no test phone configured');
+      return new Response(JSON.stringify({ 
+        success: false, 
+        message: 'No recipients available - configure customer whatsapp or test phone',
+        contactSource
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     for (const channel of channels) {

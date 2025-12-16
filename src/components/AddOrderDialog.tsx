@@ -46,6 +46,7 @@ interface OrderFormData {
   type: string;
   priority: string;
   client: string;
+  customerWhatsapp?: string;
   deliveryDeadline: string;
   deskTicket: string;
   totvsOrderNumber?: string;
@@ -257,19 +258,25 @@ export const AddOrderDialog = ({ onAddOrder }: AddOrderDialogProps) => {
               <Input {...register("client", { required: true })} placeholder="Nome do cliente" />
             </div>
             <div>
-              <Label htmlFor="deskTicket">Nº Chamado Desk</Label>
-              <Input {...register("deskTicket", { required: true })} placeholder="Ex: DSK-2024-001" />
+              <Label htmlFor="customerWhatsapp" className="flex items-center gap-1">
+                📱 WhatsApp do Cliente
+              </Label>
+              <Input 
+                {...register("customerWhatsapp", { required: true })} 
+                placeholder="Ex: 51999999999"
+                maxLength={20}
+                type="tel"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Obrigatório para notificações automáticas
+              </p>
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <Label htmlFor="totvsOrderNumber">Nº Pedido TOTVS</Label>
-              <Input 
-                {...register("totvsOrderNumber")} 
-                placeholder="Ex: 123456"
-                maxLength={50}
-              />
+              <Label htmlFor="deskTicket">Nº Chamado Desk</Label>
+              <Input {...register("deskTicket", { required: true })} placeholder="Ex: DSK-2024-001" />
             </div>
             <div>
               <Label htmlFor="deliveryDeadline">Prazo de Entrega</Label>
@@ -278,6 +285,15 @@ export const AddOrderDialog = ({ onAddOrder }: AddOrderDialogProps) => {
                 type="date" 
               />
             </div>
+          </div>
+
+          <div>
+            <Label htmlFor="totvsOrderNumber">Nº Pedido TOTVS</Label>
+            <Input 
+              {...register("totvsOrderNumber")} 
+              placeholder="Ex: 123456"
+              maxLength={50}
+            />
           </div>
 
           {/* Configurações de Firmware e Imagem */}
