@@ -11,12 +11,20 @@ import { Plus, Trash2 } from "lucide-react";
 import { ItemCostAllocation, PurchaseRequestItem } from "@/types/purchases";
 import { BUSINESS_UNITS, COST_CENTERS } from "@/lib/senderOptions";
 
+interface DefaultRateio {
+  business_unit?: string;
+  cost_center?: string;
+  account_item?: string;
+  warehouse?: string;
+}
+
 interface ItemCostAllocationDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   item: PurchaseRequestItem;
   initialAllocations?: ItemCostAllocation[];
   onSave: (allocations: Omit<ItemCostAllocation, 'id' | 'created_at'>[]) => Promise<void>;
+  defaultRateio?: DefaultRateio;
 }
 
 interface AllocationForm extends Omit<ItemCostAllocation, 'id' | 'created_at' | 'purchase_request_item_id'> {}
@@ -26,7 +34,8 @@ export function ItemCostAllocationDialog({
   onOpenChange,
   item,
   initialAllocations = [],
-  onSave
+  onSave,
+  defaultRateio
 }: ItemCostAllocationDialogProps) {
   const [allocations, setAllocations] = useState<AllocationForm[]>([]);
   const [saving, setSaving] = useState(false);
@@ -52,11 +61,11 @@ export function ItemCostAllocationDialog({
   }, [open, initialAllocations]);
 
   const createEmptyAllocation = (): AllocationForm => ({
-    business_unit: 'Autoatendimento',
-    accounting_item: '',
+    business_unit: defaultRateio?.business_unit || 'Autoatendimento',
+    accounting_item: defaultRateio?.account_item || '',
     project: '',
-    cost_center: '',
-    warehouse: '',
+    cost_center: defaultRateio?.cost_center || '',
+    warehouse: defaultRateio?.warehouse || item.warehouse || '',
     allocation_percentage: 100,
     allocated_quantity: item.requested_quantity,
     allocated_value: item.total_price || 0,

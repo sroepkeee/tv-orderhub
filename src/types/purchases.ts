@@ -78,7 +78,7 @@ export interface ItemStockInfo {
 export interface ItemCostAllocation {
   id: string;
   purchase_request_item_id: string;
-  business_unit: 'Autoatendimento' | 'Bowling' | 'Painéis' | 'Controle de Acessos';
+  business_unit: string;
   accounting_item?: string;
   project?: string;
   cost_center: string;

@@ -139,10 +139,10 @@ export const usePurchaseRequests = () => {
       const { data: user } = await supabase.auth.getUser();
       if (!user.user) throw new Error('Usuário não autenticado');
 
-      // Buscar itens com purchase_required
+      // Buscar itens com purchase_required incluindo RATEIO do pedido
       const { data: items, error: itemsError } = await supabase
         .from('order_items')
-        .select('*, orders(order_number, customer_name)')
+        .select('*, orders(id, order_number, customer_name, business_unit, cost_center, account_item, business_area, sender_company)')
         .eq('item_status', 'purchase_required');
 
       if (itemsError) throw itemsError;
@@ -232,7 +232,26 @@ export const usePurchaseRequests = () => {
 
       if (itemsInsertError) throw itemsInsertError;
 
-      toast.success(`Solicitação ${ocNumber} criada com ${items.length} itens. Configure empresa e rateios!`);
+      // Criar alocações automáticas baseadas no RATEIO do pedido
+      for (const createdItem of createdItems || []) {
+        const originalItem = items.find(i => i.item_code === createdItem.item_code);
+        const orderRateio = originalItem?.orders;
+        
+        if (orderRateio?.business_unit || orderRateio?.cost_center) {
+          await supabase.from('item_cost_allocation').insert({
+            purchase_request_item_id: createdItem.id,
+            business_unit: orderRateio.business_unit || 'Autoatendimento',
+            cost_center: orderRateio.cost_center || '',
+            accounting_item: orderRateio.account_item || '',
+            warehouse: createdItem.warehouse || '',
+            allocation_percentage: 100,
+            allocated_quantity: createdItem.requested_quantity,
+            allocated_value: createdItem.total_price || 0,
+          });
+        }
+      }
+
+      toast.success(`Solicitação ${ocNumber} criada com ${items.length} itens. Rateios do pedido aplicados!`);
       await loadRequests();
       await loadMetrics();
       
