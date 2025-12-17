@@ -14,6 +14,13 @@ const materialTypeMapping: Record<string, string> = {
 };
 
 /**
+ * Verifica se uma string está no formato DD/MM/YYYY
+ */
+function isValidDateFormat(dateStr: string): boolean {
+  return /^\d{2}\/\d{2}\/\d{4}$/.test(dateStr);
+}
+
+/**
  * Deriva área de negócio a partir do Centro de Custo
  */
 function deriveBusinessArea(costCenter?: string): string {
@@ -62,28 +69,47 @@ function formatWhatsApp(phone?: string): string | undefined {
 }
 
 /**
- * Converte data DD/MM/YYYY para formato brasileiro ou calcula se vazia
+ * Converte data DD/MM/YYYY para formato ISO ou calcula se inválida
  */
-function parseOrCalculateDate(dateStr: string | undefined, issueDate: string): string {
-  if (dateStr && dateStr.match(/\d{2}\/\d{2}\/\d{4}/)) {
-    return dateStr;
+function parseOrCalculateDate(dateStr: string | undefined, issueDate: string | undefined): string {
+  console.log('📅 [parseOrCalculateDate] Input:', { dateStr, issueDate });
+  
+  // Verificar se a data está no formato correto DD/MM/YYYY
+  if (dateStr && isValidDateFormat(dateStr)) {
+    try {
+      const result = addBusinessDays(dateStr, 0);
+      console.log('✅ [parseOrCalculateDate] Data convertida:', result);
+      return result;
+    } catch (e) {
+      console.warn('⚠️ [parseOrCalculateDate] Erro ao converter data:', e);
+    }
   }
   
-  // Calcular 10 dias úteis a partir da emissão
-  if (issueDate) {
-    return addBusinessDays(issueDate, 10);
+  // Tentar calcular a partir da data de emissão
+  if (issueDate && isValidDateFormat(issueDate)) {
+    try {
+      const result = addBusinessDays(issueDate, 10);
+      console.log('✅ [parseOrCalculateDate] Data calculada (+10 dias úteis):', result);
+      return result;
+    } catch (e) {
+      console.warn('⚠️ [parseOrCalculateDate] Erro ao calcular data:', e);
+    }
   }
   
-  // Fallback: data atual + 10 dias úteis
+  // Fallback: data atual + 14 dias (sem usar addBusinessDays que pode falhar)
   const today = new Date();
-  const formatted = `${String(today.getDate()).padStart(2, '0')}/${String(today.getMonth() + 1).padStart(2, '0')}/${today.getFullYear()}`;
-  return addBusinessDays(formatted, 10);
+  today.setDate(today.getDate() + 14);
+  const fallback = today.toISOString().split('T')[0];
+  console.log('⚠️ [parseOrCalculateDate] Usando fallback (hoje + 14 dias):', fallback);
+  return fallback;
 }
 
 /**
  * Limpa e extrai Centro de Custo do texto do Rateio
  */
 function extractCostCenter(rateioText: string): string {
+  console.log('🔍 [extractCostCenter] Input:', rateioText.substring(0, 100));
+  
   // Remover prefixo "ITEM CONTA" se presente
   let cleaned = rateioText.replace(/^ITEM\s+CONTA\s*:?\s*/i, '').trim();
   
@@ -101,7 +127,9 @@ function extractCostCenter(rateioText: string): string {
   for (const pattern of patterns) {
     const match = cleaned.match(pattern);
     if (match) {
-      return match[0].trim();
+      const result = match[0].trim();
+      console.log('✅ [extractCostCenter] Encontrado:', result);
+      return result;
     }
   }
   
@@ -113,13 +141,17 @@ function extractCostCenter(rateioText: string): string {
     .replace(/P[OÓ]S[\s-]?VENDA.*/i, '')
     .trim();
   
-  return withoutProjeto || cleaned.split(';')[0]?.trim() || '';
+  const result = withoutProjeto || cleaned.split(';')[0]?.trim() || '';
+  console.log('⚠️ [extractCostCenter] Fallback:', result);
+  return result;
 }
 
 /**
  * Limpa e extrai Item Conta do texto do Rateio
  */
 function extractAccountItem(rateioText: string): string {
+  console.log('🔍 [extractAccountItem] Input:', rateioText.substring(0, 100));
+  
   // Padrões conhecidos de Item Conta
   const patterns = [
     /PROJETO\s+[A-ZÁÉÍÓÚÂÊÔÃÕÇ\s\-]+/i,          // PROJETO ALGO
@@ -130,20 +162,23 @@ function extractAccountItem(rateioText: string): string {
   for (const pattern of patterns) {
     const match = rateioText.match(pattern);
     if (match) {
-      return match[0].trim();
+      const result = match[0].trim();
+      console.log('✅ [extractAccountItem] Encontrado:', result);
+      return result;
     }
   }
   
   // Fallback: tentar pegar segunda parte após ;
   const parts = rateioText.split(';');
   if (parts.length > 1) {
-    // Retornar segunda parte se não for igual ao centro de custo
     const secondPart = parts[1]?.trim();
     if (secondPart && !secondPart.match(/^SSM|^CUSTOMER|^FILIAL/i)) {
+      console.log('⚠️ [extractAccountItem] Fallback (segunda parte):', secondPart);
       return secondPart;
     }
   }
   
+  console.log('⚠️ [extractAccountItem] Não encontrado');
   return '';
 }
 
@@ -171,6 +206,7 @@ export async function parseTxtOrder(file: File): Promise<ParsedOrderData & { cus
   
   const items: ParsedOrderData['items'] = [];
   let customerWhatsapp: string | undefined;
+  let filialCode: string = '';
   
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
@@ -180,15 +216,72 @@ export async function parseTxtOrder(file: File): Promise<ParsedOrderData & { cus
     console.log(`\n📝 Linha ${i + 1}: [${prefix.toUpperCase()}]`);
     console.log('   Raw:', line.substring(0, 150) + (line.length > 150 ? '...' : ''));
     
-    // Cabecalho: Pedido Nº | Data Emissão
+    // ===== CABECALHO =====
+    // Formato pode variar:
+    // - Cabecalho;PEDIDO;DATA
+    // - Cabecalho;FILIAL;PEDIDO;DATA;REPRESENTANTE
     if (prefix === 'cabecalho') {
-      orderInfo.orderNumber = parts[1] || '';
-      orderInfo.issueDate = parts[2] || '';
-      console.log('   ✅ Pedido:', orderInfo.orderNumber);
-      console.log('   ✅ Data Emissão:', orderInfo.issueDate);
+      // Detectar formato verificando qual posição tem data válida
+      let foundDate = false;
+      
+      // Tentar formato: Cabecalho;FILIAL;PEDIDO;DATA;REPRESENTANTE
+      if (parts[3] && isValidDateFormat(parts[3])) {
+        filialCode = parts[1] || '';
+        orderInfo.orderNumber = parts[2] || '';
+        orderInfo.issueDate = parts[3];
+        const representative = parts[4] || '';
+        
+        console.log('   ✅ Formato: Cabecalho;FILIAL;PEDIDO;DATA;REPRESENTANTE');
+        console.log(`   ✅ Filial: ${filialCode}`);
+        console.log(`   ✅ Pedido: ${orderInfo.orderNumber}`);
+        console.log(`   ✅ Data Emissão: ${orderInfo.issueDate}`);
+        if (representative) console.log(`   ✅ Representante: ${representative}`);
+        foundDate = true;
+      }
+      // Tentar formato: Cabecalho;PEDIDO;DATA
+      else if (parts[2] && isValidDateFormat(parts[2])) {
+        orderInfo.orderNumber = parts[1] || '';
+        orderInfo.issueDate = parts[2];
+        
+        console.log('   ✅ Formato: Cabecalho;PEDIDO;DATA');
+        console.log(`   ✅ Pedido: ${orderInfo.orderNumber}`);
+        console.log(`   ✅ Data Emissão: ${orderInfo.issueDate}`);
+        foundDate = true;
+      }
+      
+      // Se não encontrou data válida, tentar extrair o que for possível
+      if (!foundDate) {
+        console.warn('   ⚠️ Formato de cabeçalho desconhecido - tentando extrair...');
+        
+        // Procurar data em todas as posições
+        for (let p = 1; p < parts.length; p++) {
+          if (isValidDateFormat(parts[p])) {
+            orderInfo.issueDate = parts[p];
+            // Pedido geralmente é a posição anterior à data
+            if (p > 1) {
+              orderInfo.orderNumber = parts[p - 1] || '';
+            }
+            console.log(`   ⚠️ Data encontrada na posição ${p}: ${orderInfo.issueDate}`);
+            console.log(`   ⚠️ Pedido (inferido): ${orderInfo.orderNumber}`);
+            foundDate = true;
+            break;
+          }
+        }
+        
+        // Se ainda não encontrou, usar primeira posição como pedido
+        if (!foundDate && parts[1]) {
+          orderInfo.orderNumber = parts[1];
+          console.log(`   ⚠️ Usando primeira posição como pedido: ${orderInfo.orderNumber}`);
+        }
+      }
+      
+      // Adicionar filial às notas se disponível
+      if (filialCode && !orderInfo.notes?.includes('Filial')) {
+        orderInfo.notes = `Filial: ${filialCode}`;
+      }
     }
     
-    // Informacoes Gerais: Codigo+Nome | CNPJ | Endereco | Bairro | IE | Telefone | CEP | Idioma | Garantia | Obs
+    // ===== INFORMACOES GERAIS =====
     else if (prefix === 'informacoes gerais') {
       console.log('   📋 Parts:', parts.map((p, idx) => `[${idx}]=${p?.substring(0, 30) || 'vazio'}`).join(' | '));
       
@@ -204,13 +297,16 @@ export async function parseTxtOrder(file: File): Promise<ParsedOrderData & { cus
       orderInfo.customerDocument = (parts[2] || '').replace(/[.\-\/]/g, '');
       
       // Telefone pode estar em diferentes posições - tentar várias
-      const phonePositions = [6, 5, 7, 4]; // Posições mais comuns
+      const phonePositions = [6, 5, 7, 4, 8]; // Posições mais comuns
       for (const pos of phonePositions) {
         const phoneCandidate = parts[pos];
-        if (phoneCandidate && phoneCandidate.match(/\d{10,}/)) {
-          console.log(`   📱 Telefone encontrado na posição ${pos}:`, phoneCandidate);
-          customerWhatsapp = formatWhatsApp(phoneCandidate);
-          if (customerWhatsapp) break;
+        if (phoneCandidate) {
+          const digits = phoneCandidate.replace(/\D/g, '');
+          if (digits.length >= 10 && digits.length <= 13) {
+            console.log(`   📱 Telefone encontrado na posição ${pos}:`, phoneCandidate);
+            customerWhatsapp = formatWhatsApp(phoneCandidate);
+            if (customerWhatsapp) break;
+          }
         }
       }
       
@@ -218,7 +314,6 @@ export async function parseTxtOrder(file: File): Promise<ParsedOrderData & { cus
       if (!customerWhatsapp) {
         for (let p = 1; p < parts.length; p++) {
           const part = parts[p];
-          // Telefone brasileiro: (XX) XXXXX-XXXX ou similar
           if (part && (part.match(/\(\d{2}\)/) || part.match(/^\d{10,11}$/))) {
             console.log(`   📱 Telefone detectado na posição ${p}:`, part);
             customerWhatsapp = formatWhatsApp(part);
@@ -229,19 +324,20 @@ export async function parseTxtOrder(file: File): Promise<ParsedOrderData & { cus
       
       // Garantia e Observação → notas
       const notes: string[] = [];
+      if (orderInfo.notes) notes.push(orderInfo.notes);
       if (parts[9]) notes.push(`Garantia: ${parts[9]}`);
       if (parts[10]) notes.push(parts[10]);
-      orderInfo.notes = notes.join(' | ');
+      orderInfo.notes = notes.filter(Boolean).join(' | ');
       
       console.log('   ✅ Cliente:', orderInfo.customerName);
       console.log('   ✅ CNPJ/CPF:', orderInfo.customerDocument);
       console.log('   ✅ WhatsApp:', customerWhatsapp || '⚠️ NÃO ENCONTRADO');
     }
     
-    // Rateio: Centro de Custos | Item contábil
+    // ===== RATEIO =====
     else if (prefix === 'rateio') {
       const allRateioText = parts.slice(1).join(';');
-      console.log('   📋 Rateio completo:', allRateioText);
+      console.log('   📋 Rateio completo:', allRateioText.substring(0, 100));
       
       // Extrair Centro de Custo e Item Conta com funções dedicadas
       orderInfo.costCenter = extractCostCenter(allRateioText);
@@ -253,7 +349,7 @@ export async function parseTxtOrder(file: File): Promise<ParsedOrderData & { cus
       console.log('   ✅ Área Negócio:', orderInfo.businessArea);
     }
     
-    // Transporte: Transportadora | Tipo Frete | Valor Frete
+    // ===== TRANSPORTE =====
     else if (prefix === 'transporte') {
       orderInfo.carrier = parts[1] || '';
       orderInfo.freightType = parts[2] || '';
@@ -268,7 +364,7 @@ export async function parseTxtOrder(file: File): Promise<ParsedOrderData & { cus
       console.log('   ✅ Valor Frete:', orderInfo.freightValue);
     }
     
-    // Entrega: Codigo+Loja+Nome | Endereço | Bairro | Municipio | UF | CEP
+    // ===== ENTREGA =====
     else if (prefix === 'entrega') {
       const endereco = parts[2] || '';
       const bairro = parts[3] || '';
@@ -293,12 +389,13 @@ export async function parseTxtOrder(file: File): Promise<ParsedOrderData & { cus
       console.log('   ✅ Município:', orderInfo.municipality);
     }
     
-    // Instalacao: (ignorar por enquanto)
+    // ===== INSTALACAO =====
     else if (prefix === 'instalacao') {
       console.log('   ⏭️ Instalação (ignorado)');
     }
     
-    // ITEM: Seq | Codigo | TipoMat | Descrição | Qtd | NCM | Preço | Total | TotalIPI | Armazem | TES+Desc
+    // ===== ITEM =====
+    // Formato: ITEM;Seq;Codigo;TipoMat;Descrição;Qtd;NCM;Preço;Total;TotalIPI;Armazem;TES+Desc
     else if (prefix === 'item') {
       console.log('   📦 Item parts:', parts.slice(1, 12).map((p, idx) => `[${idx+1}]=${p?.substring(0, 20) || 'vazio'}`).join(' | '));
       
@@ -315,8 +412,8 @@ export async function parseTxtOrder(file: File): Promise<ParsedOrderData & { cus
       const warehouse = parts[10] || '11';
       const tesOperation = parts[11] || '';
       
-      console.log('   ✅ Código:', itemCode, '| Tipo:', materialType || '⚠️ VAZIO');
-      console.log('   ✅ NCM:', ncmCode || '⚠️ NÃO ENCONTRADO', `(posição 6 = "${parts[6]}")`);
+      console.log('   ✅ Código:', itemCode, '| Tipo Material:', materialType || '⚠️ VAZIO');
+      console.log('   ✅ NCM:', ncmCode || '⚠️ NÃO ENCONTRADO', `(parts[6] = "${parts[6]}")`);
       console.log('   ✅ Descrição:', description.substring(0, 50) + (description.length > 50 ? '...' : ''));
       if (rawDescription !== description) {
         console.log('   🧹 LGPD removido da descrição');
@@ -384,14 +481,17 @@ export async function parseTxtOrder(file: File): Promise<ParsedOrderData & { cus
   console.log('✅ WhatsApp:', customerWhatsapp || '⚠️ NÃO ENCONTRADO');
   console.log('✅ Itens:', items.length);
   
-  // Verificar NCM nos itens
+  // Verificar NCM e MaterialType nos itens
   const itemsWithNcm = items.filter(i => i.ncmCode);
   const itemsWithMaterialType = items.filter(i => i.materialType);
   console.log(`✅ Itens com NCM: ${itemsWithNcm.length}/${items.length}`);
   console.log(`✅ Itens com Tipo Material: ${itemsWithMaterialType.length}/${items.length}`);
   
   if (itemsWithNcm.length === 0 && items.length > 0) {
-    console.log('⚠️ ALERTA: Nenhum item tem NCM - verificar posição no TXT');
+    console.log('⚠️ ALERTA: Nenhum item tem NCM - verifique a posição no arquivo TXT');
+  }
+  if (itemsWithMaterialType.length === 0 && items.length > 0) {
+    console.log('⚠️ ALERTA: Nenhum item tem Tipo Material - verifique a posição no arquivo TXT');
   }
   
   console.log('═══════════════════════════════════════════════════════════\n');
