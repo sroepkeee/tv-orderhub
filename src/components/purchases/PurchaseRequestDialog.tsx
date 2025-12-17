@@ -286,13 +286,17 @@ export function PurchaseRequestDialog({
                 </div>
               </div>
 
-              <div>
-                <Label>Observações</Label>
+              {/* Observações Destacadas */}
+              <div className="bg-amber-50 dark:bg-amber-950/30 border-2 border-amber-300 dark:border-amber-700 rounded-lg p-4">
+                <Label className="text-base font-semibold flex items-center gap-2 mb-2">
+                  📝 Observações Importantes
+                </Label>
                 <Textarea
                   value={formData.notes}
                   onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                  rows={3}
-                  placeholder="Observações adicionais sobre a solicitação..."
+                  rows={4}
+                  placeholder="Adicione observações importantes para a equipe de Compras e SSM...&#10;&#10;Ex: Urgência, fornecedor preferido, condições especiais..."
+                  className="bg-white dark:bg-background"
                 />
               </div>
             </div>

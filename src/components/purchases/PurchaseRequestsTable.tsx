@@ -10,7 +10,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Eye, Edit, Trash2, CheckCircle, XCircle } from "lucide-react";
+import { Eye, Edit, Trash2, CheckCircle, XCircle, Mail, MailCheck, RefreshCw } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -20,6 +21,7 @@ interface PurchaseRequestsTableProps {
   onEdit: (request: PurchaseRequest) => void;
   onDelete: (requestId: string) => void;
   onApprove: (request: PurchaseRequest) => void;
+  onResendNotification?: (requestId: string) => void;
   canApprove: boolean;
 }
 
@@ -29,6 +31,7 @@ export const PurchaseRequestsTable = ({
   onEdit,
   onDelete,
   onApprove,
+  onResendNotification,
   canApprove,
 }: PurchaseRequestsTableProps) => {
   const getStatusBadge = (status: string) => {
@@ -53,6 +56,7 @@ export const PurchaseRequestsTable = ({
             <TableHead>Solicitante</TableHead>
             <TableHead>Tipo</TableHead>
             <TableHead>Valor Estimado</TableHead>
+            <TableHead>Notificação</TableHead>
             <TableHead>Data Criação</TableHead>
             <TableHead className="text-right">Ações</TableHead>
           </TableRow>
@@ -95,6 +99,40 @@ export const PurchaseRequestsTable = ({
                     style: 'currency',
                     currency: 'BRL',
                   }).format(request.total_estimated_value || 0)}
+                </TableCell>
+                <TableCell>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className="flex items-center gap-1">
+                          {request.notification_sent_at ? (
+                            <>
+                              <MailCheck className="h-4 w-4 text-green-500" />
+                              <span className="text-xs text-green-600">
+                                {format(new Date(request.notification_sent_at), 'dd/MM HH:mm', { locale: ptBR })}
+                              </span>
+                            </>
+                          ) : (
+                            <>
+                              <Mail className="h-4 w-4 text-muted-foreground" />
+                              <span className="text-xs text-muted-foreground">Não enviado</span>
+                            </>
+                          )}
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        {request.notification_sent_at ? (
+                          <div className="text-xs">
+                            <p>Enviado: {format(new Date(request.notification_sent_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}</p>
+                            <p>Para: {request.notification_recipients?.join(', ') || 'N/A'}</p>
+                            <p>Envios: {request.notification_count || 1}</p>
+                          </div>
+                        ) : (
+                          <p>Notificação ainda não enviada</p>
+                        )}
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
                 </TableCell>
                 <TableCell>
                   {format(new Date(request.created_at), 'dd/MM/yyyy HH:mm', {

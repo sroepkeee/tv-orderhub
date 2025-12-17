@@ -10,7 +10,8 @@ const corsHeaders = {
 };
 
 interface PurchaseNotificationRequest {
-  orderId: string;
+  purchaseRequestId?: string;
+  orderId?: string;
   orderNumber: string;
   customerName: string;
   deliveryDate: string;
@@ -22,6 +23,7 @@ interface PurchaseNotificationRequest {
     warehouse: string;
   }>;
   movedBy: string;
+  notes?: string;
   // RATEIO fields
   businessUnit?: string;
   costCenter?: string;
@@ -40,6 +42,7 @@ const handler = async (req: Request): Promise<Response> => {
     const payload: PurchaseNotificationRequest = await req.json();
     
     console.log("📧 [notify-purchases] Recebendo requisição:", {
+      purchaseRequestId: payload.purchaseRequestId,
       orderId: payload.orderId,
       orderNumber: payload.orderNumber,
       itemsCount: payload.items?.length || 0,
@@ -86,6 +89,17 @@ const handler = async (req: Request): Promise<Response> => {
       </tr>
     `).join('');
 
+    // Seção de observações se houver
+    const notesSection = payload.notes ? `
+      <!-- Notes Section -->
+      <div style="background-color: #fef3c7; border-radius: 12px; padding: 24px; margin-bottom: 24px; border: 1px solid #fcd34d;">
+        <h2 style="margin: 0 0 12px 0; color: #92400e; font-size: 16px;">
+          📝 Observações Importantes
+        </h2>
+        <p style="margin: 0; color: #78350f; white-space: pre-wrap;">${payload.notes}</p>
+      </div>
+    ` : '';
+
     // Template HTML do e-mail
     const htmlContent = `
 <!DOCTYPE html>
@@ -100,7 +114,7 @@ const handler = async (req: Request): Promise<Response> => {
     <!-- Header -->
     <div style="background: linear-gradient(135deg, #f97316 0%, #ea580c 100%); padding: 32px; text-align: center;">
       <h1 style="color: #ffffff; margin: 0; font-size: 24px; font-weight: 600;">
-        🛒 Novo Pedido para Compras
+        🛒 ${payload.purchaseRequestId ? 'Solicitação de Compra' : 'Novo Pedido para Compras'}
       </h1>
       <p style="color: rgba(255,255,255,0.9); margin: 8px 0 0 0; font-size: 14px;">
         Sistema de Gestão de Pedidos - IMPLY
@@ -113,22 +127,26 @@ const handler = async (req: Request): Promise<Response> => {
       <!-- Alert Box -->
       <div style="background-color: #fff7ed; border: 1px solid #fed7aa; border-left: 4px solid #f97316; border-radius: 8px; padding: 16px; margin-bottom: 24px;">
         <p style="margin: 0; color: #9a3412; font-size: 14px;">
-          <strong>⚡ Ação Necessária:</strong> Um pedido foi movido para a fase de Compras e contém itens que precisam ser adquiridos.
+          <strong>⚡ Ação Necessária:</strong> ${payload.purchaseRequestId 
+            ? 'Uma solicitação de compra foi enviada para aprovação.' 
+            : 'Um pedido foi movido para a fase de Compras e contém itens que precisam ser adquiridos.'}
         </p>
       </div>
+      
+      ${notesSection}
       
       <!-- Order Info Card -->
       <div style="background-color: #f9fafb; border-radius: 12px; padding: 24px; margin-bottom: 24px;">
         <h2 style="margin: 0 0 16px 0; color: #111827; font-size: 18px; border-bottom: 2px solid #e5e7eb; padding-bottom: 12px;">
-          📋 Informações do Pedido
+          📋 Informações ${payload.purchaseRequestId ? 'da Solicitação' : 'do Pedido'}
         </h2>
         <table style="width: 100%; border-collapse: collapse;">
           <tr>
-            <td style="padding: 8px 0; color: #6b7280; width: 140px;">Nº do Pedido:</td>
+            <td style="padding: 8px 0; color: #6b7280; width: 140px;">${payload.purchaseRequestId ? 'Nº da OC:' : 'Nº do Pedido:'}</td>
             <td style="padding: 8px 0; color: #111827; font-weight: 600; font-size: 16px;">#${payload.orderNumber}</td>
           </tr>
           <tr>
-            <td style="padding: 8px 0; color: #6b7280;">Cliente:</td>
+            <td style="padding: 8px 0; color: #6b7280;">${payload.purchaseRequestId ? 'Empresa:' : 'Cliente:'}</td>
             <td style="padding: 8px 0; color: #111827; font-weight: 500;">${payload.customerName}</td>
           </tr>
           <tr>
@@ -139,13 +157,14 @@ const handler = async (req: Request): Promise<Response> => {
             </td>
           </tr>
           <tr>
-            <td style="padding: 8px 0; color: #6b7280;">Movido por:</td>
+            <td style="padding: 8px 0; color: #6b7280;">${payload.purchaseRequestId ? 'Solicitado por:' : 'Movido por:'}</td>
             <td style="padding: 8px 0; color: #111827;">${payload.movedBy}</td>
           </tr>
         </table>
       </div>
       
       <!-- RATEIO Info Card -->
+      ${payload.businessUnit || payload.costCenter || payload.accountItem || payload.businessArea || payload.senderCompany ? `
       <div style="background-color: #fef3c7; border-radius: 12px; padding: 24px; margin-bottom: 24px; border: 1px solid #fcd34d;">
         <h2 style="margin: 0 0 16px 0; color: #92400e; font-size: 18px; border-bottom: 2px solid #fcd34d; padding-bottom: 12px;">
           💰 Informações de RATEIO
@@ -190,14 +209,9 @@ const handler = async (req: Request): Promise<Response> => {
               </span>
             </td>
           </tr>` : ''}
-          ${!payload.businessUnit && !payload.costCenter && !payload.accountItem && !payload.businessArea && !payload.senderCompany ? `
-          <tr>
-            <td colspan="2" style="padding: 8px 0; color: #92400e; font-style: italic;">
-              Informações de RATEIO não disponíveis para este pedido.
-            </td>
-          </tr>` : ''}
         </table>
       </div>
+      ` : ''}
       
       <!-- Items Table -->
       <div style="margin-bottom: 24px;">
@@ -223,9 +237,9 @@ const handler = async (req: Request): Promise<Response> => {
       
       <!-- CTA Button -->
       <div style="text-align: center; margin: 32px 0;">
-        <a href="https://imply-pedidos.lovable.app/?openOrderId=${payload.orderId}" 
+        <a href="https://imply-pedidos.lovable.app/compras" 
            style="display: inline-block; background: linear-gradient(135deg, #f97316 0%, #ea580c 100%); color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 6px rgba(249, 115, 22, 0.25);">
-          Abrir Pedido no Sistema →
+          Abrir Módulo de Compras →
         </a>
       </div>
       
@@ -251,31 +265,66 @@ const handler = async (req: Request): Promise<Response> => {
     const emailResponse = await resend.emails.send({
       from: "Sistema de Pedidos <onboarding@resend.dev>",
       to: recipients,
-      subject: `🛒 Novo Pedido #${payload.orderNumber} - ${payload.items.length} itens para compra`,
+      subject: `🛒 ${payload.purchaseRequestId ? 'Solicitação de Compra' : 'Pedido'} #${payload.orderNumber} - ${payload.items.length} itens`,
       html: htmlContent,
     });
 
     console.log("✅ [notify-purchases] E-mail enviado com sucesso:", emailResponse);
 
-    // Registrar log no banco
+    // Inicializar cliente Supabase
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     
     if (supabaseUrl && supabaseKey) {
       const supabase = createClient(supabaseUrl, supabaseKey);
+      
+      // Se tiver purchaseRequestId, atualizar campos de notificação
+      if (payload.purchaseRequestId) {
+        const { error: updateError } = await supabase
+          .from('purchase_requests')
+          .update({
+            notification_sent_at: new Date().toISOString(),
+            notification_recipients: recipients,
+            notification_count: supabase.rpc('increment_notification_count', { request_id: payload.purchaseRequestId })
+          })
+          .eq('id', payload.purchaseRequestId);
+
+        if (updateError) {
+          console.error("⚠️ [notify-purchases] Erro ao atualizar purchase_request:", updateError);
+          // Tentar incremento manual
+          const { data: currentRequest } = await supabase
+            .from('purchase_requests')
+            .select('notification_count')
+            .eq('id', payload.purchaseRequestId)
+            .single();
+          
+          await supabase
+            .from('purchase_requests')
+            .update({
+              notification_sent_at: new Date().toISOString(),
+              notification_recipients: recipients,
+              notification_count: (currentRequest?.notification_count || 0) + 1
+            })
+            .eq('id', payload.purchaseRequestId);
+        }
+      }
+      
+      // Registrar log no banco
       await supabase.from('ai_notification_log').insert({
         channel: 'email',
         recipient: recipients.join(', '),
-        order_id: payload.orderId,
-        message_content: `Notificação de compras: Pedido #${payload.orderNumber} com ${payload.items.length} itens`,
+        order_id: payload.orderId || null,
+        message_content: `Notificação de compras: ${payload.purchaseRequestId ? 'Solicitação' : 'Pedido'} #${payload.orderNumber} com ${payload.items.length} itens`,
         status: 'sent',
         sent_at: new Date().toISOString(),
         metadata: {
           type: 'purchase_notification',
+          purchase_request_id: payload.purchaseRequestId,
           recipients: recipients,
           items_count: payload.items.length,
           moved_by: payload.movedBy,
           delivery_date: payload.deliveryDate,
+          notes: payload.notes,
           rateio: {
             business_unit: payload.businessUnit,
             cost_center: payload.costCenter,
@@ -288,7 +337,12 @@ const handler = async (req: Request): Promise<Response> => {
     }
 
     return new Response(
-      JSON.stringify({ success: true, emailId: emailResponse.data?.id }),
+      JSON.stringify({ 
+        success: true, 
+        emailId: emailResponse.data?.id,
+        recipients: recipients,
+        sentAt: new Date().toISOString()
+      }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
 

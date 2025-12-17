@@ -2312,6 +2312,10 @@ export type Database = {
           expected_delivery_date: string | null
           id: string
           notes: string | null
+          notification_count: number | null
+          notification_recipients: string[] | null
+          notification_sent_at: string | null
+          order_id: string | null
           purchase_order_number: string
           rejection_reason: string | null
           request_type: string
@@ -2328,6 +2332,10 @@ export type Database = {
           expected_delivery_date?: string | null
           id?: string
           notes?: string | null
+          notification_count?: number | null
+          notification_recipients?: string[] | null
+          notification_sent_at?: string | null
+          order_id?: string | null
           purchase_order_number: string
           rejection_reason?: string | null
           request_type?: string
@@ -2344,6 +2352,10 @@ export type Database = {
           expected_delivery_date?: string | null
           id?: string
           notes?: string | null
+          notification_count?: number | null
+          notification_recipients?: string[] | null
+          notification_sent_at?: string | null
+          order_id?: string | null
           purchase_order_number?: string
           rejection_reason?: string | null
           request_type?: string
@@ -2358,6 +2370,13 @@ export type Database = {
             columns: ["approved_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_requests_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
             referencedColumns: ["id"]
           },
           {

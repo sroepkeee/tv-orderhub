@@ -13,6 +13,11 @@ export interface PurchaseRequest {
   approved_at?: string;
   created_at: string;
   updated_at: string;
+  // Campos de rastreabilidade de notificação
+  order_id?: string;
+  notification_sent_at?: string;
+  notification_recipients?: string[];
+  notification_count?: number;
 }
 
 export interface PurchaseRequestItem {
