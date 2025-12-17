@@ -23,7 +23,7 @@ import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { CompleteOrderDialog } from "./CompleteOrderDialog";
 import { ExceptionCommentDialog } from "./ExceptionCommentDialog";
-import { PhaseButtons } from "./PhaseButtons";
+
 import { UnifiedStatusSelector } from "./UnifiedStatusSelector";
 import { ConfirmationDialog } from "./ConfirmationDialog";
 import { OrderTypeSelector } from "@/components/OrderTypeSelector";
@@ -2277,25 +2277,12 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
 
                 <div className="pt-3 border-t">
                   <Label className="text-sm font-medium mb-2 block">Status do Pedido</Label>
-                  <div className="flex gap-3 items-start">
-                    {/* Dropdown único de status */}
-                    <div className="flex-1 max-w-md">
-                      <UnifiedStatusSelector
-                        currentStatus={getValues("status") || order.status}
-                        orderCategory={order.order_category}
-                        onStatusChange={(newStatus) => handleStatusChange(newStatus)}
-                      />
-                    </div>
-                    {/* PhaseButtons mantidos para visualização rápida */}
-                    <div className="flex-1">
-                      <PhaseButtons 
-                        order={{
-                          ...order,
-                          status: getValues("status") || order.status
-                        }} 
-                        onStatusChange={(orderId, newStatus) => handleStatusChange(newStatus)} 
-                      />
-                    </div>
+                  <div className="w-full max-w-md">
+                    <UnifiedStatusSelector
+                      currentStatus={getValues("status") || order.status}
+                      orderCategory={order.order_category}
+                      onStatusChange={(newStatus) => handleStatusChange(newStatus)}
+                    />
                   </div>
                 </div>
                 
