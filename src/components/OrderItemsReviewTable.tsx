@@ -34,6 +34,7 @@ const getMaterialTypeBadge = (materialType?: string) => {
     'MC': { bg: 'bg-purple-100 dark:bg-purple-900/50', text: 'text-purple-700 dark:text-purple-300' },
     'PI': { bg: 'bg-yellow-100 dark:bg-yellow-900/50', text: 'text-yellow-700 dark:text-yellow-300' },
     'BN': { bg: 'bg-gray-100 dark:bg-gray-800', text: 'text-gray-700 dark:text-gray-300' },
+    'PP': { bg: 'bg-cyan-100 dark:bg-cyan-900/50', text: 'text-cyan-700 dark:text-cyan-300' },
   };
   
   const style = config[materialType] || config['BN'];
@@ -179,7 +180,7 @@ export function OrderItemsReviewTable({ items, onChange }: OrderItemsReviewTable
                           />
                           {getMaterialTypeBadge(item.materialType)}
                         </div>
-                        {item.ncmCode && item.ncmCode !== '0' && (
+                        {item.ncmCode && item.ncmCode !== '0' && item.ncmCode.length >= 6 && (
                           <span className="text-[10px] text-muted-foreground font-mono ml-0.5">
                             NCM: {item.ncmCode}
                           </span>

@@ -613,12 +613,12 @@ export const ImportOrderDialog = ({
                     <span className="font-medium">{parsedData.orderInfo.municipality || '-'}</span>
                   </div>
                   <div className="flex flex-col">
-                    <span className="text-muted-foreground">Data Entrega</span>
-                    <span className="font-medium">{parsedData.orderInfo.deliveryDate}</span>
+                    <span className="text-muted-foreground">Data Emissão</span>
+                    <span className="font-medium">{parsedData.orderInfo.issueDate || '-'}</span>
                   </div>
                   <div className="flex flex-col">
-                    <span className="text-muted-foreground">Data Embarque</span>
-                    <span className="font-medium">{parsedData.orderInfo.shippingDate || '-'}</span>
+                    <span className="text-muted-foreground">Data Entrega</span>
+                    <span className="font-medium">{parsedData.orderInfo.deliveryDate}</span>
                   </div>
                   <div className="flex flex-col">
                     <span className="text-muted-foreground">Transportadora</span>
