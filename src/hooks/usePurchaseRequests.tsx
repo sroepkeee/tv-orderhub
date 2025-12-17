@@ -251,18 +251,31 @@ export const usePurchaseRequests = () => {
         }
       }
 
+      // Buscar itens com alocações incluídas
+      const { data: itemsWithAllocations } = await supabase
+        .from('purchase_request_items')
+        .select(`*, item_cost_allocation(*)`)
+        .eq('purchase_request_id', request.id);
+
       toast.success(`Solicitação ${ocNumber} criada com ${items.length} itens. Rateios do pedido aplicados!`);
       await loadRequests();
       await loadMetrics();
       
+      // Mapear itens com alocações e dados enriquecidos
+      const finalItems = (itemsWithAllocations || []).map((item, index) => {
+        const originalEnriched = enrichedItems.find(e => e.item_code === item.item_code);
+        return {
+          ...item,
+          cost_allocations: item.item_cost_allocation || [],
+          purchase_history: originalEnriched?.purchase_history || [],
+          consumption_metrics: originalEnriched?.consumption_metrics,
+          current_stock: originalEnriched?.current_stock || 0,
+        };
+      });
+
       return {
         request,
-        enrichedItems: createdItems?.map((item, index) => ({
-          ...item,
-          purchase_history: enrichedItems[index].purchase_history,
-          consumption_metrics: enrichedItems[index].consumption_metrics,
-          current_stock: enrichedItems[index].current_stock,
-        }))
+        enrichedItems: finalItems
       };
     } catch (error) {
       console.error('Error creating automatic request:', error);
@@ -494,7 +507,12 @@ export const usePurchaseRequests = () => {
         .eq('purchase_request_id', requestId);
 
       if (error) throw error;
-      return data;
+      
+      // Mapear item_cost_allocation para cost_allocations
+      return (data || []).map(item => ({
+        ...item,
+        cost_allocations: item.item_cost_allocation || [],
+      }));
     } catch (error) {
       console.error('Error loading request items:', error);
       return [];
