@@ -298,7 +298,8 @@ export const ImportOrderDialog = ({
         total_value: item.totalValue || null,
         ipi_percent: item.ipiPercent || null,
         icms_percent: item.icmsPercent || null,
-        ncm_code: item.ncmCode || null
+        ncm_code: item.ncmCode || null,
+        material_type: item.materialType || null
       }));
       const {
         error: itemsError
