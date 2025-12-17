@@ -473,8 +473,8 @@ export const ImportOrderDialog = ({
     setStep('upload');
   };
   return <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
+      <DialogContent className="max-w-7xl max-h-[95vh] overflow-hidden flex flex-col">
+        <DialogHeader className="flex-shrink-0">
           <DialogTitle className="flex items-center gap-2">
             <FileSpreadsheet className="h-5 w-5" />
             Importar Pedido do TOTVS
@@ -521,178 +521,218 @@ export const ImportOrderDialog = ({
           </div>}
 
         {/* STEP 2: PREVIEW */}
-        {step === 'preview' && parsedData && validation && <div className="space-y-4">
-            <div className="flex items-center gap-2 mb-4">
-              <CheckCircle2 className="h-5 w-5 text-green-600" />
-              <span className="font-medium">Arquivo: {file?.name}</span>
-              {file && <span className="px-2 py-1 rounded text-xs font-medium bg-primary/10 text-primary">
-                  {file.name.match(/\.(txt|csv)$/i) ? '📄 TXT TOTVS' : '📊 Excel'}
-                </span>}
-              {customerWhatsapp && (
-                <Badge variant="outline" className="text-green-600 border-green-300">
-                  📱 WhatsApp: {customerWhatsapp}
+        {step === 'preview' && parsedData && validation && <div className="flex flex-col flex-1 min-h-0 space-y-3">
+            {/* Header com arquivo e badges */}
+            <div className="flex items-center justify-between flex-wrap gap-2 pb-2 border-b flex-shrink-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <CheckCircle2 className="h-4 w-4 text-green-600" />
+                <span className="font-medium text-sm truncate max-w-[200px]">{file?.name}</span>
+                <Badge variant="secondary" className="text-xs">
+                  {file?.name.match(/\.(txt|csv)$/i) ? '📄 TXT' : '📊 Excel'}
                 </Badge>
-              )}
-            </div>
-            
-            {/* Erros */}
-            {validation.errors.length > 0 && <Alert variant="destructive">
-                <XCircle className="h-4 w-4" />
-                <AlertDescription>
-                  <strong>Erros encontrados ({validation.errors.length}):</strong>
-                  <ul className="list-disc list-inside mt-2 text-sm space-y-1">
-                    {validation.errors.map((error, i) => <li key={i}>{error}</li>)}
-                  </ul>
-                </AlertDescription>
-              </Alert>}
-
-            {/* Avisos */}
-            {validation.warnings.length > 0 && <Alert>
-                <AlertTriangle className="h-4 w-4" />
-                <AlertDescription>
-                  <strong>Avisos ({validation.warnings.length}):</strong>
-                  <ul className="list-disc list-inside mt-2 text-sm space-y-1">
-                    {validation.warnings.map((warning, i) => <li key={i}>{warning}</li>)}
-                  </ul>
-                </AlertDescription>
-              </Alert>}
-
-            {/* Alertas de campos faltando */}
-            {(!parsedData.orderInfo.costCenter || !parsedData.orderInfo.municipality || !customerWhatsapp || 
-              parsedData.items.some(item => !item.ncmCode)) && (
-              <Alert className="border-amber-300 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-700">
-                <AlertTriangle className="h-4 w-4 text-amber-600" />
-                <AlertDescription className="text-amber-800 dark:text-amber-300">
-                  <strong>Campos não detectados (podem ser preenchidos depois):</strong>
-                  <ul className="list-disc list-inside mt-2 text-sm space-y-1">
-                    {!parsedData.orderInfo.costCenter && (
-                      <li>Centro de Custo não detectado</li>
-                    )}
-                    {!parsedData.orderInfo.municipality && (
-                      <li>Município não detectado</li>
-                    )}
-                    {!customerWhatsapp && (
-                      <li>WhatsApp do cliente não detectado</li>
-                    )}
-                    {parsedData.items.some(item => !item.ncmCode) && (
-                      <li>NCM não detectado em {parsedData.items.filter(item => !item.ncmCode).length} item(ns)</li>
-                    )}
-                  </ul>
-                </AlertDescription>
-              </Alert>
-            )}
-
-            {/* Preview dos dados */}
-            <div className="border rounded-lg p-4 bg-muted/50">
-              <h3 className="font-semibold mb-3 flex items-center gap-2">
-                📦 Pedido {parsedData.orderInfo.orderNumber}
-              </h3>
-              <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-                <div><strong>Cliente:</strong> {parsedData.orderInfo.customerName}</div>
-                <div><strong>Município:</strong> {parsedData.orderInfo.municipality || '-'}</div>
-                <div><strong>Data Entrega:</strong> {parsedData.orderInfo.deliveryDate}</div>
-                <div><strong>Data Embarque:</strong> {parsedData.orderInfo.shippingDate || '-'}</div>
-                <div><strong>Transportadora:</strong> {parsedData.orderInfo.carrier || '-'}</div>
-                <div><strong>Tipo Frete:</strong> {parsedData.orderInfo.freightType || '-'}</div>
-                <div><strong>Valor Frete:</strong> R$ {parsedData.orderInfo.freightValue?.toFixed(2) || '0.00'}</div>
-                <div><strong>Total Itens:</strong> {parsedData.items.length}</div>
+                {customerWhatsapp && (
+                  <Badge variant="outline" className="text-xs text-green-600 border-green-300">
+                    📱 {customerWhatsapp}
+                  </Badge>
+                )}
               </div>
               
-              {/* Seção RATEIO */}
-              {(parsedData.orderInfo.costCenter || parsedData.orderInfo.accountItem || parsedData.orderInfo.businessUnit || parsedData.orderInfo.executiveName) && (
-                <div className="mt-3 pt-3 border-t">
-                  <h4 className="font-semibold text-sm mb-2 flex items-center gap-2">
-                    📊 Informações de RATEIO
-                  </h4>
-                  <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-                    {parsedData.orderInfo.executiveName && (
-                      <div><strong>Executivo:</strong> {parsedData.orderInfo.executiveName}</div>
-                    )}
-                    {parsedData.orderInfo.costCenter && (
-                      <div><strong>Centro de Custo:</strong> {parsedData.orderInfo.costCenter}</div>
-                    )}
-                    {parsedData.orderInfo.accountItem && (
-                      <div><strong>Item Conta:</strong> {parsedData.orderInfo.accountItem}</div>
-                    )}
-                    {parsedData.orderInfo.businessUnit && (
-                      <div><strong>B.U.:</strong> {parsedData.orderInfo.businessUnit}</div>
-                    )}
-                    {parsedData.orderInfo.businessArea && (
-                      <div className="col-span-2">
-                        <strong>Área de Negócio:</strong>{' '}
-                        <Badge className={
-                          parsedData.orderInfo.businessArea === 'ssm' ? 'bg-blue-100 text-blue-700' :
-                          parsedData.orderInfo.businessArea === 'projetos' ? 'bg-green-100 text-green-700' :
-                          parsedData.orderInfo.businessArea === 'filial' ? 'bg-orange-100 text-orange-700' :
-                          parsedData.orderInfo.businessArea === 'ecommerce' ? 'bg-purple-100 text-purple-700' :
-                          'bg-gray-100 text-gray-700'
-                        }>
-                          {parsedData.orderInfo.businessArea === 'ssm' ? '🔧 Manutenção' :
-                           parsedData.orderInfo.businessArea === 'projetos' ? '📐 Instalações' :
-                           parsedData.orderInfo.businessArea === 'filial' ? '🏢 Filial' :
-                           parsedData.orderInfo.businessArea === 'ecommerce' ? '🛒 Carrinho' :
-                           parsedData.orderInfo.businessArea}
-                        </Badge>
-                      </div>
-                    )}
+              {/* Alertas compactados em badges horizontais */}
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {validation.errors.length > 0 && (
+                  <Badge variant="destructive" className="text-xs gap-1">
+                    <XCircle className="h-3 w-3" />
+                    {validation.errors.length} erros
+                  </Badge>
+                )}
+                {validation.warnings.length > 0 && (
+                  <Badge variant="outline" className="text-xs text-amber-600 border-amber-300 bg-amber-50 dark:bg-amber-950 gap-1">
+                    <AlertTriangle className="h-3 w-3" />
+                    {validation.warnings.length} avisos
+                  </Badge>
+                )}
+                {!parsedData.orderInfo.costCenter && (
+                  <Badge variant="outline" className="text-xs text-blue-600 border-blue-300 bg-blue-50 dark:bg-blue-950">
+                    Sem Centro Custo
+                  </Badge>
+                )}
+                {!parsedData.orderInfo.municipality && (
+                  <Badge variant="outline" className="text-xs text-blue-600 border-blue-300 bg-blue-50 dark:bg-blue-950">
+                    Sem Município
+                  </Badge>
+                )}
+                {!customerWhatsapp && (
+                  <Badge variant="outline" className="text-xs text-blue-600 border-blue-300 bg-blue-50 dark:bg-blue-950">
+                    Sem WhatsApp
+                  </Badge>
+                )}
+                {parsedData.items.some(item => !item.ncmCode) && (
+                  <Badge variant="outline" className="text-xs text-blue-600 border-blue-300 bg-blue-50 dark:bg-blue-950">
+                    {parsedData.items.filter(item => !item.ncmCode).length} sem NCM
+                  </Badge>
+                )}
+              </div>
+            </div>
+
+            {/* Conteúdo rolável */}
+            <div className="flex-1 overflow-y-auto min-h-0 space-y-3 pr-1">
+              {/* Preview dos dados - Layout 4 colunas */}
+              <div className="border rounded-lg p-3 bg-muted/30">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="font-semibold text-sm flex items-center gap-2">
+                    📦 Pedido {parsedData.orderInfo.orderNumber}
+                  </h3>
+                  {parsedData.orderInfo.businessArea && (
+                    <Badge className={`text-xs ${
+                      parsedData.orderInfo.businessArea === 'ssm' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300' :
+                      parsedData.orderInfo.businessArea === 'projetos' ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300' :
+                      parsedData.orderInfo.businessArea === 'filial' ? 'bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300' :
+                      parsedData.orderInfo.businessArea === 'ecommerce' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300' :
+                      'bg-muted text-muted-foreground'
+                    }`}>
+                      {parsedData.orderInfo.businessArea === 'ssm' ? '🔧 Manutenção' :
+                       parsedData.orderInfo.businessArea === 'projetos' ? '📐 Instalações' :
+                       parsedData.orderInfo.businessArea === 'filial' ? '🏢 Filial' :
+                       parsedData.orderInfo.businessArea === 'ecommerce' ? '🛒 E-commerce' :
+                       parsedData.orderInfo.businessArea}
+                    </Badge>
+                  )}
+                </div>
+                
+                {/* Grid 4 colunas compacto */}
+                <div className="grid grid-cols-4 gap-x-4 gap-y-1.5 text-xs">
+                  <div className="flex flex-col">
+                    <span className="text-muted-foreground">Cliente</span>
+                    <span className="font-medium truncate" title={parsedData.orderInfo.customerName}>
+                      {parsedData.orderInfo.customerName}
+                    </span>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-muted-foreground">Município</span>
+                    <span className="font-medium">{parsedData.orderInfo.municipality || '-'}</span>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-muted-foreground">Data Entrega</span>
+                    <span className="font-medium">{parsedData.orderInfo.deliveryDate}</span>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-muted-foreground">Data Embarque</span>
+                    <span className="font-medium">{parsedData.orderInfo.shippingDate || '-'}</span>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-muted-foreground">Transportadora</span>
+                    <span className="font-medium truncate" title={parsedData.orderInfo.carrier || '-'}>
+                      {parsedData.orderInfo.carrier || '-'}
+                    </span>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-muted-foreground">Tipo Frete</span>
+                    <span className="font-medium">{parsedData.orderInfo.freightType || '-'}</span>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-muted-foreground">Valor Frete</span>
+                    <span className="font-medium">R$ {parsedData.orderInfo.freightValue?.toFixed(2) || '0.00'}</span>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-muted-foreground">Total Itens</span>
+                    <span className="font-medium">{parsedData.items.length}</span>
+                  </div>
+                </div>
+                
+                {/* Seção RATEIO compacta */}
+                {(parsedData.orderInfo.costCenter || parsedData.orderInfo.accountItem || parsedData.orderInfo.businessUnit || parsedData.orderInfo.executiveName) && (
+                  <div className="mt-2 pt-2 border-t border-dashed">
+                    <div className="grid grid-cols-4 gap-x-4 gap-y-1.5 text-xs">
+                      {parsedData.orderInfo.executiveName && (
+                        <div className="flex flex-col">
+                          <span className="text-muted-foreground">Executivo</span>
+                          <span className="font-medium truncate">{parsedData.orderInfo.executiveName}</span>
+                        </div>
+                      )}
+                      {parsedData.orderInfo.costCenter && (
+                        <div className="flex flex-col">
+                          <span className="text-muted-foreground">Centro de Custo</span>
+                          <span className="font-medium truncate" title={parsedData.orderInfo.costCenter}>
+                            {parsedData.orderInfo.costCenter}
+                          </span>
+                        </div>
+                      )}
+                      {parsedData.orderInfo.accountItem && (
+                        <div className="flex flex-col">
+                          <span className="text-muted-foreground">Item Conta</span>
+                          <span className="font-medium truncate" title={parsedData.orderInfo.accountItem}>
+                            {parsedData.orderInfo.accountItem}
+                          </span>
+                        </div>
+                      )}
+                      {parsedData.orderInfo.businessUnit && (
+                        <div className="flex flex-col">
+                          <span className="text-muted-foreground">B.U.</span>
+                          <span className="font-medium">{parsedData.orderInfo.businessUnit}</span>
+                        </div>
+                      )}
+                    </div>
                     {rateioProject && (
-                      <div className="col-span-2 mt-2 p-2 bg-green-50 dark:bg-green-950/30 rounded border border-green-200 dark:border-green-800">
+                      <div className="mt-2 p-2 bg-green-50 dark:bg-green-950/30 rounded border border-green-200 dark:border-green-800 text-xs">
                         <div className="flex items-center gap-2">
-                          <Database className="h-4 w-4 text-green-600" />
-                          <strong className="text-green-700 dark:text-green-400">Projeto RATEIO:</strong>
-                          <span>{rateioProject.project_code} - {rateioProject.description}</span>
+                          <Database className="h-3.5 w-3.5 text-green-600" />
+                          <span className="text-green-700 dark:text-green-400">
+                            <strong>Projeto:</strong> {rateioProject.project_code} - {rateioProject.description}
+                          </span>
                         </div>
                       </div>
                     )}
                   </div>
-                </div>
-              )}
-              
-              {parsedData.orderInfo.notes && <div className="mt-2 pt-2 border-t text-sm">
-                  <strong>Observações:</strong> {parsedData.orderInfo.notes}
-                </div>}
+                )}
+                
+                {parsedData.orderInfo.notes && (
+                  <div className="mt-2 pt-2 border-t border-dashed text-xs">
+                    <span className="text-muted-foreground">Obs:</span> {parsedData.orderInfo.notes}
+                  </div>
+                )}
+              </div>
+
+              {/* Tabela de revisão e edição de itens */}
+              <OrderItemsReviewTable
+                items={parsedData.items.map(item => ({
+                  itemCode: item.itemCode,
+                  itemDescription: item.description,
+                  requestedQuantity: item.quantity,
+                  unit: item.unit,
+                  unitPrice: item.unitPrice || 0,
+                  totalValue: item.totalValue || 0,
+                  discount: item.discount || 0,
+                  warehouse: item.warehouse,
+                  deliveryDate: item.deliveryDate || parsedData.orderInfo.deliveryDate,
+                  ncmCode: item.ncmCode,
+                  materialType: (item as any).materialType
+                }))}
+                onChange={(updatedItems) => {
+                  setParsedData({
+                    ...parsedData,
+                    items: updatedItems.map((item, index) => ({
+                      ...parsedData.items[index],
+                      itemCode: item.itemCode,
+                      description: item.itemDescription,
+                      quantity: item.requestedQuantity,
+                      unit: item.unit,
+                      unitPrice: item.unitPrice,
+                      totalValue: item.totalValue,
+                      discount: item.discount,
+                      warehouse: item.warehouse,
+                      deliveryDate: item.deliveryDate
+                    }))
+                  });
+                }}
+              />
             </div>
 
-            {/* Tabela de revisão e edição de itens */}
-            <OrderItemsReviewTable
-              items={parsedData.items.map(item => ({
-                itemCode: item.itemCode,
-                itemDescription: item.description,
-                requestedQuantity: item.quantity,
-                unit: item.unit,
-                unitPrice: item.unitPrice || 0,
-                totalValue: item.totalValue || 0,
-                discount: item.discount || 0,
-                warehouse: item.warehouse,
-                deliveryDate: item.deliveryDate || parsedData.orderInfo.deliveryDate,
-                ncmCode: item.ncmCode,
-                materialType: (item as any).materialType
-              }))}
-              onChange={(updatedItems) => {
-                setParsedData({
-                  ...parsedData,
-                  items: updatedItems.map((item, index) => ({
-                    ...parsedData.items[index],
-                    itemCode: item.itemCode,
-                    description: item.itemDescription,
-                    quantity: item.requestedQuantity,
-                    unit: item.unit,
-                    unitPrice: item.unitPrice,
-                    totalValue: item.totalValue,
-                    discount: item.discount,
-                    warehouse: item.warehouse,
-                    deliveryDate: item.deliveryDate
-                  }))
-                });
-              }}
-            />
-
-            {/* Ações */}
-            <div className="flex items-center justify-end gap-2 pt-2">
-              <Button variant="outline" onClick={handleReset}>
+            {/* Footer fixo com ações */}
+            <div className="flex items-center justify-end gap-2 pt-3 border-t flex-shrink-0">
+              <Button variant="outline" onClick={handleReset} size="sm">
                 Cancelar
               </Button>
-              <Button onClick={handleImport} disabled={!validation.isValid || isProcessing || isChecking} className="gap-2">
+              <Button onClick={handleImport} disabled={!validation.isValid || isProcessing || isChecking} className="gap-2" size="sm">
                 <CheckCircle2 className="h-4 w-4" />
                 {isChecking ? "Verificando..." : "Importar Pedido"}
               </Button>
