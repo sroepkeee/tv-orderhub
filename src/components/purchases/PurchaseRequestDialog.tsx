@@ -16,6 +16,7 @@ import { ItemMetricsBadges } from "./ItemMetricsBadges";
 import { ItemMetricsEditDialog } from "./ItemMetricsEditDialog";
 import { BulkAllocationDialog } from "./BulkAllocationDialog";
 import { ItemPurchaseHistory, ItemConsumptionMetrics } from "@/types/purchases";
+import { supabase } from "@/integrations/supabase/client";
 
 interface PurchaseRequestDialogProps {
   open: boolean;
@@ -23,6 +24,13 @@ interface PurchaseRequestDialogProps {
   request?: PurchaseRequest;
   items?: EnrichedPurchaseItem[];
   onSave: (request: Partial<PurchaseRequest>, items: any[]) => Promise<void>;
+}
+
+interface OrderRateio {
+  business_unit?: string;
+  cost_center?: string;
+  account_item?: string;
+  warehouse?: string;
 }
 
 export function PurchaseRequestDialog({
@@ -48,6 +56,39 @@ export function PurchaseRequestDialog({
   const [metricsEditDialogOpen, setMetricsEditDialogOpen] = useState(false);
   const [selectedItemForMetrics, setSelectedItemForMetrics] = useState<EnrichedPurchaseItem | null>(null);
   const [saving, setSaving] = useState(false);
+  const [orderRateio, setOrderRateio] = useState<OrderRateio | null>(null);
+
+  // Buscar RATEIO do pedido original
+  useEffect(() => {
+    const fetchOrderRateio = async () => {
+      if (!open || initialItems.length === 0) {
+        setOrderRateio(null);
+        return;
+      }
+
+      // Buscar RATEIO do primeiro item que tenha order_item_id
+      const itemWithOrderId = initialItems.find(item => item.order_item_id);
+      if (itemWithOrderId?.order_item_id) {
+        const { data } = await supabase
+          .from('order_items')
+          .select('order_id, warehouse, orders(business_unit, cost_center, account_item)')
+          .eq('id', itemWithOrderId.order_item_id)
+          .single();
+
+        if (data?.orders) {
+          const orders = data.orders as any;
+          setOrderRateio({
+            business_unit: orders.business_unit,
+            cost_center: orders.cost_center,
+            account_item: orders.account_item,
+            warehouse: data.warehouse,
+          });
+        }
+      }
+    };
+
+    fetchOrderRateio();
+  }, [open, initialItems]);
 
   useEffect(() => {
     if (open) {
@@ -425,6 +466,7 @@ export function PurchaseRequestDialog({
           item={selectedItem}
           initialAllocations={selectedItem.cost_allocations}
           onSave={handleSaveAllocations}
+          defaultRateio={orderRateio || undefined}
         />
       )}
 
@@ -449,6 +491,7 @@ export function PurchaseRequestDialog({
         items={items}
         currentAllocations={costAllocations}
         onSave={handleSaveBulkAllocations}
+        defaultRateio={orderRateio || undefined}
       />
     </>
   );

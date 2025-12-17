@@ -12,12 +12,20 @@ import { Plus, Trash2, CheckCircle2, AlertCircle, XCircle, Settings } from "luci
 import { EnrichedPurchaseItem, ItemCostAllocation } from "@/types/purchases";
 import { BUSINESS_UNITS, COST_CENTERS } from "@/lib/senderOptions";
 
+interface DefaultRateio {
+  business_unit?: string;
+  cost_center?: string;
+  account_item?: string;
+  warehouse?: string;
+}
+
 interface BulkAllocationDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   items: EnrichedPurchaseItem[];
   currentAllocations: { [itemId: string]: ItemCostAllocation[] };
   onSave: (allocations: { [itemId: string]: ItemCostAllocation[] }) => void;
+  defaultRateio?: DefaultRateio;
 }
 
 interface AllocationForm extends Omit<ItemCostAllocation, 'id' | 'created_at' | 'purchase_request_item_id'> {}
@@ -27,7 +35,8 @@ export function BulkAllocationDialog({
   onOpenChange,
   items,
   currentAllocations,
-  onSave
+  onSave,
+  defaultRateio
 }: BulkAllocationDialogProps) {
   const [allocations, setAllocations] = useState<{ [itemId: string]: AllocationForm[] }>({});
   const [templateAllocation, setTemplateAllocation] = useState<AllocationForm[]>([]);
@@ -57,27 +66,27 @@ export function BulkAllocationDialog({
       });
       setAllocations(initialAllocations);
 
-      // Template padrão vazio
+      // Template padrão usando RATEIO do pedido se disponível
       setTemplateAllocation([{
-        business_unit: 'Autoatendimento',
-        accounting_item: '',
+        business_unit: defaultRateio?.business_unit || 'Autoatendimento',
+        accounting_item: defaultRateio?.account_item || '',
         project: '',
-        cost_center: '',
-        warehouse: '',
+        cost_center: defaultRateio?.cost_center || '',
+        warehouse: defaultRateio?.warehouse || '',
         allocation_percentage: 100,
         allocated_quantity: 0,
         allocated_value: 0,
         notes: ''
       }]);
     }
-  }, [open, items, currentAllocations]);
+  }, [open, items, currentAllocations, defaultRateio]);
 
   const createEmptyAllocation = (item: EnrichedPurchaseItem): AllocationForm => ({
-    business_unit: 'Autoatendimento',
-    accounting_item: '',
+    business_unit: defaultRateio?.business_unit || 'Autoatendimento',
+    accounting_item: defaultRateio?.account_item || '',
     project: '',
-    cost_center: '',
-    warehouse: '',
+    cost_center: defaultRateio?.cost_center || '',
+    warehouse: defaultRateio?.warehouse || item.warehouse || '',
     allocation_percentage: 100,
     allocated_quantity: item.requested_quantity,
     allocated_value: item.total_price || 0,
@@ -165,11 +174,11 @@ export function BulkAllocationDialog({
 
   const addTemplateAllocation = () => {
     setTemplateAllocation([...templateAllocation, {
-      business_unit: 'Autoatendimento',
-      accounting_item: '',
+      business_unit: defaultRateio?.business_unit || 'Autoatendimento',
+      accounting_item: defaultRateio?.account_item || '',
       project: '',
-      cost_center: '',
-      warehouse: '',
+      cost_center: defaultRateio?.cost_center || '',
+      warehouse: defaultRateio?.warehouse || '',
       allocation_percentage: 0,
       allocated_quantity: 0,
       allocated_value: 0,
