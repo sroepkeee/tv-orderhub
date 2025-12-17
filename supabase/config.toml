@@ -65,3 +65,6 @@ verify_jwt = true
 
 [functions.mega-api-send-media]
 verify_jwt = true
+
+[functions.notify-purchases]
+verify_jwt = true

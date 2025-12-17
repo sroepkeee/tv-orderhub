@@ -455,6 +455,69 @@ export const KanbanView = ({ orders, onEdit, onStatusChange, cardViewMode = "ful
       }
     };
     logActivity(); // Fire-and-forget
+
+    // 📧 PASSO 5: Notificar compras se movendo para fase de compras
+    if (targetPhase === 'purchases') {
+      const notifyPurchases = async () => {
+        try {
+          // Buscar itens do pedido que precisam de compra
+          const { data: orderItems } = await supabase
+            .from('order_items')
+            .select('item_code, item_description, requested_quantity, unit, warehouse, item_status')
+            .eq('order_id', orderId);
+
+          // Filtrar apenas itens marcados para compra (purchase_required ou out_of_stock)
+          const purchaseItems = (orderItems || []).filter(item => 
+            item.item_status === 'purchase_required' || 
+            item.item_status === 'purchase_requested' ||
+            item.item_status === 'out_of_stock'
+          );
+
+          if (purchaseItems.length > 0) {
+            const { data: { user: currentUser } } = await supabase.auth.getUser();
+            const { data: profile } = await supabase
+              .from('profiles')
+              .select('full_name')
+              .eq('id', currentUser?.id)
+              .single();
+
+            const payload = {
+              orderId: orderId,
+              orderNumber: order.orderNumber,
+              customerName: order.client,
+              deliveryDate: order.deliveryDeadline,
+              items: purchaseItems.map(item => ({
+                itemCode: item.item_code,
+                itemDescription: item.item_description,
+                requestedQuantity: item.requested_quantity,
+                unit: item.unit,
+                warehouse: item.warehouse
+              })),
+              movedBy: profile?.full_name || currentUser?.email || 'Sistema'
+            };
+
+            const { error } = await supabase.functions.invoke('notify-purchases', {
+              body: payload
+            });
+
+            if (error) {
+              console.error('❌ Erro ao notificar compras:', error);
+            } else {
+              console.log('✅ [notify-purchases] E-mail enviado para compras@imply.com');
+              toast({
+                title: "📧 Compras notificado",
+                description: `E-mail enviado com ${purchaseItems.length} itens para compra`,
+              });
+            }
+          } else {
+            console.log('ℹ️ Nenhum item marcado para compra neste pedido');
+          }
+        } catch (error) {
+          console.error('⚠️ Erro ao notificar compras:', error);
+        }
+      };
+      notifyPurchases(); // Fire-and-forget
+    }
   };
 
   const handleDragCancel = () => {
