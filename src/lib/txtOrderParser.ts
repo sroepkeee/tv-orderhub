@@ -11,6 +11,7 @@ const materialTypeMapping: Record<string, string> = {
   'MC': 'purchase_required', // Material Consumo
   'PI': 'production',      // Produto Intermediário
   'BN': 'in_stock',        // Beneficiamento
+  'PP': 'production',      // Produto em Processo
 };
 
 /**
@@ -339,13 +340,26 @@ export async function parseTxtOrder(file: File): Promise<ParsedOrderData & { cus
       const allRateioText = parts.slice(1).join(';');
       console.log('   📋 Rateio completo:', allRateioText.substring(0, 100));
       
-      // Extrair Centro de Custo e Item Conta com funções dedicadas
-      orderInfo.costCenter = extractCostCenter(allRateioText);
-      orderInfo.accountItem = extractAccountItem(allRateioText);
-      orderInfo.businessArea = deriveBusinessArea(orderInfo.costCenter);
+      // Formato especial: Rateio;NAO SE APLICA - DESPESA;;INDUSTRIAL;
+      const firstField = (parts[1] || '').trim();
+      const thirdField = (parts[3] || '').trim();
       
-      console.log('   ✅ Centro Custo:', orderInfo.costCenter || '⚠️ NÃO ENCONTRADO');
-      console.log('   ✅ Item Conta:', orderInfo.accountItem || '⚠️ NÃO ENCONTRADO');
+      if (firstField.includes('NAO SE APLICA') || firstField === '-') {
+        // Caso especial: sem centro de custo, BU no terceiro campo
+        orderInfo.businessUnit = thirdField || '';
+        orderInfo.costCenter = '';
+        orderInfo.accountItem = '';
+        console.log('   ⚠️ RATEIO especial (NAO SE APLICA)');
+        console.log('   ✅ Business Unit:', orderInfo.businessUnit);
+      } else {
+        // Extrair Centro de Custo e Item Conta com funções dedicadas
+        orderInfo.costCenter = extractCostCenter(allRateioText);
+        orderInfo.accountItem = extractAccountItem(allRateioText);
+        console.log('   ✅ Centro Custo:', orderInfo.costCenter || '⚠️ NÃO ENCONTRADO');
+        console.log('   ✅ Item Conta:', orderInfo.accountItem || '⚠️ NÃO ENCONTRADO');
+      }
+      
+      orderInfo.businessArea = deriveBusinessArea(orderInfo.costCenter);
       console.log('   ✅ Área Negócio:', orderInfo.businessArea);
     }
     
