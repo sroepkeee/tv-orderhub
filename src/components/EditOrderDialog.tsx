@@ -1679,6 +1679,12 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
       // 14. Excluir mudanças de data
       await supabase.from('delivery_date_changes').delete().eq('order_id', order.id);
 
+      // 14.5. Limpar referência last_order_id em customer_contacts
+      await supabase
+        .from('customer_contacts')
+        .update({ last_order_id: null })
+        .eq('last_order_id', order.id);
+
       // 15. Finalmente, excluir o pedido
       const {
         error: orderError
