@@ -2343,12 +2343,19 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                                 />
                               </TableCell>
                               <TableCell>
-                                <Input 
-                                  value={item.itemDescription} 
-                                  onChange={e => updateItem(index, "itemDescription", e.target.value)} 
-                                  placeholder="Descrição" 
-                                  className="h-8 text-sm bg-background/80 dark:bg-muted/40" 
-                                />
+                                <div className="flex flex-col gap-1">
+                                  <Input 
+                                    value={item.itemDescription} 
+                                    onChange={e => updateItem(index, "itemDescription", e.target.value)} 
+                                    placeholder="Descrição" 
+                                    className="h-8 text-sm bg-background/80 dark:bg-muted/40" 
+                                  />
+                                  {(item as any).ncm_code && (
+                                    <span className="text-xs text-muted-foreground font-mono">
+                                      NCM: {(item as any).ncm_code}
+                                    </span>
+                                  )}
+                                </div>
                               </TableCell>
                               <TableCell>
                                 <Input 

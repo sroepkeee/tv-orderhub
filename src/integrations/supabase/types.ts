@@ -1608,6 +1608,7 @@ export type Database = {
           item_description: string
           item_source_type: string | null
           item_status: string | null
+          ncm_code: string | null
           order_id: string
           phase_started_at: string | null
           production_estimated_date: string | null
@@ -1641,6 +1642,7 @@ export type Database = {
           item_description: string
           item_source_type?: string | null
           item_status?: string | null
+          ncm_code?: string | null
           order_id: string
           phase_started_at?: string | null
           production_estimated_date?: string | null
@@ -1674,6 +1676,7 @@ export type Database = {
           item_description?: string
           item_source_type?: string | null
           item_status?: string | null
+          ncm_code?: string | null
           order_id?: string
           phase_started_at?: string | null
           production_estimated_date?: string | null
