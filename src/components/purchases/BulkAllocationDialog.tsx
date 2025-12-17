@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { Plus, Trash2, CheckCircle2, AlertCircle, XCircle, Settings } from "lucide-react";
 import { EnrichedPurchaseItem, ItemCostAllocation } from "@/types/purchases";
+import { BUSINESS_UNITS, COST_CENTERS } from "@/lib/senderOptions";
 
 interface BulkAllocationDialogProps {
   open: boolean;
@@ -364,16 +365,15 @@ export function BulkAllocationDialog({
                     <Label className="text-xs">B.U *</Label>
                     <Select
                       value={alloc.business_unit}
-                      onValueChange={(value) => updateTemplateAllocation(index, 'business_unit', value as AllocationForm['business_unit'])}
+                      onValueChange={(value) => updateTemplateAllocation(index, 'business_unit', value)}
                     >
                       <SelectTrigger className="h-9">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="Autoatendimento">Autoatendimento</SelectItem>
-                        <SelectItem value="Bowling">Bowling</SelectItem>
-                        <SelectItem value="Painéis">Painéis</SelectItem>
-                        <SelectItem value="Controle de Acessos">Controle de Acessos</SelectItem>
+                        {BUSINESS_UNITS.map(bu => (
+                          <SelectItem key={bu} value={bu}>{bu}</SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>
@@ -400,12 +400,19 @@ export function BulkAllocationDialog({
 
                   <div>
                     <Label className="text-xs">C.C *</Label>
-                    <Input
+                    <Select
                       value={alloc.cost_center}
-                      onChange={(e) => updateTemplateAllocation(index, 'cost_center', e.target.value)}
-                      className="h-9"
-                      placeholder="Ex: CC-001"
-                    />
+                      onValueChange={(value) => updateTemplateAllocation(index, 'cost_center', value)}
+                    >
+                      <SelectTrigger className="h-9">
+                        <SelectValue placeholder="Selecione..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {COST_CENTERS.map(cc => (
+                          <SelectItem key={cc.code} value={cc.name}>{cc.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
 
                   <div>
@@ -498,16 +505,15 @@ export function BulkAllocationDialog({
                                 <Label className="text-xs">B.U *</Label>
                                 <Select
                                   value={alloc.business_unit}
-                                  onValueChange={(value) => updateItemAllocation(item.id, index, 'business_unit', value as AllocationForm['business_unit'], item)}
+                                  onValueChange={(value) => updateItemAllocation(item.id, index, 'business_unit', value, item)}
                                 >
                                   <SelectTrigger className="h-9">
                                     <SelectValue />
                                   </SelectTrigger>
                                   <SelectContent>
-                                    <SelectItem value="Autoatendimento">Autoatendimento</SelectItem>
-                                    <SelectItem value="Bowling">Bowling</SelectItem>
-                                    <SelectItem value="Painéis">Painéis</SelectItem>
-                                    <SelectItem value="Controle de Acessos">Controle de Acessos</SelectItem>
+                                    {BUSINESS_UNITS.map(bu => (
+                                      <SelectItem key={bu} value={bu}>{bu}</SelectItem>
+                                    ))}
                                   </SelectContent>
                                 </Select>
                               </div>
@@ -532,11 +538,19 @@ export function BulkAllocationDialog({
 
                               <div>
                                 <Label className="text-xs">C.C *</Label>
-                                <Input
+                                <Select
                                   value={alloc.cost_center}
-                                  onChange={(e) => updateItemAllocation(item.id, index, 'cost_center', e.target.value, item)}
-                                  className="h-9"
-                                />
+                                  onValueChange={(value) => updateItemAllocation(item.id, index, 'cost_center', value, item)}
+                                >
+                                  <SelectTrigger className="h-9">
+                                    <SelectValue placeholder="Selecione..." />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {COST_CENTERS.map(cc => (
+                                      <SelectItem key={cc.code} value={cc.name}>{cc.name}</SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
                               </div>
 
                               <div>

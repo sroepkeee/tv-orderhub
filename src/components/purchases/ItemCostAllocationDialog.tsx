@@ -9,6 +9,7 @@ import { Slider } from "@/components/ui/slider";
 import { toast } from "sonner";
 import { Plus, Trash2 } from "lucide-react";
 import { ItemCostAllocation, PurchaseRequestItem } from "@/types/purchases";
+import { BUSINESS_UNITS, COST_CENTERS } from "@/lib/senderOptions";
 
 interface ItemCostAllocationDialogProps {
   open: boolean;
@@ -178,16 +179,15 @@ export function ItemCostAllocationDialog({
                   <Label>B.U (Business Unit) *</Label>
                   <Select
                     value={allocation.business_unit}
-                    onValueChange={(value) => updateAllocation(index, 'business_unit', value as AllocationForm['business_unit'])}
+                    onValueChange={(value) => updateAllocation(index, 'business_unit', value)}
                   >
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="Autoatendimento">Autoatendimento</SelectItem>
-                      <SelectItem value="Bowling">Bowling</SelectItem>
-                      <SelectItem value="Painéis">Painéis</SelectItem>
-                      <SelectItem value="Controle de Acessos">Controle de Acessos</SelectItem>
+                      {BUSINESS_UNITS.map(bu => (
+                        <SelectItem key={bu} value={bu}>{bu}</SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -212,11 +212,19 @@ export function ItemCostAllocationDialog({
 
                 <div>
                   <Label>Centro de Custo *</Label>
-                  <Input
+                  <Select
                     value={allocation.cost_center}
-                    onChange={(e) => updateAllocation(index, 'cost_center', e.target.value)}
-                    placeholder="Ex: CC-001"
-                  />
+                    onValueChange={(value) => updateAllocation(index, 'cost_center', value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {COST_CENTERS.map(cc => (
+                        <SelectItem key={cc.code} value={cc.name}>{cc.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div>

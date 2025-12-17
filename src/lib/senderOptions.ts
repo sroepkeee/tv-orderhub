@@ -14,6 +14,15 @@ export interface SenderOption {
   defaultBusinessArea: string;
 }
 
+export const BUSINESS_UNITS = [
+  'Autoatendimento',
+  'Bowling',
+  'Eleventickets',
+  'Painéis'
+] as const;
+
+export type BusinessUnit = typeof BUSINESS_UNITS[number];
+
 export const SENDER_OPTIONS: SenderOption[] = [
   {
     id: '0101',
