@@ -5,11 +5,11 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { parseExcelOrder, ParsedOrderData } from "@/lib/excelParser";
-import { parsePdfOrder } from "@/lib/pdfParser";
-import { validateOrder, validatePdfOrder, ValidationResult } from "@/lib/orderValidator";
+import { parseTxtOrder } from "@/lib/txtOrderParser";
+import { validateOrder, ValidationResult } from "@/lib/orderValidator";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Upload, FileSpreadsheet, CheckCircle2, XCircle, AlertTriangle, Download, Database } from "lucide-react";
+import { Upload, FileSpreadsheet, CheckCircle2, XCircle, AlertTriangle, Download, Database, FileText } from "lucide-react";
 import { cleanItemDescription } from "@/lib/utils";
 import { useDuplicateOrderCheck } from "@/hooks/useDuplicateOrderCheck";
 import { DuplicateOrderWarningDialog } from "@/components/DuplicateOrderWarningDialog";
@@ -40,12 +40,8 @@ export const ImportOrderDialog = ({
   const { checkDuplicate, isChecking } = useDuplicateOrderCheck();
   const [rateioProject, setRateioProject] = useState<RateioProject | null>(null);
   
-  // Estados para progresso de parsing de PDF
-  const [isParsing, setIsParsing] = useState(false);
-  const [parseProgress, setParseProgress] = useState(0);
-  const [parseStatus, setParseStatus] = useState('');
-  const [canAnalyzeComplete, setCanAnalyzeComplete] = useState(false);
-  const [abortController, setAbortController] = useState<AbortController | null>(null);
+  // Estado para WhatsApp do cliente extraído do TXT
+  const [customerWhatsapp, setCustomerWhatsapp] = useState<string | undefined>();
   
   // Estado para diálogo de WhatsApp do cliente
   const [whatsAppDialogData, setWhatsAppDialogData] = useState<{
@@ -57,9 +53,9 @@ export const ImportOrderDialog = ({
     const selectedFile = e.target.files?.[0];
     if (!selectedFile) return;
 
-    // Validar tipo de arquivo
-    if (!selectedFile.name.match(/\.(xlsx|xls|pdf)$/i)) {
-      toast.error("Formato inválido. Use .xlsx, .xls ou .pdf");
+    // Validar tipo de arquivo (TXT, CSV ou Excel)
+    if (!selectedFile.name.match(/\.(xlsx|xls|txt|csv)$/i)) {
+      toast.error("Formato inválido. Use .txt, .csv, .xlsx ou .xls");
       return;
     }
 
@@ -69,112 +65,55 @@ export const ImportOrderDialog = ({
       return;
     }
     setFile(selectedFile);
+    setCustomerWhatsapp(undefined);
+    setRateioProject(null);
     
     try {
       const fileExtension = selectedFile.name.split('.').pop()?.toLowerCase();
+      setIsProcessing(true);
       
-      if (fileExtension === 'pdf') {
-        // Parsing de PDF com progresso
-        await handlePdfParsing(selectedFile);
-      } else {
-        // Parse do Excel (mantém como está)
-        setIsProcessing(true);
-        const parsed = await parseExcelOrder(selectedFile);
-        setParsedData(parsed);
-        const validationResult = validateOrder(parsed);
-        setValidation(validationResult);
-        setStep('preview');
+      let parsed: ParsedOrderData;
+      
+      if (fileExtension === 'txt' || fileExtension === 'csv') {
+        // Parse do TXT/CSV do TOTVS
+        const txtResult = await parseTxtOrder(selectedFile);
+        parsed = txtResult;
         
-        if (validationResult.isValid) {
-          toast.success("Arquivo processado com sucesso!");
-        } else {
-          toast.warning("Arquivo processado, mas há erros a corrigir");
+        // Salvar WhatsApp do cliente se disponível
+        if (txtResult.customerWhatsapp) {
+          setCustomerWhatsapp(txtResult.customerWhatsapp);
         }
-        setIsProcessing(false);
+        
+        // Enriquecer com dados do projeto RATEIO
+        const enrichedData = await enrichWithRateioProject(parsed);
+        if ((enrichedData as any).rateioProject) {
+          setRateioProject((enrichedData as any).rateioProject);
+          toast.success(`Projeto RATEIO encontrado: ${(enrichedData as any).rateioProject.description}`);
+        }
+        parsed = enrichedData;
+      } else {
+        // Parse do Excel
+        parsed = await parseExcelOrder(selectedFile);
+      }
+      
+      setParsedData(parsed);
+      const validationResult = validateOrder(parsed);
+      setValidation(validationResult);
+      setStep('preview');
+      
+      if (validationResult.isValid) {
+        toast.success("Arquivo processado com sucesso!");
+      } else {
+        toast.warning("Arquivo processado, mas há erros a corrigir");
       }
     } catch (error: any) {
       toast.error(`Erro ao processar arquivo: ${error.message}`);
       setFile(null);
+    } finally {
       setIsProcessing(false);
     }
   };
 
-  const handlePdfParsing = async (file: File, analyzeComplete = false) => {
-    setIsParsing(true);
-    setParseProgress(0);
-    setParseStatus('Iniciando leitura do PDF...');
-    setCanAnalyzeComplete(false);
-    setRateioProject(null);
-
-    const controller = new AbortController();
-    setAbortController(controller);
-    
-    try {
-      const data = await parsePdfOrder(file, {
-        maxPages: analyzeComplete ? undefined : 50,
-        earlyStop: !analyzeComplete,
-        signal: controller.signal,
-        onProgress: (page: number, total: number) => {
-          setParseProgress(Math.round((page / total) * 100));
-          setParseStatus(`Lendo página ${page}/${total}...`);
-        },
-      });
-      
-      // Enriquecer com dados do projeto RATEIO
-      setParseStatus('Buscando projeto RATEIO...');
-      const enrichedData = await enrichWithRateioProject(data);
-      
-      if ((enrichedData as any).rateioProject) {
-        setRateioProject((enrichedData as any).rateioProject);
-        toast.success(`Projeto RATEIO encontrado: ${(enrichedData as any).rateioProject.description}`);
-      }
-      
-      setParsedData(enrichedData);
-      const validation = validatePdfOrder(enrichedData);
-      setValidation(validation);
-      
-      // Aviso se parece ter itens faltando
-      const quality = (enrichedData as any).quality;
-      if (quality?.expectedCount && quality.expectedCount > quality.itemsCount) {
-        toast.warning(
-          `Foram encontrados ${quality.itemsCount} itens, mas o PDF indica cerca de ${quality.expectedCount}. ` +
-          `Revise o pedido importado, pode haver itens faltando.`
-        );
-      }
-      
-      if (!analyzeComplete && enrichedData.items.length === 0) {
-        setCanAnalyzeComplete(true);
-        toast.warning('Nenhum item encontrado nas primeiras páginas. Deseja analisar o PDF completo?');
-      }
-      
-      setStep('preview');
-    } catch (error: any) {
-      if (error.name === 'AbortError') {
-        toast.info('Leitura cancelada');
-      } else {
-        console.error('Erro ao processar PDF:', error);
-        toast.error(`Erro ao processar PDF: ${error.message}`);
-      }
-    } finally {
-      setIsParsing(false);
-      setAbortController(null);
-    }
-  };
-
-  const handleCancelParsing = () => {
-    if (abortController) {
-      abortController.abort();
-    }
-    setIsParsing(false);
-    setParseProgress(0);
-    setParseStatus('');
-  };
-
-  const handleAnalyzeComplete = () => {
-    if (file) {
-      handlePdfParsing(file, true);
-    }
-  };
   const handleImport = async () => {
     if (!parsedData || !validation?.isValid) return;
 
@@ -260,7 +199,8 @@ export const ImportOrderDialog = ({
         account_item: data.orderInfo.accountItem || null,
         business_unit: data.orderInfo.businessUnit || null,
         business_area: data.orderInfo.businessArea || 'ssm',
-        rateio_project_code: (data.orderInfo as any).rateioProjectCode || null
+        rateio_project_code: (data.orderInfo as any).rateioProjectCode || null,
+        customer_whatsapp: customerWhatsapp || (data.orderInfo as any).customerWhatsapp || null
       }).select().single();
       if (orderError) throw orderError;
       
@@ -523,20 +463,12 @@ export const ImportOrderDialog = ({
     }));
   };
   const handleReset = () => {
-    // Cancelar parsing se estiver rodando
-    if (abortController) {
-      abortController.abort();
-    }
-    
     setFile(null);
     setParsedData(null);
     setValidation(null);
     setIsProcessing(false);
-    setIsParsing(false);
-    setParseProgress(0);
-    setParseStatus('');
-    setCanAnalyzeComplete(false);
-    setAbortController(null);
+    setCustomerWhatsapp(undefined);
+    setRateioProject(null);
     setStep('upload');
   };
   return <Dialog open={open} onOpenChange={onOpenChange}>
@@ -553,59 +485,31 @@ export const ImportOrderDialog = ({
             <div className="border-2 border-dashed rounded-lg p-8 text-center">
               <Upload className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
               <h3 className="text-lg font-medium mb-2">
-                Selecione um arquivo Excel ou PDF
+                Selecione um arquivo TXT, CSV ou Excel
               </h3>
               <p className="text-sm text-muted-foreground mb-4">
-                <strong>PDF:</strong> Pedido exportado do TOTVS (recomendado)<br />
+                <strong>TXT/CSV:</strong> Arquivo exportado do TOTVS (recomendado)<br />
                 <strong>Excel:</strong> Arquivo com abas "PEDIDO" e "ITENS"
               </p>
               <Input 
                 type="file" 
-                accept=".xlsx,.xls,.pdf" 
+                accept=".xlsx,.xls,.txt,.csv" 
                 onChange={handleFileSelect} 
                 className="max-w-xs mx-auto" 
-                disabled={isProcessing || isParsing} 
+                disabled={isProcessing} 
               />
               
               <div className="mt-4 p-3 bg-muted rounded-md text-xs text-left max-w-md mx-auto">
-                <p className="font-medium mb-1">💡 Dica para PDFs:</p>
+                <p className="font-medium mb-1 flex items-center gap-1">
+                  <FileText className="h-3 w-3" /> Formato TXT do TOTVS:
+                </p>
                 <p className="text-muted-foreground">
-                  Exporte direto do TOTVS usando "Imprimir → Salvar como PDF" para melhor qualidade
+                  Linhas prefixadas: Cabecalho, Informacoes Gerais, Rateio, ITEM, Transporte, Entrega
                 </p>
               </div>
             </div>
 
-            {isParsing && (
-              <div className="space-y-4 py-4">
-                <div className="text-center">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-3"></div>
-                  <p className="font-medium mb-1">Lendo PDF...</p>
-                  <p className="text-sm text-muted-foreground">{parseStatus}</p>
-                </div>
-                
-                <div className="space-y-2">
-                  <div className="w-full bg-muted rounded-full h-2">
-                    <div 
-                      className="bg-primary h-2 rounded-full transition-all" 
-                      style={{ width: `${parseProgress}%` }}
-                    />
-                  </div>
-                  <p className="text-xs text-center text-muted-foreground">{parseProgress}%</p>
-                </div>
-
-                <div className="flex justify-center">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleCancelParsing}
-                  >
-                    Cancelar Leitura
-                  </Button>
-                </div>
-              </div>
-            )}
-
-            {isProcessing && !isParsing && (
+            {isProcessing && (
               <div className="flex items-center justify-center py-8">
                 <div className="text-center">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-2"></div>
@@ -621,71 +525,14 @@ export const ImportOrderDialog = ({
               <CheckCircle2 className="h-5 w-5 text-green-600" />
               <span className="font-medium">Arquivo: {file?.name}</span>
               {file && <span className="px-2 py-1 rounded text-xs font-medium bg-primary/10 text-primary">
-                  {file.name.endsWith('.pdf') ? '📄 PDF TOTVS' : '📊 Excel'}
+                  {file.name.match(/\.(txt|csv)$/i) ? '📄 TXT TOTVS' : '📊 Excel'}
                 </span>}
+              {customerWhatsapp && (
+                <Badge variant="outline" className="text-green-600 border-green-300">
+                  📱 WhatsApp: {customerWhatsapp}
+                </Badge>
+              )}
             </div>
-            
-            {/* Qualidade da Extração (apenas para PDF) */}
-            {file?.name.endsWith('.pdf') && (parsedData as any).quality && <Alert>
-                <AlertDescription>
-                  <div className="flex items-center gap-2">
-                    <span className="text-lg">📊</span>
-                    <div className="flex-1">
-                      <strong>Qualidade da Extração:</strong>
-                      <div className="text-sm mt-2 space-y-1">
-                        <div className="flex items-center gap-2">
-                          {(parsedData as any).quality.orderNumber ? '✅' : '⚠️'}
-                          <span>Pedido: {parsedData.orderInfo.orderNumber || 'Não identificado'}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {(parsedData as any).quality.customerName ? '✅' : '⚠️'}
-                          <span>Cliente: {parsedData.orderInfo.customerName || 'Não identificado'}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {(parsedData as any).quality.itemsCount > 0 ? '✅' : '⚠️'}
-                          <span>Itens: {(parsedData as any).quality.itemsCount} encontrados</span>
-                        </div>
-                        {(parsedData as any).quality.expectedCount > 0 && (
-                          <div className="flex items-center gap-2">
-                            <span className="text-muted-foreground">
-                              Linhas detectadas: {(parsedData as any).quality.markdownRowsCount || (parsedData as any).quality.expectedCount}
-                            </span>
-                          </div>
-                        )}
-                        {(parsedData as any).quality.detectedItemNumbers && (parsedData as any).quality.detectedItemNumbers.length > 0 && (
-                          <div className="text-xs text-muted-foreground pt-1">
-                            <div>Números de item: {(parsedData as any).quality.detectedItemNumbers.join(', ')}</div>
-                          </div>
-                        )}
-                        {(parsedData as any).quality.expectedCount > 0 && (
-                          <div className="flex items-center gap-2 pt-1">
-                            <span className="text-xs">
-                              Cobertura: {(parsedData as any).quality.itemsCount}/{(parsedData as any).quality.expectedCount} (
-                              {Math.round(((parsedData as any).quality.itemsCount / (parsedData as any).quality.expectedCount) * 100)}%)
-                            </span>
-                          </div>
-                        )}
-                        <div className="flex items-center gap-2">
-                          {(parsedData as any).quality.itemsWithPrice === (parsedData as any).quality.itemsCount ? '✅' : '⚠️'}
-                          <span>Valores: {(parsedData as any).quality.itemsWithPrice}/{(parsedData as any).quality.itemsCount} itens com preço</span>
-                        </div>
-                        <div className="mt-2 pt-2 border-t">
-                          <div className="flex items-center gap-2">
-                            <div className="flex-1 bg-muted rounded-full h-2">
-                              <div className="bg-primary h-2 rounded-full transition-all" style={{
-                          width: `${(parsedData as any).quality.extractedFields / (parsedData as any).quality.totalFields * 100}%`
-                        }} />
-                            </div>
-                            <span className="text-sm font-medium">
-                              {Math.round((parsedData as any).quality.extractedFields / (parsedData as any).quality.totalFields * 100)}%
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </AlertDescription>
-              </Alert>}
             
             {/* Erros */}
             {validation.errors.length > 0 && <Alert variant="destructive">
@@ -813,28 +660,14 @@ export const ImportOrderDialog = ({
             />
 
             {/* Ações */}
-            <div className="flex items-center gap-2 justify-between pt-2">
-              <div>
-                {canAnalyzeComplete && (
-                  <Button 
-                    onClick={handleAnalyzeComplete}
-                    variant="secondary"
-                    size="sm"
-                  >
-                    📄 Analisar PDF Completo
-                  </Button>
-                )}
-              </div>
-              
-              <div className="flex gap-2">
-                <Button variant="outline" onClick={handleReset}>
-                  Cancelar
-                </Button>
-                <Button onClick={handleImport} disabled={!validation.isValid || isProcessing || isChecking} className="gap-2">
-                  <CheckCircle2 className="h-4 w-4" />
-                  {isChecking ? "Verificando..." : "Importar Pedido"}
-                </Button>
-              </div>
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <Button variant="outline" onClick={handleReset}>
+                Cancelar
+              </Button>
+              <Button onClick={handleImport} disabled={!validation.isValid || isProcessing || isChecking} className="gap-2">
+                <CheckCircle2 className="h-4 w-4" />
+                {isChecking ? "Verificando..." : "Importar Pedido"}
+              </Button>
             </div>
           </div>}
 
