@@ -93,6 +93,47 @@ export const usePurchaseRequests = () => {
     }
   };
 
+  const sendPurchaseNotification = async (
+    requestId: string,
+    items: any[],
+    requestData: Partial<PurchaseRequest>
+  ) => {
+    try {
+      const { data: user } = await supabase.auth.getUser();
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('full_name')
+        .eq('id', user.user?.id)
+        .single();
+
+      const payload = {
+        purchaseRequestId: requestId,
+        orderNumber: requestData.purchase_order_number || 'N/A',
+        customerName: requestData.company || 'Solicitação de Compra',
+        deliveryDate: requestData.expected_delivery_date || new Date().toISOString(),
+        items: items.map(item => ({
+          itemCode: item.item_code,
+          itemDescription: item.item_description,
+          requestedQuantity: item.requested_quantity,
+          unit: item.unit,
+          warehouse: item.warehouse
+        })),
+        movedBy: profile?.full_name || 'Sistema',
+        notes: requestData.notes
+      };
+
+      const { data, error } = await supabase.functions.invoke('notify-purchases', {
+        body: payload
+      });
+
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error('Error sending notification:', error);
+      throw error;
+    }
+  };
+
   const createAutomaticRequest = async () => {
     try {
       const { data: user } = await supabase.auth.getUser();
@@ -279,15 +320,20 @@ export const usePurchaseRequests = () => {
   const saveRequest = async (
     requestData: Partial<PurchaseRequest>,
     items: any[],
-    costAllocations: { [itemId: string]: any[] }
+    costAllocations: { [itemId: string]: any[] },
+    sendNotification: boolean = false
   ) => {
     try {
       const { data: user } = await supabase.auth.getUser();
       if (!user.user) throw new Error('Usuário não autenticado');
 
+      let requestId = requestData.id;
+      let purchaseOrderNumber = requestData.purchase_order_number;
+
       // Se não tem ID, criar nova solicitação
-      if (!requestData.id) {
+      if (!requestId) {
         const { data: ocNumber } = await supabase.rpc('generate_purchase_order_number');
+        purchaseOrderNumber = ocNumber;
         
         const { data: request, error: requestError } = await supabase
           .from('purchase_requests')
@@ -305,6 +351,7 @@ export const usePurchaseRequests = () => {
           .single();
 
         if (requestError) throw requestError;
+        requestId = request.id;
 
         // Criar itens
         const requestItems = items.map(item => ({
@@ -361,16 +408,59 @@ export const usePurchaseRequests = () => {
             expected_delivery_date: requestData.expected_delivery_date,
             total_estimated_value: requestData.total_estimated_value,
           })
-          .eq('id', requestData.id);
+          .eq('id', requestId);
 
         if (updateError) throw updateError;
       }
 
+      // Se status é 'pending' (enviando para aprovação), enviar notificação
+      if (sendNotification && requestData.status === 'pending' && requestId) {
+        try {
+          await sendPurchaseNotification(requestId, items, {
+            ...requestData,
+            purchase_order_number: purchaseOrderNumber
+          });
+          toast.success('📧 E-mail enviado para Compras e SSM!');
+        } catch (notifyError) {
+          console.error('Error sending notification:', notifyError);
+          toast.warning('Solicitação salva, mas erro ao enviar e-mail');
+        }
+      }
+
       await loadRequests();
       await loadMetrics();
+      return requestId;
     } catch (error) {
       console.error('Error saving request:', error);
       throw error;
+    }
+  };
+
+  const resendNotification = async (requestId: string) => {
+    try {
+      // Buscar dados da solicitação e itens
+      const { data: request, error: requestError } = await supabase
+        .from('purchase_requests')
+        .select('*')
+        .eq('id', requestId)
+        .single();
+
+      if (requestError) throw requestError;
+
+      const { data: items, error: itemsError } = await supabase
+        .from('purchase_request_items')
+        .select('*')
+        .eq('purchase_request_id', requestId);
+
+      if (itemsError) throw itemsError;
+
+      await sendPurchaseNotification(requestId, items || [], request as Partial<PurchaseRequest>);
+      
+      toast.success('📧 E-mail reenviado com sucesso!');
+      await loadRequests();
+    } catch (error) {
+      console.error('Error resending notification:', error);
+      toast.error('Erro ao reenviar notificação');
     }
   };
 
@@ -429,6 +519,7 @@ export const usePurchaseRequests = () => {
     saveRequest,
     loadRequestItems,
     saveCostAllocations,
+    resendNotification,
     refreshRequests: loadRequests,
     refreshMetrics: loadMetrics,
   };
