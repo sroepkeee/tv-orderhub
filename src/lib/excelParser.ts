@@ -38,6 +38,7 @@ export interface ParsedOrderData {
     ipiPercent?: number;
     icmsPercent?: number;
     ncmCode?: string;
+    materialType?: string; // PA, ME, MP, MC, PI, BN
   }>;
 }
 

@@ -41,6 +41,7 @@ export interface OrderItem {
   purchase_action_started_by?: string;
   production_order_number?: string;
   ncm_code?: string;
+  material_type?: string; // PA, ME, MP, MC, PI, BN - Tipo de material do TOTVS
 }
 
 interface OrderFormData {
