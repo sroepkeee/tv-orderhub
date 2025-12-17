@@ -44,6 +44,21 @@ export const SENDER_OPTIONS: SenderOption[] = [
     fax: '(51) 2106-8001',
     email: 'nfe@imply.com',
     defaultBusinessArea: 'ssm'
+  },
+  {
+    id: 'imply_sp',
+    name: 'IMPLY SÃO PAULO',
+    shortName: 'IMPLY SP',
+    cnpj: '05.681.400/0001-23',
+    ie: '',
+    address: 'Av. Vereador Abel Ferreira, 1844 - Sala 1103, Edifício Anália Business Center, Anália Franco, São Paulo/SP, CEP 03340-000',
+    cep: '03340-000',
+    city: 'São Paulo',
+    state: 'SP',
+    phone: '(51) 2106-8000',
+    fax: '(51) 2106-8001',
+    email: 'imply@imply.com',
+    defaultBusinessArea: 'filial'
   }
 ];
 
@@ -82,12 +97,17 @@ export const COST_CENTERS: CostCenter[] = [
 ];
 
 export function deriveBusinessAreaFromOrder(senderCompany: string | undefined, costCenter: string | undefined): string {
-  // 1. Se Centro de Custo contiver "SSM" → SSM
+  // 1. Se empresa emissora for IMPLY SÃO PAULO → Filial
+  if (senderCompany === 'imply_sp') {
+    return 'filial';
+  }
+  
+  // 2. Se Centro de Custo contiver "SSM" → SSM
   if (costCenter?.toUpperCase().includes('SSM')) {
     return 'ssm';
   }
   
-  // 2. Se Centro de Custo contiver "Projetos", P&D, Montagem → Projetos
+  // 3. Se Centro de Custo contiver "Projetos", P&D, Montagem → Projetos
   const upper = costCenter?.toUpperCase() || '';
   if (upper.includes('PROJETO') || upper.includes('P&D') || upper.includes('MONTAGEM')) {
     return 'projetos';
