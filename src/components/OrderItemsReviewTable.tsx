@@ -16,6 +16,8 @@ interface OrderItem {
   discount?: number;
   warehouse: string;
   deliveryDate: string;
+  ncmCode?: string;
+  materialType?: string;
 }
 
 interface OrderItemsReviewTableProps {
@@ -114,21 +116,45 @@ export function OrderItemsReviewTable({ items, onChange }: OrderItemsReviewTable
                     <TableCell className="font-medium">{index + 1}</TableCell>
                     
                     <TableCell>
-                      <Input
-                        value={item.itemCode}
-                        onChange={(e) => updateItem(index, 'itemCode', e.target.value)}
-                        className={`h-8 ${!item.itemCode.trim() ? 'border-destructive' : ''}`}
-                        placeholder="Código"
-                      />
+                      <div className="flex flex-col gap-1">
+                        <Input
+                          value={item.itemCode}
+                          onChange={(e) => updateItem(index, 'itemCode', e.target.value)}
+                          className={`h-8 ${!item.itemCode.trim() ? 'border-destructive' : ''}`}
+                          placeholder="Código"
+                        />
+                        {item.materialType && (
+                          <Badge 
+                            variant="outline" 
+                            className={`text-xs w-fit px-1.5 py-0 font-mono
+                              ${item.materialType === 'PA' ? 'bg-green-100 text-green-700 border-green-300' :
+                                item.materialType === 'ME' ? 'bg-blue-100 text-blue-700 border-blue-300' :
+                                item.materialType === 'MP' ? 'bg-orange-100 text-orange-700 border-orange-300' :
+                                item.materialType === 'MC' ? 'bg-purple-100 text-purple-700 border-purple-300' :
+                                item.materialType === 'PI' ? 'bg-yellow-100 text-yellow-700 border-yellow-300' :
+                                'bg-gray-100 text-gray-700 border-gray-300'
+                              }`}
+                          >
+                            {item.materialType}
+                          </Badge>
+                        )}
+                      </div>
                     </TableCell>
                     
                     <TableCell>
-                      <Textarea
-                        value={item.itemDescription}
-                        onChange={(e) => updateItem(index, 'itemDescription', e.target.value)}
-                        className={`min-h-[60px] ${!item.itemDescription.trim() ? 'border-destructive' : ''}`}
-                        placeholder="Descrição do produto"
-                      />
+                      <div className="flex flex-col gap-1">
+                        <Textarea
+                          value={item.itemDescription}
+                          onChange={(e) => updateItem(index, 'itemDescription', e.target.value)}
+                          className={`min-h-[60px] ${!item.itemDescription.trim() ? 'border-destructive' : ''}`}
+                          placeholder="Descrição do produto"
+                        />
+                        {item.ncmCode && (
+                          <span className="text-xs text-muted-foreground font-mono">
+                            NCM: {item.ncmCode}
+                          </span>
+                        )}
+                      </div>
                     </TableCell>
                     
                     <TableCell>

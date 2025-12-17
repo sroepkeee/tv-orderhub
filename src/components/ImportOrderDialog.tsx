@@ -557,6 +557,31 @@ export const ImportOrderDialog = ({
                 </AlertDescription>
               </Alert>}
 
+            {/* Alertas de campos faltando */}
+            {(!parsedData.orderInfo.costCenter || !parsedData.orderInfo.municipality || !customerWhatsapp || 
+              parsedData.items.some(item => !item.ncmCode)) && (
+              <Alert className="border-amber-300 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-700">
+                <AlertTriangle className="h-4 w-4 text-amber-600" />
+                <AlertDescription className="text-amber-800 dark:text-amber-300">
+                  <strong>Campos não detectados (podem ser preenchidos depois):</strong>
+                  <ul className="list-disc list-inside mt-2 text-sm space-y-1">
+                    {!parsedData.orderInfo.costCenter && (
+                      <li>Centro de Custo não detectado</li>
+                    )}
+                    {!parsedData.orderInfo.municipality && (
+                      <li>Município não detectado</li>
+                    )}
+                    {!customerWhatsapp && (
+                      <li>WhatsApp do cliente não detectado</li>
+                    )}
+                    {parsedData.items.some(item => !item.ncmCode) && (
+                      <li>NCM não detectado em {parsedData.items.filter(item => !item.ncmCode).length} item(ns)</li>
+                    )}
+                  </ul>
+                </AlertDescription>
+              </Alert>
+            )}
+
             {/* Preview dos dados */}
             <div className="border rounded-lg p-4 bg-muted/50">
               <h3 className="font-semibold mb-3 flex items-center gap-2">
@@ -639,7 +664,9 @@ export const ImportOrderDialog = ({
                 totalValue: item.totalValue || 0,
                 discount: item.discount || 0,
                 warehouse: item.warehouse,
-                deliveryDate: item.deliveryDate || parsedData.orderInfo.deliveryDate
+                deliveryDate: item.deliveryDate || parsedData.orderInfo.deliveryDate,
+                ncmCode: item.ncmCode,
+                materialType: (item as any).materialType
               }))}
               onChange={(updatedItems) => {
                 setParsedData({

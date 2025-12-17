@@ -2335,12 +2335,31 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                                 ${item.deliveredQuantity >= item.requestedQuantity && item.deliveredQuantity > 0 ? 'border-l-4 border-l-green-500' : ''}
                               `}>
                               <TableCell>
-                                <Input 
-                                  value={item.itemCode} 
-                                  onChange={e => updateItem(index, "itemCode", e.target.value)} 
-                                  placeholder="ITEM-001" 
-                                  className="h-8 text-sm font-mono bg-blue-50 dark:bg-blue-950/50 border-blue-200 dark:border-blue-800 focus-visible:ring-blue-400" 
-                                />
+                                <div className="flex flex-col gap-1">
+                                  <Input 
+                                    value={item.itemCode} 
+                                    onChange={e => updateItem(index, "itemCode", e.target.value)} 
+                                    placeholder="ITEM-001" 
+                                    className="h-8 text-sm font-mono bg-blue-50 dark:bg-blue-950/50 border-blue-200 dark:border-blue-800 focus-visible:ring-blue-400" 
+                                  />
+                                  {/* Badge de Tipo Material (PA, ME, MP, etc.) */}
+                                  {(item as any).material_type && (
+                                    <Badge 
+                                      variant="outline" 
+                                      className={cn(
+                                        "text-xs px-1.5 py-0 w-fit font-mono",
+                                        (item as any).material_type === 'PA' && "bg-green-100 text-green-700 border-green-300 dark:bg-green-900/30 dark:text-green-400 dark:border-green-700",
+                                        (item as any).material_type === 'ME' && "bg-blue-100 text-blue-700 border-blue-300 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-700",
+                                        (item as any).material_type === 'MP' && "bg-orange-100 text-orange-700 border-orange-300 dark:bg-orange-900/30 dark:text-orange-400 dark:border-orange-700",
+                                        (item as any).material_type === 'MC' && "bg-purple-100 text-purple-700 border-purple-300 dark:bg-purple-900/30 dark:text-purple-400 dark:border-purple-700",
+                                        (item as any).material_type === 'PI' && "bg-yellow-100 text-yellow-700 border-yellow-300 dark:bg-yellow-900/30 dark:text-yellow-400 dark:border-yellow-700",
+                                        (item as any).material_type === 'BN' && "bg-gray-100 text-gray-700 border-gray-300 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-600"
+                                      )}
+                                    >
+                                      {(item as any).material_type}
+                                    </Badge>
+                                  )}
+                                </div>
                               </TableCell>
                               <TableCell>
                                 <div className="flex flex-col gap-1">

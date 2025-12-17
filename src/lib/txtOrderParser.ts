@@ -137,10 +137,27 @@ export async function parseTxtOrder(file: File): Promise<ParsedOrderData & { cus
       });
     }
     
-    // Rateio: Centro de Custos | Item contábil
+    // Rateio: Centro de Custos | Item contábil (com detecção inteligente de padrões)
     else if (prefix === 'rateio') {
-      orderInfo.costCenter = parts[1] || '';
-      orderInfo.accountItem = parts[2] || '';
+      const allRateioText = parts.slice(1).join(';');
+      
+      // Detectar Centro de Custo (geralmente contém "SSM", "FILIAL", "CUSTOMER", etc.)
+      const ccPattern = /(SSM\s*-?\s*[^;]+|FILIAL\s*[^;]*|CUSTOMER\s*SERVICE[^;]*)/i;
+      const ccMatch = allRateioText.match(ccPattern);
+      
+      // Detectar Item Conta (geralmente contém "PROJETO", "MANUTENCAO", etc.)
+      const acPattern = /(PROJETO\s+[^;]+|MANUTEN[CÇ][ÃA]O\s+[^;]+|P[ÓO]S[\s-]?VENDA[^;]*)/i;
+      const acMatch = allRateioText.match(acPattern);
+      
+      // Se não encontrar padrão, usar posições fixas
+      orderInfo.costCenter = ccMatch ? ccMatch[1].trim() : (parts[1] || '');
+      orderInfo.accountItem = acMatch ? acMatch[1].trim() : (parts[2] || '');
+      
+      // Limpar valores incorretos (quando item conta foi para centro de custo)
+      if (orderInfo.costCenter.toUpperCase().includes('ITEM CONTA')) {
+        orderInfo.costCenter = '';
+      }
+      
       orderInfo.businessArea = deriveBusinessArea(orderInfo.costCenter);
       console.log('✅ Rateio:', { costCenter: orderInfo.costCenter, accountItem: orderInfo.accountItem, businessArea: orderInfo.businessArea });
     }
@@ -239,6 +256,7 @@ export async function parseTxtOrder(file: File): Promise<ParsedOrderData & { cus
           totalValue,
           ipiPercent,
           ncmCode: ncmCode || undefined,
+          materialType: materialType || undefined, // PA, ME, MP, MC, PI, BN
         });
       }
     }

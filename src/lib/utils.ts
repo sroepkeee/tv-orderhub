@@ -56,10 +56,22 @@ export function addBusinessDays(startDate: string | Date, businessDays: number):
 export function cleanItemDescription(description: string): string {
   if (!description) return '';
   
-  // Remove qualquer texto que comece com LGPD (mais flexível para capturar texto truncado)
-  const lgpdPattern = /\s*LGPD:.*$/gi;
+  let cleaned = description
+    // Remove LGPD e tudo depois (formato "LGPD:" ou "LGPD :")
+    .replace(/\s*LGPD\s*:?\s*.*/gi, '')
+    // Remove declarações de consentimento que podem aparecer sem "LGPD:"
+    .replace(/\s*Declaro\s+que\s+ao\s+fornecer.*/gi, '')
+    // Remove texto de consentimento de dados
+    .replace(/\s*autorizo\s+o\s+uso.*/gi, '')
+    // Remove dados pessoais que vazaram
+    .replace(/\s*CPF\s*:?\s*\d{3}\.?\d{3}\.?\d{3}-?\d{2}.*/gi, '')
+    // Remove headers/footers que podem vazar do PDF
+    .replace(/\s*EMPRESA\s*:.*$/gi, '')
+    .replace(/\s*PEDIDO\s+N[ºo]\s*:.*$/gi, '')
+    .replace(/\s*EMISS[ÃA]O\s*:.*$/gi, '')
+    .trim();
   
-  return description.replace(lgpdPattern, '').trim();
+  return cleaned;
 }
 
 /**
