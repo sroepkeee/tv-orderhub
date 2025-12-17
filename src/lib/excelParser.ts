@@ -37,6 +37,7 @@ export interface ParsedOrderData {
     totalValue?: number;
     ipiPercent?: number;
     icmsPercent?: number;
+    ncmCode?: string;
   }>;
 }
 

@@ -297,7 +297,8 @@ export const ImportOrderDialog = ({
         discount_percent: item.discount || null,
         total_value: item.totalValue || null,
         ipi_percent: item.ipiPercent || null,
-        icms_percent: item.icmsPercent || null
+        icms_percent: item.icmsPercent || null,
+        ncm_code: item.ncmCode || null
       }));
       const {
         error: itemsError

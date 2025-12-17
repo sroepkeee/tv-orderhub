@@ -56,8 +56,8 @@ export function addBusinessDays(startDate: string | Date, businessDays: number):
 export function cleanItemDescription(description: string): string {
   if (!description) return '';
   
-  // Remove o parágrafo LGPD específico
-  const lgpdPattern = /\s*LGPD:\s*Declaro que ao fornecer os meus dados estou de acordo que a Imply proceda com arquivamento de meus dados,\s*conforme previsto na Lei Geral de Proteção de[^\n]*/gi;
+  // Remove qualquer texto que comece com LGPD (mais flexível para capturar texto truncado)
+  const lgpdPattern = /\s*LGPD:.*$/gi;
   
   return description.replace(lgpdPattern, '').trim();
 }

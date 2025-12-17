@@ -178,7 +178,7 @@ export async function parseTxtOrder(file: File): Promise<ParsedOrderData & { cus
       const materialType = (parts[3] || '').toUpperCase();
       const description = parts[4] || '';
       const quantity = parseFloat((parts[5] || '0').replace(/\./g, '').replace(',', '.')) || 0;
-      // parts[6] = NCM (ignorar)
+      const ncmCode = (parts[6] || '').trim(); // NCM - Nomenclatura Comum do Mercosul
       const unitPrice = parseFloat((parts[7] || '0').replace(/\./g, '').replace(',', '.')) || 0;
       const totalValue = parseFloat((parts[8] || '0').replace(/\./g, '').replace(',', '.')) || 0;
       const totalWithIpi = parseFloat((parts[9] || '0').replace(/\./g, '').replace(',', '.')) || 0;
@@ -218,6 +218,7 @@ export async function parseTxtOrder(file: File): Promise<ParsedOrderData & { cus
           unitPrice,
           totalValue,
           ipiPercent,
+          ncmCode: ncmCode || undefined,
         });
       }
     }

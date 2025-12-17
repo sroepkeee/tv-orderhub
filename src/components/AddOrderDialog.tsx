@@ -40,6 +40,7 @@ export interface OrderItem {
   purchase_action_started_at?: string;
   purchase_action_started_by?: string;
   production_order_number?: string;
+  ncm_code?: string;
 }
 
 interface OrderFormData {
