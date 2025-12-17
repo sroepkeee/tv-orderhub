@@ -22,6 +22,12 @@ interface PurchaseNotificationRequest {
     warehouse: string;
   }>;
   movedBy: string;
+  // RATEIO fields
+  businessUnit?: string;
+  costCenter?: string;
+  accountItem?: string;
+  businessArea?: string;
+  senderCompany?: string;
 }
 
 const handler = async (req: Request): Promise<Response> => {
@@ -139,6 +145,60 @@ const handler = async (req: Request): Promise<Response> => {
         </table>
       </div>
       
+      <!-- RATEIO Info Card -->
+      <div style="background-color: #fef3c7; border-radius: 12px; padding: 24px; margin-bottom: 24px; border: 1px solid #fcd34d;">
+        <h2 style="margin: 0 0 16px 0; color: #92400e; font-size: 18px; border-bottom: 2px solid #fcd34d; padding-bottom: 12px;">
+          💰 Informações de RATEIO
+        </h2>
+        <table style="width: 100%; border-collapse: collapse;">
+          ${payload.senderCompany ? `
+          <tr>
+            <td style="padding: 8px 0; color: #92400e; width: 160px;">Empresa Emissora:</td>
+            <td style="padding: 8px 0; color: #78350f; font-weight: 600;">${payload.senderCompany}</td>
+          </tr>` : ''}
+          ${payload.businessUnit ? `
+          <tr>
+            <td style="padding: 8px 0; color: #92400e;">BU (Business Unit):</td>
+            <td style="padding: 8px 0; color: #78350f; font-weight: 500;">${payload.businessUnit}</td>
+          </tr>` : ''}
+          ${payload.costCenter ? `
+          <tr>
+            <td style="padding: 8px 0; color: #92400e;">Centro de Custo:</td>
+            <td style="padding: 8px 0; color: #78350f; font-weight: 500;">${payload.costCenter}</td>
+          </tr>` : ''}
+          ${payload.accountItem ? `
+          <tr>
+            <td style="padding: 8px 0; color: #92400e;">Projeto / Item Conta:</td>
+            <td style="padding: 8px 0; color: #78350f; font-weight: 500;">${payload.accountItem}</td>
+          </tr>` : ''}
+          ${payload.businessArea ? `
+          <tr>
+            <td style="padding: 8px 0; color: #92400e;">Área de Negócio:</td>
+            <td style="padding: 8px 0;">
+              <span style="display: inline-block; padding: 4px 12px; border-radius: 16px; font-size: 12px; font-weight: 600; ${
+                payload.businessArea === 'ssm' ? 'background-color: #dbeafe; color: #1e40af;' :
+                payload.businessArea === 'filial' ? 'background-color: #dcfce7; color: #166534;' :
+                payload.businessArea === 'projetos' ? 'background-color: #f3e8ff; color: #7c3aed;' :
+                payload.businessArea === 'ecommerce' ? 'background-color: #ffedd5; color: #c2410c;' :
+                'background-color: #f3f4f6; color: #374151;'
+              }">
+                ${payload.businessArea === 'ssm' ? 'SSM (Manutenção)' :
+                  payload.businessArea === 'filial' ? 'Filial' :
+                  payload.businessArea === 'projetos' ? 'Projetos' :
+                  payload.businessArea === 'ecommerce' ? 'E-commerce' :
+                  payload.businessArea || '-'}
+              </span>
+            </td>
+          </tr>` : ''}
+          ${!payload.businessUnit && !payload.costCenter && !payload.accountItem && !payload.businessArea && !payload.senderCompany ? `
+          <tr>
+            <td colspan="2" style="padding: 8px 0; color: #92400e; font-style: italic;">
+              Informações de RATEIO não disponíveis para este pedido.
+            </td>
+          </tr>` : ''}
+        </table>
+      </div>
+      
       <!-- Items Table -->
       <div style="margin-bottom: 24px;">
         <h2 style="margin: 0 0 16px 0; color: #111827; font-size: 18px;">
@@ -186,10 +246,11 @@ const handler = async (req: Request): Promise<Response> => {
 </html>
     `;
 
-    // Enviar e-mail
+    // Enviar e-mail para compras e SSM
+    const recipients = ["compras@imply.com", "ssm@imply.com"];
     const emailResponse = await resend.emails.send({
       from: "Sistema de Pedidos <onboarding@resend.dev>",
-      to: ["compras@imply.com"],
+      to: recipients,
       subject: `🛒 Novo Pedido #${payload.orderNumber} - ${payload.items.length} itens para compra`,
       html: htmlContent,
     });
@@ -204,16 +265,24 @@ const handler = async (req: Request): Promise<Response> => {
       const supabase = createClient(supabaseUrl, supabaseKey);
       await supabase.from('ai_notification_log').insert({
         channel: 'email',
-        recipient: 'compras@imply.com',
+        recipient: recipients.join(', '),
         order_id: payload.orderId,
         message_content: `Notificação de compras: Pedido #${payload.orderNumber} com ${payload.items.length} itens`,
         status: 'sent',
         sent_at: new Date().toISOString(),
         metadata: {
           type: 'purchase_notification',
+          recipients: recipients,
           items_count: payload.items.length,
           moved_by: payload.movedBy,
-          delivery_date: payload.deliveryDate
+          delivery_date: payload.deliveryDate,
+          rateio: {
+            business_unit: payload.businessUnit,
+            cost_center: payload.costCenter,
+            account_item: payload.accountItem,
+            business_area: payload.businessArea,
+            sender_company: payload.senderCompany
+          }
         }
       });
     }

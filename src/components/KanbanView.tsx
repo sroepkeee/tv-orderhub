@@ -481,6 +481,13 @@ export const KanbanView = ({ orders, onEdit, onStatusChange, cardViewMode = "ful
               .eq('id', currentUser?.id)
               .single();
 
+            // Buscar dados completos do pedido para RATEIO
+            const { data: orderData } = await supabase
+              .from('orders')
+              .select('business_unit, cost_center, account_item, business_area, sender_company')
+              .eq('id', orderId)
+              .single();
+
             const payload = {
               orderId: orderId,
               orderNumber: order.orderNumber,
@@ -493,7 +500,13 @@ export const KanbanView = ({ orders, onEdit, onStatusChange, cardViewMode = "ful
                 unit: item.unit,
                 warehouse: item.warehouse
               })),
-              movedBy: profile?.full_name || currentUser?.email || 'Sistema'
+              movedBy: profile?.full_name || currentUser?.email || 'Sistema',
+              // RATEIO fields
+              businessUnit: orderData?.business_unit,
+              costCenter: orderData?.cost_center,
+              accountItem: orderData?.account_item,
+              businessArea: orderData?.business_area,
+              senderCompany: orderData?.sender_company,
             };
 
             const { error } = await supabase.functions.invoke('notify-purchases', {
@@ -503,9 +516,9 @@ export const KanbanView = ({ orders, onEdit, onStatusChange, cardViewMode = "ful
             if (error) {
               console.error('❌ Erro ao notificar compras:', error);
             } else {
-              console.log('✅ [notify-purchases] E-mail enviado para compras@imply.com');
+              console.log('✅ [notify-purchases] E-mail enviado para compras@imply.com e ssm@imply.com');
               toast({
-                title: "📧 Compras notificado",
+                title: "📧 Compras e SSM notificados",
                 description: `E-mail enviado com ${purchaseItems.length} itens para compra`,
               });
             }
