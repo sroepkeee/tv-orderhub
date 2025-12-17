@@ -24,6 +24,7 @@ import { useToast } from "@/hooks/use-toast";
 import { CompleteOrderDialog } from "./CompleteOrderDialog";
 import { ExceptionCommentDialog } from "./ExceptionCommentDialog";
 import { PhaseButtons } from "./PhaseButtons";
+import { UnifiedStatusSelector } from "./UnifiedStatusSelector";
 import { ConfirmationDialog } from "./ConfirmationDialog";
 import { OrderTypeSelector } from "@/components/OrderTypeSelector";
 import { cleanItemDescription, cn } from "@/lib/utils";
@@ -637,7 +638,9 @@ export const EditOrderDialog = ({
           purchase_action_started: item.purchase_action_started,
           production_order_number: item.production_order_number,
           purchase_action_started_at: item.purchase_action_started_at,
-          purchase_action_started_by: item.purchase_action_started_by
+          purchase_action_started_by: item.purchase_action_started_by,
+          ncm_code: (item as any).ncm_code,
+          material_type: (item as any).material_type
         }));
         setItems(mappedItems);
         setOriginalItems(JSON.parse(JSON.stringify(mappedItems)));
@@ -789,7 +792,9 @@ export const EditOrderDialog = ({
       purchase_action_started: item.purchase_action_started,
       production_order_number: item.production_order_number,
       purchase_action_started_at: item.purchase_action_started_at,
-      purchase_action_started_by: item.purchase_action_started_by
+      purchase_action_started_by: item.purchase_action_started_by,
+      ncm_code: item.ncm_code,
+      material_type: item.material_type
     }));
     setItems(mappedItems);
     setOriginalItems(JSON.parse(JSON.stringify(mappedItems)));
@@ -2130,9 +2135,9 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                     <Label htmlFor="totvsOrderNumber">Nº Pedido TOTVS</Label>
                     <Input {...register("totvsOrderNumber" as any)} placeholder="Ex: 123456" maxLength={50} />
                   </div>
-                  {order.issueDate && <div>
+                {order.issueDate && <div>
                       <Label htmlFor="issueDate">Data de Emissão (TOTVS)</Label>
-                      <Input type="date" value={order.issueDate ? format(new Date(order.issueDate), 'yyyy-MM-dd') : ''} disabled className="bg-muted cursor-not-allowed" />
+                      <Input type="date" value={order.issueDate ? order.issueDate.split('T')[0] : ''} disabled className="bg-muted cursor-not-allowed" />
                       <p className="text-xs text-muted-foreground mt-0.5">
                         Data original do pedido (não editável)
                       </p>
@@ -2266,10 +2271,26 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
 
                 <div className="pt-3 border-t">
                   <Label className="text-sm font-medium mb-2 block">Status do Pedido</Label>
-                  <PhaseButtons order={{
-                    ...order,
-                    status: getValues("status") || order.status
-                  }} onStatusChange={(orderId, newStatus) => handleStatusChange(newStatus)} />
+                  <div className="flex gap-3 items-start">
+                    {/* Dropdown único de status */}
+                    <div className="flex-1 max-w-md">
+                      <UnifiedStatusSelector
+                        currentStatus={getValues("status") || order.status}
+                        orderCategory={order.order_category}
+                        onStatusChange={(newStatus) => handleStatusChange(newStatus)}
+                      />
+                    </div>
+                    {/* PhaseButtons mantidos para visualização rápida */}
+                    <div className="flex-1">
+                      <PhaseButtons 
+                        order={{
+                          ...order,
+                          status: getValues("status") || order.status
+                        }} 
+                        onStatusChange={(orderId, newStatus) => handleStatusChange(newStatus)} 
+                      />
+                    </div>
+                  </div>
                 </div>
                 
                 {/* Hidden input para garantir que o status seja enviado no formulário */}
@@ -2369,7 +2390,9 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                                     placeholder="Descrição" 
                                     className="h-8 text-sm bg-background/80 dark:bg-muted/40" 
                                   />
-                                  {(item as any).ncm_code && (
+                                  {(item as any).ncm_code && 
+                                   (item as any).ncm_code !== '0' && 
+                                   String((item as any).ncm_code).length >= 6 && (
                                     <span className="text-xs text-muted-foreground font-mono">
                                       NCM: {(item as any).ncm_code}
                                     </span>
