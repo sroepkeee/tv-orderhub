@@ -145,6 +145,11 @@ export const EditOrderDialog = ({
   const [modifiedFields, setModifiedFields] = useState<Set<string>>(new Set());
   const [showUnsavedChangesDialog, setShowUnsavedChangesDialog] = useState(false);
   
+  // ✨ Estados para controle de envio de e-mail de compras
+  const [purchaseEmailSent, setPurchaseEmailSent] = useState(false);
+  const [purchaseEmailDate, setPurchaseEmailDate] = useState<string | null>(null);
+  const [sendingPurchaseEmail, setSendingPurchaseEmail] = useState(false);
+  
   // ✨ Ref para ignorar próxima atualização realtime (evitar reload desnecessário)
   const ignoreNextRealtimeUpdateRef = useRef(false);
 
@@ -182,6 +187,105 @@ export const EditOrderDialog = ({
       setCurrentUserId(user?.id || null);
     });
   }, [open]);
+
+  // ✨ Verificar se e-mail de compras foi enviado
+  useEffect(() => {
+    if (!open || !order?.id) return;
+    
+    const checkPurchaseEmail = async () => {
+      const { data } = await supabase
+        .from('ai_notification_log')
+        .select('created_at')
+        .eq('order_id', order.id)
+        .eq('channel', 'email')
+        .ilike('metadata->>type', 'purchase_notification')
+        .order('created_at', { ascending: false })
+        .limit(1);
+      
+      if (data && data.length > 0) {
+        setPurchaseEmailSent(true);
+        setPurchaseEmailDate(data[0].created_at);
+      } else {
+        setPurchaseEmailSent(false);
+        setPurchaseEmailDate(null);
+      }
+    };
+    
+    checkPurchaseEmail();
+  }, [open, order?.id]);
+
+  // ✨ Função para enviar e-mail de compras
+  const sendPurchaseEmail = async () => {
+    const purchaseItems = items.filter(item => 
+      ['purchase_required', 'purchase_requested', 'out_of_stock'].includes(item.item_status || '')
+    );
+    
+    if (purchaseItems.length === 0) {
+      toast({
+        title: "Nenhum item para compra",
+        description: "Não há itens com status de compra necessária.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    setSendingPurchaseEmail(true);
+    
+    try {
+      const { data: userData } = await supabase.auth.getUser();
+      const userName = userData?.user?.user_metadata?.full_name || userData?.user?.email || 'Usuário';
+      
+      const formattedItems = purchaseItems.map(item => ({
+        item_code: item.itemCode,
+        item_description: item.itemDescription,
+        requested_quantity: item.requestedQuantity,
+        unit: item.unit,
+        warehouse: item.warehouse,
+        item_status: item.item_status
+      }));
+      
+      const payload = {
+        orderNumber: order.orderNumber,
+        customerName: order.client,
+        deliveryDate: order.deliveryDeadline,
+        userName,
+        items: formattedItems,
+        businessUnit: order.business_unit,
+        costCenter: order.cost_center,
+        accountItem: order.account_item,
+        businessArea: order.business_area,
+        senderCompany: order.sender_company
+      };
+      
+      const { error } = await supabase.functions.invoke('notify-purchases', {
+        body: payload
+      });
+      
+      if (error) throw error;
+      
+      setPurchaseEmailSent(true);
+      setPurchaseEmailDate(new Date().toISOString());
+      
+      toast({
+        title: "📧 E-mail enviado",
+        description: "Compras e SSM notificados com sucesso."
+      });
+    } catch (error: any) {
+      console.error('Erro ao enviar e-mail de compras:', error);
+      toast({
+        title: "Erro ao enviar e-mail",
+        description: error.message || "Não foi possível enviar o e-mail de compras.",
+        variant: "destructive"
+      });
+    } finally {
+      setSendingPurchaseEmail(false);
+    }
+  };
+
+  // Contagem de itens que precisam de compra
+  const purchaseItemsCount = items.filter(item => 
+    ['purchase_required', 'purchase_requested', 'out_of_stock'].includes(item.item_status || '')
+  ).length;
 
   // ✨ Verificar se há alterações não salvas
   const hasUnsavedChanges = useCallback((): boolean => {
@@ -2292,10 +2396,49 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                 <div className="space-y-3 pt-3">
                   <div className="flex items-center justify-between">
                     <Label className="text-lg font-semibold">Itens do Pedido</Label>
-                    <Button type="button" onClick={addItem} size="sm" className="gap-2">
-                      <Plus className="h-4 w-4" />
-                      Adicionar Item
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      {/* Botão de envio de e-mail de compras */}
+                      {purchaseItemsCount > 0 && (
+                        <div className="flex items-center gap-2">
+                          {purchaseEmailSent && purchaseEmailDate && (
+                            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 dark:bg-green-950 dark:text-green-300 dark:border-green-800 gap-1">
+                              <CheckCircle className="h-3 w-3" />
+                              Enviado {format(new Date(purchaseEmailDate), 'dd/MM HH:mm')}
+                            </Badge>
+                          )}
+                          <Button
+                            type="button"
+                            onClick={sendPurchaseEmail}
+                            disabled={sendingPurchaseEmail}
+                            size="sm"
+                            variant={purchaseEmailSent ? "outline" : "default"}
+                            className={cn(
+                              "gap-2",
+                              !purchaseEmailSent && "bg-orange-600 hover:bg-orange-700 text-white"
+                            )}
+                          >
+                            {sendingPurchaseEmail ? (
+                              <>
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                                Enviando...
+                              </>
+                            ) : (
+                              <>
+                                <Send className="h-4 w-4" />
+                                {purchaseEmailSent ? 'Reenviar' : 'Enviar Compras'}
+                                <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-xs">
+                                  {purchaseItemsCount}
+                                </Badge>
+                              </>
+                            )}
+                          </Button>
+                        </div>
+                      )}
+                      <Button type="button" onClick={addItem} size="sm" className="gap-2">
+                        <Plus className="h-4 w-4" />
+                        Adicionar Item
+                      </Button>
+                    </div>
                   </div>
 
                   {items.length === 0 ? <Card className="p-4 text-center text-muted-foreground text-sm">
