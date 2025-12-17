@@ -105,7 +105,8 @@ export async function parseTxtOrder(file: File): Promise<ParsedOrderData & { cus
       console.log('✅ Cabecalho:', { orderNumber: orderInfo.orderNumber, issueDate: orderInfo.issueDate });
     }
     
-    // Informacoes Gerais: Codigo+Nome | CNPJ | Endereço | Bairro | IE | Telefone | CEP | Idioma | Garantia | Observação
+    // Informacoes Gerais: Codigo+Nome | CNPJ | ... | Telefone | ... | Garantia | Observação
+    // Endereço agora vem da linha Entrega
     else if (prefix === 'informacoes gerais') {
       // Position 1: "005161 - NOME DO CLIENTE" ou apenas "NOME DO CLIENTE"
       const customerField = parts[1] || '';
@@ -117,13 +118,10 @@ export async function parseTxtOrder(file: File): Promise<ParsedOrderData & { cus
       }
       
       orderInfo.customerDocument = (parts[2] || '').replace(/[.\-\/]/g, '');
-      orderInfo.deliveryAddress = [parts[3], parts[4]].filter(Boolean).join(', '); // Endereço + Bairro
+      // parts[3-4] = Endereço/Bairro (agora vem da linha Entrega)
       // parts[5] = IE (ignorar)
       customerWhatsapp = formatWhatsApp(parts[6]); // Telefone → WhatsApp
-      // parts[7] = CEP (adicionar ao endereço)
-      if (parts[7]) {
-        orderInfo.deliveryAddress += ` - CEP: ${parts[7]}`;
-      }
+      // parts[7] = CEP (agora vem da linha Entrega)
       // parts[8] = Idioma (ignorar)
       
       // Garantia e Observação → notas
@@ -147,7 +145,7 @@ export async function parseTxtOrder(file: File): Promise<ParsedOrderData & { cus
       console.log('✅ Rateio:', { costCenter: orderInfo.costCenter, accountItem: orderInfo.accountItem, businessArea: orderInfo.businessArea });
     }
     
-    // Transporte: Transportadora | Tipo Frete | Valor Frete (assumindo este formato)
+    // Transporte: Transportadora | Tipo Frete | Valor Frete
     else if (prefix === 'transporte') {
       orderInfo.carrier = parts[1] || '';
       orderInfo.freightType = parts[2] || '';
@@ -160,10 +158,32 @@ export async function parseTxtOrder(file: File): Promise<ParsedOrderData & { cus
       console.log('✅ Transporte:', { carrier: orderInfo.carrier, freightType: orderInfo.freightType, freightValue: orderInfo.freightValue });
     }
     
-    // Entrega: Município ou Cidade/UF
+    // Entrega: Codigo+Loja+Nome | Endereço | Bairro | Municipio | UF | CEP
     else if (prefix === 'entrega') {
-      orderInfo.municipality = parts[1] || '';
-      console.log('✅ Entrega:', { municipality: orderInfo.municipality });
+      // parts[1] = Codigo + Loja + Nome (ignorar - já temos do Informacoes Gerais)
+      const endereco = parts[2] || '';
+      const bairro = parts[3] || '';
+      const municipio = parts[4] || '';
+      const uf = parts[5] || '';
+      const cep = parts[6] || '';
+      
+      // Montar endereço de entrega completo
+      const addressParts = [endereco, bairro].filter(Boolean);
+      orderInfo.deliveryAddress = addressParts.join(', ');
+      if (cep) {
+        orderInfo.deliveryAddress += ` - CEP: ${cep}`;
+      }
+      
+      // Município com UF
+      orderInfo.municipality = municipio;
+      if (uf) {
+        orderInfo.municipality += `/${uf}`;
+      }
+      
+      console.log('✅ Entrega:', { 
+        deliveryAddress: orderInfo.deliveryAddress, 
+        municipality: orderInfo.municipality 
+      });
     }
     
     // Instalacao: (ignorar por enquanto)
