@@ -594,16 +594,10 @@ Deno.serve(async (req) => {
         console.log('📱 Processing GROUP message from:', groupId, '-', groupName);
       }
       
-      // Ignorar mensagens enviadas por nós
-      if (key?.fromMe === true) {
-        console.log('⏭️ Ignoring outbound message');
-        return new Response(
-          JSON.stringify({ success: true, ignored: true }),
-          {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 200,
-          }
-        );
+      // Processar mensagens enviadas pelo celular/web (fromMe: true)
+      const isFromMe = key?.fromMe === true;
+      if (isFromMe) {
+        console.log('📱 Processing OUTBOUND message from mobile/web');
       }
 
       // Extract phone number - prioritize key.remoteJid for inbound messages
@@ -880,6 +874,28 @@ Deno.serve(async (req) => {
         );
       }
       
+      // Verificar se é mensagem duplicada (evitar duplicatas de mensagens enviadas pelo sistema)
+      if (isFromMe) {
+        // Verificar se já existe uma mensagem outbound recente com mesmo conteúdo
+        const { data: existingMsg } = await supabase
+          .from('carrier_conversations')
+          .select('id')
+          .eq('carrier_id', carrierId)
+          .eq('message_direction', 'outbound')
+          .eq('message_content', messageText)
+          .gte('created_at', new Date(Date.now() - 60000).toISOString()) // últimos 60 segundos
+          .limit(1)
+          .maybeSingle();
+        
+        if (existingMsg) {
+          console.log('⏭️ Skipping duplicate outbound message');
+          return new Response(
+            JSON.stringify({ success: true, skipped: 'duplicate_outbound' }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+          );
+        }
+      }
+
       // Inserir conversa com flags de mídia
       const { data: conversation, error: conversationError } = await supabase
         .from('carrier_conversations')
@@ -888,7 +904,7 @@ Deno.serve(async (req) => {
           order_id: orderId,
           quote_id: lastQuote?.id || null,
           conversation_type: hasQuoteData ? 'quote_request' : 'general',
-          message_direction: 'inbound',
+          message_direction: isFromMe ? 'outbound' : 'inbound',
           message_content: messageText,
           contact_type: contactType,
           is_group_message: isGroupMessage,
@@ -898,6 +914,7 @@ Deno.serve(async (req) => {
           media_type: hasMedia ? mediaData!.type : null,
           message_metadata: {
             received_via: 'mega_api',
+            sent_via: isFromMe ? 'mobile_or_web' : null,
             phone_number: phoneNumber,
             mega_message_id: messageData.key?.id || null,
             message_timestamp: messageData.messageTimestamp,
