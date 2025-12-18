@@ -594,8 +594,33 @@ Deno.serve(async (req) => {
         console.log('📱 Processing GROUP message from:', groupId, '-', groupName);
       }
       
-      // Processar mensagens enviadas pelo celular/web (fromMe: true)
-      const isFromMe = key?.fromMe === true;
+      // 🔍 DETECÇÃO MELHORADA DE MENSAGENS OUTBOUND
+      // Detectar se é mensagem enviada pelo usuário conectado
+      // Método 1: key.fromMe (padrão da API)
+      // Método 2: Comparar participant com número conectado (para grupos)
+      const connectedInstanceJid = payload.jid || '';
+      const connectedNumber = connectedInstanceJid.replace(/@s\.whatsapp\.net$/g, '').replace(/\D/g, '');
+      const participantJid = key?.participant || key?.remoteJid || '';
+      const participantNumber = participantJid.replace(/@s\.whatsapp\.net$/g, '').replace(/@g\.us$/g, '').replace(/\D/g, '');
+      
+      // Verificar se é outbound por múltiplos métodos
+      const fromMeFlag = key?.fromMe === true;
+      const isParticipantConnected = connectedNumber && participantNumber && 
+        (connectedNumber === participantNumber || 
+         connectedNumber.endsWith(participantNumber) || 
+         participantNumber.endsWith(connectedNumber));
+      
+      const isFromMe = fromMeFlag || isParticipantConnected;
+      
+      console.log('🔍 Outbound detection:', {
+        fromMeFlag,
+        connectedNumber,
+        participantNumber,
+        isParticipantConnected,
+        isFromMe,
+        isGroupMessage
+      });
+      
       if (isFromMe) {
         console.log('📱 Processing OUTBOUND message from mobile/web');
       }
