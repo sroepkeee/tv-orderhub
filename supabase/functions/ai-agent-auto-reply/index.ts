@@ -11,6 +11,7 @@ interface AutoReplyRequest {
   conversation_id: string;
   message_content: string;
   sender_phone: string;
+  receiver_phone?: string; // The WhatsApp number that received the message
   carrier_id?: string;
   carrier_name?: string;
   order_id?: string;
@@ -30,6 +31,35 @@ interface AgentConfig {
   max_response_time_seconds: number;
   human_handoff_keywords: string[];
   auto_reply_delay_ms: number;
+  forbidden_phrases?: string[];
+  system_prompt?: string;
+  conversation_style?: string;
+  avoid_repetition?: boolean;
+}
+
+interface AgentInstance {
+  id: string;
+  instance_name: string;
+  agent_type: string;
+  whatsapp_number: string | null;
+  is_active: boolean;
+  auto_reply_enabled: boolean;
+  personality: string | null;
+  tone_of_voice: string | null;
+  language: string | null;
+  custom_instructions: string | null;
+  signature: string | null;
+  use_signature: boolean;
+  llm_model: string | null;
+  auto_reply_delay_ms: number;
+  system_prompt: string | null;
+  conversation_style: string | null;
+  closing_style: string | null;
+  avoid_repetition: boolean;
+  forbidden_phrases: string[] | null;
+  emoji_library: string[] | null;
+  max_message_length: number;
+  specializations: string[] | null;
 }
 
 serve(async (req) => {
@@ -52,7 +82,8 @@ serve(async (req) => {
     const { 
       conversation_id, 
       message_content, 
-      sender_phone, 
+      sender_phone,
+      receiver_phone,
       carrier_id, 
       carrier_name,
       order_id,
@@ -61,29 +92,88 @@ serve(async (req) => {
     } = requestData;
 
     console.log('📞 Contact type:', contact_type);
+    console.log('📱 Receiver phone:', receiver_phone);
 
-    // 1. Fetch agent configuration
-    const { data: config, error: configError } = await supabase
-      .from('ai_agent_config')
-      .select('*')
-      .limit(1)
-      .single();
+    // 1. Try to find specific agent instance by receiver phone number
+    let agentInstance: AgentInstance | null = null;
+    let agentConfig: AgentConfig | null = null;
 
-    if (configError || !config) {
-      console.error('❌ Failed to fetch agent config:', configError);
-      return new Response(JSON.stringify({ 
-        success: false, 
-        error: 'Agent config not found' 
-      }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+    if (receiver_phone) {
+      const normalizedPhone = receiver_phone.replace(/\D/g, '');
+      console.log('🔍 Looking for agent instance with phone:', normalizedPhone);
+      
+      const { data: instanceData } = await supabase
+        .from('ai_agent_instances')
+        .select('*')
+        .eq('is_active', true)
+        .or(`whatsapp_number.eq.${normalizedPhone},whatsapp_number.ilike.%${normalizedPhone.slice(-8)}%`)
+        .limit(1)
+        .single();
+
+      if (instanceData) {
+        agentInstance = instanceData as AgentInstance;
+        console.log(`✅ Found agent instance: ${agentInstance.instance_name} (${agentInstance.agent_type})`);
+      }
     }
 
-    const agentConfig = config as AgentConfig;
+    // 2. If no specific instance, fall back to global config
+    if (!agentInstance) {
+      console.log('⚙️ No specific instance found, using global config');
+      const { data: config, error: configError } = await supabase
+        .from('ai_agent_config')
+        .select('*')
+        .limit(1)
+        .single();
 
-    // 2. Check if auto-reply is enabled
-    if (!agentConfig.auto_reply_enabled) {
+      if (configError || !config) {
+        console.error('❌ Failed to fetch agent config:', configError);
+        return new Response(JSON.stringify({ 
+          success: false, 
+          error: 'Agent config not found' 
+        }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      agentConfig = config as AgentConfig;
+    }
+
+    // Build effective config from instance or global
+    const effectiveConfig = agentInstance ? {
+      agent_name: agentInstance.instance_name,
+      personality: agentInstance.personality || 'Profissional e amigável',
+      tone_of_voice: agentInstance.tone_of_voice || 'informal',
+      language: agentInstance.language || 'pt-BR',
+      custom_instructions: agentInstance.custom_instructions,
+      signature: agentInstance.signature,
+      auto_reply_enabled: agentInstance.auto_reply_enabled,
+      llm_model: agentInstance.llm_model || 'gpt-4o-mini',
+      max_response_time_seconds: 30,
+      human_handoff_keywords: [], // Will get from global config
+      auto_reply_delay_ms: agentInstance.auto_reply_delay_ms || 1000,
+      forbidden_phrases: agentInstance.forbidden_phrases || [],
+      system_prompt: agentInstance.system_prompt,
+      conversation_style: agentInstance.conversation_style || 'chatty',
+      avoid_repetition: agentInstance.avoid_repetition ?? true,
+    } : agentConfig!;
+
+    // Get global handoff keywords if using instance
+    if (agentInstance) {
+      const { data: globalConfig } = await supabase
+        .from('ai_agent_config')
+        .select('human_handoff_keywords')
+        .limit(1)
+        .single();
+      
+      if (globalConfig?.human_handoff_keywords) {
+        effectiveConfig.human_handoff_keywords = globalConfig.human_handoff_keywords;
+      }
+    }
+
+    console.log(`🤖 Using agent: ${effectiveConfig.agent_name} (model: ${effectiveConfig.llm_model})`);
+
+    // 3. Check if auto-reply is enabled
+    if (!effectiveConfig.auto_reply_enabled) {
       console.log('⏭️ Auto-reply disabled, skipping');
       return new Response(JSON.stringify({ 
         success: false, 
@@ -95,7 +185,7 @@ serve(async (req) => {
 
     // 3. Check for human handoff keywords
     const lowerMessage = message_content.toLowerCase();
-    const triggerKeywords = agentConfig.human_handoff_keywords?.filter(
+    const triggerKeywords = effectiveConfig.human_handoff_keywords?.filter(
       keyword => lowerMessage.includes(keyword.toLowerCase())
     ) || [];
     const needsHumanHandoff = triggerKeywords.length > 0;
@@ -627,15 +717,15 @@ Quantidade Total: ${itemsTotalQuantity} unidade(s)
       : `TRANSPORTADORA - seja profissional e objetivo`;
 
     // Get forbidden phrases
-    const forbiddenPhrases = (config as any).forbidden_phrases ?? [
+    const forbiddenPhrases = effectiveConfig.forbidden_phrases ?? [
       'Qualquer dúvida, estou à disposição',
       'Fico no aguardo',
       'Abraço, Equipe Imply',
       'Estou à disposição'
     ];
 
-    // NEW HUMANIZED SYSTEM PROMPT - SHORT AND CONVERSATIONAL
-    const systemPrompt = `Você é ${agentConfig.agent_name}, atendente da IMPLY pelo WhatsApp.
+    // Use instance system_prompt if available, otherwise build default
+    const systemPrompt = effectiveConfig.system_prompt || `Você é ${effectiveConfig.agent_name}, atendente da IMPLY pelo WhatsApp.
 
 🎯 REGRAS DE OURO (NUNCA QUEBRE):
 1. MÁXIMO 3-4 LINHAS por mensagem
@@ -703,7 +793,7 @@ Lembre-se: Conversa de WhatsApp = mensagens CURTAS e DIRETAS!`;
       });
     }
 
-    console.log('🤖 Calling OpenAI API with model:', agentConfig.llm_model);
+    console.log('🤖 Calling OpenAI API with model:', effectiveConfig.llm_model);
     console.log(`📜 Including ${conversationHistory.length} previous messages in context`);
 
     // Build messages array with conversation history
@@ -743,7 +833,7 @@ Use este contexto para:
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: agentConfig.llm_model || 'gpt-4o-mini',
+        model: effectiveConfig.llm_model || 'gpt-4o-mini',
         messages: messagesForLLM,
         max_tokens: 150, // Reduzido para forçar respostas curtas
         temperature: 0.5, // Reduzido para mais consistência
@@ -782,7 +872,7 @@ Use este contexto para:
           carrier_id,
           carrier_name,
           generated_by: 'ai_agent',
-          model: agentConfig.llm_model,
+          model: effectiveConfig.llm_model,
           processing_time_ms: Date.now() - startTime,
         }
       });
@@ -818,8 +908,8 @@ Use este contexto para:
     }
 
     // Add delay before sending (more natural)
-    if (agentConfig.auto_reply_delay_ms > 0) {
-      await new Promise(resolve => setTimeout(resolve, agentConfig.auto_reply_delay_ms));
+    if (effectiveConfig.auto_reply_delay_ms > 0) {
+      await new Promise(resolve => setTimeout(resolve, effectiveConfig.auto_reply_delay_ms));
     }
 
     // Normalize URL

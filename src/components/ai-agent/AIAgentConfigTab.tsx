@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { Save, Bot, MessageSquare, Mail, Clock, Bell, Sparkles, Zap, AlertTriangle, FlaskConical, Smartphone, MessageCircle, Ban } from "lucide-react";
+import { Save, MessageSquare, Mail, Clock, Bell, AlertTriangle, FlaskConical, Smartphone, Settings } from "lucide-react";
 import { toast } from "sonner";
 import { NOTIFICATION_PHASE_OPTIONS } from "@/lib/notificationPhases";
 
@@ -29,16 +29,13 @@ interface AgentConfig {
   signature: string;
   custom_instructions: string | null;
   notification_phases?: string[];
-  // Auto-reply with AI
   auto_reply_enabled?: boolean;
   llm_model?: string;
   max_response_time_seconds?: number;
   human_handoff_keywords?: string[];
   auto_reply_delay_ms?: number;
   auto_reply_contact_types?: string[];
-  // Test mode
   test_phone?: string | null;
-  // Conversation style
   use_signature?: boolean;
   closing_style?: string;
   conversation_style?: string;
@@ -90,298 +87,42 @@ export function AIAgentConfigTab({ config, onUpdate }: Props) {
 
   return (
     <div className="space-y-6">
-      {/* Status e Identidade */}
+      {/* Header Info */}
+      <Card className="bg-muted/30 border-dashed">
+        <CardHeader className="pb-2">
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <Settings className="h-5 w-5" />
+            Configurações Globais
+          </CardTitle>
+          <CardDescription>
+            Estas configurações afetam <strong>todos os agentes</strong>. Para configurar a identidade e personalidade de cada agente individualmente, acesse a aba "Agentes".
+          </CardDescription>
+        </CardHeader>
+      </Card>
+
+      {/* Modelo de IA Padrão */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Bot className="h-5 w-5" />
-            Identidade do Agente
-          </CardTitle>
-          <CardDescription>Configure a personalidade e comportamento do agente</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <Label>Status do Agente</Label>
-              <p className="text-sm text-muted-foreground">Ativar ou desativar o envio de notificações</p>
-            </div>
-            <Switch
-              checked={formData.is_active ?? config.is_active}
-              onCheckedChange={(checked) => updateField('is_active', checked)}
-            />
-          </div>
-
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-2">
-              <Label>Nome do Agente</Label>
-              <Input
-                value={formData.agent_name ?? config.agent_name}
-                onChange={(e) => updateField('agent_name', e.target.value)}
-                placeholder="Ex: Assistente Imply"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Assinatura</Label>
-              <Input
-                value={formData.signature ?? config.signature}
-                onChange={(e) => updateField('signature', e.target.value)}
-                placeholder="Ex: Equipe Imply"
-              />
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label>Personalidade</Label>
-            <Textarea
-              value={formData.personality ?? config.personality}
-              onChange={(e) => updateField('personality', e.target.value)}
-              placeholder="Descreva a personalidade do agente..."
-              rows={3}
-            />
-          </div>
-
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-2">
-              <Label>Tom de Voz</Label>
-              <Select
-                value={formData.tone_of_voice ?? config.tone_of_voice}
-                onValueChange={(value) => updateField('tone_of_voice', value)}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="formal">Formal</SelectItem>
-                  <SelectItem value="informal">Informal</SelectItem>
-                  <SelectItem value="amigavel">Amigável</SelectItem>
-                  <SelectItem value="profissional">Profissional</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Idioma</Label>
-              <Select
-                value={formData.language ?? config.language}
-                onValueChange={(value) => updateField('language', value)}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="pt-BR">Português (Brasil)</SelectItem>
-                  <SelectItem value="en-US">English (US)</SelectItem>
-                  <SelectItem value="es">Español</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label>Instruções Personalizadas</Label>
-            <Textarea
-              value={formData.custom_instructions ?? config.custom_instructions ?? ''}
-              onChange={(e) => updateField('custom_instructions', e.target.value)}
-              placeholder="Instruções adicionais para o agente..."
-              rows={4}
-            />
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Auto-Reply com IA */}
-      <Card className="border-2 border-primary/20 bg-gradient-to-br from-primary/5 to-transparent">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Sparkles className="h-5 w-5 text-primary" />
-            Resposta Automática com IA
-            <Badge variant="secondary" className="ml-2">
-              <Zap className="h-3 w-3 mr-1" />
-              OpenAI
-            </Badge>
+            <AlertTriangle className="h-5 w-5 text-amber-500" />
+            Palavras-chave para Transferência Humana
           </CardTitle>
           <CardDescription>
-            Configure o agente de IA para responder automaticamente às mensagens recebidas via WhatsApp
+            Quando detectadas em qualquer agente, a IA para de responder e marca para atendimento humano
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex items-center justify-between p-4 rounded-lg bg-background border">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-primary/10 rounded-lg">
-                <Bot className="h-5 w-5 text-primary" />
-              </div>
-              <div>
-                <Label className="text-base">Habilitar Auto-Resposta</Label>
-                <p className="text-sm text-muted-foreground">
-                  O agente responderá automaticamente usando IA
-                </p>
-              </div>
-            </div>
-            <Switch
-              checked={formData.auto_reply_enabled ?? config.auto_reply_enabled ?? false}
-              onCheckedChange={(checked) => updateField('auto_reply_enabled', checked)}
-            />
-          </div>
-
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-2">
-              <Label>Modelo de IA</Label>
-              <Select
-                value={formData.llm_model ?? config.llm_model ?? 'gpt-4o-mini'}
-                onValueChange={(value) => updateField('llm_model', value)}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="gpt-4o-mini">
-                    GPT-4o Mini (Rápido e Econômico)
-                  </SelectItem>
-                  <SelectItem value="gpt-4o">
-                    GPT-4o (Mais Capaz)
-                  </SelectItem>
-                  <SelectItem value="gpt-4-turbo">
-                    GPT-4 Turbo
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Delay antes de responder (ms)</Label>
-              <Input
-                type="number"
-                value={formData.auto_reply_delay_ms ?? config.auto_reply_delay_ms ?? 1000}
-                onChange={(e) => updateField('auto_reply_delay_ms', parseInt(e.target.value))}
-                min={0}
-                max={10000}
-                step={500}
-              />
-              <p className="text-xs text-muted-foreground">
-                Simula digitação natural. Recomendado: 1000-3000ms
-              </p>
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <AlertTriangle className="h-4 w-4 text-amber-500" />
-              <Label>Palavras-chave para Transferência Humana</Label>
-            </div>
-            <Textarea
-              value={(formData.human_handoff_keywords ?? config.human_handoff_keywords ?? []).join(', ')}
-              onChange={(e) => updateField('human_handoff_keywords', 
-                e.target.value.split(',').map(s => s.trim()).filter(s => s.length > 0)
-              )}
-              placeholder="humano, atendente, pessoa, falar com alguém..."
-              rows={2}
-            />
-            <p className="text-xs text-muted-foreground">
-              Separe por vírgulas. Quando detectadas, a IA não responderá e marcará para atendimento humano.
-            </p>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Estilo de Conversa */}
-      <Card className="border-2 border-purple-500/20 bg-gradient-to-br from-purple-500/5 to-transparent">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <MessageCircle className="h-5 w-5 text-purple-500" />
-            Estilo de Conversa
-            <Badge variant="outline" className="ml-2 border-purple-500/50 text-purple-600">
-              Anti-Robô
-            </Badge>
-          </CardTitle>
-          <CardDescription>
-            Configure como o agente deve conversar para evitar mensagens repetitivas e robóticas
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-2">
-              <Label>Estilo de Conversa</Label>
-              <Select
-                value={formData.conversation_style ?? config.conversation_style ?? 'chatty'}
-                onValueChange={(value) => updateField('conversation_style', value)}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="chatty">🗣️ Conversacional (natural, fluído)</SelectItem>
-                  <SelectItem value="concise">📝 Conciso (direto ao ponto)</SelectItem>
-                  <SelectItem value="formal">👔 Formal (profissional)</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Estilo de Fechamento</Label>
-              <Select
-                value={formData.closing_style ?? config.closing_style ?? 'varied'}
-                onValueChange={(value) => updateField('closing_style', value)}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="varied">🎲 Variado (muda a cada mensagem)</SelectItem>
-                  <SelectItem value="fixed">📌 Fixo (sempre igual)</SelectItem>
-                  <SelectItem value="none">❌ Nenhum (sem fechamento)</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <div className="flex items-center justify-between p-4 rounded-lg bg-background border">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-purple-500/10 rounded-lg">
-                <Ban className="h-5 w-5 text-purple-500" />
-              </div>
-              <div>
-                <Label className="text-base">Usar Assinatura</Label>
-                <p className="text-sm text-muted-foreground">
-                  Incluir assinatura formal no final das mensagens
-                </p>
-              </div>
-            </div>
-            <Switch
-              checked={formData.use_signature ?? config.use_signature ?? false}
-              onCheckedChange={(checked) => updateField('use_signature', checked)}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <Ban className="h-4 w-4 text-red-500" />
-              <Label>Frases Proibidas</Label>
-            </div>
-            <Textarea
-              value={(formData.forbidden_phrases ?? config.forbidden_phrases ?? []).join('\n')}
-              onChange={(e) => updateField('forbidden_phrases', 
-                e.target.value.split('\n').map(s => s.trim()).filter(s => s.length > 0)
-              )}
-              placeholder="Qualquer dúvida, estou à disposição&#10;Fico no aguardo&#10;Abraço, Equipe Imply"
-              rows={4}
-              className="font-mono text-sm"
-            />
-            <p className="text-xs text-muted-foreground">
-              Uma frase por linha. O agente NUNCA usará estas frases nas respostas.
-            </p>
-          </div>
-
-          <div className="flex items-center justify-between p-3 rounded-lg bg-green-500/10 border border-green-500/20">
-            <div className="flex items-center gap-2">
-              <Sparkles className="h-4 w-4 text-green-500" />
-              <span className="text-sm text-green-700 dark:text-green-400">
-                Evitar repetição ativa - o agente variará expressões automaticamente
-              </span>
-            </div>
-            <Switch
-              checked={formData.avoid_repetition ?? config.avoid_repetition ?? true}
-              onCheckedChange={(checked) => updateField('avoid_repetition', checked)}
-            />
-          </div>
+          <Textarea
+            value={(formData.human_handoff_keywords ?? config.human_handoff_keywords ?? []).join(', ')}
+            onChange={(e) => updateField('human_handoff_keywords', 
+              e.target.value.split(',').map(s => s.trim()).filter(s => s.length > 0)
+            )}
+            placeholder="humano, atendente, pessoa, falar com alguém, gerente, supervisor..."
+            rows={3}
+          />
+          <p className="text-xs text-muted-foreground">
+            Separe por vírgulas. Estas palavras são compartilhadas entre todos os agentes.
+          </p>
         </CardContent>
       </Card>
 
@@ -393,7 +134,7 @@ export function AIAgentConfigTab({ config, onUpdate }: Props) {
             Fases de Notificação ao Cliente
           </CardTitle>
           <CardDescription>
-            Selecione em quais mudanças de status o cliente receberá notificação automática
+            Selecione em quais mudanças de status os clientes receberão notificação automática (vale para todos os agentes)
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -443,7 +184,7 @@ export function AIAgentConfigTab({ config, onUpdate }: Props) {
             </Badge>
           </CardTitle>
           <CardDescription>
-            Configure um número de teste para receber cópia de todas as notificações enviadas
+            Configure um número de teste para receber cópia de todas as notificações enviadas por qualquer agente
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -483,7 +224,7 @@ export function AIAgentConfigTab({ config, onUpdate }: Props) {
             <MessageSquare className="h-5 w-5" />
             Canais de Comunicação
           </CardTitle>
-          <CardDescription>Habilite os canais disponíveis para envio</CardDescription>
+          <CardDescription>Habilite os canais disponíveis para envio (global)</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center justify-between">
@@ -527,7 +268,7 @@ export function AIAgentConfigTab({ config, onUpdate }: Props) {
             <Clock className="h-5 w-5" />
             Horários e Limites
           </CardTitle>
-          <CardDescription>Configure janelas de envio e limites de notificações</CardDescription>
+          <CardDescription>Configure janelas de envio e limites de notificações (global)</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center justify-between">
