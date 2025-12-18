@@ -826,8 +826,22 @@ export function AIAgentMessagesTab({ selectedAgentType = 'carrier' }: Props) {
                         </div>
                       ) : (
                         messages.map(message => {
+                          const sentVia = message.message_metadata?.sent_via;
                           const isAiGenerated = message.message_metadata?.is_ai_generated || 
-                            message.message_metadata?.sent_via === 'ai_agent_auto_reply';
+                            sentVia === 'ai_agent_auto_reply';
+                          const isMobileOrWeb = sentVia === 'mobile_or_web';
+                          const isSystem = sentVia === 'mega_api' && !isAiGenerated && !isMobileOrWeb;
+                          
+                          // Determinar badge de origem para mensagens outbound
+                          const getOriginBadge = () => {
+                            if (message.message_direction !== 'outbound') return null;
+                            if (isAiGenerated) return { icon: '🤖', label: 'IA', color: 'bg-blue-50 dark:bg-blue-950/50 border-blue-300 text-blue-600 dark:text-blue-400' };
+                            if (isMobileOrWeb) return { icon: '📱', label: 'Celular', color: 'bg-orange-50 dark:bg-orange-950/50 border-orange-300 text-orange-600 dark:text-orange-400' };
+                            if (isSystem) return { icon: '💻', label: 'Sistema', color: 'bg-green-50 dark:bg-green-950/50 border-green-300 text-green-600 dark:text-green-400' };
+                            return null;
+                          };
+                          
+                          const originBadge = getOriginBadge();
                           
                           return (
                             <div
@@ -839,17 +853,19 @@ export function AIAgentMessagesTab({ selectedAgentType = 'carrier' }: Props) {
                                   message.message_direction === 'outbound'
                                     ? isAiGenerated 
                                       ? 'bg-blue-100 dark:bg-blue-900/40 border border-blue-200 dark:border-blue-800'
-                                      : 'bg-[#dcf8c6] dark:bg-green-900/50'
+                                      : isMobileOrWeb
+                                        ? 'bg-orange-50 dark:bg-orange-900/30 border border-orange-200 dark:border-orange-800'
+                                        : 'bg-[#dcf8c6] dark:bg-green-900/50'
                                     : 'bg-muted'
                                 }`}
                               >
-                                {/* AI Badge */}
-                                {isAiGenerated && (
+                                {/* Origin Badge */}
+                                {originBadge && (
                                   <div className="flex items-center gap-1 mb-1">
-                                    <Badge variant="outline" className="text-[9px] h-4 px-1.5 bg-blue-50 dark:bg-blue-950/50 border-blue-300 text-blue-600 dark:text-blue-400">
-                                      🤖 IA
+                                    <Badge variant="outline" className={`text-[9px] h-4 px-1.5 ${originBadge.color}`}>
+                                      {originBadge.icon} {originBadge.label}
                                     </Badge>
-                                    {message.message_metadata?.model && (
+                                    {isAiGenerated && message.message_metadata?.model && (
                                       <span className="text-[9px] text-muted-foreground">
                                         {message.message_metadata.model}
                                       </span>
