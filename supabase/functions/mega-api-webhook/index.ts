@@ -684,19 +684,30 @@ Deno.serve(async (req) => {
       // Find carrier by phone number - search all variations
       console.log('🔍 Looking for carrier with WhatsApp variations:', uniqueVariations);
       
-      // Build OR query with all phone variations
+      // Build OR query with all phone variations - também buscar com variações no nome
       const orConditions = uniqueVariations
         .map(variation => `whatsapp.ilike.%${variation}%`)
         .join(',');
       
-      const { data: carrier, error: carrierError } = await supabase
+      // Buscar carrier existente - PRIMEIRO verificar todas as variações
+      let carrier: { id: string; name: string; whatsapp: string | null } | null = null;
+      
+      const { data: carrierData, error: carrierError } = await supabase
         .from('carriers')
         .select('id, name, whatsapp')
-        .or(orConditions)
-        .maybeSingle();
+        .or(orConditions);
 
       if (carrierError) {
         console.error('Error finding carrier:', carrierError);
+      }
+      
+      // Se encontrou múltiplos, pegar o que tem match mais preciso
+      if (carrierData && carrierData.length > 0) {
+        // Preferir match exato sobre match parcial
+        carrier = carrierData.find(c => 
+          uniqueVariations.some(v => c.whatsapp?.includes(v))
+        ) || carrierData[0];
+        console.log(`✅ Found carrier: ${carrier.name} (${carrier.id})`);
       }
 
       // Se não encontrou carrier, buscar em customer_contacts
@@ -733,27 +744,29 @@ Deno.serve(async (req) => {
           customerName = customer.customer_name;
           contactType = 'customer';
           
-          // Para clientes, precisamos criar um "carrier" temporário para manter compatibilidade
-          // ou usar um carrier genérico para clientes
+          // Para clientes, buscar se já existe um carrier para este número
+          // Usar TODAS as variações para evitar duplicatas
           const customerCarrierName = `Cliente: ${customer.customer_name}`;
           
-          // Buscar se já existe um carrier para este cliente
-          const { data: existingCarrier } = await supabase
+          const { data: existingCarriers } = await supabase
             .from('carriers')
-            .select('id, name')
-            .eq('whatsapp', phoneNumber)
-            .maybeSingle();
+            .select('id, name, whatsapp')
+            .or(orConditions);
           
-          if (existingCarrier) {
+          if (existingCarriers && existingCarriers.length > 0) {
+            // Usar o carrier existente (evitar duplicata)
+            const existingCarrier = existingCarriers[0];
             carrierId = existingCarrier.id;
             carrierName = existingCarrier.name;
+            console.log('✅ Using existing carrier for customer:', existingCarrier.id);
           } else {
-            // Criar carrier para o cliente
+            // Criar carrier para o cliente - usar número normalizado
+            const normalizedPhone = uniqueVariations[0]; // Usar primeira variação (mais completa)
             const { data: newCarrier, error: createError } = await supabase
               .from('carriers')
               .insert({
                 name: customerCarrierName,
-                whatsapp: phoneNumber,
+                whatsapp: normalizedPhone,
                 is_active: true,
                 notes: `Contato de cliente criado automaticamente - Customer ID: ${customer.id}`,
               })
@@ -770,29 +783,46 @@ Deno.serve(async (req) => {
       }
       
       // Se ainda não encontrou, criar contato desconhecido
+      // MAS primeiro verificar novamente se não existe com qualquer variação
       if (!carrierId) {
-        console.log('⚠️ Contact not found anywhere for phone:', phoneNumber, '- Creating unknown contact');
+        console.log('⚠️ Contact not found, double-checking before creating...');
         
-        const unknownCarrierName = `Contato ${phoneNumber.slice(-4)}`;
-        
-        const { data: newCarrier, error: createError } = await supabase
+        // Última tentativa de encontrar carrier existente
+        const { data: lastCheckCarrier } = await supabase
           .from('carriers')
-          .insert({
-            name: unknownCarrierName,
-            whatsapp: phoneNumber,
-            is_active: true,
-            notes: `Contato criado automaticamente via WhatsApp em ${new Date().toISOString()}`,
-          })
           .select('id, name')
-          .single();
+          .or(orConditions)
+          .limit(1)
+          .maybeSingle();
         
-        if (createError) {
-          console.error('Error creating unknown carrier:', createError);
-          contactType = 'unknown';
+        if (lastCheckCarrier) {
+          carrierId = lastCheckCarrier.id;
+          carrierName = lastCheckCarrier.name;
+          console.log('✅ Found carrier on final check:', lastCheckCarrier.id);
         } else {
-          carrierId = newCarrier.id;
-          carrierName = newCarrier.name;
-          console.log('✅ Created new carrier for unknown contact:', newCarrier.id);
+          // Realmente não existe, criar novo
+          const unknownCarrierName = `Contato ${phoneNumber.slice(-4)}`;
+          const normalizedPhone = uniqueVariations[0]; // Usar primeira variação
+          
+          const { data: newCarrier, error: createError } = await supabase
+            .from('carriers')
+            .insert({
+              name: unknownCarrierName,
+              whatsapp: normalizedPhone,
+              is_active: true,
+              notes: `Contato criado automaticamente via WhatsApp em ${new Date().toISOString()}`,
+            })
+            .select('id, name')
+            .single();
+          
+          if (createError) {
+            console.error('Error creating unknown carrier:', createError);
+            contactType = 'unknown';
+          } else {
+            carrierId = newCarrier.id;
+            carrierName = newCarrier.name;
+            console.log('✅ Created new carrier for unknown contact:', newCarrier.id);
+          }
         }
       }
 
@@ -947,79 +977,120 @@ Deno.serve(async (req) => {
 
       console.log('✅ Message saved successfully:', conversation.id);
 
-      // 🤖 Trigger AI Agent auto-reply (fire and forget)
+      // 🤖 DEBOUNCE: Adicionar mensagem ao buffer ao invés de responder imediatamente
       // ⚠️ SKIP GROUPS - Only respond to individual contacts (economia de tokens)
-      // Para CLIENTES: usar ai-agent-logistics-reply (busca multi-estratégia + contexto rico)
-      // Para TRANSPORTADORAS: usar ai-agent-auto-reply (resposta genérica)
-      // Nota: Para mídia, informar o agente que há mídia anexada
+      // O processo de debounce aguarda 5 segundos para agrupar mensagens rápidas
+      const DEBOUNCE_DELAY_MS = 5000; // 5 segundos
+      
       if (isGroupMessage) {
         console.log('⏭️ Skipping AI Agent for group message:', groupName || groupId || 'unknown group');
         console.log('📝 Group messages are saved but NOT auto-replied to (token economy)');
-      } else {
+      } else if (carrierId) {
         try {
-          console.log('🤖 Triggering AI Agent reply for:', contactType, hasMedia ? '(with media)' : '');
+          console.log('🕐 Adding message to debounce buffer for:', contactType);
           
-          if (contactType === 'customer') {
-            // CLIENTES: Usar logistics-reply para contexto completo com busca de pedidos
-            fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/ai-agent-logistics-reply`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
-              },
-              body: JSON.stringify({
-                message: messageText,
-                from_phone: phoneNumber,
-                carrier_id: carrierId,
-                contact_type: 'customer',
-                customer_id: customerId,
-                conversation_id: conversation.id,
-                has_media: hasMedia,
-                media_type: hasMedia ? mediaData!.type : null,
-                media_caption: hasMedia ? mediaData!.caption : null,
-              }),
-            }).then(async (res) => {
-              const result = await res.json();
-              console.log('🤖 Customer logistics-reply result:', JSON.stringify(result, null, 2));
-              
-              // Se gerou mensagem, enviar via Mega API
-              if (result.success && result.message) {
-                await sendAutoReplyMessage(phoneNumber, result.message, carrierId, supabase);
-              }
-            }).catch((err) => {
-              console.error('🤖 Customer logistics-reply error:', err);
-            });
+          // Buscar número da instância conectada (receiver_phone)
+          const { data: connectedInstance } = await supabase
+            .from('whatsapp_instances')
+            .select('phone_number')
+            .eq('status', 'connected')
+            .limit(1)
+            .maybeSingle();
+          
+          const receiverPhone = connectedInstance?.phone_number || null;
+          
+          // Verificar se já existe buffer pendente para este contato
+          const { data: existingBuffer } = await supabase
+            .from('pending_ai_replies')
+            .select('*')
+            .eq('carrier_id', carrierId)
+            .eq('sender_phone', phoneNumber)
+            .is('processed_at', null)
+            .maybeSingle();
+          
+          const messageEntry = {
+            content: messageText,
+            timestamp: new Date().toISOString(),
+            has_media: hasMedia,
+            media_type: hasMedia ? mediaData!.type : null,
+            conversation_id: conversation.id,
+          };
+          
+          if (existingBuffer) {
+            // Adicionar ao buffer existente e estender tempo de debounce
+            const updatedBuffer = [...(existingBuffer.messages_buffer as any[]), messageEntry];
+            const updatedConversationIds = [...(existingBuffer.conversation_ids || []), conversation.id];
+            
+            await supabase
+              .from('pending_ai_replies')
+              .update({
+                messages_buffer: updatedBuffer,
+                conversation_ids: updatedConversationIds,
+                scheduled_reply_at: new Date(Date.now() + DEBOUNCE_DELAY_MS).toISOString(),
+              })
+              .eq('id', existingBuffer.id);
+            
+            console.log(`📬 Added to existing buffer (now ${updatedBuffer.length} messages), reply in ${DEBOUNCE_DELAY_MS}ms`);
           } else {
-            // TRANSPORTADORAS: Usar auto-reply padrão
-            fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/ai-agent-auto-reply`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
-              },
-              body: JSON.stringify({
-                conversation_id: conversation.id,
-                message_content: messageText,
-                sender_phone: phoneNumber,
+            // Criar novo buffer
+            await supabase
+              .from('pending_ai_replies')
+              .insert({
                 carrier_id: carrierId,
-                carrier_name: carrierName || 'Contato desconhecido',
-                order_id: orderId,
+                sender_phone: phoneNumber,
+                receiver_phone: receiverPhone,
                 contact_type: contactType,
-                has_media: hasMedia,
-                media_type: hasMedia ? mediaData!.type : null,
-                media_caption: hasMedia ? mediaData!.caption : null,
-              }),
-            }).then(async (res) => {
-              const result = await res.json();
-              console.log('🤖 Carrier auto-reply result:', JSON.stringify(result, null, 2));
-            }).catch((err) => {
-              console.error('🤖 Carrier auto-reply error:', err);
-            });
+                messages_buffer: [messageEntry],
+                conversation_ids: [conversation.id],
+                first_message_at: new Date().toISOString(),
+                scheduled_reply_at: new Date(Date.now() + DEBOUNCE_DELAY_MS).toISOString(),
+              });
+            
+            console.log(`📬 Created new debounce buffer, reply scheduled in ${DEBOUNCE_DELAY_MS}ms`);
           }
           
-        } catch (autoReplyError) {
-          console.error('🤖 Failed to trigger auto-reply:', autoReplyError);
-          // Don't throw - auto-reply failure shouldn't break webhook
+          // Disparar processamento após o delay (fire and forget)
+          // Isso garante que mesmo sem cron, as mensagens serão processadas
+          setTimeout(async () => {
+            try {
+              await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/process-pending-replies`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+                },
+                body: JSON.stringify({ trigger: 'debounce_timeout' }),
+              });
+            } catch (err) {
+              console.error('🕐 Failed to trigger process-pending-replies:', err);
+            }
+          }, DEBOUNCE_DELAY_MS + 500); // +500ms de margem
+          
+        } catch (debounceError) {
+          console.error('🕐 Failed to add to debounce buffer:', debounceError);
+          // Fallback: responder imediatamente se o debounce falhar
+          console.log('⚠️ Falling back to immediate reply...');
+          
+          const functionName = contactType === 'customer' 
+            ? 'ai-agent-logistics-reply' 
+            : 'ai-agent-auto-reply';
+          
+          fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/${functionName}`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+            },
+            body: JSON.stringify({
+              conversation_id: conversation.id,
+              message_content: messageText,
+              sender_phone: phoneNumber,
+              carrier_id: carrierId,
+              carrier_name: carrierName || 'Contato desconhecido',
+              order_id: orderId,
+              contact_type: contactType,
+            }),
+          }).catch(err => console.error('🤖 Fallback auto-reply error:', err));
         }
       }
 

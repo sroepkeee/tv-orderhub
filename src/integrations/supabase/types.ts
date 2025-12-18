@@ -148,6 +148,7 @@ export type Database = {
           created_at: string | null
           custom_instructions: string | null
           description: string | null
+          domain_type: string | null
           emoji_library: string[] | null
           forbidden_phrases: string[] | null
           id: string
@@ -159,6 +160,7 @@ export type Database = {
           personality: string | null
           personality_traits: Json | null
           response_style: Json | null
+          search_orders: boolean | null
           signature: string | null
           specializations: string[] | null
           system_prompt: string | null
@@ -178,6 +180,7 @@ export type Database = {
           created_at?: string | null
           custom_instructions?: string | null
           description?: string | null
+          domain_type?: string | null
           emoji_library?: string[] | null
           forbidden_phrases?: string[] | null
           id?: string
@@ -189,6 +192,7 @@ export type Database = {
           personality?: string | null
           personality_traits?: Json | null
           response_style?: Json | null
+          search_orders?: boolean | null
           signature?: string | null
           specializations?: string[] | null
           system_prompt?: string | null
@@ -208,6 +212,7 @@ export type Database = {
           created_at?: string | null
           custom_instructions?: string | null
           description?: string | null
+          domain_type?: string | null
           emoji_library?: string[] | null
           forbidden_phrases?: string[] | null
           id?: string
@@ -219,6 +224,7 @@ export type Database = {
           personality?: string | null
           personality_traits?: Json | null
           response_style?: Json | null
+          search_orders?: boolean | null
           signature?: string | null
           specializations?: string[] | null
           system_prompt?: string | null
@@ -2410,6 +2416,56 @@ export type Database = {
           vehicle_plate?: string | null
         }
         Relationships: []
+      }
+      pending_ai_replies: {
+        Row: {
+          carrier_id: string
+          contact_type: string | null
+          conversation_ids: string[] | null
+          created_at: string | null
+          first_message_at: string
+          id: string
+          messages_buffer: Json
+          processed_at: string | null
+          receiver_phone: string | null
+          scheduled_reply_at: string
+          sender_phone: string
+        }
+        Insert: {
+          carrier_id: string
+          contact_type?: string | null
+          conversation_ids?: string[] | null
+          created_at?: string | null
+          first_message_at?: string
+          id?: string
+          messages_buffer?: Json
+          processed_at?: string | null
+          receiver_phone?: string | null
+          scheduled_reply_at: string
+          sender_phone: string
+        }
+        Update: {
+          carrier_id?: string
+          contact_type?: string | null
+          conversation_ids?: string[] | null
+          created_at?: string | null
+          first_message_at?: string
+          id?: string
+          messages_buffer?: Json
+          processed_at?: string | null
+          receiver_phone?: string | null
+          scheduled_reply_at?: string
+          sender_phone?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pending_ai_replies_carrier_id_fkey"
+            columns: ["carrier_id"]
+            isOneToOne: false
+            referencedRelation: "carriers"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       permission_audit_log: {
         Row: {

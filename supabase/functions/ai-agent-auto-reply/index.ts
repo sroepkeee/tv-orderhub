@@ -60,6 +60,9 @@ interface AgentInstance {
   emoji_library: string[] | null;
   max_message_length: number;
   specializations: string[] | null;
+  // Novos campos para separação de domínio
+  search_orders: boolean;
+  domain_type: string | null;
 }
 
 serve(async (req) => {
@@ -155,7 +158,18 @@ serve(async (req) => {
       system_prompt: agentInstance.system_prompt,
       conversation_style: agentInstance.conversation_style || 'chatty',
       avoid_repetition: agentInstance.avoid_repetition ?? true,
-    } : agentConfig!;
+      // Campos de domínio
+      search_orders: agentInstance.search_orders ?? true,
+      domain_type: agentInstance.domain_type || 'general',
+      agent_type: agentInstance.agent_type || 'general',
+      specializations: agentInstance.specializations || [],
+    } : {
+      ...agentConfig!,
+      search_orders: true, // Global config sempre busca pedidos
+      domain_type: 'general',
+      agent_type: 'general',
+      specializations: [],
+    };
 
     // Get global handoff keywords if using instance
     if (agentInstance) {
@@ -364,23 +378,32 @@ serve(async (req) => {
     }
 
     // 5. EXTRACT ORDER NUMBER FROM MESSAGE
-    console.log('🔍 Extracting order number from message...');
-    const orderPatterns = [
-      /pedido\s*(?:n[°º]?|numero|#)?\s*[:\-]?\s*(\d{4,})/i,
-      /ordem\s*(?:n[°º]?|numero|#)?\s*[:\-]?\s*(\d{4,})/i,
-      /n[°º]?\s*(\d{5,})/i,
-      /#\s*(\d{4,})/,
-      /\b(\d{6})\b/,  // 6+ digits as order number
-    ];
+    // ⚠️ SEPARAÇÃO DE DOMÍNIO: Só buscar pedidos se search_orders=true
+    const shouldSearchOrders = effectiveConfig.search_orders !== false;
+    console.log(`🔍 Domain: ${effectiveConfig.domain_type}, search_orders: ${shouldSearchOrders}`);
     
     let extractedOrderNumber: string | null = null;
-    for (const pattern of orderPatterns) {
-      const match = message_content.match(pattern);
-      if (match) {
-        extractedOrderNumber = match[1];
-        console.log(`📦 Extracted order number: ${extractedOrderNumber}`);
-        break;
+    
+    if (shouldSearchOrders) {
+      console.log('🔍 Extracting order number from message...');
+      const orderPatterns = [
+        /pedido\s*(?:n[°º]?|numero|#)?\s*[:\-]?\s*(\d{4,})/i,
+        /ordem\s*(?:n[°º]?|numero|#)?\s*[:\-]?\s*(\d{4,})/i,
+        /n[°º]?\s*(\d{5,})/i,
+        /#\s*(\d{4,})/,
+        /\b(\d{6})\b/,  // 6+ digits as order number
+      ];
+      
+      for (const pattern of orderPatterns) {
+        const match = message_content.match(pattern);
+        if (match) {
+          extractedOrderNumber = match[1];
+          console.log(`📦 Extracted order number: ${extractedOrderNumber}`);
+          break;
+        }
       }
+    } else {
+      console.log('⏭️ Skipping order search (domain: after_sales or search_orders=false)');
     }
 
     // 5. LOOKUP ORDER IN DATABASE (with sensitive data filtering)
@@ -470,8 +493,8 @@ serve(async (req) => {
       return labels[modality?.toLowerCase()] || modality;
     };
 
-    // Try to find order by extracted number
-    if (extractedOrderNumber) {
+    // Try to find order by extracted number (ONLY if search_orders enabled)
+    if (shouldSearchOrders && extractedOrderNumber) {
       console.log(`🔍 Searching for order: ${extractedOrderNumber}`);
       const { data: order } = await supabase
         .from('orders')
@@ -505,8 +528,8 @@ serve(async (req) => {
       }
     }
 
-    // If no order found by number, try by order_id or customer context
-    if (!foundOrder && order_id) {
+    // If no order found by number, try by order_id or customer context (ONLY if search_orders enabled)
+    if (shouldSearchOrders && !foundOrder && order_id) {
       const { data: order } = await supabase
         .from('orders')
         .select(`
@@ -537,8 +560,8 @@ serve(async (req) => {
       }
     }
 
-    // If customer contact, try to find their last order
-    if (!foundOrder && contact_type === 'customer' && sender_phone) {
+    // If customer contact, try to find their last order (ONLY if search_orders enabled)
+    if (shouldSearchOrders && !foundOrder && contact_type === 'customer' && sender_phone) {
       const phoneDigits = sender_phone.replace(/\D/g, '').slice(-8);
       
       // Search by customer_contacts.last_order_id
@@ -662,8 +685,10 @@ Quantidade Total: ${itemsTotalQuantity} unidade(s)
 `;
     }
 
-    // 6. Fetch knowledge base for RAG
-    console.log('🔍 Searching knowledge base...');
+    // 6. Fetch knowledge base for RAG - USAR agent_type da instância (não contact_type)
+    const agentTypeForKnowledge = effectiveConfig.agent_type || 'general';
+    console.log(`🔍 Searching knowledge base for agent_type: ${agentTypeForKnowledge}`);
+    
     const queryTokens = message_content.toLowerCase()
       .split(/\s+/)
       .filter(token => token.length > 2)
@@ -673,8 +698,24 @@ Quantidade Total: ${itemsTotalQuantity} unidade(s)
       .from('ai_knowledge_base')
       .select('title, content, category, keywords, carrier_name, occurrence_type, sla_category')
       .eq('is_active', true)
-      .or(`agent_type.eq.${contact_type},agent_type.eq.general`)
+      .or(`agent_type.eq.${agentTypeForKnowledge},agent_type.eq.general`)
       .limit(10);
+
+    // 6b. BUSCAR REGRAS E POLÍTICAS do ai_rules
+    console.log('📋 Fetching AI rules and policies...');
+    const { data: aiRules } = await supabase
+      .from('ai_rules')
+      .select('policy, rule, rule_description, rule_risk, action')
+      .eq('is_active', true)
+      .limit(20);
+    
+    const rulesContext = (aiRules && aiRules.length > 0)
+      ? `\n\n📋 REGRAS E POLÍTICAS:\n${aiRules.map(r => 
+          `- [${r.policy}] ${r.rule_description} (Risco: ${r.rule_risk})`
+        ).join('\n')}`
+      : '';
+    
+    console.log(`📋 Found ${aiRules?.length || 0} active rules`);
 
     // Score and filter relevant knowledge
     const relevantKnowledge = (knowledge || [])
@@ -709,8 +750,8 @@ Quantidade Total: ${itemsTotalQuantity} unidade(s)
     const knowledgeContext = relevantKnowledge.length > 0
       ? `\n\nBase de Conhecimento:\n${relevantKnowledge.map(k => 
           `- ${k.title}: ${k.content.substring(0, 200)}...`
-        ).join('\n')}`
-      : '';
+        ).join('\n')}${rulesContext}`
+      : rulesContext;
 
     const contactTypeInstructions = contact_type === 'customer' 
       ? `CLIENTE - seja empático e amigável`
