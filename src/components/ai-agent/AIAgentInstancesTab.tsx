@@ -8,12 +8,13 @@ import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ScrollArea } from '@/components/ui/scroll-area';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { 
-  Bot, Plus, Edit, Trash2, Phone, MessageSquare, Settings, 
-  Sparkles, Brain, Heart, Zap, Users, Package, Headphones 
+  Bot, Plus, Edit, Trash2, Phone, Settings, 
+  Sparkles, Brain, Zap, Users, Package, Headphones,
+  MessageCircle, Ban, User
 } from 'lucide-react';
 
 interface AgentInstance {
@@ -30,6 +31,21 @@ interface AgentInstance {
   emoji_library: string[];
   max_message_length: number;
   created_at: string;
+  // New identity fields
+  system_prompt: string | null;
+  auto_reply_enabled: boolean;
+  personality: string | null;
+  tone_of_voice: string | null;
+  language: string | null;
+  custom_instructions: string | null;
+  signature: string | null;
+  use_signature: boolean;
+  llm_model: string | null;
+  auto_reply_delay_ms: number;
+  conversation_style: string | null;
+  closing_style: string | null;
+  avoid_repetition: boolean;
+  forbidden_phrases: string[] | null;
 }
 
 const AGENT_TYPE_CONFIG = {
@@ -41,22 +57,28 @@ const AGENT_TYPE_CONFIG = {
 };
 
 const TONE_OPTIONS = [
-  { value: 'professional', label: 'Profissional' },
-  { value: 'friendly', label: 'Amigável' },
-  { value: 'empathetic', label: 'Empático' },
-  { value: 'casual', label: 'Casual' },
-];
-
-const FORMALITY_OPTIONS = [
   { value: 'formal', label: 'Formal' },
-  { value: 'semi-formal', label: 'Semi-formal' },
   { value: 'informal', label: 'Informal' },
+  { value: 'amigavel', label: 'Amigável' },
+  { value: 'profissional', label: 'Profissional' },
 ];
 
-const EMPATHY_OPTIONS = [
-  { value: 'low', label: 'Baixo' },
-  { value: 'medium', label: 'Médio' },
-  { value: 'high', label: 'Alto' },
+const CONVERSATION_STYLE_OPTIONS = [
+  { value: 'chatty', label: '🗣️ Conversacional' },
+  { value: 'concise', label: '📝 Conciso' },
+  { value: 'formal', label: '👔 Formal' },
+];
+
+const CLOSING_STYLE_OPTIONS = [
+  { value: 'varied', label: '🎲 Variado' },
+  { value: 'fixed', label: '📌 Fixo' },
+  { value: 'none', label: '❌ Nenhum' },
+];
+
+const LLM_MODELS = [
+  { value: 'gpt-4o-mini', label: 'GPT-4o Mini (Rápido)' },
+  { value: 'gpt-4o', label: 'GPT-4o (Avançado)' },
+  { value: 'gpt-4-turbo', label: 'GPT-4 Turbo' },
 ];
 
 export default function AIAgentInstancesTab() {
@@ -64,19 +86,41 @@ export default function AIAgentInstancesTab() {
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingInstance, setEditingInstance] = useState<AgentInstance | null>(null);
+  const [activeTab, setActiveTab] = useState('identity');
   
-  // Form state
+  // Form state - organized by sections
   const [formData, setFormData] = useState({
+    // Basic Info
     instance_name: '',
     agent_type: 'general',
     whatsapp_number: '',
     description: '',
+    is_active: true,
+    
+    // Identity
+    personality: 'Profissional, amigável e prestativo',
+    tone_of_voice: 'informal',
+    language: 'pt-BR',
+    signature: '',
+    use_signature: false,
+    
+    // AI Configuration
+    system_prompt: '',
+    custom_instructions: '',
+    llm_model: 'gpt-4o-mini',
+    auto_reply_enabled: true,
+    auto_reply_delay_ms: 1000,
+    
+    // Conversation Style
+    conversation_style: 'chatty',
+    closing_style: 'varied',
+    avoid_repetition: true,
+    forbidden_phrases: 'Qualquer dúvida, estou à disposição\nFico no aguardo\nAbraço, Equipe Imply',
+    
+    // Response Style
     specializations: '',
     emoji_library: '😊,👍,✅,📦,🚚',
     max_message_length: 150,
-    tone: 'professional',
-    formality: 'semi-formal',
-    empathy_level: 'medium',
   });
 
   useEffect(() => {
@@ -91,10 +135,10 @@ export default function AIAgentInstancesTab() {
         .order('created_at', { ascending: true });
 
       if (error) throw error;
-      setInstances(data || []);
+      setInstances((data || []) as AgentInstance[]);
     } catch (error) {
       console.error('Error loading instances:', error);
-      toast.error('Erro ao carregar instâncias');
+      toast.error('Erro ao carregar agentes');
     } finally {
       setLoading(false);
     }
@@ -106,14 +150,27 @@ export default function AIAgentInstancesTab() {
       agent_type: 'general',
       whatsapp_number: '',
       description: '',
+      is_active: true,
+      personality: 'Profissional, amigável e prestativo',
+      tone_of_voice: 'informal',
+      language: 'pt-BR',
+      signature: '',
+      use_signature: false,
+      system_prompt: '',
+      custom_instructions: '',
+      llm_model: 'gpt-4o-mini',
+      auto_reply_enabled: true,
+      auto_reply_delay_ms: 1000,
+      conversation_style: 'chatty',
+      closing_style: 'varied',
+      avoid_repetition: true,
+      forbidden_phrases: 'Qualquer dúvida, estou à disposição\nFico no aguardo\nAbraço, Equipe Imply',
       specializations: '',
       emoji_library: '😊,👍,✅,📦,🚚',
       max_message_length: 150,
-      tone: 'professional',
-      formality: 'semi-formal',
-      empathy_level: 'medium',
     });
     setEditingInstance(null);
+    setActiveTab('identity');
   };
 
   const openEditDialog = (instance: AgentInstance) => {
@@ -123,12 +180,24 @@ export default function AIAgentInstancesTab() {
       agent_type: instance.agent_type,
       whatsapp_number: instance.whatsapp_number || '',
       description: instance.description || '',
+      is_active: instance.is_active,
+      personality: instance.personality || 'Profissional, amigável e prestativo',
+      tone_of_voice: instance.tone_of_voice || 'informal',
+      language: instance.language || 'pt-BR',
+      signature: instance.signature || '',
+      use_signature: instance.use_signature || false,
+      system_prompt: instance.system_prompt || '',
+      custom_instructions: instance.custom_instructions || '',
+      llm_model: instance.llm_model || 'gpt-4o-mini',
+      auto_reply_enabled: instance.auto_reply_enabled ?? true,
+      auto_reply_delay_ms: instance.auto_reply_delay_ms || 1000,
+      conversation_style: instance.conversation_style || 'chatty',
+      closing_style: instance.closing_style || 'varied',
+      avoid_repetition: instance.avoid_repetition ?? true,
+      forbidden_phrases: instance.forbidden_phrases?.join('\n') || '',
       specializations: instance.specializations?.join(', ') || '',
       emoji_library: instance.emoji_library?.join(',') || '😊,👍,✅',
       max_message_length: instance.max_message_length || 150,
-      tone: String(instance.response_style?.tone || 'professional'),
-      formality: String(instance.response_style?.formality || 'semi-formal'),
-      empathy_level: String(instance.response_style?.empathy_level || 'medium'),
     });
     setDialogOpen(true);
   };
@@ -140,13 +209,32 @@ export default function AIAgentInstancesTab() {
         agent_type: formData.agent_type,
         whatsapp_number: formData.whatsapp_number || null,
         description: formData.description || null,
+        is_active: formData.is_active,
+        // Identity
+        personality: formData.personality,
+        tone_of_voice: formData.tone_of_voice,
+        language: formData.language,
+        signature: formData.signature || null,
+        use_signature: formData.use_signature,
+        // AI Config
+        system_prompt: formData.system_prompt || null,
+        custom_instructions: formData.custom_instructions || null,
+        llm_model: formData.llm_model,
+        auto_reply_enabled: formData.auto_reply_enabled,
+        auto_reply_delay_ms: formData.auto_reply_delay_ms,
+        // Conversation Style
+        conversation_style: formData.conversation_style,
+        closing_style: formData.closing_style,
+        avoid_repetition: formData.avoid_repetition,
+        forbidden_phrases: formData.forbidden_phrases.split('\n').map(s => s.trim()).filter(Boolean),
+        // Response Style
         specializations: formData.specializations.split(',').map(s => s.trim()).filter(Boolean),
         emoji_library: formData.emoji_library.split(',').map(s => s.trim()).filter(Boolean),
         max_message_length: formData.max_message_length,
         response_style: {
-          tone: formData.tone,
-          formality: formData.formality,
-          empathy_level: formData.empathy_level,
+          tone: formData.tone_of_voice,
+          formality: formData.tone_of_voice === 'formal' ? 'formal' : 'semi-formal',
+          empathy_level: 'medium',
         },
       };
 
@@ -156,13 +244,13 @@ export default function AIAgentInstancesTab() {
           .update(payload)
           .eq('id', editingInstance.id);
         if (error) throw error;
-        toast.success('Instância atualizada!');
+        toast.success('Agente atualizado!');
       } else {
         const { error } = await supabase
           .from('ai_agent_instances')
           .insert(payload);
         if (error) throw error;
-        toast.success('Instância criada!');
+        toast.success('Agente criado!');
       }
 
       setDialogOpen(false);
@@ -170,7 +258,7 @@ export default function AIAgentInstancesTab() {
       loadInstances();
     } catch (error) {
       console.error('Error saving instance:', error);
-      toast.error('Erro ao salvar instância');
+      toast.error('Erro ao salvar agente');
     }
   };
 
@@ -181,7 +269,7 @@ export default function AIAgentInstancesTab() {
         .update({ is_active: !instance.is_active })
         .eq('id', instance.id);
       if (error) throw error;
-      toast.success(instance.is_active ? 'Instância desativada' : 'Instância ativada');
+      toast.success(instance.is_active ? 'Agente desativado' : 'Agente ativado');
       loadInstances();
     } catch (error) {
       console.error('Error toggling instance:', error);
@@ -190,18 +278,18 @@ export default function AIAgentInstancesTab() {
   };
 
   const deleteInstance = async (id: string) => {
-    if (!confirm('Tem certeza que deseja excluir esta instância?')) return;
+    if (!confirm('Tem certeza que deseja excluir este agente?')) return;
     try {
       const { error } = await supabase
         .from('ai_agent_instances')
         .delete()
         .eq('id', id);
       if (error) throw error;
-      toast.success('Instância excluída');
+      toast.success('Agente excluído');
       loadInstances();
     } catch (error) {
       console.error('Error deleting instance:', error);
-      toast.error('Erro ao excluir instância');
+      toast.error('Erro ao excluir agente');
     }
   };
 
@@ -220,101 +308,108 @@ export default function AIAgentInstancesTab() {
         <div>
           <h2 className="text-2xl font-bold flex items-center gap-2">
             <Bot className="h-6 w-6" />
-            Instâncias de Agentes
+            Agentes de IA
           </h2>
           <p className="text-muted-foreground">
-            Gerencie múltiplos agentes de IA, cada um com sua personalidade e número WhatsApp
+            Configure múltiplos agentes, cada um com sua identidade, personalidade e número WhatsApp
           </p>
         </div>
         <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetForm(); }}>
           <DialogTrigger asChild>
             <Button>
               <Plus className="h-4 w-4 mr-2" />
-              Nova Instância
+              Novo Agente
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
             <DialogHeader>
-              <DialogTitle>
-                {editingInstance ? 'Editar Instância' : 'Nova Instância de Agente'}
+              <DialogTitle className="flex items-center gap-2">
+                <Bot className="h-5 w-5" />
+                {editingInstance ? 'Editar Agente' : 'Novo Agente de IA'}
               </DialogTitle>
             </DialogHeader>
-            <div className="space-y-4 py-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Nome da Instância *</Label>
-                  <Input
-                    value={formData.instance_name}
-                    onChange={(e) => setFormData({ ...formData, instance_name: e.target.value })}
-                    placeholder="Ex: Agente Pós-Venda"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Tipo de Agente *</Label>
-                  <Select
-                    value={formData.agent_type}
-                    onValueChange={(value) => setFormData({ ...formData, agent_type: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {Object.entries(AGENT_TYPE_CONFIG).map(([key, config]) => (
-                        <SelectItem key={key} value={key}>
-                          <div className="flex items-center gap-2">
-                            <config.icon className="h-4 w-4" />
-                            {config.label}
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
+            
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 overflow-hidden flex flex-col">
+              <TabsList className="grid grid-cols-4 mb-4">
+                <TabsTrigger value="identity" className="flex items-center gap-1">
+                  <User className="h-4 w-4" />
+                  Identidade
+                </TabsTrigger>
+                <TabsTrigger value="ai" className="flex items-center gap-1">
+                  <Brain className="h-4 w-4" />
+                  IA
+                </TabsTrigger>
+                <TabsTrigger value="style" className="flex items-center gap-1">
+                  <MessageCircle className="h-4 w-4" />
+                  Estilo
+                </TabsTrigger>
+                <TabsTrigger value="config" className="flex items-center gap-1">
+                  <Settings className="h-4 w-4" />
+                  Config
+                </TabsTrigger>
+              </TabsList>
 
-              <div className="space-y-2">
-                <Label>Número WhatsApp</Label>
-                <Input
-                  value={formData.whatsapp_number}
-                  onChange={(e) => setFormData({ ...formData, whatsapp_number: e.target.value })}
-                  placeholder="5551999999999"
-                />
-                <p className="text-xs text-muted-foreground">Número dedicado para este agente (com código do país)</p>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Descrição</Label>
-                <Textarea
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  placeholder="Descreva o propósito e especialidades deste agente..."
-                  rows={3}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label>Especializações (separadas por vírgula)</Label>
-                <Input
-                  value={formData.specializations}
-                  onChange={(e) => setFormData({ ...formData, specializations: e.target.value })}
-                  placeholder="garantia, suporte, troca, devolução"
-                />
-              </div>
-
-              <Card className="bg-muted/30">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm flex items-center gap-2">
-                    <Sparkles className="h-4 w-4" />
-                    Estilo de Resposta
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-3 gap-4">
+              <div className="flex-1 overflow-y-auto pr-2">
+                {/* Tab: Identity */}
+                <TabsContent value="identity" className="space-y-4 mt-0">
+                  <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label>Tom</Label>
+                      <Label>Nome do Agente *</Label>
+                      <Input
+                        value={formData.instance_name}
+                        onChange={(e) => setFormData({ ...formData, instance_name: e.target.value })}
+                        placeholder="Ex: Ana - Pós-Venda"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Tipo de Agente *</Label>
                       <Select
-                        value={formData.tone}
-                        onValueChange={(value) => setFormData({ ...formData, tone: value })}
+                        value={formData.agent_type}
+                        onValueChange={(value) => setFormData({ ...formData, agent_type: value })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {Object.entries(AGENT_TYPE_CONFIG).map(([key, config]) => (
+                            <SelectItem key={key} value={key}>
+                              <div className="flex items-center gap-2">
+                                <config.icon className="h-4 w-4" />
+                                {config.label}
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Número WhatsApp Dedicado</Label>
+                    <Input
+                      value={formData.whatsapp_number}
+                      onChange={(e) => setFormData({ ...formData, whatsapp_number: e.target.value })}
+                      placeholder="5551999999999"
+                    />
+                    <p className="text-xs text-muted-foreground">Este agente responderá mensagens recebidas neste número</p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Personalidade</Label>
+                    <Textarea
+                      value={formData.personality}
+                      onChange={(e) => setFormData({ ...formData, personality: e.target.value })}
+                      placeholder="Descreva a personalidade do agente..."
+                      rows={3}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Tom de Voz</Label>
+                      <Select
+                        value={formData.tone_of_voice}
+                        onValueChange={(value) => setFormData({ ...formData, tone_of_voice: value })}
                       >
                         <SelectTrigger>
                           <SelectValue />
@@ -327,37 +422,198 @@ export default function AIAgentInstancesTab() {
                       </Select>
                     </div>
                     <div className="space-y-2">
-                      <Label>Formalidade</Label>
+                      <Label>Idioma</Label>
                       <Select
-                        value={formData.formality}
-                        onValueChange={(value) => setFormData({ ...formData, formality: value })}
+                        value={formData.language}
+                        onValueChange={(value) => setFormData({ ...formData, language: value })}
                       >
                         <SelectTrigger>
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          {FORMALITY_OPTIONS.map((opt) => (
+                          <SelectItem value="pt-BR">Português (Brasil)</SelectItem>
+                          <SelectItem value="en-US">English (US)</SelectItem>
+                          <SelectItem value="es">Español</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Descrição / Propósito</Label>
+                    <Textarea
+                      value={formData.description}
+                      onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                      placeholder="Descreva o propósito e especialidades deste agente..."
+                      rows={2}
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50 border">
+                    <div>
+                      <Label>Usar Assinatura</Label>
+                      <p className="text-xs text-muted-foreground">Incluir assinatura no final das mensagens</p>
+                    </div>
+                    <Switch
+                      checked={formData.use_signature}
+                      onCheckedChange={(checked) => setFormData({ ...formData, use_signature: checked })}
+                    />
+                  </div>
+
+                  {formData.use_signature && (
+                    <div className="space-y-2">
+                      <Label>Assinatura</Label>
+                      <Input
+                        value={formData.signature}
+                        onChange={(e) => setFormData({ ...formData, signature: e.target.value })}
+                        placeholder="Ex: Equipe Imply"
+                      />
+                    </div>
+                  )}
+                </TabsContent>
+
+                {/* Tab: AI Configuration */}
+                <TabsContent value="ai" className="space-y-4 mt-0">
+                  <div className="flex items-center justify-between p-4 rounded-lg bg-primary/5 border border-primary/20">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-primary/10 rounded-lg">
+                        <Sparkles className="h-5 w-5 text-primary" />
+                      </div>
+                      <div>
+                        <Label className="text-base">Habilitar Auto-Resposta</Label>
+                        <p className="text-sm text-muted-foreground">
+                          Este agente responderá automaticamente usando IA
+                        </p>
+                      </div>
+                    </div>
+                    <Switch
+                      checked={formData.auto_reply_enabled}
+                      onCheckedChange={(checked) => setFormData({ ...formData, auto_reply_enabled: checked })}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Modelo de IA</Label>
+                      <Select
+                        value={formData.llm_model}
+                        onValueChange={(value) => setFormData({ ...formData, llm_model: value })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {LLM_MODELS.map((model) => (
+                            <SelectItem key={model.value} value={model.value}>{model.label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Delay antes de responder (ms)</Label>
+                      <Input
+                        type="number"
+                        value={formData.auto_reply_delay_ms}
+                        onChange={(e) => setFormData({ ...formData, auto_reply_delay_ms: parseInt(e.target.value) || 1000 })}
+                        min={0}
+                        max={10000}
+                        step={500}
+                      />
+                      <p className="text-xs text-muted-foreground">Simula digitação natural</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="flex items-center gap-2">
+                      <Brain className="h-4 w-4" />
+                      System Prompt (Instruções Base)
+                    </Label>
+                    <Textarea
+                      value={formData.system_prompt}
+                      onChange={(e) => setFormData({ ...formData, system_prompt: e.target.value })}
+                      placeholder="Você é um assistente especializado em..."
+                      rows={6}
+                      className="font-mono text-sm"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Define o comportamento base do agente. Use linguagem clara e direta.
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Instruções Personalizadas Adicionais</Label>
+                    <Textarea
+                      value={formData.custom_instructions}
+                      onChange={(e) => setFormData({ ...formData, custom_instructions: e.target.value })}
+                      placeholder="Regras específicas, informações da empresa, etc..."
+                      rows={4}
+                    />
+                  </div>
+                </TabsContent>
+
+                {/* Tab: Conversation Style */}
+                <TabsContent value="style" className="space-y-4 mt-0">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Estilo de Conversa</Label>
+                      <Select
+                        value={formData.conversation_style}
+                        onValueChange={(value) => setFormData({ ...formData, conversation_style: value })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {CONVERSATION_STYLE_OPTIONS.map((opt) => (
                             <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
                     </div>
                     <div className="space-y-2">
-                      <Label>Empatia</Label>
+                      <Label>Estilo de Fechamento</Label>
                       <Select
-                        value={formData.empathy_level}
-                        onValueChange={(value) => setFormData({ ...formData, empathy_level: value })}
+                        value={formData.closing_style}
+                        onValueChange={(value) => setFormData({ ...formData, closing_style: value })}
                       >
                         <SelectTrigger>
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          {EMPATHY_OPTIONS.map((opt) => (
+                          {CLOSING_STYLE_OPTIONS.map((opt) => (
                             <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
                     </div>
+                  </div>
+
+                  <div className="flex items-center justify-between p-3 rounded-lg bg-green-500/10 border border-green-500/20">
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="h-4 w-4 text-green-500" />
+                      <span className="text-sm">Evitar repetição de expressões</span>
+                    </div>
+                    <Switch
+                      checked={formData.avoid_repetition}
+                      onCheckedChange={(checked) => setFormData({ ...formData, avoid_repetition: checked })}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="flex items-center gap-2">
+                      <Ban className="h-4 w-4 text-red-500" />
+                      Frases Proibidas
+                    </Label>
+                    <Textarea
+                      value={formData.forbidden_phrases}
+                      onChange={(e) => setFormData({ ...formData, forbidden_phrases: e.target.value })}
+                      placeholder="Qualquer dúvida, estou à disposição&#10;Fico no aguardo"
+                      rows={4}
+                      className="font-mono text-sm"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Uma frase por linha. O agente NUNCA usará estas frases.
+                    </p>
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
@@ -380,18 +636,59 @@ export default function AIAgentInstancesTab() {
                       />
                     </div>
                   </div>
-                </CardContent>
-              </Card>
+                </TabsContent>
 
-              <div className="flex justify-end gap-2 pt-4">
+                {/* Tab: Additional Config */}
+                <TabsContent value="config" className="space-y-4 mt-0">
+                  <div className="space-y-2">
+                    <Label>Especializações (separadas por vírgula)</Label>
+                    <Input
+                      value={formData.specializations}
+                      onChange={(e) => setFormData({ ...formData, specializations: e.target.value })}
+                      placeholder="garantia, suporte, troca, devolução, rastreamento"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Define os tópicos que este agente domina
+                    </p>
+                  </div>
+
+                  <Card className="bg-muted/30">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm">Resumo da Configuração</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Tipo:</span>
+                        <Badge variant="secondary">{getAgentConfig(formData.agent_type).label}</Badge>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Auto-resposta:</span>
+                        <Badge variant={formData.auto_reply_enabled ? "default" : "outline"}>
+                          {formData.auto_reply_enabled ? 'Ativa' : 'Desativada'}
+                        </Badge>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Modelo:</span>
+                        <span>{formData.llm_model}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Tom:</span>
+                        <span>{formData.tone_of_voice}</span>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-4 border-t mt-4">
                 <Button variant="outline" onClick={() => { setDialogOpen(false); resetForm(); }}>
                   Cancelar
                 </Button>
                 <Button onClick={handleSave} disabled={!formData.instance_name}>
-                  {editingInstance ? 'Salvar Alterações' : 'Criar Instância'}
+                  {editingInstance ? 'Salvar Alterações' : 'Criar Agente'}
                 </Button>
               </div>
-            </div>
+            </Tabs>
           </DialogContent>
         </Dialog>
       </div>
@@ -413,9 +710,17 @@ export default function AIAgentInstancesTab() {
                     </div>
                     <div>
                       <CardTitle className="text-lg">{instance.instance_name}</CardTitle>
-                      <Badge variant="secondary" className="text-xs">
-                        {config.label}
-                      </Badge>
+                      <div className="flex items-center gap-2 mt-1">
+                        <Badge variant="secondary" className="text-xs">
+                          {config.label}
+                        </Badge>
+                        {instance.auto_reply_enabled && (
+                          <Badge variant="outline" className="text-xs border-green-500/50 text-green-600">
+                            <Sparkles className="h-3 w-3 mr-1" />
+                            IA Ativa
+                          </Badge>
+                        )}
+                      </div>
                     </div>
                   </div>
                   <Switch
@@ -438,6 +743,13 @@ export default function AIAgentInstancesTab() {
                   </div>
                 )}
 
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <Brain className="h-3 w-3" />
+                  <span>{instance.llm_model || 'gpt-4o-mini'}</span>
+                  <span>•</span>
+                  <span>{instance.tone_of_voice || 'informal'}</span>
+                </div>
+
                 {instance.specializations?.length > 0 && (
                   <div className="flex flex-wrap gap-1">
                     {instance.specializations.slice(0, 4).map((spec, i) => (
@@ -453,35 +765,12 @@ export default function AIAgentInstancesTab() {
                   </div>
                 )}
 
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <Heart className="h-3 w-3" />
-                  <span>Empatia: {String(instance.response_style?.empathy_level || 'medium')}</span>
-                  <span>•</span>
-                  <MessageSquare className="h-3 w-3" />
-                  <span>Max: {instance.max_message_length} chars</span>
-                </div>
-
-                {instance.emoji_library?.length > 0 && (
-                  <div className="text-lg">
-                    {instance.emoji_library.slice(0, 8).join(' ')}
-                  </div>
-                )}
-
-                <div className="flex gap-2 pt-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="flex-1"
-                    onClick={() => openEditDialog(instance)}
-                  >
+                <div className="flex items-center gap-2 pt-2 border-t">
+                  <Button variant="ghost" size="sm" onClick={() => openEditDialog(instance)}>
                     <Edit className="h-4 w-4 mr-1" />
                     Editar
                   </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => deleteInstance(instance.id)}
-                  >
+                  <Button variant="ghost" size="sm" className="text-destructive" onClick={() => deleteInstance(instance.id)}>
                     <Trash2 className="h-4 w-4" />
                   </Button>
                 </div>
@@ -494,10 +783,13 @@ export default function AIAgentInstancesTab() {
       {instances.length === 0 && (
         <Card className="p-8 text-center">
           <Bot className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-          <p className="text-muted-foreground">Nenhuma instância de agente criada</p>
-          <Button className="mt-4" onClick={() => setDialogOpen(true)}>
+          <h3 className="text-lg font-semibold mb-2">Nenhum agente configurado</h3>
+          <p className="text-muted-foreground mb-4">
+            Crie seu primeiro agente de IA para começar a automatizar atendimentos
+          </p>
+          <Button onClick={() => setDialogOpen(true)}>
             <Plus className="h-4 w-4 mr-2" />
-            Criar Primeira Instância
+            Criar Primeiro Agente
           </Button>
         </Card>
       )}

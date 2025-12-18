@@ -28,18 +28,18 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { id: 'dashboard', label: 'Indicadores', icon: <BarChart3 className="h-5 w-5" />, description: 'Visão geral e métricas' },
-  { id: 'instances', label: 'Instâncias', icon: <Sparkles className="h-5 w-5" />, description: 'Gerenciar múltiplos agentes' },
+  { id: 'dashboard', label: 'Dashboard', icon: <BarChart3 className="h-5 w-5" />, description: 'Visão geral e métricas' },
+  { id: 'instances', label: 'Agentes', icon: <Bot className="h-5 w-5" />, description: 'Identidade e personalidade' },
+  { id: 'config', label: 'Config. Globais', icon: <Settings className="h-5 w-5" />, description: 'Configurações compartilhadas' },
   { id: 'learning', label: 'Aprendizado', icon: <Brain className="h-5 w-5" />, description: 'Evolução e retroalimentação' },
-  { id: 'config', label: 'Configuração', icon: <Settings className="h-5 w-5" />, description: 'Configurações do agente' },
+  { id: 'knowledge', label: 'Base de Conhecimento', icon: <Book className="h-5 w-5" />, description: 'RAG e documentos' },
   { id: 'messages', label: 'Mensagens', icon: <MessageSquare className="h-5 w-5" />, description: 'Conversas dos agentes' },
   { id: 'logs', label: 'Eventos', icon: <CalendarDays className="h-5 w-5" />, description: 'Log de eventos' },
   { id: 'files', label: 'Arquivos', icon: <FolderOpen className="h-5 w-5" />, description: 'Arquivos enviados' },
-  { id: 'rules', label: 'Regras', icon: <Shield className="h-5 w-5" />, description: 'Regras de compliance (Regex)' },
+  { id: 'rules', label: 'Regras', icon: <Shield className="h-5 w-5" />, description: 'Regras de compliance' },
   { id: 'policies', label: 'Políticas', icon: <FileText className="h-5 w-5" />, description: 'Políticas de negócio' },
   { id: 'contacts', label: 'Contatos', icon: <Users className="h-5 w-5" />, description: 'Gerenciar contatos' },
   { id: 'connections', label: 'Conexões', icon: <Link2 className="h-5 w-5" />, description: 'WhatsApp e API' },
-  { id: 'knowledge', label: 'Conhecimento', icon: <Book className="h-5 w-5" />, description: 'Base de conhecimento (RAG)' },
 ];
 
 const AGENT_TYPES: { value: AgentType; label: string; icon: React.ReactNode; color: string }[] = [

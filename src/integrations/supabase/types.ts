@@ -140,49 +140,91 @@ export type Database = {
       ai_agent_instances: {
         Row: {
           agent_type: string
+          auto_reply_delay_ms: number | null
+          auto_reply_enabled: boolean | null
+          avoid_repetition: boolean | null
+          closing_style: string | null
+          conversation_style: string | null
           created_at: string | null
+          custom_instructions: string | null
           description: string | null
           emoji_library: string[] | null
+          forbidden_phrases: string[] | null
           id: string
           instance_name: string
           is_active: boolean
+          language: string | null
+          llm_model: string | null
           max_message_length: number | null
+          personality: string | null
           personality_traits: Json | null
           response_style: Json | null
+          signature: string | null
           specializations: string[] | null
+          system_prompt: string | null
+          tone_of_voice: string | null
           updated_at: string | null
+          use_signature: boolean | null
           whatsapp_instance_id: string | null
           whatsapp_number: string | null
         }
         Insert: {
           agent_type?: string
+          auto_reply_delay_ms?: number | null
+          auto_reply_enabled?: boolean | null
+          avoid_repetition?: boolean | null
+          closing_style?: string | null
+          conversation_style?: string | null
           created_at?: string | null
+          custom_instructions?: string | null
           description?: string | null
           emoji_library?: string[] | null
+          forbidden_phrases?: string[] | null
           id?: string
           instance_name: string
           is_active?: boolean
+          language?: string | null
+          llm_model?: string | null
           max_message_length?: number | null
+          personality?: string | null
           personality_traits?: Json | null
           response_style?: Json | null
+          signature?: string | null
           specializations?: string[] | null
+          system_prompt?: string | null
+          tone_of_voice?: string | null
           updated_at?: string | null
+          use_signature?: boolean | null
           whatsapp_instance_id?: string | null
           whatsapp_number?: string | null
         }
         Update: {
           agent_type?: string
+          auto_reply_delay_ms?: number | null
+          auto_reply_enabled?: boolean | null
+          avoid_repetition?: boolean | null
+          closing_style?: string | null
+          conversation_style?: string | null
           created_at?: string | null
+          custom_instructions?: string | null
           description?: string | null
           emoji_library?: string[] | null
+          forbidden_phrases?: string[] | null
           id?: string
           instance_name?: string
           is_active?: boolean
+          language?: string | null
+          llm_model?: string | null
           max_message_length?: number | null
+          personality?: string | null
           personality_traits?: Json | null
           response_style?: Json | null
+          signature?: string | null
           specializations?: string[] | null
+          system_prompt?: string | null
+          tone_of_voice?: string | null
           updated_at?: string | null
+          use_signature?: boolean | null
           whatsapp_instance_id?: string | null
           whatsapp_number?: string | null
         }
