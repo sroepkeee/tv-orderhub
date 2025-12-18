@@ -9,23 +9,21 @@ import {
   CheckCircle2, 
   XCircle, 
   Clock, 
-  TrendingUp,
   Wifi,
   WifiOff,
   RefreshCw,
-  Send,
-  Truck,
-  Users,
   Bot,
   Coins,
   DollarSign,
   Zap,
-  BarChart3
+  BarChart3,
+  Phone,
+  Settings,
+  Power,
+  PowerOff
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { subDays, format } from "date-fns";
-import { ptBR } from "date-fns/locale";
-import { AgentType, AgentConfig } from "@/hooks/useAIAgentAdmin";
 import { cn } from "@/lib/utils";
 
 interface NotificationMetrics {
@@ -41,12 +39,6 @@ interface NotificationMetrics {
     failed: number;
     pending: number;
   };
-}
-
-interface QuoteMetrics {
-  totalSent: number;
-  totalResponded: number;
-  responseRate: number;
 }
 
 interface WhatsAppStatus {
@@ -65,6 +57,18 @@ interface TokenMetrics {
   totalCalls: number;
 }
 
+interface AgentInstance {
+  id: string;
+  instance_name: string;
+  agent_type: string;
+  description: string | null;
+  is_active: boolean;
+  whatsapp_number: string | null;
+  llm_model: string | null;
+  auto_reply_enabled: boolean | null;
+  personality: string | null;
+}
+
 // OpenAI pricing per 1M tokens (approximate)
 const TOKEN_PRICING: Record<string, { input: number; output: number }> = {
   'gpt-4o': { input: 2.50, output: 10.00 },
@@ -76,23 +80,18 @@ const TOKEN_PRICING: Record<string, { input: number; output: number }> = {
   'default': { input: 0.50, output: 1.50 },
 };
 
-interface Props {
-  config: AgentConfig | null;
-  configs: Record<AgentType, AgentConfig | null>;
-  selectedAgentType: AgentType;
-  onToggleActive: (active: boolean) => Promise<void>;
-}
+const AGENT_TYPE_COLORS: Record<string, { bg: string; border: string; text: string; icon: string }> = {
+  carrier: { bg: 'bg-amber-500/10', border: 'border-amber-500/50', text: 'text-amber-600', icon: '🚚' },
+  customer: { bg: 'bg-blue-500/10', border: 'border-blue-500/50', text: 'text-blue-600', icon: '👤' },
+  general: { bg: 'bg-purple-500/10', border: 'border-purple-500/50', text: 'text-purple-600', icon: '🤖' },
+};
 
-export function AIAgentDashboardTab({ config, configs, selectedAgentType, onToggleActive }: Props) {
+export function AIAgentDashboardTab() {
   const [notificationMetrics, setNotificationMetrics] = useState<NotificationMetrics | null>(null);
-  const [quoteMetrics, setQuoteMetrics] = useState<QuoteMetrics | null>(null);
   const [whatsappStatus, setWhatsappStatus] = useState<WhatsAppStatus>({ connected: false });
   const [tokenMetrics, setTokenMetrics] = useState<TokenMetrics | null>(null);
+  const [agentInstances, setAgentInstances] = useState<AgentInstance[]>([]);
   const [loading, setLoading] = useState(true);
-  const [toggling, setToggling] = useState(false);
-
-  const carrierConfig = configs.carrier;
-  const customerConfig = configs.customer;
 
   const loadMetrics = async () => {
     setLoading(true);
@@ -100,6 +99,16 @@ export function AIAgentDashboardTab({ config, configs, selectedAgentType, onTogg
       const now = new Date();
       const last24h = subDays(now, 1).toISOString();
       const lastWeek = subDays(now, 7).toISOString();
+
+      // Load agent instances
+      const { data: instances } = await supabase
+        .from('ai_agent_instances')
+        .select('*')
+        .order('created_at', { ascending: true });
+      
+      if (instances) {
+        setAgentInstances(instances as AgentInstance[]);
+      }
 
       // Buscar logs de notificações
       const { data: logs24h } = await supabase
@@ -187,22 +196,6 @@ export function AIAgentDashboardTab({ config, configs, selectedAgentType, onTogg
         totalCalls,
       });
 
-      // Buscar métricas de cotações
-      const { data: quotes } = await supabase
-        .from('freight_quotes')
-        .select('status')
-        .gte('created_at', lastWeek);
-
-      if (quotes) {
-        const totalQuotes = quotes.length;
-        const responded = quotes.filter(q => q.status === 'responded').length;
-        setQuoteMetrics({
-          totalSent: totalQuotes,
-          totalResponded: responded,
-          responseRate: totalQuotes > 0 ? (responded / totalQuotes) * 100 : 0
-        });
-      }
-
       // Buscar status do WhatsApp
       const { data: instance } = await supabase
         .from('whatsapp_instances')
@@ -228,22 +221,150 @@ export function AIAgentDashboardTab({ config, configs, selectedAgentType, onTogg
     loadMetrics();
   }, []);
 
-  const handleToggle = async () => {
-    if (!config) return;
-    setToggling(true);
-    await onToggleActive(!config.is_active);
-    setToggling(false);
-  };
-
   const formatTokens = (tokens: number) => {
     if (tokens >= 1_000_000) return `${(tokens / 1_000_000).toFixed(2)}M`;
     if (tokens >= 1_000) return `${(tokens / 1_000).toFixed(1)}k`;
     return tokens.toString();
   };
 
+  const getAgentTypeLabel = (type: string) => {
+    switch (type) {
+      case 'carrier': return 'Transportadoras';
+      case 'customer': return 'Clientes';
+      default: return 'Geral';
+    }
+  };
+
   return (
     <div className="space-y-6">
-      {/* Token Usage Card - NEW */}
+      {/* Agent Instances Grid */}
+      <div>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold flex items-center gap-2">
+            <Bot className="h-5 w-5" />
+            Agentes Cadastrados
+          </h3>
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={() => {
+              // Navigate to instances tab - this will be handled by parent
+              const event = new CustomEvent('navigate-to-tab', { detail: 'instances' });
+              window.dispatchEvent(event);
+            }}
+          >
+            <Settings className="h-4 w-4 mr-2" />
+            Gerenciar Agentes
+          </Button>
+        </div>
+
+        {agentInstances.length === 0 ? (
+          <Card className="border-dashed">
+            <CardContent className="flex flex-col items-center justify-center py-8">
+              <Bot className="h-12 w-12 text-muted-foreground mb-4" />
+              <p className="text-muted-foreground text-center">
+                Nenhum agente cadastrado ainda.
+              </p>
+              <Button 
+                variant="outline" 
+                className="mt-4"
+                onClick={() => {
+                  const event = new CustomEvent('navigate-to-tab', { detail: 'instances' });
+                  window.dispatchEvent(event);
+                }}
+              >
+                Criar Primeiro Agente
+              </Button>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {agentInstances.map((agent) => {
+              const colors = AGENT_TYPE_COLORS[agent.agent_type] || AGENT_TYPE_COLORS.general;
+              
+              return (
+                <Card 
+                  key={agent.id} 
+                  className={cn(
+                    "relative overflow-hidden transition-all hover:shadow-md",
+                    colors.border,
+                    agent.is_active ? 'border-2' : 'border opacity-75'
+                  )}
+                >
+                  {/* Status indicator bar */}
+                  <div className={cn(
+                    "absolute top-0 left-0 right-0 h-1",
+                    agent.is_active ? 'bg-green-500' : 'bg-gray-400'
+                  )} />
+                  
+                  <CardHeader className="pb-2">
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="text-2xl">{colors.icon}</span>
+                        <div>
+                          <CardTitle className="text-base">{agent.instance_name}</CardTitle>
+                          <Badge variant="outline" className={cn("text-xs mt-1", colors.text, colors.bg)}>
+                            {getAgentTypeLabel(agent.agent_type)}
+                          </Badge>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        {agent.is_active ? (
+                          <Power className="h-4 w-4 text-green-500" />
+                        ) : (
+                          <PowerOff className="h-4 w-4 text-gray-400" />
+                        )}
+                      </div>
+                    </div>
+                  </CardHeader>
+                  
+                  <CardContent className="space-y-3">
+                    {agent.description && (
+                      <p className="text-xs text-muted-foreground line-clamp-2">
+                        {agent.description}
+                      </p>
+                    )}
+                    
+                    <div className="flex flex-wrap gap-2">
+                      {agent.whatsapp_number && (
+                        <Badge variant="secondary" className="text-xs flex items-center gap-1">
+                          <Phone className="h-3 w-3" />
+                          +{agent.whatsapp_number}
+                        </Badge>
+                      )}
+                      {agent.llm_model && (
+                        <Badge variant="secondary" className="text-xs">
+                          {agent.llm_model.replace('google/', '').replace('openai/', '')}
+                        </Badge>
+                      )}
+                      {agent.auto_reply_enabled && (
+                        <Badge className="text-xs bg-green-500/20 text-green-600 border-green-500/30">
+                          Auto-reply
+                        </Badge>
+                      )}
+                    </div>
+
+                    <div className="flex items-center justify-between pt-2 border-t">
+                      <span className={cn(
+                        "text-xs font-medium flex items-center gap-1",
+                        agent.is_active ? 'text-green-600' : 'text-muted-foreground'
+                      )}>
+                        <span className={cn(
+                          "w-2 h-2 rounded-full",
+                          agent.is_active ? 'bg-green-500 animate-pulse' : 'bg-gray-400'
+                        )} />
+                        {agent.is_active ? 'Ativo' : 'Inativo'}
+                      </span>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Token Usage Card */}
       <Card className="border-2 border-amber-500/30 bg-gradient-to-br from-amber-50/50 to-orange-50/50 dark:from-amber-950/20 dark:to-orange-950/20">
         <CardHeader className="pb-2">
           <CardTitle className="text-lg flex items-center gap-2">
@@ -356,136 +477,6 @@ export function AIAgentDashboardTab({ config, configs, selectedAgentType, onTogg
         </CardContent>
       </Card>
 
-      {/* Agent Status Cards */}
-      <div className="grid gap-4 md:grid-cols-2">
-        {/* Carrier Agent Card */}
-        <Card className={cn(
-          "relative overflow-hidden",
-          carrierConfig?.is_active ? 'border-amber-500/50' : 'border-border',
-          selectedAgentType === 'carrier' && 'ring-2 ring-amber-500/50'
-        )}>
-          <div className="absolute top-0 left-0 right-0 h-1 bg-amber-500" />
-          <CardHeader className="pb-2">
-            <CardDescription className="flex items-center gap-2">
-              <Truck className="h-4 w-4 text-amber-500" />
-              Agente de Transportadoras
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className={cn(
-                  "w-3 h-3 rounded-full",
-                  carrierConfig?.is_active ? 'bg-green-500 animate-pulse' : 'bg-gray-400'
-                )} />
-                <span className="text-xl font-bold">
-                  {carrierConfig?.is_active ? 'Ativo' : 'Inativo'}
-                </span>
-              </div>
-              <div className="text-right">
-                <p className="text-2xl font-bold">{quoteMetrics?.totalSent || 0}</p>
-                <p className="text-xs text-muted-foreground">cotações (7d)</p>
-              </div>
-            </div>
-            <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
-              <Badge variant="outline" className="text-xs">
-                {quoteMetrics?.responseRate.toFixed(0) || 0}% respondidas
-              </Badge>
-              {carrierConfig?.auto_reply_enabled && (
-                <Badge className="bg-amber-500/20 text-amber-600 border-amber-500/30">
-                  Auto-reply ON
-                </Badge>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Customer Agent Card */}
-        <Card className={cn(
-          "relative overflow-hidden",
-          customerConfig?.is_active ? 'border-blue-500/50' : 'border-border',
-          selectedAgentType === 'customer' && 'ring-2 ring-blue-500/50'
-        )}>
-          <div className="absolute top-0 left-0 right-0 h-1 bg-blue-500" />
-          <CardHeader className="pb-2">
-            <CardDescription className="flex items-center gap-2">
-              <Users className="h-4 w-4 text-blue-500" />
-              Agente de Clientes
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className={cn(
-                  "w-3 h-3 rounded-full",
-                  customerConfig?.is_active ? 'bg-green-500 animate-pulse' : 'bg-gray-400'
-                )} />
-                <span className="text-xl font-bold">
-                  {customerConfig?.is_active ? 'Ativo' : 'Inativo'}
-                </span>
-              </div>
-              <div className="text-right">
-                <p className="text-2xl font-bold">{notificationMetrics?.total24h || 0}</p>
-                <p className="text-xs text-muted-foreground">notificações (24h)</p>
-              </div>
-            </div>
-            <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
-              <Badge variant="outline" className="text-xs">
-                {notificationMetrics?.successRate.toFixed(0) || 0}% sucesso
-              </Badge>
-              {customerConfig?.auto_reply_enabled && (
-                <Badge className="bg-blue-500/20 text-blue-600 border-blue-500/30">
-                  Auto-reply ON
-                </Badge>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Current Agent Control */}
-      <Card className={cn(
-        "border-2",
-        selectedAgentType === 'carrier' ? 'border-amber-500/30' : 'border-blue-500/30'
-      )}>
-        <CardHeader className="pb-2">
-          <CardDescription className="flex items-center gap-2">
-            <Bot className="h-4 w-4" />
-            Controle do Agente Selecionado
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-lg font-semibold flex items-center gap-2">
-                {selectedAgentType === 'carrier' ? (
-                  <>
-                    <Truck className="h-5 w-5 text-amber-500" />
-                    {config?.agent_name || 'Agente de Transportadoras'}
-                  </>
-                ) : (
-                  <>
-                    <Users className="h-5 w-5 text-blue-500" />
-                    {config?.agent_name || 'Agente de Clientes'}
-                  </>
-                )}
-              </h3>
-              <p className="text-sm text-muted-foreground mt-1">
-                {config?.personality?.slice(0, 100)}...
-              </p>
-            </div>
-            <Button 
-              size="lg" 
-              variant={config?.is_active ? 'destructive' : 'default'}
-              onClick={handleToggle}
-              disabled={toggling}
-            >
-              {toggling ? 'Aguarde...' : (config?.is_active ? 'Desativar' : 'Ativar')}
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
       {/* Connection Status */}
       <div className="grid gap-4 md:grid-cols-2">
         {/* WhatsApp Status */}
@@ -524,38 +515,24 @@ export function AIAgentDashboardTab({ config, configs, selectedAgentType, onTogg
           <CardHeader className="pb-2">
             <CardDescription className="flex items-center gap-2">
               <Activity className="h-4 w-4" />
-              Canais Habilitados
+              Resumo de Notificações
             </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="flex gap-4">
               <div className="flex items-center gap-2">
-                <MessageSquare className={cn(
-                  "h-5 w-5",
-                  config?.whatsapp_enabled ? 'text-green-500' : 'text-muted-foreground'
-                )} />
-                <span className={config?.whatsapp_enabled ? 'font-medium' : 'text-muted-foreground'}>
-                  WhatsApp
-                </span>
-                {config?.whatsapp_enabled ? (
-                  <CheckCircle2 className="h-4 w-4 text-green-500" />
-                ) : (
-                  <XCircle className="h-4 w-4 text-muted-foreground" />
-                )}
+                <MessageSquare className="h-5 w-5 text-green-500" />
+                <div>
+                  <span className="font-bold">{notificationMetrics?.byChannel.whatsapp || 0}</span>
+                  <span className="text-xs text-muted-foreground ml-1">WhatsApp</span>
+                </div>
               </div>
               <div className="flex items-center gap-2">
-                <Mail className={cn(
-                  "h-5 w-5",
-                  config?.email_enabled ? 'text-blue-500' : 'text-muted-foreground'
-                )} />
-                <span className={config?.email_enabled ? 'font-medium' : 'text-muted-foreground'}>
-                  E-mail
-                </span>
-                {config?.email_enabled ? (
-                  <CheckCircle2 className="h-4 w-4 text-green-500" />
-                ) : (
-                  <XCircle className="h-4 w-4 text-muted-foreground" />
-                )}
+                <Mail className="h-5 w-5 text-blue-500" />
+                <div>
+                  <span className="font-bold">{notificationMetrics?.byChannel.email || 0}</span>
+                  <span className="text-xs text-muted-foreground ml-1">E-mail</span>
+                </div>
               </div>
             </div>
           </CardContent>
@@ -580,9 +557,7 @@ export function AIAgentDashboardTab({ config, configs, selectedAgentType, onTogg
                 </div>
                 <div>
                   <p className="font-medium">WhatsApp</p>
-                  <p className="text-xs text-muted-foreground">
-                    {config?.whatsapp_enabled ? 'Habilitado' : 'Desabilitado'}
-                  </p>
+                  <p className="text-xs text-muted-foreground">Canal principal</p>
                 </div>
               </div>
               <span className="text-2xl font-bold">{notificationMetrics?.byChannel.whatsapp || 0}</span>
@@ -595,9 +570,7 @@ export function AIAgentDashboardTab({ config, configs, selectedAgentType, onTogg
                 </div>
                 <div>
                   <p className="font-medium">E-mail</p>
-                  <p className="text-xs text-muted-foreground">
-                    {config?.email_enabled ? 'Habilitado' : 'Desabilitado'}
-                  </p>
+                  <p className="text-xs text-muted-foreground">Canal secundário</p>
                 </div>
               </div>
               <span className="text-2xl font-bold">{notificationMetrics?.byChannel.email || 0}</span>

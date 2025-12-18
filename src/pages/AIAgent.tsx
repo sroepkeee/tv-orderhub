@@ -1,11 +1,10 @@
-import { useState } from "react";
-import { useAIAgentAdmin, AgentType } from "@/hooks/useAIAgentAdmin";
+import { useState, useEffect } from "react";
+import { useAIAgentAdmin } from "@/hooks/useAIAgentAdmin";
 import { cn } from "@/lib/utils";
-import { Loader2, Bot, ShieldAlert, BarChart3, MessageSquare, CalendarDays, FolderOpen, Shield, Users, Link2, Book, ChevronLeft, ChevronRight, Settings, Truck, FileText, Brain, Sparkles } from "lucide-react";
+import { Loader2, Bot, ShieldAlert, BarChart3, MessageSquare, CalendarDays, FolderOpen, Shield, Users, Link2, Book, ChevronLeft, ChevronRight, Settings, FileText, Brain } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AIAgentDashboardTab } from "@/components/ai-agent/AIAgentDashboardTab";
 import { AIAgentKnowledgeTab } from "@/components/ai-agent/AIAgentKnowledgeTab";
 import { AIAgentQuoteTab } from "@/components/ai-agent/AIAgentQuoteTab";
@@ -29,7 +28,7 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { id: 'dashboard', label: 'Dashboard', icon: <BarChart3 className="h-5 w-5" />, description: 'Visão geral e métricas' },
-  { id: 'instances', label: 'Agentes', icon: <Bot className="h-5 w-5" />, description: 'Identidade e personalidade' },
+  { id: 'instances', label: 'Agentes', icon: <Bot className="h-5 w-5" />, description: 'Gerenciar agentes de IA' },
   { id: 'config', label: 'Config. Globais', icon: <Settings className="h-5 w-5" />, description: 'Configurações compartilhadas' },
   { id: 'learning', label: 'Aprendizado', icon: <Brain className="h-5 w-5" />, description: 'Evolução e retroalimentação' },
   { id: 'knowledge', label: 'Base de Conhecimento', icon: <Book className="h-5 w-5" />, description: 'RAG e documentos' },
@@ -42,28 +41,10 @@ const NAV_ITEMS: NavItem[] = [
   { id: 'connections', label: 'Conexões', icon: <Link2 className="h-5 w-5" />, description: 'WhatsApp e API' },
 ];
 
-const AGENT_TYPES: { value: AgentType; label: string; icon: React.ReactNode; color: string }[] = [
-  { 
-    value: 'carrier', 
-    label: 'Transportadoras', 
-    icon: <Truck className="h-4 w-4" />,
-    color: 'text-amber-500'
-  },
-  { 
-    value: 'customer', 
-    label: 'Clientes', 
-    icon: <Users className="h-4 w-4" />,
-    color: 'text-blue-500'
-  },
-];
-
 export default function AIAgent() {
   const {
     isAuthorized,
     loading,
-    selectedAgentType,
-    setSelectedAgentType,
-    configs,
     config,
     knowledgeBase,
     getKnowledgeForAgent,
@@ -81,6 +62,18 @@ export default function AIAgent() {
 
   const [activeTab, setActiveTab] = useState('dashboard');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+
+  // Listen for navigation events from child components
+  useEffect(() => {
+    const handleNavigate = (event: CustomEvent) => {
+      setActiveTab(event.detail);
+    };
+    
+    window.addEventListener('navigate-to-tab', handleNavigate as EventListener);
+    return () => {
+      window.removeEventListener('navigate-to-tab', handleNavigate as EventListener);
+    };
+  }, []);
 
   if (loading) {
     return (
@@ -102,23 +95,10 @@ export default function AIAgent() {
     );
   }
 
-  const handleToggleActive = async (active: boolean) => {
-    await updateConfig({ is_active: active });
-  };
-
-  const currentAgentInfo = AGENT_TYPES.find(a => a.value === selectedAgentType);
-
   const renderContent = () => {
     switch (activeTab) {
       case 'dashboard':
-        return (
-          <AIAgentDashboardTab 
-            config={config} 
-            configs={configs}
-            selectedAgentType={selectedAgentType}
-            onToggleActive={handleToggleActive} 
-          />
-        );
+        return <AIAgentDashboardTab />;
       case 'instances':
         return <AIAgentInstancesTab />;
       case 'learning':
@@ -126,7 +106,7 @@ export default function AIAgent() {
       case 'config':
         return <AIAgentConfigTab config={config} onUpdate={updateConfig} />;
       case 'messages':
-        return <AIAgentMessagesTab selectedAgentType={selectedAgentType} />;
+        return <AIAgentMessagesTab />;
       case 'quote':
         return <AIAgentQuoteTab />;
       case 'logs':
@@ -151,23 +131,16 @@ export default function AIAgent() {
       case 'knowledge':
         return (
           <AIAgentKnowledgeTab 
-            items={getKnowledgeForAgent(selectedAgentType)}
+            items={getKnowledgeForAgent('carrier')}
             allItems={knowledgeBase}
-            selectedAgentType={selectedAgentType}
+            selectedAgentType="carrier"
             onAdd={addKnowledge}
             onUpdate={updateKnowledge}
             onDelete={deleteKnowledge}
           />
         );
       default:
-        return (
-          <AIAgentDashboardTab 
-            config={config}
-            configs={configs}
-            selectedAgentType={selectedAgentType}
-            onToggleActive={handleToggleActive} 
-          />
-        );
+        return <AIAgentDashboardTab />;
     }
   };
 
@@ -195,51 +168,6 @@ export default function AIAgent() {
               </div>
             )}
           </div>
-
-          {/* Agent Type Selector */}
-          {!sidebarCollapsed && (
-            <div className="px-3 py-3 border-b">
-              <Tabs 
-                value={selectedAgentType} 
-                onValueChange={(v) => setSelectedAgentType(v as AgentType)}
-                className="w-full"
-              >
-                <TabsList className="w-full grid grid-cols-2 h-auto p-1">
-                  {AGENT_TYPES.map((agent) => (
-                    <TabsTrigger
-                      key={agent.value}
-                      value={agent.value}
-                      className={cn(
-                        "flex items-center gap-1.5 text-xs py-2",
-                        selectedAgentType === agent.value && agent.color
-                      )}
-                    >
-                      {agent.icon}
-                      <span className="hidden sm:inline">{agent.label}</span>
-                    </TabsTrigger>
-                  ))}
-                </TabsList>
-              </Tabs>
-            </div>
-          )}
-
-          {/* Status Badge */}
-          {!sidebarCollapsed && config && (
-            <div className="px-4 py-2 border-b">
-              <div className={cn(
-                "flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium",
-                config.is_active 
-                  ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' 
-                  : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
-              )}>
-                <span className={cn(
-                  "w-2 h-2 rounded-full",
-                  config.is_active ? 'bg-green-500 animate-pulse' : 'bg-yellow-500'
-                )} />
-                {currentAgentInfo?.label}: {config.is_active ? 'Ativo' : 'Inativo'}
-              </div>
-            </div>
-          )}
 
           {/* Navigation */}
           <ScrollArea className="flex-1 py-2">
@@ -299,26 +227,13 @@ export default function AIAgent() {
         <main className="flex-1 overflow-auto">
           <div className="p-6">
             {/* Page Header */}
-            <div className="mb-6 flex items-center justify-between">
-              <div>
-                <div className="flex items-center gap-2">
-                  <h2 className="text-2xl font-bold">
-                    {NAV_ITEMS.find(i => i.id === activeTab)?.label}
-                  </h2>
-                  <span className={cn(
-                    "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium",
-                    selectedAgentType === 'carrier' 
-                      ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
-                      : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
-                  )}>
-                    {currentAgentInfo?.icon}
-                    {currentAgentInfo?.label}
-                  </span>
-                </div>
-                <p className="text-muted-foreground">
-                  {NAV_ITEMS.find(i => i.id === activeTab)?.description}
-                </p>
-              </div>
+            <div className="mb-6">
+              <h2 className="text-2xl font-bold">
+                {NAV_ITEMS.find(i => i.id === activeTab)?.label}
+              </h2>
+              <p className="text-muted-foreground">
+                {NAV_ITEMS.find(i => i.id === activeTab)?.description}
+              </p>
             </div>
 
             {/* Content */}
