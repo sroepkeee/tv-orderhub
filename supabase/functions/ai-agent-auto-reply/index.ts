@@ -1018,7 +1018,7 @@ Use este contexto para:
           contact_type: contact_type || 'carrier', // Usar contact_type do request
           message_metadata: {
             sent_via: 'ai_agent_auto_reply',
-            model: agentConfig.llm_model,
+            model: effectiveConfig.llm_model,
             processing_time_ms: Date.now() - startTime,
             mega_response: sendResult,
             is_ai_generated: true,
@@ -1057,7 +1057,7 @@ Use este contexto para:
           contact_type,
           order_id,
           generated_by: 'ai_agent_auto_reply',
-          model: agentConfig.llm_model,
+          model: effectiveConfig.llm_model,
           processing_time_ms: Date.now() - startTime,
           knowledge_used: relevantKnowledge.map(k => k.title),
           conversation_history_count: conversationHistory.length,
@@ -1082,7 +1082,7 @@ Use este contexto para:
       message: generatedMessage,
       sent: messageSent,
       processing_time_ms: processingTime,
-      model: agentConfig.llm_model,
+      model: effectiveConfig.llm_model,
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
