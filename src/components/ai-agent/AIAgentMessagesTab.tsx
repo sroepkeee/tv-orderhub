@@ -54,6 +54,9 @@ interface Conversation {
   message_direction: string;
   sentiment?: 'positive' | 'neutral' | 'negative' | 'critical' | null;
   score?: number | null;
+  is_group_message?: boolean;
+  group_id?: string | null;
+  group_name?: string | null;
 }
 
 interface MessageMetadata {
@@ -165,31 +168,44 @@ export function AIAgentMessagesTab({ selectedAgentType = 'carrier' }: Props) {
           contact_type,
           delivered_at,
           read_at,
+          is_group_message,
+          group_id,
+          group_name,
           carriers!inner(name, whatsapp)
         `)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
 
+      // Agrupar por carrier_id OU group_id (grupos têm prioridade)
       const grouped = (data || []).reduce((acc: Record<string, Conversation>, msg: any) => {
-        const carrierId = msg.carrier_id;
-        if (!acc[carrierId] || new Date(msg.created_at) > new Date(acc[carrierId].last_message_at)) {
-          acc[carrierId] = {
+        // Usar group_id como chave se for mensagem de grupo, senão carrier_id
+        const groupKey = msg.is_group_message && msg.group_id 
+          ? `group_${msg.group_id}` 
+          : msg.carrier_id;
+        
+        if (!acc[groupKey] || new Date(msg.created_at) > new Date(acc[groupKey].last_message_at)) {
+          acc[groupKey] = {
             id: msg.id,
-            carrier_id: carrierId,
-            contact_name: msg.carriers?.name || 'Desconhecido',
+            carrier_id: msg.carrier_id,
+            contact_name: msg.is_group_message && msg.group_name 
+              ? msg.group_name 
+              : (msg.carriers?.name || 'Desconhecido'),
             contact_phone: msg.carriers?.whatsapp || '',
             last_message: msg.message_content,
             last_message_at: msg.created_at,
             unread_count: 0,
             contact_type: msg.contact_type || 'carrier',
             message_direction: msg.message_direction,
-            sentiment: sentimentCache[carrierId]?.sentiment,
-            score: sentimentCache[carrierId]?.score,
+            sentiment: sentimentCache[msg.carrier_id]?.sentiment,
+            score: sentimentCache[msg.carrier_id]?.score,
+            is_group_message: msg.is_group_message || false,
+            group_id: msg.group_id,
+            group_name: msg.group_name,
           };
         }
         if (msg.message_direction === 'inbound' && !msg.read_at) {
-          acc[carrierId].unread_count = (acc[carrierId].unread_count || 0) + 1;
+          acc[groupKey].unread_count = (acc[groupKey].unread_count || 0) + 1;
         }
         return acc;
       }, {});
@@ -380,11 +396,13 @@ export function AIAgentMessagesTab({ selectedAgentType = 'carrier' }: Props) {
 
     // Type filter
     if (activeTab === 'cotacoes') {
-      filtered = filtered.filter(c => c.contact_type === 'carrier');
+      filtered = filtered.filter(c => c.contact_type === 'carrier' && !c.is_group_message);
     } else if (activeTab === 'clientes') {
-      filtered = filtered.filter(c => c.contact_type === 'customer');
+      filtered = filtered.filter(c => c.contact_type === 'customer' && !c.is_group_message);
     } else if (activeTab === 'recebidas') {
       filtered = filtered.filter(c => c.message_direction === 'inbound');
+    } else if (activeTab === 'grupos') {
+      filtered = filtered.filter(c => c.is_group_message === true);
     }
 
     // Sentiment filter
@@ -396,12 +414,16 @@ export function AIAgentMessagesTab({ selectedAgentType = 'carrier' }: Props) {
     if (searchTerm) {
       filtered = filtered.filter(c =>
         c.contact_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        c.contact_phone.includes(searchTerm)
+        c.contact_phone.includes(searchTerm) ||
+        (c.group_name && c.group_name.toLowerCase().includes(searchTerm.toLowerCase()))
       );
     }
 
     return filtered;
   };
+
+  // Count groups
+  const groupCount = conversations.filter(c => c.is_group_message).length;
 
   const filteredConversations = getFilteredConversations();
 
@@ -518,12 +540,12 @@ export function AIAgentMessagesTab({ selectedAgentType = 'carrier' }: Props) {
           <CardHeader className="pb-2 px-3 pt-3 space-y-2">
             {/* Type Tabs */}
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <TabsList className="w-full grid grid-cols-4 h-8">
-                <TabsTrigger value="todas" className="text-xs px-2">Todas</TabsTrigger>
+              <TabsList className="w-full grid grid-cols-5 h-8">
+                <TabsTrigger value="todas" className="text-xs px-1.5">Todas</TabsTrigger>
                 <TooltipProvider>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <TabsTrigger value="cotacoes" className="text-xs px-2">
+                      <TabsTrigger value="cotacoes" className="text-xs px-1.5">
                         <Truck className="h-3 w-3" />
                       </TabsTrigger>
                     </TooltipTrigger>
@@ -535,7 +557,7 @@ export function AIAgentMessagesTab({ selectedAgentType = 'carrier' }: Props) {
                 <TooltipProvider>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <TabsTrigger value="clientes" className="text-xs px-2">
+                      <TabsTrigger value="clientes" className="text-xs px-1.5">
                         <Users className="h-3 w-3" />
                       </TabsTrigger>
                     </TooltipTrigger>
@@ -547,7 +569,24 @@ export function AIAgentMessagesTab({ selectedAgentType = 'carrier' }: Props) {
                 <TooltipProvider>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <TabsTrigger value="recebidas" className="text-xs px-2">
+                      <TabsTrigger value="grupos" className="text-xs px-1.5 relative">
+                        <Users className="h-3 w-3" />
+                        {groupCount > 0 && (
+                          <span className="absolute -top-1 -right-1 bg-blue-500 text-white text-[8px] rounded-full h-3.5 min-w-[14px] px-0.5 flex items-center justify-center">
+                            {groupCount}
+                          </span>
+                        )}
+                      </TabsTrigger>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom">
+                      <p>Grupos ({groupCount})</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <TabsTrigger value="recebidas" className="text-xs px-1.5">
                         <Inbox className="h-3 w-3" />
                       </TabsTrigger>
                     </TooltipTrigger>
@@ -684,9 +723,13 @@ export function AIAgentMessagesTab({ selectedAgentType = 'carrier' }: Props) {
                             : 'hover:bg-muted/50'
                         } ${isCritical ? 'border-l-2 border-l-red-500' : ''}`}
                       >
-                        <Avatar className={`h-9 w-9 ${getAvatarColor(conversation.contact_name)}`}>
+                        <Avatar className={`h-9 w-9 ${conversation.is_group_message ? 'bg-blue-500' : getAvatarColor(conversation.contact_name)}`}>
                           <AvatarFallback className="text-white text-xs">
-                            {getInitials(conversation.contact_name)}
+                            {conversation.is_group_message ? (
+                              <Users className="h-4 w-4" />
+                            ) : (
+                              getInitials(conversation.contact_name)
+                            )}
                           </AvatarFallback>
                         </Avatar>
                         <div className="flex-1 min-w-0">
@@ -695,6 +738,11 @@ export function AIAgentMessagesTab({ selectedAgentType = 'carrier' }: Props) {
                               <p className="font-medium text-sm truncate">
                                 {conversation.contact_name}
                               </p>
+                              {conversation.is_group_message && (
+                                <Badge variant="outline" className="text-[9px] h-4 px-1 bg-blue-50 dark:bg-blue-950/50 border-blue-300 text-blue-600">
+                                  Grupo
+                                </Badge>
+                              )}
                               {getSentimentBadge(conversation.sentiment, conversation.score)}
                             </div>
                             <span className="text-[10px] text-muted-foreground flex-shrink-0">
@@ -745,7 +793,11 @@ export function AIAgentMessagesTab({ selectedAgentType = 'carrier' }: Props) {
                           <span className="font-mono">{formatPhoneNumber(selectedConversation.contact_phone)}</span>
                         )}
                         <Badge variant="outline" className="text-[10px] h-4">
-                          {selectedConversation.contact_type === 'carrier' ? 'Transportadora' : 'Cliente'}
+                          {selectedConversation.is_group_message 
+                            ? 'Grupo' 
+                            : selectedConversation.contact_type === 'carrier' 
+                              ? 'Transportadora' 
+                              : 'Cliente'}
                         </Badge>
                       </div>
                     </div>
