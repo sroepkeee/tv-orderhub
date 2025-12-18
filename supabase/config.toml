@@ -68,3 +68,6 @@ verify_jwt = true
 
 [functions.notify-purchases]
 verify_jwt = true
+
+[functions.process-pending-replies]
+verify_jwt = true
