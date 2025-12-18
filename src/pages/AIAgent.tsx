@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useAIAgentAdmin, AgentType } from "@/hooks/useAIAgentAdmin";
 import { cn } from "@/lib/utils";
-import { Loader2, Bot, ShieldAlert, BarChart3, MessageSquare, CalendarDays, FolderOpen, Shield, Users, Link2, Book, ChevronLeft, ChevronRight, Settings, Truck, FileText } from "lucide-react";
+import { Loader2, Bot, ShieldAlert, BarChart3, MessageSquare, CalendarDays, FolderOpen, Shield, Users, Link2, Book, ChevronLeft, ChevronRight, Settings, Truck, FileText, Brain, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -17,6 +17,8 @@ import { AIAgentFilesTab } from "@/components/ai-agent/AIAgentFilesTab";
 import { AIAgentComplianceTab } from "@/components/ai-agent/AIAgentComplianceTab";
 import { AIAgentConfigTab } from "@/components/ai-agent/AIAgentConfigTab";
 import { AIAgentPoliciesTab } from "@/components/ai-agent/AIAgentPoliciesTab";
+import AIAgentInstancesTab from "@/components/ai-agent/AIAgentInstancesTab";
+import AIAgentLearningTab from "@/components/ai-agent/AIAgentLearningTab";
 
 interface NavItem {
   id: string;
@@ -27,6 +29,8 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { id: 'dashboard', label: 'Indicadores', icon: <BarChart3 className="h-5 w-5" />, description: 'Visão geral e métricas' },
+  { id: 'instances', label: 'Instâncias', icon: <Sparkles className="h-5 w-5" />, description: 'Gerenciar múltiplos agentes' },
+  { id: 'learning', label: 'Aprendizado', icon: <Brain className="h-5 w-5" />, description: 'Evolução e retroalimentação' },
   { id: 'config', label: 'Configuração', icon: <Settings className="h-5 w-5" />, description: 'Configurações do agente' },
   { id: 'messages', label: 'Mensagens', icon: <MessageSquare className="h-5 w-5" />, description: 'Conversas dos agentes' },
   { id: 'logs', label: 'Eventos', icon: <CalendarDays className="h-5 w-5" />, description: 'Log de eventos' },
@@ -115,6 +119,10 @@ export default function AIAgent() {
             onToggleActive={handleToggleActive} 
           />
         );
+      case 'instances':
+        return <AIAgentInstancesTab />;
+      case 'learning':
+        return <AIAgentLearningTab />;
       case 'config':
         return <AIAgentConfigTab config={config} onUpdate={updateConfig} />;
       case 'messages':

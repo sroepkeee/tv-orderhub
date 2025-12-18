@@ -137,6 +137,122 @@ export type Database = {
         }
         Relationships: []
       }
+      ai_agent_instances: {
+        Row: {
+          agent_type: string
+          created_at: string | null
+          description: string | null
+          emoji_library: string[] | null
+          id: string
+          instance_name: string
+          is_active: boolean
+          max_message_length: number | null
+          personality_traits: Json | null
+          response_style: Json | null
+          specializations: string[] | null
+          updated_at: string | null
+          whatsapp_instance_id: string | null
+          whatsapp_number: string | null
+        }
+        Insert: {
+          agent_type?: string
+          created_at?: string | null
+          description?: string | null
+          emoji_library?: string[] | null
+          id?: string
+          instance_name: string
+          is_active?: boolean
+          max_message_length?: number | null
+          personality_traits?: Json | null
+          response_style?: Json | null
+          specializations?: string[] | null
+          updated_at?: string | null
+          whatsapp_instance_id?: string | null
+          whatsapp_number?: string | null
+        }
+        Update: {
+          agent_type?: string
+          created_at?: string | null
+          description?: string | null
+          emoji_library?: string[] | null
+          id?: string
+          instance_name?: string
+          is_active?: boolean
+          max_message_length?: number | null
+          personality_traits?: Json | null
+          response_style?: Json | null
+          specializations?: string[] | null
+          updated_at?: string | null
+          whatsapp_instance_id?: string | null
+          whatsapp_number?: string | null
+        }
+        Relationships: []
+      }
+      ai_agent_metrics: {
+        Row: {
+          agent_instance_id: string | null
+          avg_confidence_score: number | null
+          avg_response_time_ms: number | null
+          created_at: string | null
+          escalation_rate: number | null
+          id: string
+          knowledge_gaps_count: number | null
+          metric_date: string
+          negative_sentiment_rate: number | null
+          positive_sentiment_rate: number | null
+          resolution_rate: number | null
+          suggestions_approved: number | null
+          suggestions_generated: number | null
+          tokens_consumed: number | null
+          total_conversations: number | null
+          total_messages: number | null
+        }
+        Insert: {
+          agent_instance_id?: string | null
+          avg_confidence_score?: number | null
+          avg_response_time_ms?: number | null
+          created_at?: string | null
+          escalation_rate?: number | null
+          id?: string
+          knowledge_gaps_count?: number | null
+          metric_date?: string
+          negative_sentiment_rate?: number | null
+          positive_sentiment_rate?: number | null
+          resolution_rate?: number | null
+          suggestions_approved?: number | null
+          suggestions_generated?: number | null
+          tokens_consumed?: number | null
+          total_conversations?: number | null
+          total_messages?: number | null
+        }
+        Update: {
+          agent_instance_id?: string | null
+          avg_confidence_score?: number | null
+          avg_response_time_ms?: number | null
+          created_at?: string | null
+          escalation_rate?: number | null
+          id?: string
+          knowledge_gaps_count?: number | null
+          metric_date?: string
+          negative_sentiment_rate?: number | null
+          positive_sentiment_rate?: number | null
+          resolution_rate?: number | null
+          suggestions_approved?: number | null
+          suggestions_generated?: number | null
+          tokens_consumed?: number | null
+          total_conversations?: number | null
+          total_messages?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_agent_metrics_agent_instance_id_fkey"
+            columns: ["agent_instance_id"]
+            isOneToOne: false
+            referencedRelation: "ai_agent_instances"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ai_compliance_policies: {
         Row: {
           created_at: string | null
@@ -272,6 +388,160 @@ export type Database = {
             columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_knowledge_suggestions: {
+        Row: {
+          agent_instance_id: string | null
+          approved_at: string | null
+          approved_by: string | null
+          confidence_score: number | null
+          conversation_id: string | null
+          created_at: string | null
+          created_knowledge_id: string | null
+          detection_reason: string | null
+          id: string
+          rejection_reason: string | null
+          source_question: string | null
+          status: string | null
+          suggested_category: string | null
+          suggested_content: string
+          suggested_keywords: string[] | null
+          suggested_title: string
+          suggestion_type: string
+          updated_at: string | null
+        }
+        Insert: {
+          agent_instance_id?: string | null
+          approved_at?: string | null
+          approved_by?: string | null
+          confidence_score?: number | null
+          conversation_id?: string | null
+          created_at?: string | null
+          created_knowledge_id?: string | null
+          detection_reason?: string | null
+          id?: string
+          rejection_reason?: string | null
+          source_question?: string | null
+          status?: string | null
+          suggested_category?: string | null
+          suggested_content: string
+          suggested_keywords?: string[] | null
+          suggested_title: string
+          suggestion_type?: string
+          updated_at?: string | null
+        }
+        Update: {
+          agent_instance_id?: string | null
+          approved_at?: string | null
+          approved_by?: string | null
+          confidence_score?: number | null
+          conversation_id?: string | null
+          created_at?: string | null
+          created_knowledge_id?: string | null
+          detection_reason?: string | null
+          id?: string
+          rejection_reason?: string | null
+          source_question?: string | null
+          status?: string | null
+          suggested_category?: string | null
+          suggested_content?: string
+          suggested_keywords?: string[] | null
+          suggested_title?: string
+          suggestion_type?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_knowledge_suggestions_agent_instance_id_fkey"
+            columns: ["agent_instance_id"]
+            isOneToOne: false
+            referencedRelation: "ai_agent_instances"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_knowledge_suggestions_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "carrier_conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_knowledge_suggestions_created_knowledge_id_fkey"
+            columns: ["created_knowledge_id"]
+            isOneToOne: false
+            referencedRelation: "ai_knowledge_base"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_learning_feedback: {
+        Row: {
+          agent_instance_id: string | null
+          confidence_score: number | null
+          conversation_id: string | null
+          created_at: string | null
+          customer_sentiment: string | null
+          feedback_notes: string | null
+          feedback_source: string | null
+          id: string
+          knowledge_gaps_detected: string[] | null
+          message_content: string
+          required_human_intervention: boolean | null
+          resolution_status: string | null
+          response_content: string
+          response_time_ms: number | null
+          tokens_used: number | null
+        }
+        Insert: {
+          agent_instance_id?: string | null
+          confidence_score?: number | null
+          conversation_id?: string | null
+          created_at?: string | null
+          customer_sentiment?: string | null
+          feedback_notes?: string | null
+          feedback_source?: string | null
+          id?: string
+          knowledge_gaps_detected?: string[] | null
+          message_content: string
+          required_human_intervention?: boolean | null
+          resolution_status?: string | null
+          response_content: string
+          response_time_ms?: number | null
+          tokens_used?: number | null
+        }
+        Update: {
+          agent_instance_id?: string | null
+          confidence_score?: number | null
+          conversation_id?: string | null
+          created_at?: string | null
+          customer_sentiment?: string | null
+          feedback_notes?: string | null
+          feedback_source?: string | null
+          id?: string
+          knowledge_gaps_detected?: string[] | null
+          message_content?: string
+          required_human_intervention?: boolean | null
+          resolution_status?: string | null
+          response_content?: string
+          response_time_ms?: number | null
+          tokens_used?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_learning_feedback_agent_instance_id_fkey"
+            columns: ["agent_instance_id"]
+            isOneToOne: false
+            referencedRelation: "ai_agent_instances"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_learning_feedback_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "carrier_conversations"
             referencedColumns: ["id"]
           },
         ]
