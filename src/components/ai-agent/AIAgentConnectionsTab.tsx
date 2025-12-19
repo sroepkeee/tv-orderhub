@@ -19,7 +19,10 @@ import {
   QrCode,
   Wifi,
   WifiOff,
-  RotateCcw
+  RotateCcw,
+  Settings,
+  Save,
+  Loader2
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -27,6 +30,24 @@ import { useWhatsAppStatus } from "@/hooks/useWhatsAppStatus";
 import { WhatsAppQRCodeDialog } from "@/components/carriers/WhatsAppQRCodeDialog";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface MegaAPICredentials {
   url: string;
@@ -46,6 +67,10 @@ export function AIAgentConnectionsTab() {
   const [webhookUrl] = useState(`https://wejkyyjhckdlttieuyku.supabase.co/functions/v1/mega-api-webhook`);
   const [webhookStatus, setWebhookStatus] = useState<{ active: boolean; lastReceived?: string } | null>(null);
   const [qrDialogOpen, setQrDialogOpen] = useState(false);
+  const [configDialogOpen, setConfigDialogOpen] = useState(false);
+  const [disconnectDialogOpen, setDisconnectDialogOpen] = useState(false);
+  const [savingConfig, setSavingConfig] = useState(false);
+  const [disconnecting, setDisconnecting] = useState(false);
   
   const {
     connected: whatsappConnected,
@@ -140,6 +165,89 @@ export function AIAgentConnectionsTab() {
     toast.success('WhatsApp conectado com sucesso!');
   };
 
+  const handleDisconnect = async () => {
+    setDisconnecting(true);
+    try {
+      // Primeiro tentar desconectar via API
+      const result = await disconnect();
+      
+      // Forçar atualização do banco mesmo se a API falhar
+      const { error: dbError } = await supabase
+        .from('whatsapp_instances')
+        .update({
+          status: 'disconnected',
+          phone_number: null,
+          connected_at: null,
+          qrcode: null,
+          qrcode_updated_at: null,
+          updated_at: new Date().toISOString()
+        })
+        .not('id', 'is', null);
+
+      if (dbError) {
+        console.error('Error updating database:', dbError);
+      }
+
+      setDisconnectDialogOpen(false);
+      toast.success('Instância desconectada. Configure as novas credenciais.');
+      
+      // Abrir diálogo de configuração
+      setConfigDialogOpen(true);
+      
+      // Refresh status
+      refreshWhatsApp();
+    } catch (error) {
+      console.error('Error disconnecting:', error);
+      toast.error('Erro ao desconectar, mas você pode configurar novas credenciais');
+      setConfigDialogOpen(true);
+    } finally {
+      setDisconnecting(false);
+      setDisconnectDialogOpen(false);
+    }
+  };
+
+  const handleSaveCredentials = async () => {
+    if (!credentials.url || !credentials.token || !credentials.instance) {
+      toast.error('Preencha todos os campos');
+      return;
+    }
+
+    setSavingConfig(true);
+    try {
+      // Atualizar ou inserir na tabela whatsapp_instances
+      const { error: upsertError } = await supabase
+        .from('whatsapp_instances')
+        .upsert({
+          instance_key: credentials.instance,
+          name: 'Imply Notificações',
+          status: 'disconnected',
+          updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'instance_key'
+        });
+
+      if (upsertError) {
+        console.error('Error saving instance:', upsertError);
+      }
+
+      toast.success('Credenciais salvas! Agora configure os Secrets no Supabase.');
+      toast.info(
+        'Configure no Supabase: MEGA_API_URL, MEGA_API_TOKEN, MEGA_API_INSTANCE',
+        { duration: 10000 }
+      );
+
+      setConfigDialogOpen(false);
+      
+      // Mostrar link para secrets do Supabase
+      window.open('https://supabase.com/dashboard/project/wejkyyjhckdlttieuyku/settings/functions', '_blank');
+    } catch (error) {
+      console.error('Error saving credentials:', error);
+      toast.error('Erro ao salvar credenciais');
+    } finally {
+      setSavingConfig(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* WhatsApp Connection */}
@@ -231,10 +339,18 @@ export function AIAgentConnectionsTab() {
               <RotateCcw className="h-4 w-4" />
               Forçar Reinício
             </Button>
+            <Button 
+              variant="outline" 
+              onClick={() => setConfigDialogOpen(true)}
+              className="gap-2"
+            >
+              <Settings className="h-4 w-4" />
+              Configurar Credenciais
+            </Button>
             {whatsappConnected && (
               <Button 
                 variant="destructive" 
-                onClick={disconnect}
+                onClick={() => setDisconnectDialogOpen(true)}
                 className="gap-2"
               >
                 Desconectar
@@ -403,6 +519,126 @@ export function AIAgentConnectionsTab() {
         isConnected={whatsappConnected}
         onRestartInstance={restartInstance}
       />
+
+      {/* Credentials Configuration Dialog */}
+      <Dialog open={configDialogOpen} onOpenChange={setConfigDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <KeyRound className="h-5 w-5" />
+              Configurar Mega API
+            </DialogTitle>
+            <DialogDescription>
+              Insira as credenciais da sua instância Mega API. 
+              Após salvar, configure os Secrets no Supabase.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="api-url">URL da API</Label>
+              <Input
+                id="api-url"
+                placeholder="https://api.megaapi.com.br"
+                value={credentials.url}
+                onChange={(e) => setCredentials(prev => ({ ...prev, url: e.target.value }))}
+              />
+              <p className="text-xs text-muted-foreground">
+                Ex: https://api.megaapi.com.br ou sua URL personalizada
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="api-token">Token / Bearer</Label>
+              <div className="flex gap-2">
+                <Input
+                  id="api-token"
+                  type={showToken ? "text" : "password"}
+                  placeholder="Seu token de autenticação"
+                  value={credentials.token}
+                  onChange={(e) => setCredentials(prev => ({ ...prev, token: e.target.value }))}
+                />
+                <Button
+                  variant="outline"
+                  size="icon"
+                  type="button"
+                  onClick={() => setShowToken(!showToken)}
+                >
+                  {showToken ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </Button>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="instance-key">Instance Key</Label>
+              <Input
+                id="instance-key"
+                placeholder="sua-instancia-key"
+                value={credentials.instance}
+                onChange={(e) => setCredentials(prev => ({ ...prev, instance: e.target.value }))}
+              />
+              <p className="text-xs text-muted-foreground">
+                Identificador único da sua instância na Mega API
+              </p>
+            </div>
+
+            <div className="p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg">
+              <p className="text-sm text-amber-800 dark:text-amber-200">
+                <strong>Importante:</strong> Após salvar aqui, você precisará atualizar os Secrets no Supabase:
+              </p>
+              <ul className="text-xs text-amber-700 dark:text-amber-300 mt-2 space-y-1">
+                <li>• MEGA_API_URL</li>
+                <li>• MEGA_API_TOKEN</li>
+                <li>• MEGA_API_INSTANCE</li>
+              </ul>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfigDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleSaveCredentials} disabled={savingConfig} className="gap-2">
+              {savingConfig ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Save className="h-4 w-4" />
+              )}
+              Salvar e Configurar Secrets
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Disconnect Confirmation Dialog */}
+      <AlertDialog open={disconnectDialogOpen} onOpenChange={setDisconnectDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Desconectar WhatsApp?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Isso irá encerrar a conexão atual com o WhatsApp. 
+              Você poderá configurar novas credenciais para conectar outra instância.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={disconnecting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleDisconnect}
+              disabled={disconnecting}
+              className="bg-destructive hover:bg-destructive/90"
+            >
+              {disconnecting ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Desconectando...
+                </>
+              ) : (
+                'Desconectar e Reconfigurar'
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
