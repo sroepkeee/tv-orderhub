@@ -1687,6 +1687,108 @@ export type Database = {
           },
         ]
       }
+      message_queue: {
+        Row: {
+          attempts: number
+          created_at: string
+          error_message: string | null
+          id: string
+          last_attempt_at: string | null
+          max_attempts: number
+          media_base64: string | null
+          media_caption: string | null
+          media_filename: string | null
+          message_content: string
+          message_type: string
+          metadata: Json | null
+          priority: number
+          recipient_name: string | null
+          recipient_whatsapp: string
+          scheduled_for: string
+          sent_at: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          attempts?: number
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          last_attempt_at?: string | null
+          max_attempts?: number
+          media_base64?: string | null
+          media_caption?: string | null
+          media_filename?: string | null
+          message_content: string
+          message_type?: string
+          metadata?: Json | null
+          priority?: number
+          recipient_name?: string | null
+          recipient_whatsapp: string
+          scheduled_for?: string
+          sent_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          attempts?: number
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          last_attempt_at?: string | null
+          max_attempts?: number
+          media_base64?: string | null
+          media_caption?: string | null
+          media_filename?: string | null
+          message_content?: string
+          message_type?: string
+          metadata?: Json | null
+          priority?: number
+          recipient_name?: string | null
+          recipient_whatsapp?: string
+          scheduled_for?: string
+          sent_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      message_queue_stats: {
+        Row: {
+          avg_send_time_ms: number | null
+          created_at: string
+          id: string
+          messages_per_hour: Json | null
+          stat_date: string
+          total_failed: number | null
+          total_queued: number | null
+          total_sent: number | null
+          updated_at: string
+        }
+        Insert: {
+          avg_send_time_ms?: number | null
+          created_at?: string
+          id?: string
+          messages_per_hour?: Json | null
+          stat_date?: string
+          total_failed?: number | null
+          total_queued?: number | null
+          total_sent?: number | null
+          updated_at?: string
+        }
+        Update: {
+          avg_send_time_ms?: number | null
+          created_at?: string
+          id?: string
+          messages_per_hour?: Json | null
+          stat_date?: string
+          total_failed?: number | null
+          total_queued?: number | null
+          total_sent?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       notifications: {
         Row: {
           comment_id: string | null
