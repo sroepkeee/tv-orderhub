@@ -14,7 +14,7 @@ import { toast } from 'sonner';
 import { 
   Bot, Plus, Edit, Trash2, Phone, Settings, 
   Sparkles, Brain, Zap, Users, Package, Headphones,
-  MessageCircle, Ban, User
+  MessageCircle, Ban, User, TrendingUp
 } from 'lucide-react';
 
 interface AgentInstance {
@@ -53,6 +53,7 @@ const AGENT_TYPE_CONFIG = {
   customer: { label: 'Cliente', icon: Users, color: 'bg-green-500' },
   after_sales: { label: 'Pós-Venda', icon: Headphones, color: 'bg-purple-500' },
   commercial: { label: 'Comercial', icon: Zap, color: 'bg-amber-500' },
+  manager: { label: 'Gerencial', icon: TrendingUp, color: 'bg-indigo-500' },
   general: { label: 'Geral', icon: Bot, color: 'bg-gray-500' },
 };
 

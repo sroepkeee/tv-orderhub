@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useAIAgentAdmin } from "@/hooks/useAIAgentAdmin";
 import { cn } from "@/lib/utils";
-import { Loader2, Bot, ShieldAlert, BarChart3, MessageSquare, CalendarDays, FolderOpen, Shield, Users, Link2, Book, ChevronLeft, ChevronRight, Settings, FileText, Brain } from "lucide-react";
+import { Loader2, Bot, ShieldAlert, BarChart3, MessageSquare, CalendarDays, FolderOpen, Shield, Users, Link2, Book, ChevronLeft, ChevronRight, Settings, FileText, Brain, TrendingUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -18,6 +18,7 @@ import { AIAgentConfigTab } from "@/components/ai-agent/AIAgentConfigTab";
 import { AIAgentPoliciesTab } from "@/components/ai-agent/AIAgentPoliciesTab";
 import AIAgentInstancesTab from "@/components/ai-agent/AIAgentInstancesTab";
 import AIAgentLearningTab from "@/components/ai-agent/AIAgentLearningTab";
+import { ManagerAgentDashboard } from "@/components/admin/ManagerAgentDashboard";
 
 interface NavItem {
   id: string;
@@ -29,6 +30,7 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { id: 'dashboard', label: 'Dashboard', icon: <BarChart3 className="h-5 w-5" />, description: 'Visão geral e métricas' },
   { id: 'instances', label: 'Agentes', icon: <Bot className="h-5 w-5" />, description: 'Gerenciar agentes de IA' },
+  { id: 'manager-agent', label: 'Agente Gerencial', icon: <TrendingUp className="h-5 w-5" />, description: 'Métricas e alertas para gestores' },
   { id: 'config', label: 'Config. Globais', icon: <Settings className="h-5 w-5" />, description: 'Configurações compartilhadas' },
   { id: 'learning', label: 'Aprendizado', icon: <Brain className="h-5 w-5" />, description: 'Evolução e retroalimentação' },
   { id: 'knowledge', label: 'Base de Conhecimento', icon: <Book className="h-5 w-5" />, description: 'RAG e documentos' },
@@ -101,6 +103,8 @@ export default function AIAgent() {
         return <AIAgentDashboardTab />;
       case 'instances':
         return <AIAgentInstancesTab />;
+      case 'manager-agent':
+        return <ManagerAgentDashboard />;
       case 'learning':
         return <AIAgentLearningTab />;
       case 'config':
