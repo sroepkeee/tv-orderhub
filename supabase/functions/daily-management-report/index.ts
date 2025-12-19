@@ -249,15 +249,19 @@ async function calculateMetrics(supabase: any): Promise<OrderMetrics> {
   const lastWeek = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
   const twoWeeksAgo = new Date(today.getTime() - 14 * 24 * 60 * 60 * 1000);
 
-  // Buscar pedidos ativos
-  const { data: orders } = await supabase
+  // Buscar pedidos ativos COM order_items para calcular valor
+  const { data: orders, error: ordersError } = await supabase
     .from('orders')
     .select(`
-      id, order_number, customer_name, status, total_value, 
+      id, order_number, customer_name, status, 
       delivery_date, created_at, updated_at,
-      order_items(id, item_code, item_status)
+      order_items(id, item_code, item_status, unit_price, requested_quantity, total_value)
     `)
     .not('status', 'in', '("completed","cancelled","delivered")');
+
+  if (ordersError) {
+    console.error('❌ Error fetching orders:', ordersError);
+  }
 
   const activeOrders = orders || [];
   console.log(`📦 Found ${activeOrders.length} active orders`);
@@ -316,10 +320,15 @@ async function calculateMetrics(supabase: any): Promise<OrderMetrics> {
       daysUntil: daysUntilDelivery,
     });
 
-    // Somar valor
-    if (order.total_value) {
-      totalValue += parseFloat(order.total_value);
-    }
+    // Calcular valor somando dos itens
+    const orderValue = (order.order_items || []).reduce((sum: number, item: any) => {
+      const itemValue = item.total_value || (item.unit_price * item.requested_quantity) || 0;
+      return sum + Number(itemValue);
+    }, 0);
+    totalValue += orderValue;
+    
+    // Guardar valor calculado no objeto order para uso posterior
+    (order as any).calculated_value = orderValue;
 
     // Verificar se é novo hoje
     const createdAt = new Date(order.created_at);
@@ -340,7 +349,7 @@ async function calculateMetrics(supabase: any): Promise<OrderMetrics> {
       
       if (deliveryDate < today) {
         lateCount++;
-        lateValue += parseFloat(order.total_value) || 0;
+        lateValue += orderValue;
       } else if (daysUntilDelivery <= 2) {
         criticalCount++;
       } else {
@@ -398,12 +407,12 @@ async function calculateMetrics(supabase: any): Promise<OrderMetrics> {
   // ==================== TENDÊNCIAS SEMANAIS ====================
   const { data: thisWeekCreated } = await supabase
     .from('orders')
-    .select('id, total_value')
+    .select('id, order_items(total_value, unit_price, requested_quantity)')
     .gte('created_at', lastWeek.toISOString());
 
   const { data: lastWeekCreated } = await supabase
     .from('orders')
-    .select('id, total_value')
+    .select('id, order_items(total_value, unit_price, requested_quantity)')
     .gte('created_at', twoWeeksAgo.toISOString())
     .lt('created_at', lastWeek.toISOString());
 
@@ -430,8 +439,17 @@ async function calculateMetrics(supabase: any): Promise<OrderMetrics> {
   const newLastWeek = lastWeekCreated?.length || 0;
   const deliveredThisWeek = thisWeekDelivered?.length || 0;
   const deliveredLastWeek = lastWeekDelivered?.length || 0;
-  const valueThisWeek = (thisWeekCreated || []).reduce((sum: number, o: any) => sum + (Number(o.total_value) || 0), 0);
-  const valueLastWeek = (lastWeekCreated || []).reduce((sum: number, o: any) => sum + (Number(o.total_value) || 0), 0);
+  
+  // Calcular valor somando order_items
+  const calcOrderValue = (order: any) => {
+    return (order.order_items || []).reduce((sum: number, item: any) => {
+      const itemValue = item.total_value || (item.unit_price * item.requested_quantity) || 0;
+      return sum + Number(itemValue);
+    }, 0);
+  };
+  
+  const valueThisWeek = (thisWeekCreated || []).reduce((sum: number, o: any) => sum + calcOrderValue(o), 0);
+  const valueLastWeek = (lastWeekCreated || []).reduce((sum: number, o: any) => sum + calcOrderValue(o), 0);
 
   const trends = {
     newOrdersThisWeek: newThisWeek,
@@ -448,8 +466,8 @@ async function calculateMetrics(supabase: any): Promise<OrderMetrics> {
 
   // ==================== TOP PEDIDOS ====================
   const topOrders = activeOrders
-    .filter((o: any) => o.total_value)
-    .sort((a: any, b: any) => parseFloat(b.total_value) - parseFloat(a.total_value))
+    .filter((o: any) => (o as any).calculated_value > 0)
+    .sort((a: any, b: any) => ((b as any).calculated_value || 0) - ((a as any).calculated_value || 0))
     .slice(0, 5)
     .map((o: any) => {
       const deliveryDate = o.delivery_date ? new Date(o.delivery_date) : null;
@@ -460,7 +478,7 @@ async function calculateMetrics(supabase: any): Promise<OrderMetrics> {
       return {
         orderNumber: o.order_number,
         customer: o.customer_name,
-        totalValue: parseFloat(o.total_value),
+        totalValue: (o as any).calculated_value || 0,
         status: o.status,
         statusLabel: statusLabels[o.status] || o.status,
         daysUntilDelivery: daysUntil,
@@ -791,47 +809,161 @@ Requirements:
   }
 }
 
-// ==================== WHATSAPP ====================
+// ==================== WHATSAPP (ENVIO DIRETO VIA MEGA API) ====================
 async function sendWhatsAppMessage(supabaseClient: any, phone: string, message: string): Promise<boolean> {
   try {
-    const { data, error } = await supabaseClient.functions.invoke('mega-api-send', {
-      body: { phoneNumber: phone, message },
-    });
+    // Buscar instância conectada do banco
+    const { data: activeInstance, error: instanceError } = await supabaseClient
+      .from('whatsapp_instances')
+      .select('instance_key')
+      .eq('status', 'connected')
+      .maybeSingle();
 
-    if (error) {
-      console.error('Error sending WhatsApp message:', error);
+    if (instanceError || !activeInstance) {
+      console.error('❌ No connected WhatsApp instance found');
       return false;
     }
 
-    console.log('✅ WhatsApp message sent to:', phone);
-    return true;
+    // Formatar número
+    let phoneNumber = phone.replace(/\D/g, '');
+    if (!phoneNumber.startsWith('55')) {
+      phoneNumber = `55${phoneNumber}`;
+    }
+
+    // Configurar Mega API
+    let megaApiUrl = (Deno.env.get('MEGA_API_URL') ?? '').trim();
+    if (!megaApiUrl.startsWith('http://') && !megaApiUrl.startsWith('https://')) {
+      megaApiUrl = `https://${megaApiUrl}`;
+    }
+    megaApiUrl = megaApiUrl.replace(/\/+$/, '');
+    const megaApiToken = Deno.env.get('MEGA_API_TOKEN') ?? '';
+
+    console.log(`📤 Sending WhatsApp to ${phoneNumber} via instance ${activeInstance.instance_key}`);
+
+    // Enviar diretamente via Mega API
+    const endpoint = `/rest/sendMessage/${activeInstance.instance_key}/text`;
+    const fullUrl = `${megaApiUrl}${endpoint}`;
+
+    const body = {
+      messageData: {
+        to: phoneNumber,
+        text: message,
+        linkPreview: false,
+      }
+    };
+
+    // Tentar diferentes formatos de autenticação
+    const authFormats: Record<string, string>[] = [
+      { 'apikey': megaApiToken },
+      { 'Authorization': `Bearer ${megaApiToken}` },
+      { 'Apikey': megaApiToken },
+    ];
+
+    for (const authHeader of authFormats) {
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        ...authHeader,
+      };
+
+      const response = await fetch(fullUrl, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(body),
+      });
+
+      if (response.ok) {
+        console.log('✅ WhatsApp message sent to:', phoneNumber);
+        return true;
+      }
+
+      if (response.status !== 401 && response.status !== 403) {
+        const errorText = await response.text();
+        console.error(`❌ Mega API error: ${response.status} - ${errorText}`);
+        return false;
+      }
+    }
+
+    console.error('❌ All auth methods failed for WhatsApp send');
+    return false;
   } catch (error) {
-    console.error('Error calling mega-api-send:', error);
+    console.error('❌ Error sending WhatsApp message:', error);
     return false;
   }
 }
 
 async function sendWhatsAppImage(supabaseClient: any, phone: string, base64Data: string, caption: string): Promise<boolean> {
   try {
-    const { data, error } = await supabaseClient.functions.invoke('mega-api-send-media', {
-      body: {
-        phoneNumber: phone,
-        mediaType: 'image',
-        base64Data,
-        caption,
-        fileName: 'relatorio-chart.png',
-      },
-    });
+    // Buscar instância conectada
+    const { data: activeInstance } = await supabaseClient
+      .from('whatsapp_instances')
+      .select('instance_key')
+      .eq('status', 'connected')
+      .maybeSingle();
 
-    if (error) {
-      console.error('Error sending WhatsApp image:', error);
+    if (!activeInstance) {
+      console.error('❌ No connected WhatsApp instance for image send');
       return false;
     }
 
-    console.log('✅ WhatsApp image sent to:', phone);
-    return true;
+    // Formatar número
+    let phoneNumber = phone.replace(/\D/g, '');
+    if (!phoneNumber.startsWith('55')) {
+      phoneNumber = `55${phoneNumber}`;
+    }
+
+    // Configurar Mega API
+    let megaApiUrl = (Deno.env.get('MEGA_API_URL') ?? '').trim();
+    if (!megaApiUrl.startsWith('http://') && !megaApiUrl.startsWith('https://')) {
+      megaApiUrl = `https://${megaApiUrl}`;
+    }
+    megaApiUrl = megaApiUrl.replace(/\/+$/, '');
+    const megaApiToken = Deno.env.get('MEGA_API_TOKEN') ?? '';
+
+    // Endpoint para mídia
+    const endpoint = `/rest/sendMessage/${activeInstance.instance_key}/image`;
+    const fullUrl = `${megaApiUrl}${endpoint}`;
+
+    const body = {
+      messageData: {
+        to: phoneNumber,
+        image: `data:image/png;base64,${base64Data}`,
+        caption: caption,
+      }
+    };
+
+    const authFormats: Record<string, string>[] = [
+      { 'apikey': megaApiToken },
+      { 'Authorization': `Bearer ${megaApiToken}` },
+    ];
+
+    for (const authHeader of authFormats) {
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        ...authHeader,
+      };
+
+      const response = await fetch(fullUrl, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(body),
+      });
+
+      if (response.ok) {
+        console.log('✅ WhatsApp image sent to:', phoneNumber);
+        return true;
+      }
+
+      if (response.status !== 401 && response.status !== 403) {
+        const errorText = await response.text();
+        console.error(`❌ Mega API image error: ${response.status} - ${errorText}`);
+        return false;
+      }
+    }
+
+    console.error('❌ All auth methods failed for image send');
+    return false;
   } catch (error) {
-    console.error('Error calling mega-api-send-media:', error);
+    console.error('❌ Error sending WhatsApp image:', error);
     return false;
   }
 }
