@@ -74,3 +74,6 @@ verify_jwt = true
 
 [functions.daily-management-report]
 verify_jwt = false
+
+[functions.ai-agent-manager-query]
+verify_jwt = false

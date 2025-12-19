@@ -450,6 +450,35 @@ async function sendAutoReplyMessage(
   }
 }
 
+// Função para verificar se o número é de um gestor cadastrado
+async function checkIfManager(supabase: any, phoneNumber: string): Promise<boolean> {
+  try {
+    // Criar variações do número para busca flexível
+    const phoneClean = phoneNumber.replace(/\D/g, '');
+    const lastDigits = phoneClean.slice(-8);
+    
+    const { data: recipient, error } = await supabase
+      .from('management_report_recipients')
+      .select('id, is_active')
+      .eq('is_active', true)
+      .or(`whatsapp.ilike.%${lastDigits}%,whatsapp.ilike.%${phoneClean}%`)
+      .limit(1)
+      .maybeSingle();
+    
+    if (error) {
+      console.error('Error checking manager status:', error);
+      return false;
+    }
+    
+    const isManager = !!recipient;
+    console.log(`👔 Manager check for ${phoneNumber}: ${isManager ? 'YES' : 'NO'}`);
+    return isManager;
+  } catch (err) {
+    console.error('Exception in checkIfManager:', err);
+    return false;
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -1019,6 +1048,10 @@ Deno.serve(async (req) => {
 
       console.log('✅ Message saved successfully:', conversation.id);
 
+      // 🤖 VERIFICAR SE É GESTOR - Resposta instantânea sem debounce
+      // Gestores cadastrados em management_report_recipients recebem respostas imediatas
+      const isManager = await checkIfManager(supabase, phoneNumber);
+      
       // 🤖 DEBOUNCE: Adicionar mensagem ao buffer ao invés de responder imediatamente
       // ⚠️ SKIP GROUPS - Only respond to individual contacts (economia de tokens)
       // O processo de debounce aguarda 5 segundos para agrupar mensagens rápidas
@@ -1027,6 +1060,33 @@ Deno.serve(async (req) => {
       if (isGroupMessage) {
         console.log('⏭️ Skipping AI Agent for group message:', groupName || groupId || 'unknown group');
         console.log('📝 Group messages are saved but NOT auto-replied to (token economy)');
+      } else if (isManager && carrierId) {
+        // 👔 GESTOR: Resposta instantânea via ai-agent-manager-query
+        console.log('👔 Manager detected! Routing to manager query handler...');
+        
+        try {
+          const response = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/ai-agent-manager-query`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+            },
+            body: JSON.stringify({
+              message: messageText,
+              senderPhone: phoneNumber,
+              carrierId: carrierId,
+            }),
+          });
+          
+          if (response.ok) {
+            const result = await response.json();
+            console.log('✅ Manager query processed:', result.intent);
+          } else {
+            console.error('❌ Manager query failed:', await response.text());
+          }
+        } catch (err) {
+          console.error('❌ Manager query error:', err);
+        }
       } else if (carrierId) {
         try {
           console.log('🕐 Adding message to debounce buffer for:', contactType);
