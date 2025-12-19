@@ -1380,40 +1380,73 @@ Deno.serve(async (req) => {
 
       console.log('📤 Sending manager response to:', formattedPhone);
 
-      const sendResponse = await fetch(sendUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'apikey': megaApiToken,
-        },
-        body: JSON.stringify(body),
-      });
+      // Multi-header fallback para compatibilidade com Mega API
+      const authFormats: Record<string, string>[] = [
+        { 'apikey': megaApiToken },
+        { 'Authorization': `Bearer ${megaApiToken}` },
+        { 'Apikey': megaApiToken },
+      ];
 
-      if (sendResponse.ok) {
-        console.log('✅ Manager response sent successfully');
+      let messageSent = false;
+      let lastError = '';
 
-        if (carrierId) {
-          await supabase.from('carrier_conversations').insert({
-            carrier_id: carrierId,
-            conversation_type: 'general',
-            message_direction: 'inbound',
-            message_content: message,
-            contact_type: 'manager',
-            message_metadata: { intent: intent.type },
+      for (const authHeader of authFormats) {
+        try {
+          const headers: Record<string, string> = {
+            'Content-Type': 'application/json',
+            ...authHeader,
+          };
+
+          const sendResponse = await fetch(sendUrl, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify(body),
           });
 
-          await supabase.from('carrier_conversations').insert({
-            carrier_id: carrierId,
-            conversation_type: 'general',
-            message_direction: 'outbound',
-            message_content: responseMessage,
-            contact_type: 'manager',
-            message_metadata: { sent_via: 'manager_query', intent: intent.type },
-            sent_at: new Date().toISOString(),
-          });
+          const responseText = await sendResponse.text();
+          console.log(`📤 Response (${Object.keys(authHeader)[0]}): ${sendResponse.status} - ${responseText.substring(0, 200)}`);
+
+          if (sendResponse.ok) {
+            console.log('✅ Manager response sent successfully');
+            messageSent = true;
+
+            if (carrierId) {
+              await supabase.from('carrier_conversations').insert({
+                carrier_id: carrierId,
+                conversation_type: 'general',
+                message_direction: 'inbound',
+                message_content: message,
+                contact_type: 'manager',
+                message_metadata: { intent: intent.type },
+              });
+
+              await supabase.from('carrier_conversations').insert({
+                carrier_id: carrierId,
+                conversation_type: 'general',
+                message_direction: 'outbound',
+                message_content: responseMessage,
+                contact_type: 'manager',
+                message_metadata: { sent_via: 'manager_query', intent: intent.type },
+                sent_at: new Date().toISOString(),
+              });
+            }
+            break; // Sucesso, sair do loop
+          } else if (sendResponse.status === 401 || sendResponse.status === 403) {
+            lastError = `${sendResponse.status}: ${responseText.substring(0, 200)}`;
+            continue; // Tentar próximo header
+          } else {
+            lastError = `${sendResponse.status}: ${responseText.substring(0, 200)}`;
+            break; // Outro erro, não tentar mais
+          }
+        } catch (fetchError) {
+          lastError = fetchError instanceof Error ? fetchError.message : 'Unknown fetch error';
+          console.error(`❌ Fetch error:`, lastError);
+          continue;
         }
-      } else {
-        console.error('❌ Failed to send manager response:', await sendResponse.text());
+      }
+
+      if (!messageSent) {
+        console.error('❌ Failed to send manager response after trying all auth methods:', lastError);
       }
     }
 
