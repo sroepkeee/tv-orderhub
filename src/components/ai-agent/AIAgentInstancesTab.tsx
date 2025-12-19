@@ -147,8 +147,51 @@ export default function AIAgentInstancesTab() {
   });
 
   useEffect(() => {
-    loadInstances();
+    loadInstances().then(() => {
+      ensureManagerAgentExists();
+    });
   }, []);
+
+  const ensureManagerAgentExists = async () => {
+    try {
+      const { data: existingManager, error: checkError } = await supabase
+        .from('ai_agent_instances')
+        .select('id')
+        .eq('agent_type', 'manager')
+        .limit(1);
+      
+      if (checkError) throw checkError;
+      
+      if (!existingManager || existingManager.length === 0) {
+        const { error: insertError } = await supabase
+          .from('ai_agent_instances')
+          .insert({
+            instance_name: 'Agente Gerencial',
+            agent_type: 'manager',
+            description: 'Especialista em métricas, análise de performance e alertas para gestores.',
+            is_active: true,
+            personality: 'Analítico, preciso e proativo. Focado em métricas e performance.',
+            tone_of_voice: 'profissional',
+            system_prompt: MANAGER_SYSTEM_PROMPT,
+            auto_reply_enabled: true,
+            llm_model: 'gpt-4o-mini',
+            specializations: ['métricas', 'alertas', 'análise de dados', 'SLA', 'performance'],
+            language: 'pt-BR',
+            conversation_style: 'concise',
+            closing_style: 'none',
+            avoid_repetition: true,
+            custom_instructions: 'Priorize dados precisos e acionáveis. Alertar sobre itens críticos.',
+          });
+        
+        if (insertError) throw insertError;
+        
+        toast.success('Agente Gerencial criado automaticamente');
+        loadInstances();
+      }
+    } catch (error) {
+      console.error('Error ensuring manager agent exists:', error);
+    }
+  };
 
   const loadInstances = async () => {
     try {
