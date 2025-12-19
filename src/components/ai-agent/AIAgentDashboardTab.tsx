@@ -83,7 +83,10 @@ const TOKEN_PRICING: Record<string, { input: number; output: number }> = {
 const AGENT_TYPE_COLORS: Record<string, { bg: string; border: string; text: string; icon: string }> = {
   carrier: { bg: 'bg-amber-500/10', border: 'border-amber-500/50', text: 'text-amber-600', icon: '🚚' },
   customer: { bg: 'bg-blue-500/10', border: 'border-blue-500/50', text: 'text-blue-600', icon: '👤' },
-  general: { bg: 'bg-purple-500/10', border: 'border-purple-500/50', text: 'text-purple-600', icon: '🤖' },
+  after_sales: { bg: 'bg-purple-500/10', border: 'border-purple-500/50', text: 'text-purple-600', icon: '🎧' },
+  commercial: { bg: 'bg-yellow-500/10', border: 'border-yellow-500/50', text: 'text-yellow-600', icon: '⚡' },
+  manager: { bg: 'bg-indigo-500/10', border: 'border-indigo-500/50', text: 'text-indigo-600', icon: '📊' },
+  general: { bg: 'bg-gray-500/10', border: 'border-gray-500/50', text: 'text-gray-600', icon: '🤖' },
 };
 
 export function AIAgentDashboardTab() {
@@ -231,6 +234,9 @@ export function AIAgentDashboardTab() {
     switch (type) {
       case 'carrier': return 'Transportadoras';
       case 'customer': return 'Clientes';
+      case 'after_sales': return 'Pós-Venda';
+      case 'commercial': return 'Comercial';
+      case 'manager': return 'Gerencial';
       default: return 'Geral';
     }
   };
