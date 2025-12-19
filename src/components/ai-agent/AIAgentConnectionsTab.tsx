@@ -22,7 +22,10 @@ import {
   RotateCcw,
   Settings,
   Save,
-  Loader2
+  Loader2,
+  AlertTriangle,
+  Trash2,
+  Zap
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -55,6 +58,14 @@ interface MegaAPICredentials {
   instance: string;
 }
 
+interface InstanceDiagnostic {
+  dbInstance: string | null;
+  dbStatus: string | null;
+  dbUpdatedAt: string | null;
+  hasMultipleInstances: boolean;
+  instanceCount: number;
+}
+
 export function AIAgentConnectionsTab() {
   const [credentials, setCredentials] = useState<MegaAPICredentials>({
     url: '',
@@ -69,8 +80,17 @@ export function AIAgentConnectionsTab() {
   const [qrDialogOpen, setQrDialogOpen] = useState(false);
   const [configDialogOpen, setConfigDialogOpen] = useState(false);
   const [disconnectDialogOpen, setDisconnectDialogOpen] = useState(false);
+  const [newConnectionDialogOpen, setNewConnectionDialogOpen] = useState(false);
   const [savingConfig, setSavingConfig] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
+  const [cleaningData, setCleaningData] = useState(false);
+  const [diagnostic, setDiagnostic] = useState<InstanceDiagnostic>({
+    dbInstance: null,
+    dbStatus: null,
+    dbUpdatedAt: null,
+    hasMultipleInstances: false,
+    instanceCount: 0
+  });
   
   const {
     connected: whatsappConnected,
@@ -86,23 +106,43 @@ export function AIAgentConnectionsTab() {
     restartInstance
   } = useWhatsAppStatus();
 
-  // Carregar instância do banco
+  // Carregar instância do banco e diagnóstico
   useEffect(() => {
-    loadInstance();
+    loadInstanceDiagnostic();
   }, []);
 
-  const loadInstance = async () => {
-    const { data } = await supabase
-      .from('whatsapp_instances')
-      .select('*')
-      .limit(1)
-      .maybeSingle();
-    
-    if (data) {
-      setCredentials(prev => ({
-        ...prev,
-        instance: data.instance_key || ''
-      }));
+  const loadInstanceDiagnostic = async () => {
+    try {
+      // Buscar todas as instâncias do banco
+      const { data: instances, error } = await supabase
+        .from('whatsapp_instances')
+        .select('*')
+        .order('updated_at', { ascending: false });
+
+      if (error) {
+        console.error('Error loading instances:', error);
+        return;
+      }
+
+      const instanceCount = instances?.length || 0;
+      const latestInstance = instances?.[0];
+
+      setDiagnostic({
+        dbInstance: latestInstance?.instance_key || null,
+        dbStatus: latestInstance?.status || null,
+        dbUpdatedAt: latestInstance?.updated_at || null,
+        hasMultipleInstances: instanceCount > 1,
+        instanceCount
+      });
+
+      if (latestInstance) {
+        setCredentials(prev => ({
+          ...prev,
+          instance: latestInstance.instance_key || ''
+        }));
+      }
+    } catch (error) {
+      console.error('Error in loadInstanceDiagnostic:', error);
     }
   };
 
@@ -237,6 +277,7 @@ export function AIAgentConnectionsTab() {
       );
 
       setConfigDialogOpen(false);
+      loadInstanceDiagnostic();
       
       // Mostrar link para secrets do Supabase
       window.open('https://supabase.com/dashboard/project/wejkyyjhckdlttieuyku/settings/functions', '_blank');
@@ -248,8 +289,121 @@ export function AIAgentConnectionsTab() {
     }
   };
 
+  // Limpar todos os dados antigos e preparar para nova conexão
+  const handleCleanAndNewConnection = async () => {
+    setCleaningData(true);
+    try {
+      // 1. Deletar todas as instâncias antigas
+      const { error: deleteError } = await supabase
+        .from('whatsapp_instances')
+        .delete()
+        .not('id', 'is', null); // Delete all
+
+      if (deleteError) {
+        console.error('Error deleting instances:', deleteError);
+        toast.error('Erro ao limpar instâncias antigas');
+        return;
+      }
+
+      // 2. Limpar credenciais locais
+      setCredentials({
+        url: '',
+        token: '',
+        instance: ''
+      });
+
+      // 3. Resetar diagnóstico
+      setDiagnostic({
+        dbInstance: null,
+        dbStatus: null,
+        dbUpdatedAt: null,
+        hasMultipleInstances: false,
+        instanceCount: 0
+      });
+
+      toast.success('Dados antigos removidos! Agora configure a nova instância.');
+      setNewConnectionDialogOpen(false);
+      setConfigDialogOpen(true);
+    } catch (error) {
+      console.error('Error cleaning data:', error);
+      toast.error('Erro ao limpar dados');
+    } finally {
+      setCleaningData(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
+      {/* Diagnostic Card - Only show if there are issues */}
+      {(diagnostic.hasMultipleInstances || (!whatsappConnected && diagnostic.dbInstance)) && (
+        <Card className="border-amber-500/50 bg-amber-50/50 dark:bg-amber-950/20">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-amber-700 dark:text-amber-400">
+              <AlertTriangle className="h-5 w-5" />
+              Diagnóstico de Configuração
+            </CardTitle>
+            <CardDescription>
+              Problemas detectados na configuração da instância WhatsApp
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid gap-3 md:grid-cols-2">
+              <div className="p-3 bg-background rounded-lg border">
+                <p className="text-xs text-muted-foreground mb-1">Instância no Banco</p>
+                <p className="font-mono text-sm font-medium">
+                  {diagnostic.dbInstance || 'Nenhuma configurada'}
+                </p>
+                {diagnostic.dbStatus && (
+                  <Badge variant={diagnostic.dbStatus === 'connected' ? 'default' : 'secondary'} className="mt-1">
+                    {diagnostic.dbStatus}
+                  </Badge>
+                )}
+              </div>
+              <div className="p-3 bg-background rounded-lg border">
+                <p className="text-xs text-muted-foreground mb-1">Secret Configurado</p>
+                <p className="font-mono text-sm font-medium text-muted-foreground">
+                  MEGA_API_INSTANCE
+                </p>
+                <p className="text-xs text-amber-600 mt-1">
+                  Verifique se corresponde ao banco
+                </p>
+              </div>
+            </div>
+
+            {diagnostic.hasMultipleInstances && (
+              <div className="p-3 bg-red-100 dark:bg-red-950/30 rounded-lg border border-red-300 dark:border-red-800">
+                <p className="text-sm text-red-700 dark:text-red-400 flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4" />
+                  <strong>Múltiplas instâncias detectadas ({diagnostic.instanceCount})</strong>
+                </p>
+                <p className="text-xs text-red-600 dark:text-red-500 mt-1">
+                  Recomendamos limpar e criar uma nova conexão.
+                </p>
+              </div>
+            )}
+
+            <div className="flex flex-wrap gap-2">
+              <Button 
+                variant="outline"
+                onClick={() => setNewConnectionDialogOpen(true)}
+                className="gap-2 text-amber-700 border-amber-300 hover:bg-amber-100"
+              >
+                <Zap className="h-4 w-4" />
+                Nova Conexão (Limpar Tudo)
+              </Button>
+              <Button 
+                variant="ghost"
+                onClick={loadInstanceDiagnostic}
+                className="gap-2"
+              >
+                <RefreshCw className="h-4 w-4" />
+                Atualizar Diagnóstico
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* WhatsApp Connection */}
       <Card className={whatsappConnected ? 'border-green-500/50' : 'border-muted'}>
         <CardHeader>
@@ -275,6 +429,11 @@ export function AIAgentConnectionsTab() {
                 </CardTitle>
                 <CardDescription>
                   {instanceName || 'Imply Notificações'} via Mega API
+                  {diagnostic.dbInstance && !whatsappConnected && (
+                    <span className="ml-2 text-xs text-amber-600">
+                      (Instance: {diagnostic.dbInstance})
+                    </span>
+                  )}
                 </CardDescription>
               </div>
             </div>
@@ -310,16 +469,31 @@ export function AIAgentConnectionsTab() {
                 <p className="text-sm text-muted-foreground">
                   Escaneie o QR Code para conectar sua conta
                 </p>
+                {!diagnostic.dbInstance && (
+                  <p className="text-xs text-amber-600 mt-2">
+                    Configure as credenciais primeiro
+                  </p>
+                )}
               </div>
             </div>
           )}
 
           <div className="flex flex-wrap gap-2">
             {!whatsappConnected && (
-              <Button onClick={() => setQrDialogOpen(true)} className="gap-2">
-                <QrCode className="h-4 w-4" />
-                Gerar QR Code
-              </Button>
+              <>
+                <Button onClick={() => setQrDialogOpen(true)} className="gap-2">
+                  <QrCode className="h-4 w-4" />
+                  Gerar QR Code
+                </Button>
+                <Button 
+                  variant="outline"
+                  onClick={() => setNewConnectionDialogOpen(true)}
+                  className="gap-2"
+                >
+                  <Zap className="h-4 w-4" />
+                  Nova Conexão
+                </Button>
+              </>
             )}
             <Button 
               variant="outline" 
@@ -634,6 +808,67 @@ export function AIAgentConnectionsTab() {
                 </>
               ) : (
                 'Desconectar e Reconfigurar'
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* New Connection Dialog - Clean and Start Fresh */}
+      <AlertDialog open={newConnectionDialogOpen} onOpenChange={setNewConnectionDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <Zap className="h-5 w-5 text-amber-500" />
+              Nova Conexão WhatsApp
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-3">
+              <p>
+                Esta ação irá limpar todos os dados da instância atual e preparar 
+                para uma nova configuração.
+              </p>
+              
+              <div className="p-3 bg-amber-50 dark:bg-amber-950/30 rounded-lg border border-amber-200 dark:border-amber-800 text-left">
+                <p className="text-sm font-medium text-amber-800 dark:text-amber-200 mb-2">
+                  O que será feito:
+                </p>
+                <ul className="text-xs text-amber-700 dark:text-amber-300 space-y-1">
+                  <li className="flex items-center gap-2">
+                    <Trash2 className="h-3 w-3" />
+                    Remover todas as instâncias do banco de dados
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Settings className="h-3 w-3" />
+                    Abrir configuração para nova instância
+                  </li>
+                </ul>
+              </div>
+
+              <div className="p-3 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-200 dark:border-blue-800 text-left">
+                <p className="text-xs text-blue-700 dark:text-blue-300">
+                  <strong>Lembre-se:</strong> Após configurar aqui, você também precisará 
+                  atualizar os Secrets no Supabase (MEGA_API_URL, MEGA_API_TOKEN, MEGA_API_INSTANCE)
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={cleaningData}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleCleanAndNewConnection}
+              disabled={cleaningData}
+              className="bg-amber-600 hover:bg-amber-700"
+            >
+              {cleaningData ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Limpando...
+                </>
+              ) : (
+                <>
+                  <Zap className="h-4 w-4 mr-2" />
+                  Limpar e Configurar Nova
+                </>
               )}
             </AlertDialogAction>
           </AlertDialogFooter>
