@@ -26,7 +26,9 @@ import {
   Loader2,
   RefreshCw,
   FileText,
-  Image
+  Image,
+  MessageSquare,
+  HelpCircle
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -375,6 +377,87 @@ export function ManagementReportSettings() {
               <RefreshCw className="mr-2 h-4 w-4" />
               Atualizar
             </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Manager Commands Documentation */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <MessageSquare className="h-5 w-5" />
+            Comandos via WhatsApp
+          </CardTitle>
+          <CardDescription>
+            Gestores cadastrados podem consultar informações enviando mensagens para o WhatsApp conectado
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-3">
+              <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/50">
+                <span className="text-xl">📦</span>
+                <div>
+                  <p className="font-medium">Status de Pedido</p>
+                  <p className="text-sm text-muted-foreground">"status 12345" ou "#12345"</p>
+                  <p className="text-xs text-muted-foreground mt-1">Retorna detalhes completos do pedido</p>
+                </div>
+              </div>
+              
+              <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/50">
+                <span className="text-xl">📊</span>
+                <div>
+                  <p className="font-medium">Resumo do Dia</p>
+                  <p className="text-sm text-muted-foreground">"resumo" ou "dashboard" ou "hoje"</p>
+                  <p className="text-xs text-muted-foreground mt-1">Visão geral de todos os pedidos ativos</p>
+                </div>
+              </div>
+              
+              <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/50">
+                <span className="text-xl">⚠️</span>
+                <div>
+                  <p className="font-medium">Pedidos Atrasados</p>
+                  <p className="text-sm text-muted-foreground">"atrasados" ou "atraso"</p>
+                  <p className="text-xs text-muted-foreground mt-1">Lista pedidos fora do prazo de entrega</p>
+                </div>
+              </div>
+            </div>
+            
+            <div className="space-y-3">
+              <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/50">
+                <span className="text-xl">🔧</span>
+                <div>
+                  <p className="font-medium">Pedidos por Fase</p>
+                  <p className="text-sm text-muted-foreground">"pedidos em produção", "expedição", "faturamento"</p>
+                  <p className="text-xs text-muted-foreground mt-1">Filtra pedidos por fase específica</p>
+                </div>
+              </div>
+              
+              <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/50">
+                <span className="text-xl">💰</span>
+                <div>
+                  <p className="font-medium">Maiores Pedidos</p>
+                  <p className="text-sm text-muted-foreground">"top pedidos" ou "maiores"</p>
+                  <p className="text-xs text-muted-foreground mt-1">Top 5 pedidos por valor</p>
+                </div>
+              </div>
+              
+              <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/50">
+                <span className="text-xl">👤</span>
+                <div>
+                  <p className="font-medium">Buscar Cliente</p>
+                  <p className="text-sm text-muted-foreground">"cliente NOME"</p>
+                  <p className="text-xs text-muted-foreground mt-1">Busca pedidos por nome do cliente</p>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <div className="mt-4 p-3 rounded-lg border border-dashed">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <HelpCircle className="h-4 w-4" />
+              <span>Gestores podem enviar "ajuda" ou "comandos" para ver todos os comandos disponíveis</span>
+            </div>
           </div>
         </CardContent>
       </Card>
