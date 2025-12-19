@@ -466,14 +466,23 @@ async function getOrderAttachments(supabase: any, orderNumber: string): Promise<
 async function getSLAMetrics(supabase: any): Promise<string> {
   const today = new Date();
   
-  // Buscar pedidos ativos
+  // Buscar pedidos ativos com itens para calcular valor
   const { data: orders } = await supabase
     .from('orders')
-    .select('id, status, delivery_date, total_value, created_at')
+    .select('id, status, delivery_date, created_at, order_items(total_value, unit_price, requested_quantity)')
     .not('status', 'in', '("completed","cancelled","delivered")');
 
   const activeOrders = orders || [];
-  const totalValue = activeOrders.reduce((sum: number, o: any) => sum + (Number(o.total_value) || 0), 0);
+  
+  // Função para calcular valor de um pedido somando seus itens
+  const calcOrderValue = (order: any) => {
+    return (order.order_items || []).reduce((sum: number, item: any) => {
+      const itemValue = item.total_value || (item.unit_price * item.requested_quantity) || 0;
+      return sum + Number(itemValue);
+    }, 0);
+  };
+  
+  const totalValue = activeOrders.reduce((sum: number, o: any) => sum + calcOrderValue(o), 0);
 
   // Calcular métricas
   let onTime = 0;
@@ -485,10 +494,11 @@ async function getSLAMetrics(supabase: any): Promise<string> {
     if (!order.delivery_date) return;
     const deliveryDate = new Date(order.delivery_date);
     const daysUntil = Math.ceil((deliveryDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+    const orderValue = calcOrderValue(order);
 
     if (daysUntil < 0) {
       late++;
-      lateValue += Number(order.total_value) || 0;
+      lateValue += orderValue;
     } else if (daysUntil <= 2) {
       critical++;
     } else {
@@ -610,16 +620,16 @@ async function getWeeklyTrend(supabase: any): Promise<string> {
   const lastWeek = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
   const twoWeeksAgo = new Date(today.getTime() - 14 * 24 * 60 * 60 * 1000);
 
-  // Pedidos criados esta semana
+  // Pedidos criados esta semana com itens para calcular valor
   const { data: thisWeekCreated } = await supabase
     .from('orders')
-    .select('id, total_value')
+    .select('id, order_items(total_value, unit_price, requested_quantity)')
     .gte('created_at', lastWeek.toISOString());
 
   // Pedidos criados semana passada
   const { data: lastWeekCreated } = await supabase
     .from('orders')
-    .select('id, total_value')
+    .select('id, order_items(total_value, unit_price, requested_quantity)')
     .gte('created_at', twoWeeksAgo.toISOString())
     .lt('created_at', lastWeek.toISOString());
 
@@ -643,8 +653,16 @@ async function getWeeklyTrend(supabase: any): Promise<string> {
   const thisWeekDeliveredCount = thisWeekDelivered?.length || 0;
   const lastWeekDeliveredCount = lastWeekDelivered?.length || 0;
 
-  const thisWeekValue = (thisWeekCreated || []).reduce((sum: number, o: any) => sum + (Number(o.total_value) || 0), 0);
-  const lastWeekValue = (lastWeekCreated || []).reduce((sum: number, o: any) => sum + (Number(o.total_value) || 0), 0);
+  // Calcular valor somando order_items
+  const calcOrderValue = (order: any) => {
+    return (order.order_items || []).reduce((sum: number, item: any) => {
+      const itemValue = item.total_value || (item.unit_price * item.requested_quantity) || 0;
+      return sum + Number(itemValue);
+    }, 0);
+  };
+
+  const thisWeekValue = (thisWeekCreated || []).reduce((sum: number, o: any) => sum + calcOrderValue(o), 0);
+  const lastWeekValue = (lastWeekCreated || []).reduce((sum: number, o: any) => sum + calcOrderValue(o), 0);
 
   // Calcular variações
   const createdChange = lastWeekCount > 0 
@@ -688,7 +706,7 @@ async function getBottleneckAnalysis(supabase: any): Promise<string> {
   // Buscar pedidos ativos com tempo em cada fase
   const { data: orders } = await supabase
     .from('orders')
-    .select('id, status, created_at, updated_at, total_value')
+    .select('id, order_number, status, created_at, updated_at')
     .not('status', 'in', '("completed","cancelled","delivered")');
 
   const phaseThresholds: Record<string, number> = {
@@ -826,9 +844,8 @@ Todas as fases estão dentro dos limites esperados.`;
 
     if (b.orders.length > 0) {
       response += `\n• Pedidos travados:`;
-      b.orders.forEach(o => {
-        const value = Number(o.total_value) || 0;
-        response += `\n  - #${o.order_number || o.id.substring(0, 8)} (${o.daysInPhase}d)`;
+      b.orders.forEach((o: any) => {
+        response += `\n  - #${o.order_number || o.id?.substring(0, 8) || 'N/A'} (${o.daysInPhase}d)`;
       });
     }
   });
@@ -981,8 +998,8 @@ async function getOrderDetails(supabase: any, orderNumber: string): Promise<stri
     .from('orders')
     .select(`
       id, order_number, customer_name, status, delivery_date, 
-      total_value, notes, created_at, freight_type, destination_city, destination_state,
-      order_items(id, item_code, item_description, requested_quantity, delivered_quantity, item_status, delivery_date)
+      notes, created_at, freight_type, destination_city, destination_state,
+      order_items(id, item_code, item_description, requested_quantity, delivered_quantity, item_status, delivery_date, unit_price, total_value)
     `)
     .or(`order_number.ilike.%${orderNumber}%,order_number.eq.${orderNumber}`)
     .limit(1)
@@ -994,7 +1011,13 @@ async function getOrderDetails(supabase: any, orderNumber: string): Promise<stri
 
   const items = order.order_items || [];
   const itemsCount = items.length;
-  const totalValue = order.total_value ? `R$ ${Number(order.total_value).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : 'Não informado';
+  
+  // Calcular valor total dos itens
+  const calculatedValue = items.reduce((sum: number, item: any) => {
+    const itemValue = item.total_value || (item.unit_price * item.requested_quantity) || 0;
+    return sum + Number(itemValue);
+  }, 0);
+  const totalValue = calculatedValue > 0 ? `R$ ${calculatedValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : 'Não informado';
   
   const deliveryDate = order.delivery_date ? new Date(order.delivery_date) : null;
   const today = new Date();
@@ -1110,11 +1133,20 @@ async function getDailySummary(supabase: any): Promise<string> {
 
   const { data: orders } = await supabase
     .from('orders')
-    .select('id, order_number, customer_name, status, total_value, delivery_date, created_at')
+    .select('id, order_number, customer_name, status, delivery_date, created_at, order_items(total_value, unit_price, requested_quantity)')
     .not('status', 'in', '("completed","cancelled","delivered")');
 
   const activeOrders = orders || [];
-  const totalValue = activeOrders.reduce((sum: number, o: any) => sum + (Number(o.total_value) || 0), 0);
+  
+  // Função para calcular valor do pedido
+  const calcOrderValue = (order: any) => {
+    return (order.order_items || []).reduce((sum: number, item: any) => {
+      const itemValue = item.total_value || (item.unit_price * item.requested_quantity) || 0;
+      return sum + Number(itemValue);
+    }, 0);
+  };
+  
+  const totalValue = activeOrders.reduce((sum: number, o: any) => sum + calcOrderValue(o), 0);
 
   const phaseCount: Record<string, number> = {};
   const phaseMap: Record<string, string> = {
@@ -1232,7 +1264,7 @@ async function getDelayedOrders(supabase: any): Promise<string> {
 
   const { data: orders } = await supabase
     .from('orders')
-    .select('id, order_number, customer_name, status, total_value, delivery_date')
+    .select('id, order_number, customer_name, status, delivery_date, order_items(total_value, unit_price, requested_quantity)')
     .not('status', 'in', '("completed","cancelled","delivered")')
     .lt('delivery_date', today.toISOString().split('T')[0])
     .order('delivery_date', { ascending: true })
@@ -1242,6 +1274,14 @@ async function getDelayedOrders(supabase: any): Promise<string> {
     return '✅ Nenhum pedido atrasado no momento!';
   }
 
+  // Função para calcular valor do pedido
+  const calcOrderValue = (order: any) => {
+    return (order.order_items || []).reduce((sum: number, item: any) => {
+      const itemValue = item.total_value || (item.unit_price * item.requested_quantity) || 0;
+      return sum + Number(itemValue);
+    }, 0);
+  };
+
   let response = `⚠️ *Pedidos Atrasados (${orders.length})*
 ━━━━━━━━━━━━━━━━━━`;
 
@@ -1249,7 +1289,7 @@ async function getDelayedOrders(supabase: any): Promise<string> {
   orders.forEach((order: any, index: number) => {
     const deliveryDate = new Date(order.delivery_date);
     const daysLate = Math.ceil((today.getTime() - deliveryDate.getTime()) / (1000 * 60 * 60 * 24));
-    const value = order.total_value ? Number(order.total_value) : 0;
+    const value = calcOrderValue(order);
     totalDelayed += value;
 
     response += `
@@ -1320,7 +1360,7 @@ async function getOrdersByPhase(supabase: any, phase: string): Promise<string> {
 
   const { data: orders } = await supabase
     .from('orders')
-    .select('id, order_number, customer_name, status, total_value, delivery_date')
+    .select('id, order_number, customer_name, status, delivery_date, order_items(total_value, unit_price, requested_quantity)')
     .in('status', statuses)
     .order('delivery_date', { ascending: true })
     .limit(15);
@@ -1329,13 +1369,22 @@ async function getOrdersByPhase(supabase: any, phase: string): Promise<string> {
     return `✅ Nenhum pedido em ${phaseLabels[phase] || phase} no momento.`;
   }
 
+  // Função para calcular valor do pedido
+  const calcOrderValue = (order: any) => {
+    return (order.order_items || []).reduce((sum: number, item: any) => {
+      const itemValue = item.total_value || (item.unit_price * item.requested_quantity) || 0;
+      return sum + Number(itemValue);
+    }, 0);
+  };
+
   const phaseLabel = phaseLabels[phase] || phase;
   let response = `${phaseLabel} *Pedidos (${orders.length})*
 ━━━━━━━━━━━━━━━━━━`;
 
   orders.forEach((order: any, index: number) => {
     const deliveryDate = order.delivery_date ? new Date(order.delivery_date).toLocaleDateString('pt-BR') : 'S/D';
-    const value = order.total_value ? `R$ ${Number(order.total_value).toLocaleString('pt-BR', { minimumFractionDigits: 0 })}` : '';
+    const orderValue = calcOrderValue(order);
+    const value = orderValue > 0 ? `R$ ${orderValue.toLocaleString('pt-BR', { minimumFractionDigits: 0 })}` : '';
 
     response += `
 ${index + 1}. *#${order.order_number}* - ${order.customer_name.substring(0, 20)}
@@ -1347,24 +1396,42 @@ ${index + 1}. *#${order.order_number}* - ${order.customer_name.substring(0, 20)}
 
 // Buscar top pedidos por valor
 async function getTopOrders(supabase: any, limit: number): Promise<string> {
+  // Buscar pedidos ativos com seus itens para calcular valor
   const { data: orders } = await supabase
     .from('orders')
-    .select('id, order_number, customer_name, status, total_value, delivery_date')
+    .select('id, order_number, customer_name, status, delivery_date, order_items(total_value, unit_price, requested_quantity)')
     .not('status', 'in', '("completed","cancelled","delivered")')
-    .not('total_value', 'is', null)
-    .order('total_value', { ascending: false })
-    .limit(limit);
+    .limit(100); // Buscar mais para depois ordenar por valor calculado
 
   if (!orders || orders.length === 0) {
     return '❌ Nenhum pedido ativo encontrado.';
+  }
+
+  // Função para calcular valor do pedido
+  const calcOrderValue = (order: any) => {
+    return (order.order_items || []).reduce((sum: number, item: any) => {
+      const itemValue = item.total_value || (item.unit_price * item.requested_quantity) || 0;
+      return sum + Number(itemValue);
+    }, 0);
+  };
+
+  // Calcular valores e ordenar
+  const ordersWithValue = orders
+    .map((order: any) => ({ ...order, calculatedValue: calcOrderValue(order) }))
+    .filter((o: any) => o.calculatedValue > 0)
+    .sort((a: any, b: any) => b.calculatedValue - a.calculatedValue)
+    .slice(0, limit);
+
+  if (ordersWithValue.length === 0) {
+    return '❌ Nenhum pedido com valor informado.';
   }
 
   let response = `💰 *Top ${limit} Maiores Pedidos*
 ━━━━━━━━━━━━━━━━━━`;
 
   let total = 0;
-  orders.forEach((order: any, index: number) => {
-    const value = Number(order.total_value) || 0;
+  ordersWithValue.forEach((order: any, index: number) => {
+    const value = order.calculatedValue;
     total += value;
     const deliveryDate = order.delivery_date ? new Date(order.delivery_date).toLocaleDateString('pt-BR') : 'S/D';
 
@@ -1388,7 +1455,7 @@ ${index + 1}️⃣ *#${order.order_number}*
 async function searchByCustomer(supabase: any, customerName: string): Promise<string> {
   const { data: orders } = await supabase
     .from('orders')
-    .select('id, order_number, customer_name, status, total_value, delivery_date')
+    .select('id, order_number, customer_name, status, delivery_date, order_items(total_value, unit_price, requested_quantity)')
     .ilike('customer_name', `%${customerName}%`)
     .not('status', 'in', '("completed","cancelled","delivered")')
     .order('created_at', { ascending: false })
@@ -1398,12 +1465,20 @@ async function searchByCustomer(supabase: any, customerName: string): Promise<st
     return `❌ Nenhum pedido ativo encontrado para cliente "${customerName}".`;
   }
 
+  // Função para calcular valor do pedido
+  const calcOrderValue = (order: any) => {
+    return (order.order_items || []).reduce((sum: number, item: any) => {
+      const itemValue = item.total_value || (item.unit_price * item.requested_quantity) || 0;
+      return sum + Number(itemValue);
+    }, 0);
+  };
+
   let response = `👤 *Pedidos do Cliente "${customerName}"* (${orders.length})
 ━━━━━━━━━━━━━━━━━━`;
 
   let total = 0;
   orders.forEach((order: any, index: number) => {
-    const value = Number(order.total_value) || 0;
+    const value = calcOrderValue(order);
     total += value;
     const deliveryDate = order.delivery_date ? new Date(order.delivery_date).toLocaleDateString('pt-BR') : 'S/D';
 
@@ -1471,7 +1546,7 @@ async function processWithAI(supabase: any, query: string): Promise<string> {
     // Buscar métricas atuais para contexto
     const { data: activeOrders } = await supabase
       .from('orders')
-      .select('status, total_value, delivery_date')
+      .select('status, delivery_date, order_items(total_value, unit_price, requested_quantity)')
       .not('status', 'in', '("completed","cancelled","delivered")');
 
     const today = new Date();
@@ -1480,10 +1555,18 @@ async function processWithAI(supabase: any, query: string): Promise<string> {
     let delayedCount = 0;
     let criticalCount = 0;
 
+    // Função para calcular valor do pedido
+    const calcOrderValue = (order: any) => {
+      return (order.order_items || []).reduce((sum: number, item: any) => {
+        const itemValue = item.total_value || (item.unit_price * item.requested_quantity) || 0;
+        return sum + Number(itemValue);
+      }, 0);
+    };
+
     (activeOrders || []).forEach((o: any) => {
       const phase = getPhaseFromStatus(o.status);
       phaseDistribution[phase] = (phaseDistribution[phase] || 0) + 1;
-      totalValue += Number(o.total_value) || 0;
+      totalValue += calcOrderValue(o);
       
       if (o.delivery_date) {
         const deliveryDate = new Date(o.delivery_date);
