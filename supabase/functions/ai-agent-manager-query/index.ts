@@ -12,9 +12,53 @@ interface QueryIntent {
   params: Record<string, any>;
 }
 
+// Helper para mapear status para nome da fase
+function getPhaseFromStatus(status: string): string {
+  const phaseMap: Record<string, string> = {
+    'almox_ssm_pending': 'Almox SSM', 'almox_ssm_received': 'Almox SSM',
+    'order_generation_pending': 'Gerar Ordem', 'order_in_creation': 'Gerar Ordem', 'order_generated': 'Gerar Ordem',
+    'almox_general_separating': 'Almox Geral', 'almox_general_ready': 'Almox Geral', 'almox_general_received': 'Almox Geral',
+    'purchase_pending': 'Compras', 'purchase_quoted': 'Compras', 'purchase_ordered': 'Compras', 'purchase_received': 'Compras',
+    'pending': 'Produção', 'in_production': 'Produção', 'separation_started': 'Produção', 'awaiting_material': 'Produção', 'separation_completed': 'Produção', 'production_completed': 'Produção',
+    'balance_calculation': 'Gerar Saldo', 'balance_review': 'Gerar Saldo', 'balance_approved': 'Gerar Saldo',
+    'awaiting_lab': 'Laboratório', 'in_lab_analysis': 'Laboratório', 'lab_completed': 'Laboratório',
+    'in_quality_check': 'Embalagem', 'in_packaging': 'Embalagem', 'ready_for_shipping': 'Embalagem',
+    'freight_quote_requested': 'Cotação', 'freight_quote_received': 'Cotação', 'freight_approved': 'Cotação',
+    'ready_to_invoice': 'À Faturar', 'pending_invoice_request': 'À Faturar',
+    'invoice_requested': 'Faturamento', 'awaiting_invoice': 'Faturamento', 'invoice_issued': 'Faturamento', 'invoice_sent': 'Faturamento',
+    'released_for_shipping': 'Expedição', 'in_expedition': 'Expedição', 'pickup_scheduled': 'Expedição', 'awaiting_pickup': 'Expedição',
+    'in_transit': 'Transporte', 'collected': 'Transporte',
+  };
+  return phaseMap[status] || 'Outros';
+}
+
+// Fuzzy matching para correção de typos comuns
+function fuzzyMatch(input: string): string {
+  const corrections: Record<string, string> = {
+    'starus': 'status', 'stauts': 'status', 'statsu': 'status', 'estatus': 'status',
+    'rsumo': 'resumo', 'resumoo': 'resumo', 'reusmo': 'resumo', 'resmo': 'resumo',
+    'atrazados': 'atrasados', 'atrazado': 'atrasado', 'atrasaods': 'atrasados',
+    'produçao': 'produção', 'producao': 'produção', 'produçã': 'produção',
+    'embalage': 'embalagem', 'embalgen': 'embalagem',
+    'faturamneto': 'faturamento', 'faturament': 'faturamento',
+    'laboratorio': 'laboratório', 'laboratori': 'laboratório',
+    'expediçao': 'expedição', 'expedicao': 'expedição',
+    'metricas': 'métricas', 'metrica': 'métricas',
+    'tendencia': 'tendência', 'tendenci': 'tendência',
+    'cotaçao': 'cotação', 'cotacao': 'cotação',
+  };
+  
+  let result = input;
+  for (const [wrong, correct] of Object.entries(corrections)) {
+    result = result.replace(new RegExp(wrong, 'gi'), correct);
+  }
+  return result;
+}
+
 // Detectar intenção da mensagem do gestor
 function detectManagerIntent(message: string): QueryIntent {
-  const messageLower = message.toLowerCase().trim();
+  const correctedMessage = fuzzyMatch(message);
+  const messageLower = correctedMessage.toLowerCase().trim();
 
   // Rateio
   const rateioMatch = messageLower.match(/(?:rateio|projeto)\s*#?\s*(\d+)/i);
@@ -48,7 +92,8 @@ function detectManagerIntent(message: string): QueryIntent {
 
   // Métricas/SLA
   if (messageLower.includes('métricas') || messageLower.includes('metricas') || 
-      messageLower.includes('sla') || messageLower.includes('performance')) {
+      messageLower.includes('sla') || messageLower.includes('performance') ||
+      messageLower.includes('indicador')) {
     return { type: 'metricas', params: {} };
   }
 
@@ -60,7 +105,8 @@ function detectManagerIntent(message: string): QueryIntent {
 
   // Gargalos
   if (messageLower.includes('gargalo') || messageLower.includes('bottleneck') || 
-      messageLower.includes('problema') || messageLower.includes('travado')) {
+      messageLower.includes('problema') || messageLower.includes('travado') ||
+      messageLower.includes('parado') || messageLower.includes('engarrafado')) {
     return { type: 'gargalos', params: {} };
   }
 
@@ -72,7 +118,7 @@ function detectManagerIntent(message: string): QueryIntent {
 
   // Alertas
   if (messageLower.includes('alertas') || messageLower.includes('pendências') || 
-      messageLower.includes('urgente')) {
+      messageLower.includes('urgente') || messageLower.includes('crítico')) {
     return { type: 'alertas', params: {} };
   }
 
@@ -85,7 +131,8 @@ function detectManagerIntent(message: string): QueryIntent {
 
   // Resumo do dia
   if (messageLower.includes('resumo') || messageLower.includes('dashboard') || 
-      messageLower.includes('hoje') || messageLower.includes('dia')) {
+      messageLower.includes('hoje') || messageLower.includes('visão geral') ||
+      messageLower === 'dia' || messageLower === 'status' || messageLower === 'geral') {
     return { type: 'daily_summary', params: {} };
   }
 
@@ -95,15 +142,34 @@ function detectManagerIntent(message: string): QueryIntent {
     return { type: 'delayed_orders', params: {} };
   }
 
-  // Pedidos por fase
+  // Pedidos por fase - ATUALIZADO COM TODAS AS FASES
   const phaseKeywords: Record<string, string[]> = {
-    'production_client': ['produção', 'producao', 'em produção', 'em producao', 'production'],
-    'packaging': ['embalagem', 'embalando', 'packaging'],
-    'logistics': ['expedição', 'expedicao', 'logística', 'logistica', 'logistics'],
-    'invoicing': ['faturamento', 'faturar', 'fatura', 'nf', 'nota fiscal', 'invoice'],
-    'laboratory': ['laboratório', 'laboratorio', 'lab'],
-    'freight_quote': ['frete solicitado', 'cotação pendente'],
-    'in_transit': ['trânsito', 'transito', 'em transporte', 'in_transit'],
+    // Almox SSM
+    'almox_ssm': ['almox ssm', 'ssm', 'almoxarifado ssm', 'recebimento ssm'],
+    // Gerar Ordem
+    'order_generation': ['gerar ordem', 'ordem', 'geração', 'criação ordem', 'gerando ordem'],
+    // Almox Geral  
+    'almox_general': ['almox geral', 'almoxarifado geral', 'separação almox'],
+    // Compras
+    'purchases': ['compra', 'compras', 'suprimentos', 'suprimento', 'purchase', 'pendente compra'],
+    // Produção
+    'production_client': ['produção', 'producao', 'em produção', 'em producao', 'production', 'separação'],
+    // Gerar Saldo
+    'balance': ['saldo', 'gerar saldo', 'cálculo saldo'],
+    // Laboratório
+    'laboratory': ['laboratório', 'laboratorio', 'lab', 'análise lab'],
+    // Embalagem
+    'packaging': ['embalagem', 'embalando', 'packaging', 'conferência', 'qualidade'],
+    // Cotação de Frete
+    'freight_quote': ['cotação frete', 'frete solicitado', 'cotação pendente', 'cotação'],
+    // À Faturar
+    'ready_to_invoice': ['à faturar', 'a faturar', 'pronto faturar', 'pronto para faturar', 'aguardando fatura'],
+    // Faturamento Solicitado
+    'invoicing': ['faturamento', 'faturar', 'fatura', 'nf', 'nota fiscal', 'invoice', 'nf solicitada'],
+    // Expedição
+    'logistics': ['expedição', 'expedicao', 'logística', 'logistica', 'logistics', 'envio'],
+    // Em Trânsito
+    'in_transit': ['trânsito', 'transito', 'em transporte', 'in_transit', 'viagem', 'entrega'],
   };
 
   for (const [phase, keywords] of Object.entries(phaseKeywords)) {
@@ -433,18 +499,61 @@ async function getSLAMetrics(supabase: any): Promise<string> {
   // Calcular tempo médio por fase
   const phaseCount: Record<string, { count: number; totalDays: number }> = {};
   const phaseMap: Record<string, string> = {
+    // Almox SSM
+    'almox_ssm_pending': 'Almox SSM',
+    'almox_ssm_received': 'Almox SSM',
+    // Gerar Ordem
+    'order_generation_pending': 'Gerar Ordem',
+    'order_in_creation': 'Gerar Ordem',
+    'order_generated': 'Gerar Ordem',
+    // Almox Geral
+    'almox_general_separating': 'Almox Geral',
+    'almox_general_ready': 'Almox Geral',
+    'almox_general_received': 'Almox Geral',
+    // Compras
+    'purchase_pending': 'Compras',
+    'purchase_quoted': 'Compras',
+    'purchase_ordered': 'Compras',
+    'purchase_received': 'Compras',
+    // Produção
+    'pending': 'Produção',
     'in_production': 'Produção',
     'separation_started': 'Produção',
+    'awaiting_material': 'Produção',
+    'separation_completed': 'Produção',
     'production_completed': 'Produção',
-    'in_packaging': 'Embalagem',
-    'ready_for_shipping': 'Embalagem',
-    'in_transit': 'Transporte',
+    // Gerar Saldo
+    'balance_calculation': 'Gerar Saldo',
+    'balance_review': 'Gerar Saldo',
+    'balance_approved': 'Gerar Saldo',
+    // Laboratório
     'awaiting_lab': 'Laboratório',
     'in_lab_analysis': 'Laboratório',
+    'lab_completed': 'Laboratório',
+    // Embalagem
+    'in_quality_check': 'Embalagem',
+    'in_packaging': 'Embalagem',
+    'ready_for_shipping': 'Embalagem',
+    // Cotação de Frete
+    'freight_quote_requested': 'Cotação',
+    'freight_quote_received': 'Cotação',
+    'freight_approved': 'Cotação',
+    // À Faturar
+    'ready_to_invoice': 'À Faturar',
+    'pending_invoice_request': 'À Faturar',
+    // Faturamento
     'invoice_requested': 'Faturamento',
     'awaiting_invoice': 'Faturamento',
+    'invoice_issued': 'Faturamento',
+    'invoice_sent': 'Faturamento',
+    // Expedição
     'released_for_shipping': 'Expedição',
     'in_expedition': 'Expedição',
+    'pickup_scheduled': 'Expedição',
+    'awaiting_pickup': 'Expedição',
+    // Em Trânsito
+    'in_transit': 'Transporte',
+    'collected': 'Transporte',
   };
 
   activeOrders.forEach((order: any) => {
@@ -583,28 +692,77 @@ async function getBottleneckAnalysis(supabase: any): Promise<string> {
     .not('status', 'in', '("completed","cancelled","delivered")');
 
   const phaseThresholds: Record<string, number> = {
+    'Almox SSM': 2,
+    'Gerar Ordem': 2,
+    'Almox Geral': 2,
+    'Compras': 7,
     'Produção': 7,
+    'Gerar Saldo': 1,
     'Laboratório': 3,
     'Embalagem': 2,
+    'Cotação': 3,
+    'À Faturar': 1,
     'Faturamento': 2,
     'Expedição': 2,
-    'Cotação': 3,
+    'Transporte': 5,
   };
 
   const phaseMap: Record<string, string> = {
+    // Almox SSM
+    'almox_ssm_pending': 'Almox SSM',
+    'almox_ssm_received': 'Almox SSM',
+    // Gerar Ordem
+    'order_generation_pending': 'Gerar Ordem',
+    'order_in_creation': 'Gerar Ordem',
+    'order_generated': 'Gerar Ordem',
+    // Almox Geral
+    'almox_general_separating': 'Almox Geral',
+    'almox_general_ready': 'Almox Geral',
+    'almox_general_received': 'Almox Geral',
+    // Compras
+    'purchase_pending': 'Compras',
+    'purchase_quoted': 'Compras',
+    'purchase_ordered': 'Compras',
+    'purchase_received': 'Compras',
+    // Produção
+    'pending': 'Produção',
     'in_production': 'Produção',
     'separation_started': 'Produção',
     'awaiting_material': 'Produção',
+    'separation_completed': 'Produção',
     'production_completed': 'Produção',
-    'in_packaging': 'Embalagem',
-    'ready_for_shipping': 'Embalagem',
+    // Gerar Saldo
+    'balance_calculation': 'Gerar Saldo',
+    'balance_review': 'Gerar Saldo',
+    'balance_approved': 'Gerar Saldo',
+    // Laboratório
     'awaiting_lab': 'Laboratório',
     'in_lab_analysis': 'Laboratório',
+    'lab_completed': 'Laboratório',
+    // Embalagem
+    'in_quality_check': 'Embalagem',
+    'in_packaging': 'Embalagem',
+    'ready_for_shipping': 'Embalagem',
+    // Cotação de Frete
+    'freight_quote_requested': 'Cotação',
+    'freight_quote_received': 'Cotação',
+    'freight_approved': 'Cotação',
+    // À Faturar
+    'ready_to_invoice': 'À Faturar',
+    'pending_invoice_request': 'À Faturar',
+    // Faturamento
     'invoice_requested': 'Faturamento',
     'awaiting_invoice': 'Faturamento',
-    'freight_quote_requested': 'Cotação',
+    'invoice_issued': 'Faturamento',
+    'invoice_sent': 'Faturamento',
+    // Expedição
     'released_for_shipping': 'Expedição',
     'in_expedition': 'Expedição',
+    'pickup_scheduled': 'Expedição',
+    'awaiting_pickup': 'Expedição',
+    // Em Trânsito
+    'in_transit': 'Transporte',
+    'collected': 'Transporte',
   };
 
   const bottlenecks: Array<{ phase: string; count: number; avgDays: number; threshold: number; orders: any[] }> = [];
@@ -851,20 +1009,64 @@ async function getOrderDetails(supabase: any, orderNumber: string): Promise<stri
   }
 
   const statusLabels: Record<string, string> = {
+    // Almox SSM
+    'almox_ssm_pending': '📥 Aguardando SSM',
+    'almox_ssm_received': '✅ Recebido SSM',
+    // Gerar Ordem
+    'order_generation_pending': '📝 Pendente Ordem',
+    'order_in_creation': '📝 Criando Ordem',
+    'order_generated': '✅ Ordem Gerada',
+    // Almox Geral
+    'almox_general_separating': '📦 Separando',
+    'almox_general_ready': '✅ Pronto Almox',
+    'almox_general_received': '📥 Recebido Almox',
+    // Compras
+    'purchase_pending': '🛒 Pendente Compra',
+    'purchase_quoted': '💰 Cotação Recebida',
+    'purchase_ordered': '📋 Pedido Emitido',
+    'purchase_received': '✅ Material Recebido',
+    // Produção
+    'pending': '⏳ Pendente',
     'in_production': '🔧 Em Produção',
     'separation_started': '📦 Separação Iniciada',
+    'awaiting_material': '⏳ Aguardando Material',
+    'separation_completed': '✅ Separação Concluída',
     'production_completed': '✅ Produção Concluída',
-    'in_packaging': '📦 Em Embalagem',
-    'ready_for_shipping': '🚚 Pronto para Envio',
-    'in_transit': '🚛 Em Trânsito',
-    'delivered': '✅ Entregue',
+    // Gerar Saldo
+    'balance_calculation': '🧮 Calculando Saldo',
+    'balance_review': '🔍 Revisando Saldo',
+    'balance_approved': '✅ Saldo Aprovado',
+    // Laboratório
     'awaiting_lab': '🔬 Aguardando Lab',
     'in_lab_analysis': '🔬 Em Análise Lab',
-    'invoice_requested': '💳 NF Solicitada',
-    'invoice_issued': '💳 NF Emitida',
+    'lab_completed': '✅ Lab Concluído',
+    // Embalagem
+    'in_quality_check': '🔍 Em Conferência',
+    'in_packaging': '📦 Em Embalagem',
+    'ready_for_shipping': '🚚 Pronto para Envio',
+    // Cotação de Frete
     'freight_quote_requested': '💰 Cotação Solicitada',
-    'freight_approved': '💰 Frete Aprovado',
-    'awaiting_material': '⏳ Aguardando Material',
+    'freight_quote_received': '💰 Cotação Recebida',
+    'freight_approved': '✅ Frete Aprovado',
+    // À Faturar
+    'ready_to_invoice': '💳 Pronto para Faturar',
+    'pending_invoice_request': '⏳ Aguardando Solicitação',
+    // Faturamento
+    'invoice_requested': '💳 NF Solicitada',
+    'awaiting_invoice': '⏳ Processando NF',
+    'invoice_issued': '✅ NF Emitida',
+    'invoice_sent': '✅ NF Enviada',
+    // Expedição
+    'released_for_shipping': '📤 Liberado Envio',
+    'in_expedition': '📤 Na Expedição',
+    'pickup_scheduled': '📅 Retirada Agendada',
+    'awaiting_pickup': '⏳ Aguardando Retirada',
+    // Em Trânsito
+    'in_transit': '🚛 Em Trânsito',
+    'collected': '✅ Coletado',
+    // Conclusão
+    'delivered': '✅ Entregue',
+    'completed': '✅ Concluído',
   };
 
   const statusText = statusLabels[order.status] || order.status;
@@ -916,30 +1118,61 @@ async function getDailySummary(supabase: any): Promise<string> {
 
   const phaseCount: Record<string, number> = {};
   const phaseMap: Record<string, string> = {
+    // Almox SSM
+    'almox_ssm_pending': 'Almox SSM',
+    'almox_ssm_received': 'Almox SSM',
+    // Gerar Ordem
+    'order_generation_pending': 'Gerar Ordem',
+    'order_in_creation': 'Gerar Ordem',
+    'order_generated': 'Gerar Ordem',
+    // Almox Geral
+    'almox_general_separating': 'Almox Geral',
+    'almox_general_ready': 'Almox Geral',
+    'almox_general_received': 'Almox Geral',
+    // Compras
+    'purchase_pending': 'Compras',
+    'purchase_quoted': 'Compras',
+    'purchase_ordered': 'Compras',
+    'purchase_received': 'Compras',
+    // Produção
+    'pending': 'Produção',
     'in_production': 'Produção',
     'separation_started': 'Produção',
-    'production_completed': 'Produção',
     'awaiting_material': 'Produção',
     'separation_completed': 'Produção',
-    'in_packaging': 'Embalagem',
-    'ready_for_shipping': 'Embalagem',
-    'in_quality_check': 'Embalagem',
-    'in_transit': 'Transporte',
-    'collected': 'Transporte',
+    'production_completed': 'Produção',
+    // Gerar Saldo
+    'balance_calculation': 'Gerar Saldo',
+    'balance_review': 'Gerar Saldo',
+    'balance_approved': 'Gerar Saldo',
+    // Laboratório
     'awaiting_lab': 'Laboratório',
     'in_lab_analysis': 'Laboratório',
     'lab_completed': 'Laboratório',
+    // Embalagem
+    'in_quality_check': 'Embalagem',
+    'in_packaging': 'Embalagem',
+    'ready_for_shipping': 'Embalagem',
+    // Cotação de Frete
+    'freight_quote_requested': 'Cotação',
+    'freight_quote_received': 'Cotação',
+    'freight_approved': 'Cotação',
+    // À Faturar
+    'ready_to_invoice': 'À Faturar',
+    'pending_invoice_request': 'À Faturar',
+    // Faturamento
     'invoice_requested': 'Faturamento',
     'awaiting_invoice': 'Faturamento',
     'invoice_issued': 'Faturamento',
     'invoice_sent': 'Faturamento',
-    'freight_quote_requested': 'Cotação',
-    'freight_quote_received': 'Cotação',
-    'freight_approved': 'Cotação',
+    // Expedição
     'released_for_shipping': 'Expedição',
     'in_expedition': 'Expedição',
     'pickup_scheduled': 'Expedição',
     'awaiting_pickup': 'Expedição',
+    // Em Trânsito
+    'in_transit': 'Transporte',
+    'collected': 'Transporte',
   };
 
   activeOrders.forEach((order: any) => {
@@ -1036,22 +1269,47 @@ ${index + 1}️⃣ *#${order.order_number}* - ${order.customer_name.substring(0,
 // Buscar pedidos por fase
 async function getOrdersByPhase(supabase: any, phase: string): Promise<string> {
   const statusMap: Record<string, string[]> = {
-    'production_client': ['in_production', 'separation_started', 'awaiting_material', 'separation_completed', 'production_completed'],
-    'packaging': ['in_quality_check', 'in_packaging', 'ready_for_shipping'],
-    'logistics': ['released_for_shipping', 'in_expedition', 'pickup_scheduled', 'awaiting_pickup'],
-    'invoicing': ['invoice_requested', 'awaiting_invoice', 'invoice_issued', 'invoice_sent'],
+    // Almox SSM
+    'almox_ssm': ['almox_ssm_pending', 'almox_ssm_received'],
+    // Gerar Ordem
+    'order_generation': ['order_generation_pending', 'order_in_creation', 'order_generated'],
+    // Almox Geral
+    'almox_general': ['almox_general_separating', 'almox_general_ready', 'almox_general_received'],
+    // Compras
+    'purchases': ['purchase_pending', 'purchase_quoted', 'purchase_ordered', 'purchase_received'],
+    // Produção
+    'production_client': ['pending', 'in_production', 'separation_started', 'awaiting_material', 'separation_completed', 'production_completed'],
+    // Gerar Saldo
+    'balance': ['balance_calculation', 'balance_review', 'balance_approved'],
+    // Laboratório
     'laboratory': ['awaiting_lab', 'in_lab_analysis', 'lab_completed'],
+    // Embalagem
+    'packaging': ['in_quality_check', 'in_packaging', 'ready_for_shipping'],
+    // Cotação de Frete
     'freight_quote': ['freight_quote_requested', 'freight_quote_received', 'freight_approved'],
+    // À Faturar
+    'ready_to_invoice': ['ready_to_invoice', 'pending_invoice_request'],
+    // Faturamento
+    'invoicing': ['invoice_requested', 'awaiting_invoice', 'invoice_issued', 'invoice_sent'],
+    // Expedição
+    'logistics': ['released_for_shipping', 'in_expedition', 'pickup_scheduled', 'awaiting_pickup'],
+    // Em Trânsito
     'in_transit': ['in_transit', 'collected'],
   };
 
   const phaseLabels: Record<string, string> = {
+    'almox_ssm': '📥 Almox SSM',
+    'order_generation': '📝 Gerar Ordem',
+    'almox_general': '📦 Almox Geral',
+    'purchases': '🛒 Compras',
     'production_client': '🔧 Produção',
-    'packaging': '📦 Embalagem',
-    'logistics': '📤 Expedição',
-    'invoicing': '💳 Faturamento',
+    'balance': '🧮 Gerar Saldo',
     'laboratory': '🔬 Laboratório',
+    'packaging': '📦 Embalagem',
     'freight_quote': '💰 Cotação de Frete',
+    'ready_to_invoice': '💳 À Faturar',
+    'invoicing': '💳 Faturamento',
+    'logistics': '📤 Expedição',
     'in_transit': '🚛 Em Trânsito',
   };
 
@@ -1189,9 +1447,13 @@ function getHelpMessage(): string {
 • "transportadora NOME" - Por carrier
 
 🔧 *Por Fase:*
-• "produção" / "embalagem"
-• "faturamento" / "laboratório"
-• "expedição" / "trânsito"
+• "almox ssm" / "gerar ordem"
+• "compras" / "almox geral"
+• "produção" / "gerar saldo"
+• "laboratório" / "embalagem"
+• "cotação" / "à faturar"
+• "faturamento" / "expedição"
+• "trânsito"
 
 💰 *Maiores Pedidos:*
 • "top" ou "maiores"`;
@@ -1206,26 +1468,110 @@ async function processWithAI(supabase: any, query: string): Promise<string> {
   }
 
   try {
-    // Buscar contexto
-    const { data: recentOrders } = await supabase
+    // Buscar métricas atuais para contexto
+    const { data: activeOrders } = await supabase
       .from('orders')
-      .select('order_number, customer_name, status, total_value')
-      .not('status', 'in', '("completed","cancelled")')
-      .limit(5);
+      .select('status, total_value, delivery_date')
+      .not('status', 'in', '("completed","cancelled","delivered")');
 
-    const context = recentOrders?.map((o: any) => 
-      `#${o.order_number} - ${o.customer_name} (${o.status}) R$${o.total_value || 0}`
-    ).join('\n') || 'Nenhum pedido recente';
+    const today = new Date();
+    const phaseDistribution: Record<string, number> = {};
+    let totalValue = 0;
+    let delayedCount = 0;
+    let criticalCount = 0;
+
+    (activeOrders || []).forEach((o: any) => {
+      const phase = getPhaseFromStatus(o.status);
+      phaseDistribution[phase] = (phaseDistribution[phase] || 0) + 1;
+      totalValue += Number(o.total_value) || 0;
+      
+      if (o.delivery_date) {
+        const deliveryDate = new Date(o.delivery_date);
+        const daysUntil = Math.ceil((deliveryDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+        if (daysUntil < 0) delayedCount++;
+        else if (daysUntil <= 2) criticalCount++;
+      }
+    });
+
+    const metricsContext = `
+MÉTRICAS ATUAIS (${today.toLocaleDateString('pt-BR')}):
+- Pedidos ativos: ${(activeOrders || []).length}
+- Valor total: R$ ${totalValue.toLocaleString('pt-BR', { minimumFractionDigits: 0 })}
+- Atrasados: ${delayedCount}
+- Críticos (<3 dias): ${criticalCount}
+- Distribuição: ${Object.entries(phaseDistribution).map(([p, c]) => `${p}: ${c}`).join(', ')}`;
 
     // Buscar conhecimento RAG para gestores
     const { data: ragItems } = await supabase
       .from('ai_knowledge_base')
-      .select('title, content')
+      .select('title, content, category')
       .or('agent_type.eq.manager,agent_type.eq.general')
       .eq('is_active', true)
-      .limit(3);
+      .order('priority', { ascending: false })
+      .limit(5);
 
-    const ragContext = ragItems?.map((r: any) => `${r.title}: ${r.content.substring(0, 200)}`).join('\n') || '';
+    const ragContext = ragItems?.map((r: any) => 
+      `[${r.category}] ${r.title}: ${r.content.substring(0, 300)}`
+    ).join('\n\n') || '';
+
+    const systemPrompt = `Você é o *Assistente Gerencial IMPLY*, especializado em gestão de pedidos e operações logísticas.
+
+## FASES DO KANBAN (ordem do fluxo):
+1. 📥 *Almox SSM* - Recebimento inicial de materiais SSM
+2. 📝 *Gerar Ordem* - Criação da ordem de produção
+3. 🛒 *Compras* - Solicitação e recebimento de materiais
+4. 📦 *Almox Geral* - Separação no almoxarifado geral
+5. 🔧 *Produção* - Fabricação/montagem dos produtos
+6. 🧮 *Gerar Saldo* - Cálculo de saldo para faturamento
+7. 🔬 *Laboratório* - Testes e validações técnicas
+8. 📦 *Embalagem* - Conferência e embalagem
+9. 💰 *Cotação de Frete* - Solicitação de cotações às transportadoras
+10. 💳 *À Faturar* - Aguardando solicitação de NF
+11. 💳 *Faturamento* - Emissão de nota fiscal
+12. 📤 *Expedição* - Liberação e coleta
+13. 🚛 *Em Trânsito* - Em viagem até o cliente
+14. ✅ *Conclusão* - Pedido entregue
+
+## SLAs ESPERADOS POR FASE:
+- Almox SSM/Geral: 2 dias
+- Gerar Ordem: 2 dias
+- Compras: 7 dias
+- Produção: 7 dias
+- Gerar Saldo: 1 dia
+- Laboratório: 3 dias
+- Embalagem: 2 dias
+- Cotação Frete: 3 dias
+- À Faturar: 1 dia
+- Faturamento: 2 dias
+- Expedição: 2 dias
+
+${metricsContext}
+
+## CONHECIMENTO DA BASE:
+${ragContext || 'Nenhum conhecimento específico disponível.'}
+
+## COMANDOS DISPONÍVEIS:
+- "resumo" → Dashboard do dia
+- "status NUMERO" → Detalhes do pedido
+- "volumes NUMERO" → Dimensões e pesos
+- "cotações NUMERO" → Cotações de frete
+- "histórico NUMERO" → Timeline de alterações
+- "métricas" → Dashboard de SLA
+- "tendência" → Comparativo semanal
+- "gargalos" → Identificar bottlenecks
+- "atrasados" → Lista de atrasos
+- "alertas" → Pendências urgentes
+- "cliente NOME" → Pedidos do cliente
+- "rateio CODIGO" → Info do projeto
+- "transportadora NOME" → Por carrier
+- FASE (ex: "produção", "compras", "à faturar") → Pedidos na fase
+
+## REGRAS:
+1. Use formatação WhatsApp: *negrito*, _itálico_
+2. Seja conciso e direto
+3. Sugira comandos quando apropriado
+4. Mencione SLAs quando houver atrasos
+5. Destaque números importantes`;
 
     const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
@@ -1236,22 +1582,10 @@ async function processWithAI(supabase: any, query: string): Promise<string> {
       body: JSON.stringify({
         model: 'google/gemini-2.5-flash',
         messages: [
-          {
-            role: 'system',
-            content: `Você é o Assistente Gerencial da IMPLY. Responda de forma concisa e use formatação WhatsApp (*negrito*, _itálico_).
-
-Conhecimento disponível:
-${ragContext}
-            
-Pedidos recentes:
-${context}
-
-Comandos disponíveis: "resumo", "atrasados", "status NUMERO", "volumes NUMERO", "cotações NUMERO", "histórico NUMERO", "métricas", "tendência", "gargalos", "cliente NOME", "rateio CODIGO", "transportadora NOME", "alertas".
-
-Se não souber a resposta específica, sugira o comando mais apropriado.`
-          },
+          { role: 'system', content: systemPrompt },
           { role: 'user', content: query }
         ],
+        max_tokens: 500,
       }),
     });
 
