@@ -14,8 +14,9 @@ import { toast } from 'sonner';
 import { 
   Bot, Plus, Edit, Trash2, Phone, Settings, 
   Sparkles, Brain, Zap, Users, Package, Headphones,
-  MessageCircle, Ban, User, TrendingUp
+  MessageCircle, Ban, User, TrendingUp, Wrench
 } from 'lucide-react';
+import { ManagerAgentConfig } from './ManagerAgentConfig';
 
 interface AgentInstance {
   id: string;
@@ -56,6 +57,27 @@ const AGENT_TYPE_CONFIG = {
   manager: { label: 'Gerencial', icon: TrendingUp, color: 'bg-indigo-500' },
   general: { label: 'Geral', icon: Bot, color: 'bg-gray-500' },
 };
+
+// Default system prompt for manager agents
+const MANAGER_SYSTEM_PROMPT = `Você é um assistente gerencial especializado em análise de pedidos, métricas e performance operacional.
+
+## Comandos Disponíveis:
+- "status [número]" - Consultar status de pedido específico
+- "métricas" - Ver dashboard de performance atual
+- "atrasados" - Listar todos os pedidos atrasados
+- "rateio [código]" - Consultar projeto de rateio
+- "volumes [número]" - Ver volumes do pedido
+- "cotações [número]" - Ver cotações de frete do pedido
+- "histórico [número]" - Ver timeline de alterações
+- "gargalos" - Identificar bottlenecks operacionais
+- "tendência" - Comparativo semanal de performance
+
+## Diretrizes:
+1. Sempre forneça dados precisos e acionáveis
+2. Priorize informações críticas (atrasos, SLA em risco)
+3. Use formatação clara com emojis para destaque
+4. Sugira ações proativas quando identificar problemas
+5. Mantenha respostas concisas mas completas`;
 
 const TONE_OPTIONS = [
   { value: 'formal', label: 'Formal' },
@@ -298,6 +320,28 @@ export default function AIAgentInstancesTab() {
     return AGENT_TYPE_CONFIG[type as keyof typeof AGENT_TYPE_CONFIG] || AGENT_TYPE_CONFIG.general;
   };
 
+  // Apply default values when manager type is selected
+  const applyManagerDefaults = (newType: string) => {
+    if (newType === 'manager' && !editingInstance) {
+      setFormData(prev => ({
+        ...prev,
+        agent_type: newType,
+        instance_name: prev.instance_name || 'Agente Gerencial',
+        personality: 'Analítico, preciso e proativo. Focado em métricas e performance operacional.',
+        tone_of_voice: 'profissional',
+        conversation_style: 'concise',
+        system_prompt: MANAGER_SYSTEM_PROMPT,
+        specializations: 'métricas, alertas, análise de dados, SLA, performance, gargalos',
+        custom_instructions: 'Priorize informações críticas como atrasos e SLA em risco. Use formatação clara com emojis para destaque visual.',
+        emoji_library: '📊,✅,⚠️,🚨,📈,📉,🎯,⏰',
+        description: 'Agente especializado em consultas gerenciais, métricas de performance e alertas inteligentes.',
+      }));
+      toast.info('Configurações padrão do Agente Gerencial aplicadas!');
+    } else {
+      setFormData(prev => ({ ...prev, agent_type: newType }));
+    }
+  };
+
   if (loading) {
     return <div className="flex items-center justify-center p-8">Carregando...</div>;
   }
@@ -331,7 +375,7 @@ export default function AIAgentInstancesTab() {
             </DialogHeader>
             
             <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 overflow-hidden flex flex-col">
-              <TabsList className="grid grid-cols-4 mb-4">
+              <TabsList className={`grid mb-4 ${formData.agent_type === 'manager' ? 'grid-cols-5' : 'grid-cols-4'}`}>
                 <TabsTrigger value="identity" className="flex items-center gap-1">
                   <User className="h-4 w-4" />
                   Identidade
@@ -348,6 +392,12 @@ export default function AIAgentInstancesTab() {
                   <Settings className="h-4 w-4" />
                   Config
                 </TabsTrigger>
+                {formData.agent_type === 'manager' && (
+                  <TabsTrigger value="tools" className="flex items-center gap-1">
+                    <Wrench className="h-4 w-4" />
+                    Ferramentas
+                  </TabsTrigger>
+                )}
               </TabsList>
 
               <div className="flex-1 overflow-y-auto pr-2">
@@ -366,7 +416,7 @@ export default function AIAgentInstancesTab() {
                       <Label>Tipo de Agente *</Label>
                       <Select
                         value={formData.agent_type}
-                        onValueChange={(value) => setFormData({ ...formData, agent_type: value })}
+                        onValueChange={applyManagerDefaults}
                       >
                         <SelectTrigger>
                           <SelectValue />
@@ -679,6 +729,13 @@ export default function AIAgentInstancesTab() {
                     </CardContent>
                   </Card>
                 </TabsContent>
+
+                {/* Tab: Manager Tools (conditional) */}
+                {formData.agent_type === 'manager' && (
+                  <TabsContent value="tools" className="space-y-4 mt-0">
+                    <ManagerAgentConfig agentId={editingInstance?.id} />
+                  </TabsContent>
+                )}
               </div>
 
               <div className="flex justify-end gap-2 pt-4 border-t mt-4">
