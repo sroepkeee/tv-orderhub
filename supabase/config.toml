@@ -71,3 +71,6 @@ verify_jwt = true
 
 [functions.process-pending-replies]
 verify_jwt = true
+
+[functions.daily-management-report]
+verify_jwt = false

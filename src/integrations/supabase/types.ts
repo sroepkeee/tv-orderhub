@@ -1544,6 +1544,97 @@ export type Database = {
           },
         ]
       }
+      management_report_log: {
+        Row: {
+          chart_sent: boolean | null
+          error_message: string | null
+          id: string
+          message_content: string | null
+          metrics_snapshot: Json | null
+          recipient_id: string | null
+          recipient_whatsapp: string
+          report_type: string
+          sent_at: string | null
+          status: string
+        }
+        Insert: {
+          chart_sent?: boolean | null
+          error_message?: string | null
+          id?: string
+          message_content?: string | null
+          metrics_snapshot?: Json | null
+          recipient_id?: string | null
+          recipient_whatsapp: string
+          report_type?: string
+          sent_at?: string | null
+          status?: string
+        }
+        Update: {
+          chart_sent?: boolean | null
+          error_message?: string | null
+          id?: string
+          message_content?: string | null
+          metrics_snapshot?: Json | null
+          recipient_id?: string | null
+          recipient_whatsapp?: string
+          report_type?: string
+          sent_at?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "management_report_log_recipient_id_fkey"
+            columns: ["recipient_id"]
+            isOneToOne: false
+            referencedRelation: "management_report_recipients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      management_report_recipients: {
+        Row: {
+          created_at: string | null
+          id: string
+          is_active: boolean
+          last_report_sent_at: string | null
+          preferred_time: string | null
+          report_types: string[]
+          updated_at: string | null
+          user_id: string
+          whatsapp: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          is_active?: boolean
+          last_report_sent_at?: string | null
+          preferred_time?: string | null
+          report_types?: string[]
+          updated_at?: string | null
+          user_id: string
+          whatsapp: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          is_active?: boolean
+          last_report_sent_at?: string | null
+          preferred_time?: string | null
+          report_types?: string[]
+          updated_at?: string | null
+          user_id?: string
+          whatsapp?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_user"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       mention_tags: {
         Row: {
           comment_id: string

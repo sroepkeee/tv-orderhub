@@ -6,7 +6,8 @@ import { UserPresenceDashboard } from "@/components/admin/UserPresenceDashboard"
 import { RecentActivityFeed } from "@/components/admin/RecentActivityFeed";
 import { UserSessionsTable } from "@/components/admin/UserSessionsTable";
 import { LoginAuditTable } from "@/components/admin/LoginAuditTable";
-import { Shield, ArrowLeft } from "lucide-react";
+import { ManagementReportSettings } from "@/components/admin/ManagementReportSettings";
+import { Shield, ArrowLeft, BarChart3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 
@@ -35,10 +36,14 @@ const Admin = () => {
         </div>
 
         <Tabs defaultValue="users" className="w-full">
-          <TabsList className="grid w-full grid-cols-3 mb-4">
+          <TabsList className="grid w-full grid-cols-4 mb-4">
             <TabsTrigger value="users">Usuários</TabsTrigger>
             <TabsTrigger value="monitoring">Monitoramento</TabsTrigger>
             <TabsTrigger value="audit">Auditoria</TabsTrigger>
+            <TabsTrigger value="reports" className="flex items-center gap-1">
+              <BarChart3 className="h-3 w-3" />
+              Relatórios
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="users" className="space-y-4">
@@ -57,6 +62,10 @@ const Admin = () => {
 
           <TabsContent value="audit" className="space-y-4">
             <PermissionAuditLog />
+          </TabsContent>
+
+          <TabsContent value="reports" className="space-y-4">
+            <ManagementReportSettings />
           </TabsContent>
         </Tabs>
       </div>
