@@ -2764,9 +2764,11 @@ export type Database = {
           full_name: string | null
           id: string
           is_active: boolean | null
+          is_manager: boolean | null
           last_login: string | null
           location: string | null
           updated_at: string
+          whatsapp: string | null
         }
         Insert: {
           created_at?: string
@@ -2775,9 +2777,11 @@ export type Database = {
           full_name?: string | null
           id: string
           is_active?: boolean | null
+          is_manager?: boolean | null
           last_login?: string | null
           location?: string | null
           updated_at?: string
+          whatsapp?: string | null
         }
         Update: {
           created_at?: string
@@ -2786,9 +2790,11 @@ export type Database = {
           full_name?: string | null
           id?: string
           is_active?: boolean | null
+          is_manager?: boolean | null
           last_login?: string | null
           location?: string | null
           updated_at?: string
+          whatsapp?: string | null
         }
         Relationships: []
       }

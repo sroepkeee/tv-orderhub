@@ -5,8 +5,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { UserCheck, UserX, UserCog, Search, CheckCircle, XCircle, Clock } from "lucide-react";
+import { UserCheck, UserX, UserCog, Search, CheckCircle, XCircle, Clock, Crown } from "lucide-react";
 import { UserApprovalDialog } from "./UserApprovalDialog";
 import { UserRolesDialog } from "./UserRolesDialog";
 import { DepartmentSelect } from "./DepartmentSelect";
@@ -25,6 +26,8 @@ interface UserData {
   roles: string[];
   created_at: string;
   is_active: boolean;
+  whatsapp: string | null;
+  is_manager: boolean;
 }
 
 export const UserManagementTable = () => {
@@ -73,10 +76,10 @@ export const UserManagementTable = () => {
     try {
       setLoading(true);
       
-      // Buscar profiles
+      // Buscar profiles com novos campos whatsapp e is_manager
     const { data: profiles, error: profilesError } = await supabase
       .from('profiles')
-      .select('id, email, full_name, department, location, created_at, is_active')
+      .select('id, email, full_name, department, location, created_at, is_active, whatsapp, is_manager')
       .order('created_at', { ascending: false });
       
       if (profilesError) throw profilesError;
@@ -114,6 +117,8 @@ export const UserManagementTable = () => {
         roles: roles,
         created_at: profile.created_at,
         is_active: profile.is_active ?? false,
+        whatsapp: profile.whatsapp || null,
+        is_manager: profile.is_manager ?? false,
       };
       });
       
@@ -195,6 +200,49 @@ export const UserManagementTable = () => {
     }
   };
 
+  const updateUserWhatsApp = async (userId: string, newWhatsApp: string) => {
+    const formatted = newWhatsApp.replace(/\D/g, '');
+    const { error } = await supabase
+      .from('profiles')
+      .update({ whatsapp: formatted || null })
+      .eq('id', userId);
+
+    if (error) {
+      toast({
+        title: "Erro",
+        description: "Não foi possível atualizar WhatsApp",
+        variant: "destructive",
+      });
+    } else {
+      toast({
+        title: "Sucesso",
+        description: "WhatsApp atualizado!",
+      });
+      loadUsers();
+    }
+  };
+
+  const toggleUserManager = async (userId: string, currentValue: boolean) => {
+    const { error } = await supabase
+      .from('profiles')
+      .update({ is_manager: !currentValue })
+      .eq('id', userId);
+
+    if (error) {
+      toast({
+        title: "Erro",
+        description: "Não foi possível alterar status de gestor",
+        variant: "destructive",
+      });
+    } else {
+      toast({
+        title: "Sucesso",
+        description: `Usuário ${!currentValue ? 'marcado como gestor' : 'removido de gestor'}!`,
+      });
+      loadUsers();
+    }
+  };
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'approved':
@@ -209,10 +257,11 @@ export const UserManagementTable = () => {
   const pendingCount = users.filter(u => u.approval_status === 'pending').length;
   const approvedCount = users.filter(u => u.approval_status === 'approved').length;
   const rejectedCount = users.filter(u => u.approval_status === 'rejected').length;
+  const managerCount = users.filter(u => u.is_manager).length;
 
   return (
     <>
-      <div className="grid gap-4 md:grid-cols-3 mb-6">
+      <div className="grid gap-4 md:grid-cols-4 mb-6">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Pendentes</CardTitle>
@@ -238,6 +287,15 @@ export const UserManagementTable = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{rejectedCount}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Gestores</CardTitle>
+            <Crown className="h-4 w-4 text-amber-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{managerCount}</div>
           </CardContent>
         </Card>
       </div>
@@ -279,6 +337,8 @@ export const UserManagementTable = () => {
                 <TableRow>
               <TableHead>Nome</TableHead>
               <TableHead>Email</TableHead>
+              <TableHead>WhatsApp</TableHead>
+              <TableHead>Gestor</TableHead>
               <TableHead>Departamento</TableHead>
               <TableHead>Localização</TableHead>
               <TableHead>Status Ativo</TableHead>
@@ -291,13 +351,13 @@ export const UserManagementTable = () => {
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={9} className="text-center py-8">
+                    <TableCell colSpan={11} className="text-center py-8">
                       Carregando usuários...
                     </TableCell>
                   </TableRow>
                 ) : filteredUsers.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={11} className="text-center py-8 text-muted-foreground">
                       Nenhum usuário encontrado
                     </TableCell>
                   </TableRow>
@@ -312,12 +372,38 @@ export const UserManagementTable = () => {
                           }}
                           className="flex items-center gap-2 hover:text-primary transition-colors text-left"
                         >
+                          {user.is_manager && <Crown className="h-4 w-4 text-amber-500" />}
                           <span className="font-medium underline decoration-dotted">
                             {user.full_name}
                           </span>
                         </button>
                       </TableCell>
                       <TableCell className="text-muted-foreground">{user.email}</TableCell>
+                      <TableCell>
+                        <Input
+                          placeholder="5551999999999"
+                          value={user.whatsapp || ''}
+                          onChange={(e) => {
+                            const newUsers = users.map(u => 
+                              u.id === user.id ? { ...u, whatsapp: e.target.value } : u
+                            );
+                            setUsers(newUsers);
+                          }}
+                          onBlur={(e) => updateUserWhatsApp(user.id, e.target.value)}
+                          className="w-36 text-sm"
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <Switch
+                            checked={user.is_manager}
+                            onCheckedChange={() => toggleUserManager(user.id, user.is_manager)}
+                          />
+                          {user.is_manager && (
+                            <Crown className="h-4 w-4 text-amber-500" />
+                          )}
+                        </div>
+                      </TableCell>
                       <TableCell>
                         <DepartmentSelect
                           userId={user.id}

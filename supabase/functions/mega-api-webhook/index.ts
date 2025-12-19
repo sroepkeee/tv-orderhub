@@ -457,10 +457,11 @@ async function checkIfManager(supabase: any, phoneNumber: string): Promise<boole
     const phoneClean = phoneNumber.replace(/\D/g, '');
     const lastDigits = phoneClean.slice(-8);
     
-    const { data: recipient, error } = await supabase
-      .from('management_report_recipients')
-      .select('id, is_active')
-      .eq('is_active', true)
+    // Buscar na tabela profiles onde is_manager = true
+    const { data: manager, error } = await supabase
+      .from('profiles')
+      .select('id, full_name, is_manager, whatsapp')
+      .eq('is_manager', true)
       .or(`whatsapp.ilike.%${lastDigits}%,whatsapp.ilike.%${phoneClean}%`)
       .limit(1)
       .maybeSingle();
@@ -470,8 +471,8 @@ async function checkIfManager(supabase: any, phoneNumber: string): Promise<boole
       return false;
     }
     
-    const isManager = !!recipient;
-    console.log(`👔 Manager check for ${phoneNumber}: ${isManager ? 'YES' : 'NO'}`);
+    const isManager = !!manager;
+    console.log(`👔 Manager check for ${phoneNumber}: ${isManager ? 'YES' : 'NO'}${manager ? ` (${manager.full_name})` : ''}`);
     return isManager;
   } catch (err) {
     console.error('Exception in checkIfManager:', err);
