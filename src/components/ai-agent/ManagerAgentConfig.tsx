@@ -15,6 +15,7 @@ import {
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { ManagerAgentDashboard } from '@/components/admin/ManagerAgentDashboard';
+import { ManagerRecipientsManager } from './ManagerRecipientsManager';
 
 interface ManagerAgentConfigProps {
   agentId?: string;
@@ -64,6 +65,9 @@ export function ManagerAgentConfig({ agentId }: ManagerAgentConfigProps) {
 
   return (
     <div className="space-y-6">
+      {/* Gestores Cadastrados */}
+      <ManagerRecipientsManager />
+
       {/* Comandos Disponíveis */}
       <Card>
         <CardHeader className="pb-3">
