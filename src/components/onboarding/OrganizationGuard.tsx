@@ -21,7 +21,9 @@ export function OrganizationGuard({ children }: OrganizationGuardProps) {
 
   // Páginas que não precisam de organização
   const exemptPaths = ['/landing', '/auth', '/onboarding'];
-  const isExemptPath = exemptPaths.some(path => location.pathname.startsWith(path));
+  const isExemptPath = exemptPaths.some(path => 
+    location.pathname === path || location.pathname.startsWith(path + '/')
+  );
 
   useEffect(() => {
     const checkOrganization = async () => {

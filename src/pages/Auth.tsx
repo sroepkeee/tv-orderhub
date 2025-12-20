@@ -9,7 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { trackLogin } from "@/hooks/useLoginTracking";
-import { Truck, Shield } from "lucide-react";
+import { Activity, Shield } from "lucide-react";
 import { ForgotPasswordDialog } from "@/components/ForgotPasswordDialog";
 
 export default function Auth() {
@@ -132,11 +132,11 @@ export default function Auth() {
         <CardHeader className="space-y-1 text-center">
           <div className="flex justify-center mb-4">
             <div className="rounded-full bg-primary/10 p-3">
-              <Truck className="h-8 w-8 text-primary" />
+              <Activity className="h-8 w-8 text-primary" />
             </div>
           </div>
-          <CardTitle className="text-2xl font-bold">Logística SSM</CardTitle>
-          <CardDescription>Sistema de Gestão de Entregas</CardDescription>
+          <CardTitle className="text-2xl font-bold">V.I.V.O.</CardTitle>
+          <CardDescription>Controle Operacional Inteligente</CardDescription>
         </CardHeader>
         <CardContent>
           <Tabs defaultValue="signin" className="w-full">
