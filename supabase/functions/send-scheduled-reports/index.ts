@@ -1,0 +1,433 @@
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
+interface OrderMetrics {
+  totalOrders: number;
+  totalValue: number;
+  newToday: number;
+  slaOntime: number;
+  slaLate: number;
+  phaseDistribution: Record<string, number>;
+  bottlenecks: Array<{ phase: string; count: number; avgDays: number }>;
+}
+
+interface Order {
+  id: string;
+  status: string;
+  created_at: string;
+  delivery_date: string | null;
+  order_value: string | null;
+}
+
+interface WhatsAppInstance {
+  id: string;
+  instance_id: string;
+  is_active: boolean;
+  status: string;
+}
+
+const phaseLabels: Record<string, string> = {
+  'ordem_gerada': 'Ordem Gerada',
+  'aguardando_compras': 'Aguardando Compras',
+  'em_producao': 'Em Produção',
+  'aguardando_laboratorio': 'Aguardando Laboratório',
+  'em_laboratorio': 'Em Laboratório',
+  'aguardando_frete': 'Aguardando Frete',
+  'em_transito': 'Em Trânsito',
+  'entregue': 'Entregue',
+  'concluido': 'Concluído'
+};
+
+const statusToPhase: Record<string, string> = {
+  'ordem_gerada': 'ordem_gerada',
+  'aguardando_insumos': 'aguardando_compras',
+  'em_producao': 'em_producao',
+  'disponivel_para_laboratorio': 'aguardando_laboratorio',
+  'em_laboratorio': 'em_laboratorio',
+  'disponivel_para_transporte': 'aguardando_frete',
+  'em_transito': 'em_transito',
+  'entregue': 'entregue',
+  'concluido': 'concluido',
+  'cancelado': 'cancelado'
+};
+
+async function calculateMetrics(supabase: any, organizationId?: string): Promise<OrderMetrics> {
+  let query = supabase
+    .from('orders')
+    .select('id, status, created_at, delivery_date, order_value')
+    .not('status', 'in', '("concluido","cancelado")');
+
+  if (organizationId) {
+    query = query.eq('organization_id', organizationId);
+  }
+
+  const { data: orders, error } = await query;
+
+  if (error) {
+    console.error('Error fetching orders:', error);
+    throw error;
+  }
+
+  const orderList = (orders || []) as Order[];
+  const today = new Date().toISOString().split('T')[0];
+  const newToday = orderList.filter(o => o.created_at?.startsWith(today)).length;
+  
+  let slaOntime = 0;
+  let slaLate = 0;
+  const phaseDistribution: Record<string, number> = {};
+  const phaseTimes: Record<string, { total: number; count: number }> = {};
+
+  orderList.forEach(order => {
+    // SLA calculation
+    if (order.delivery_date) {
+      const deliveryDate = new Date(order.delivery_date);
+      const now = new Date();
+      if (deliveryDate >= now) {
+        slaOntime++;
+      } else {
+        slaLate++;
+      }
+    }
+
+    // Phase distribution
+    const phase = statusToPhase[order.status] || order.status;
+    phaseDistribution[phase] = (phaseDistribution[phase] || 0) + 1;
+
+    // Phase time calculation
+    if (order.created_at) {
+      const createdAt = new Date(order.created_at);
+      const now = new Date();
+      const daysInPhase = Math.floor((now.getTime() - createdAt.getTime()) / (1000 * 60 * 60 * 24));
+      
+      if (!phaseTimes[phase]) {
+        phaseTimes[phase] = { total: 0, count: 0 };
+      }
+      phaseTimes[phase].total += daysInPhase;
+      phaseTimes[phase].count++;
+    }
+  });
+
+  // Calculate bottlenecks
+  const bottlenecks = Object.entries(phaseTimes)
+    .map(([phase, data]) => ({
+      phase,
+      count: phaseDistribution[phase] || 0,
+      avgDays: data.count > 0 ? Math.round(data.total / data.count) : 0
+    }))
+    .filter(b => b.avgDays > 3) // More than 3 days is a bottleneck
+    .sort((a, b) => b.avgDays - a.avgDays);
+
+  const totalValue = orderList.reduce((sum, o) => sum + (parseFloat(o.order_value || '0') || 0), 0);
+
+  return {
+    totalOrders: orderList.length,
+    totalValue,
+    newToday,
+    slaOntime,
+    slaLate,
+    phaseDistribution,
+    bottlenecks
+  };
+}
+
+function formatCurrency(value: number): string {
+  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
+}
+
+function formatReportMessage(template: string, metrics: OrderMetrics, date: string): string {
+  const total = metrics.slaOntime + metrics.slaLate;
+  const slaOntimePct = total > 0 ? Math.round((metrics.slaOntime / total) * 100) : 100;
+  const slaLatePct = total > 0 ? Math.round((metrics.slaLate / total) * 100) : 0;
+
+  const phaseSummary = Object.entries(metrics.phaseDistribution)
+    .map(([phase, count]) => `• ${phaseLabels[phase] || phase}: ${count}`)
+    .join('\n');
+
+  const alerts = metrics.bottlenecks.length > 0
+    ? '⚠️ *Gargalos detectados:*\n' + metrics.bottlenecks
+        .slice(0, 3)
+        .map(b => `• ${phaseLabels[b.phase] || b.phase}: ${b.count} pedidos (${b.avgDays} dias)`)
+        .join('\n')
+    : '✅ Nenhum gargalo significativo';
+
+  return template
+    .replace('{{date}}', date)
+    .replace('{{total_orders}}', metrics.totalOrders.toString())
+    .replace('{{total_value}}', formatCurrency(metrics.totalValue))
+    .replace('{{new_today}}', metrics.newToday.toString())
+    .replace('{{sla_ontime}}', metrics.slaOntime.toString())
+    .replace('{{sla_ontime_pct}}', slaOntimePct.toString())
+    .replace('{{sla_late}}', metrics.slaLate.toString())
+    .replace('{{sla_late_pct}}', slaLatePct.toString())
+    .replace('{{phase_summary}}', phaseSummary)
+    .replace('{{alerts}}', alerts);
+}
+
+async function generateChart(supabase: any, chartType: string, dataSource: string, metrics: OrderMetrics, provider: string): Promise<string | null> {
+  try {
+    let chartData;
+
+    if (dataSource === 'phase_distribution') {
+      const labels = Object.keys(metrics.phaseDistribution).map(k => phaseLabels[k] || k);
+      const data = Object.values(metrics.phaseDistribution);
+      chartData = {
+        chartType: 'pie',
+        data: {
+          labels,
+          datasets: [{
+            data,
+            backgroundColor: ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16']
+          }]
+        },
+        options: { title: 'Distribuição por Fase', width: 500, height: 300 },
+        provider
+      };
+    } else if (dataSource === 'sla_compliance') {
+      const total = metrics.slaOntime + metrics.slaLate;
+      const slaPercentage = total > 0 ? Math.round((metrics.slaOntime / total) * 100) : 100;
+      chartData = {
+        chartType: 'gauge',
+        data: {
+          labels: ['SLA'],
+          datasets: [{ data: [slaPercentage] }]
+        },
+        options: { title: 'Conformidade SLA', width: 400, height: 200 },
+        provider
+      };
+    } else {
+      return null;
+    }
+
+    const response = await supabase.functions.invoke('generate-chart', {
+      body: chartData
+    });
+
+    if (response.error) {
+      console.error('Chart generation error:', response.error);
+      return null;
+    }
+
+    return response.data?.imageBase64 || null;
+  } catch (error) {
+    console.error('Error generating chart:', error);
+    return null;
+  }
+}
+
+async function sendWhatsAppMessage(supabase: any, phone: string, message: string): Promise<boolean> {
+  try {
+    const { data: instance, error } = await supabase
+      .from('whatsapp_instances')
+      .select('id, instance_id, is_active, status')
+      .eq('is_active', true)
+      .eq('status', 'connected')
+      .limit(1)
+      .single();
+
+    if (error || !instance) {
+      console.error('No connected WhatsApp instance found');
+      return false;
+    }
+
+    const typedInstance = instance as WhatsAppInstance;
+
+    const MEGA_API_TOKEN = Deno.env.get('MEGA_API_TOKEN');
+    if (!MEGA_API_TOKEN) {
+      console.error('MEGA_API_TOKEN not configured');
+      return false;
+    }
+
+    const cleanPhone = phone.replace(/\D/g, '');
+    const formattedPhone = cleanPhone.startsWith('55') ? cleanPhone : `55${cleanPhone}`;
+
+    const response = await fetch(`https://api.megaapi.com.br/rest/sendMessage/${typedInstance.instance_id}/${MEGA_API_TOKEN}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        messageData: {
+          to: `${formattedPhone}@s.whatsapp.net`,
+          text: message
+        }
+      })
+    });
+
+    return response.ok;
+  } catch (error) {
+    console.error('Error sending WhatsApp message:', error);
+    return false;
+  }
+}
+
+async function sendWhatsAppImage(supabase: any, phone: string, imageBase64: string, caption?: string): Promise<boolean> {
+  try {
+    const response = await supabase.functions.invoke('mega-api-send-media', {
+      body: {
+        phone,
+        mediaType: 'image',
+        mediaBase64: imageBase64.replace(/^data:image\/\w+;base64,/, ''),
+        caption: caption || ''
+      }
+    });
+
+    return !response.error;
+  } catch (error) {
+    console.error('Error sending WhatsApp image:', error);
+    return false;
+  }
+}
+
+serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
+    const body = await req.json().catch(() => ({}));
+    const { scheduleId, testMode, testPhone } = body;
+
+    console.log('Processing scheduled reports...', { scheduleId, testMode });
+
+    // Get schedules to process
+    let query = supabase
+      .from('report_schedules')
+      .select(`
+        *,
+        template:report_templates(*)
+      `)
+      .eq('is_active', true);
+
+    if (scheduleId) {
+      query = query.eq('id', scheduleId);
+    } else {
+      // Get schedules that are due now
+      const now = new Date();
+      const currentTime = now.toTimeString().slice(0, 5);
+      const currentDay = now.getDay() === 0 ? 7 : now.getDay(); // Convert Sunday from 0 to 7
+      
+      query = query
+        .lte('send_time', `${currentTime}:59`)
+        .gte('send_time', `${currentTime}:00`)
+        .contains('send_days', [currentDay]);
+    }
+
+    const { data: schedules, error: schedulesError } = await query;
+
+    if (schedulesError) {
+      console.error('Error fetching schedules:', schedulesError);
+      throw schedulesError;
+    }
+
+    console.log(`Found ${schedules?.length || 0} schedules to process`);
+
+    const results: Array<{ scheduleId: string; sent: number; failed: number }> = [];
+
+    for (const schedule of schedules || []) {
+      const template = schedule.template;
+      if (!template) {
+        console.warn(`No template found for schedule ${schedule.id}`);
+        continue;
+      }
+
+      // Calculate metrics for this organization
+      const metrics = await calculateMetrics(supabase, schedule.organization_id);
+      
+      const today = new Date().toLocaleDateString('pt-BR');
+      const message = formatReportMessage(template.message_template || '', metrics, today);
+
+      // Generate charts if needed
+      const charts: string[] = [];
+      if (schedule.include_charts && template.charts) {
+        for (const chartConfig of template.charts) {
+          const chartBase64 = await generateChart(
+            supabase,
+            chartConfig.type,
+            chartConfig.data_source,
+            metrics,
+            schedule.chart_provider
+          );
+          if (chartBase64) {
+            charts.push(chartBase64);
+          }
+        }
+      }
+
+      // Send to recipients
+      const recipients = testMode && testPhone 
+        ? [{ whatsapp: testPhone, name: 'Test' }]
+        : (schedule.recipients as Array<{ whatsapp: string; name: string }>);
+
+      let sent = 0;
+      let failed = 0;
+
+      for (const recipient of recipients) {
+        const success = await sendWhatsAppMessage(supabase, recipient.whatsapp, message);
+        
+        if (success) {
+          // Send charts
+          for (const chart of charts) {
+            await sendWhatsAppImage(supabase, recipient.whatsapp, chart);
+          }
+          sent++;
+        } else {
+          failed++;
+        }
+
+        // Log the send
+        await supabase.from('report_send_log').insert({
+          organization_id: schedule.organization_id,
+          schedule_id: schedule.id,
+          template_id: template.id,
+          recipient_whatsapp: recipient.whatsapp,
+          recipient_name: recipient.name,
+          status: success ? 'sent' : 'failed',
+          message_content: message,
+          charts_sent: charts.length,
+          metrics_snapshot: metrics,
+          error_message: success ? null : 'Failed to send message'
+        });
+      }
+
+      // Update schedule last_sent_at
+      await supabase
+        .from('report_schedules')
+        .update({ last_sent_at: new Date().toISOString() })
+        .eq('id', schedule.id);
+
+      results.push({ scheduleId: schedule.id, sent, failed });
+    }
+
+    console.log('Report processing complete:', results);
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        processed: results.length,
+        results
+      }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+
+  } catch (error) {
+    console.error('Error processing scheduled reports:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    return new Response(
+      JSON.stringify({
+        success: false,
+        error: errorMessage
+      }),
+      { 
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      }
+    );
+  }
+});

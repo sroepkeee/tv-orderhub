@@ -83,3 +83,15 @@ verify_jwt = false
 
 [functions.queue-alert]
 verify_jwt = false
+
+[functions.generate-chart]
+verify_jwt = true
+
+[functions.send-scheduled-reports]
+verify_jwt = false
+
+[functions.manager-metrics]
+verify_jwt = false
+
+[functions.manager-smart-alerts]
+verify_jwt = false
