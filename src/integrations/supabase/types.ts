@@ -1003,6 +1003,62 @@ export type Database = {
           },
         ]
       }
+      chart_configs: {
+        Row: {
+          background_color: string | null
+          chart_type: string
+          colors: Json
+          created_at: string
+          data_source: string
+          height: number
+          id: string
+          is_active: boolean
+          name: string
+          options: Json
+          organization_id: string | null
+          updated_at: string
+          width: number
+        }
+        Insert: {
+          background_color?: string | null
+          chart_type?: string
+          colors?: Json
+          created_at?: string
+          data_source: string
+          height?: number
+          id?: string
+          is_active?: boolean
+          name: string
+          options?: Json
+          organization_id?: string | null
+          updated_at?: string
+          width?: number
+        }
+        Update: {
+          background_color?: string | null
+          chart_type?: string
+          colors?: Json
+          created_at?: string
+          data_source?: string
+          height?: number
+          id?: string
+          is_active?: boolean
+          name?: string
+          options?: Json
+          organization_id?: string | null
+          updated_at?: string
+          width?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chart_configs_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       conversation_sentiment_cache: {
         Row: {
           carrier_id: string
@@ -3201,6 +3257,210 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      report_schedules: {
+        Row: {
+          chart_provider: string
+          created_at: string
+          created_by: string | null
+          frequency: string
+          id: string
+          include_charts: boolean
+          is_active: boolean
+          last_sent_at: string | null
+          name: string
+          next_send_at: string | null
+          organization_id: string | null
+          recipients: Json
+          send_days: number[] | null
+          send_time: string
+          template_id: string | null
+          timezone: string
+          updated_at: string
+        }
+        Insert: {
+          chart_provider?: string
+          created_at?: string
+          created_by?: string | null
+          frequency?: string
+          id?: string
+          include_charts?: boolean
+          is_active?: boolean
+          last_sent_at?: string | null
+          name: string
+          next_send_at?: string | null
+          organization_id?: string | null
+          recipients?: Json
+          send_days?: number[] | null
+          send_time?: string
+          template_id?: string | null
+          timezone?: string
+          updated_at?: string
+        }
+        Update: {
+          chart_provider?: string
+          created_at?: string
+          created_by?: string | null
+          frequency?: string
+          id?: string
+          include_charts?: boolean
+          is_active?: boolean
+          last_sent_at?: string | null
+          name?: string
+          next_send_at?: string | null
+          organization_id?: string | null
+          recipients?: Json
+          send_days?: number[] | null
+          send_time?: string
+          template_id?: string | null
+          timezone?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "report_schedules_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "report_schedules_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "report_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      report_send_log: {
+        Row: {
+          charts_sent: number | null
+          created_at: string
+          error_message: string | null
+          id: string
+          message_content: string | null
+          metrics_snapshot: Json | null
+          organization_id: string | null
+          recipient_name: string | null
+          recipient_whatsapp: string
+          schedule_id: string | null
+          sent_at: string | null
+          status: string
+          template_id: string | null
+        }
+        Insert: {
+          charts_sent?: number | null
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          message_content?: string | null
+          metrics_snapshot?: Json | null
+          organization_id?: string | null
+          recipient_name?: string | null
+          recipient_whatsapp: string
+          schedule_id?: string | null
+          sent_at?: string | null
+          status?: string
+          template_id?: string | null
+        }
+        Update: {
+          charts_sent?: number | null
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          message_content?: string | null
+          metrics_snapshot?: Json | null
+          organization_id?: string | null
+          recipient_name?: string | null
+          recipient_whatsapp?: string
+          schedule_id?: string | null
+          sent_at?: string | null
+          status?: string
+          template_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "report_send_log_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "report_send_log_schedule_id_fkey"
+            columns: ["schedule_id"]
+            isOneToOne: false
+            referencedRelation: "report_schedules"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "report_send_log_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "report_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      report_templates: {
+        Row: {
+          charts: Json
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          is_active: boolean
+          is_system: boolean
+          message_template: string | null
+          metrics: Json
+          name: string
+          organization_id: string | null
+          report_type: string
+          sections: Json
+          updated_at: string
+        }
+        Insert: {
+          charts?: Json
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          is_system?: boolean
+          message_template?: string | null
+          metrics?: Json
+          name: string
+          organization_id?: string | null
+          report_type?: string
+          sections?: Json
+          updated_at?: string
+        }
+        Update: {
+          charts?: Json
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          is_system?: boolean
+          message_template?: string | null
+          metrics?: Json
+          name?: string
+          organization_id?: string | null
+          report_type?: string
+          sections?: Json
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "report_templates_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       saas_leads: {
         Row: {
