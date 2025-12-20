@@ -1,42 +1,42 @@
-import { MessageCircle, LayoutDashboard, Settings, Users, BarChart3, Bell } from "lucide-react";
+import { FileInput, GitBranch, Settings2, UserCheck, MessageSquare, BarChart3 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 
 const features = [
   {
-    icon: MessageCircle,
-    title: "Consulta via WhatsApp",
-    description: "Cliente manda mensagem, IA responde o status automaticamente. 24/7, sem intervenção humana.",
-    color: "bg-green-500/10 text-green-600",
-  },
-  {
-    icon: LayoutDashboard,
-    title: "Kanban de Fases",
-    description: "Visualize onde cada pedido está no fluxo. Arraste entre fases com um clique.",
+    icon: FileInput,
+    title: "Entrada Flexível",
+    description: "Importe via CSV, formulário ou integração. Campos configuráveis para sua operação. Validação automática.",
     color: "bg-blue-500/10 text-blue-600",
   },
   {
-    icon: Settings,
-    title: "Fases Customizáveis",
-    description: "Configure o fluxo da sua operação. Crie as fases que fazem sentido pro seu negócio.",
+    icon: GitBranch,
+    title: "Fluxo Visual",
+    description: "Visualize o processo inteiro. Arraste itens entre fases. Saiba onde cada coisa está em tempo real.",
     color: "bg-purple-500/10 text-purple-600",
   },
   {
-    icon: Users,
-    title: "Responsáveis por Etapa",
-    description: "Cada fase tem seu dono. Notificações automáticas quando pedidos chegam.",
+    icon: Settings2,
+    title: "Processo Seu",
+    description: "Configure até 20 fases. Nomes, ordem, cores. Exatamente como sua operação funciona na prática.",
     color: "bg-orange-500/10 text-orange-600",
   },
   {
-    icon: BarChart3,
-    title: "Métricas Automáticas",
-    description: "Dashboard gerencial diário via WhatsApp. Saiba exatamente como está sua operação.",
-    color: "bg-cyan-500/10 text-cyan-600",
+    icon: UserCheck,
+    title: "Dono por Etapa",
+    description: "Cada fase tem seu responsável. Notificação automática quando entra processo. Histórico completo.",
+    color: "bg-green-500/10 text-green-600",
   },
   {
-    icon: Bell,
-    title: "Alertas Inteligentes",
-    description: "Atrasos e gargalos detectados automaticamente. Aja antes que vire problema.",
-    color: "bg-red-500/10 text-red-600",
+    icon: MessageSquare,
+    title: "WhatsApp Nativo",
+    description: "\"Qual o status do X?\" — A IA responde. Funciona 24/7, onde seu time e clientes já estão.",
+    color: "bg-emerald-500/10 text-emerald-600",
+  },
+  {
+    icon: BarChart3,
+    title: "5 Métricas que Importam",
+    description: "Tempo por fase, atrasados, gargalos, volume, performance. Sem dashboard pesado. Decisão rápida.",
+    color: "bg-cyan-500/10 text-cyan-600",
   },
 ];
 
@@ -46,11 +46,11 @@ export function FeaturesGrid() {
       <div className="container mx-auto px-4">
         <div className="text-center max-w-2xl mx-auto mb-16">
           <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
-            Tudo que você precisa para{" "}
-            <span className="text-primary">controlar sua operação</span>
+            Os 6 módulos que{" "}
+            <span className="text-primary">sua operação precisa</span>
           </h2>
           <p className="text-lg text-muted-foreground">
-            Funcionalidades essenciais. Sem complexidade desnecessária.
+            Funcionalidades essenciais. Sem complexidade desnecessária. Tudo configurável.
           </p>
         </div>
 

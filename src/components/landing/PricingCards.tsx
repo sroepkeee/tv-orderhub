@@ -14,11 +14,11 @@ const plans = [
     period: "/mês",
     description: "Para operações em crescimento",
     features: [
-      "Até 100 pedidos/mês",
+      "Até 100 processos/mês",
       "1 número WhatsApp",
-      "Fases customizáveis",
+      "Até 10 fases customizáveis",
       "Consulta via WhatsApp",
-      "Dashboard básico",
+      "5 métricas essenciais",
       "Suporte por email",
     ],
     popular: false,
@@ -30,9 +30,9 @@ const plans = [
     period: "/mês",
     description: "Para operações consolidadas",
     features: [
-      "Até 500 pedidos/mês",
+      "Até 500 processos/mês",
       "2 números WhatsApp",
-      "Fases customizáveis",
+      "Até 20 fases customizáveis",
       "IA avançada com contexto",
       "Relatórios gerenciais",
       "Alertas inteligentes",
@@ -48,7 +48,7 @@ const plans = [
     period: "",
     description: "Para grandes operações",
     features: [
-      "Pedidos ilimitados",
+      "Processos ilimitados",
       "WhatsApp ilimitado",
       "Multi-organizações",
       "IA personalizada",
@@ -64,7 +64,7 @@ const plans = [
 
 export function PricingCards({ onSelectPlan }: PricingCardsProps) {
   return (
-    <section className="py-24 bg-muted/30">
+    <section className="py-24 bg-background">
       <div className="container mx-auto px-4">
         <div className="text-center max-w-2xl mx-auto mb-16">
           <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
@@ -73,6 +73,9 @@ export function PricingCards({ onSelectPlan }: PricingCardsProps) {
           </h2>
           <p className="text-lg text-muted-foreground">
             Comece grátis por 14 dias. Sem cartão de crédito.
+          </p>
+          <p className="text-sm text-muted-foreground mt-2">
+            Funciona para pedidos, OS, projetos, cargas — qualquer processo.
           </p>
         </div>
 
