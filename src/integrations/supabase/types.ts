@@ -58,6 +58,7 @@ export type Database = {
           max_response_time_seconds: number
           min_interval_minutes: number | null
           notification_phases: string[] | null
+          organization_id: string | null
           personality: string
           respect_working_hours: boolean
           signature: string | null
@@ -91,6 +92,7 @@ export type Database = {
           max_response_time_seconds?: number
           min_interval_minutes?: number | null
           notification_phases?: string[] | null
+          organization_id?: string | null
           personality?: string
           respect_working_hours?: boolean
           signature?: string | null
@@ -124,6 +126,7 @@ export type Database = {
           max_response_time_seconds?: number
           min_interval_minutes?: number | null
           notification_phases?: string[] | null
+          organization_id?: string | null
           personality?: string
           respect_working_hours?: boolean
           signature?: string | null
@@ -135,7 +138,15 @@ export type Database = {
           working_hours_end?: string | null
           working_hours_start?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "ai_agent_config_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       ai_agent_instances: {
         Row: {
@@ -157,6 +168,7 @@ export type Database = {
           language: string | null
           llm_model: string | null
           max_message_length: number | null
+          organization_id: string | null
           personality: string | null
           personality_traits: Json | null
           response_style: Json | null
@@ -189,6 +201,7 @@ export type Database = {
           language?: string | null
           llm_model?: string | null
           max_message_length?: number | null
+          organization_id?: string | null
           personality?: string | null
           personality_traits?: Json | null
           response_style?: Json | null
@@ -221,6 +234,7 @@ export type Database = {
           language?: string | null
           llm_model?: string | null
           max_message_length?: number | null
+          organization_id?: string | null
           personality?: string | null
           personality_traits?: Json | null
           response_style?: Json | null
@@ -234,7 +248,15 @@ export type Database = {
           whatsapp_instance_id?: string | null
           whatsapp_number?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "ai_agent_instances_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       ai_agent_metrics: {
         Row: {
@@ -388,6 +410,7 @@ export type Database = {
           is_active: boolean
           keywords: string[] | null
           occurrence_type: string | null
+          organization_id: string | null
           priority: number | null
           regions: string[] | null
           sla_category: string | null
@@ -406,6 +429,7 @@ export type Database = {
           is_active?: boolean
           keywords?: string[] | null
           occurrence_type?: string | null
+          organization_id?: string | null
           priority?: number | null
           regions?: string[] | null
           sla_category?: string | null
@@ -424,6 +448,7 @@ export type Database = {
           is_active?: boolean
           keywords?: string[] | null
           occurrence_type?: string | null
+          organization_id?: string | null
           priority?: number | null
           regions?: string[] | null
           sla_category?: string | null
@@ -436,6 +461,13 @@ export type Database = {
             columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_knowledge_base_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
         ]
@@ -914,6 +946,7 @@ export type Database = {
           is_active: boolean | null
           name: string
           notes: string | null
+          organization_id: string | null
           phone: string | null
           quote_email: string | null
           service_states: string[] | null
@@ -933,6 +966,7 @@ export type Database = {
           is_active?: boolean | null
           name: string
           notes?: string | null
+          organization_id?: string | null
           phone?: string | null
           quote_email?: string | null
           service_states?: string[] | null
@@ -952,13 +986,22 @@ export type Database = {
           is_active?: boolean | null
           name?: string
           notes?: string | null
+          organization_id?: string | null
           phone?: string | null
           quote_email?: string | null
           service_states?: string[] | null
           updated_at?: string | null
           whatsapp?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "carriers_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       conversation_sentiment_cache: {
         Row: {
@@ -1041,6 +1084,7 @@ export type Database = {
           opt_in_email: boolean | null
           opt_in_whatsapp: boolean | null
           orders_count: number | null
+          organization_id: string | null
           phone: string | null
           preferred_channel: string | null
           source: string | null
@@ -1064,6 +1108,7 @@ export type Database = {
           opt_in_email?: boolean | null
           opt_in_whatsapp?: boolean | null
           orders_count?: number | null
+          organization_id?: string | null
           phone?: string | null
           preferred_channel?: string | null
           source?: string | null
@@ -1087,6 +1132,7 @@ export type Database = {
           opt_in_email?: boolean | null
           opt_in_whatsapp?: boolean | null
           orders_count?: number | null
+          organization_id?: string | null
           phone?: string | null
           preferred_channel?: string | null
           source?: string | null
@@ -1101,6 +1147,13 @@ export type Database = {
             columns: ["last_order_id"]
             isOneToOne: false
             referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_contacts_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
         ]
@@ -1799,6 +1852,7 @@ export type Database = {
           message: string
           metadata: Json | null
           order_id: string
+          organization_id: string | null
           read_at: string | null
           title: string
           type: string
@@ -1814,6 +1868,7 @@ export type Database = {
           message: string
           metadata?: Json | null
           order_id: string
+          organization_id?: string | null
           read_at?: string | null
           title: string
           type?: string
@@ -1829,6 +1884,7 @@ export type Database = {
           message?: string
           metadata?: Json | null
           order_id?: string
+          organization_id?: string | null
           read_at?: string | null
           title?: string
           type?: string
@@ -1848,6 +1904,13 @@ export type Database = {
             columns: ["order_id"]
             isOneToOne: false
             referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
         ]
@@ -2341,6 +2404,7 @@ export type Database = {
           id: string
           operation_nature: string
           order_type: string
+          organization_id: string | null
           responsible_department: string | null
           stock_operation: string
           updated_at: string | null
@@ -2359,6 +2423,7 @@ export type Database = {
           id?: string
           operation_nature: string
           order_type: string
+          organization_id?: string | null
           responsible_department?: string | null
           stock_operation: string
           updated_at?: string | null
@@ -2377,11 +2442,20 @@ export type Database = {
           id?: string
           operation_nature?: string
           order_type?: string
+          organization_id?: string | null
           responsible_department?: string | null
           stock_operation?: string
           updated_at?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "order_type_config_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       order_volumes: {
         Row: {
@@ -2473,6 +2547,7 @@ export type Database = {
           order_category: string | null
           order_number: string
           order_type: string
+          organization_id: string | null
           package_height_m: number | null
           package_length_m: number | null
           package_volumes: number | null
@@ -2529,6 +2604,7 @@ export type Database = {
           order_category?: string | null
           order_number: string
           order_type: string
+          organization_id?: string | null
           package_height_m?: number | null
           package_length_m?: number | null
           package_volumes?: number | null
@@ -2585,6 +2661,7 @@ export type Database = {
           order_category?: string | null
           order_number?: string
           order_type?: string
+          organization_id?: string | null
           package_height_m?: number | null
           package_length_m?: number | null
           package_volumes?: number | null
@@ -2607,6 +2684,97 @@ export type Database = {
           updated_at?: string
           user_id?: string
           vehicle_plate?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "orders_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      organization_members: {
+        Row: {
+          id: string
+          invited_at: string | null
+          invited_by: string | null
+          is_active: boolean | null
+          joined_at: string | null
+          organization_id: string
+          role: string
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          invited_at?: string | null
+          invited_by?: string | null
+          is_active?: boolean | null
+          joined_at?: string | null
+          organization_id: string
+          role?: string
+          user_id: string
+        }
+        Update: {
+          id?: string
+          invited_at?: string | null
+          invited_by?: string | null
+          is_active?: boolean | null
+          joined_at?: string | null
+          organization_id?: string
+          role?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_members_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      organizations: {
+        Row: {
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          logo_url: string | null
+          name: string
+          plan: string
+          plan_limits: Json | null
+          settings: Json | null
+          slug: string
+          trial_ends_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          logo_url?: string | null
+          name: string
+          plan?: string
+          plan_limits?: Json | null
+          settings?: Json | null
+          slug: string
+          trial_ends_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          logo_url?: string | null
+          name?: string
+          plan?: string
+          plan_limits?: Json | null
+          settings?: Json | null
+          slug?: string
+          trial_ends_at?: string | null
+          updated_at?: string | null
         }
         Relationships: []
       }
@@ -2696,6 +2864,7 @@ export type Database = {
           icon: string | null
           id: string
           order_index: number | null
+          organization_id: string | null
           phase_key: string
           responsible_role: Database["public"]["Enums"]["app_role"]
         }
@@ -2707,6 +2876,7 @@ export type Database = {
           icon?: string | null
           id?: string
           order_index?: number | null
+          organization_id?: string | null
           phase_key: string
           responsible_role: Database["public"]["Enums"]["app_role"]
         }
@@ -2718,10 +2888,19 @@ export type Database = {
           icon?: string | null
           id?: string
           order_index?: number | null
+          organization_id?: string | null
           phase_key?: string
           responsible_role?: Database["public"]["Enums"]["app_role"]
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "phase_config_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       phase_permissions: {
         Row: {
@@ -2730,6 +2909,7 @@ export type Database = {
           can_view: boolean | null
           created_at: string | null
           id: string
+          organization_id: string | null
           phase_key: string
           role: Database["public"]["Enums"]["app_role"]
           updated_at: string | null
@@ -2740,6 +2920,7 @@ export type Database = {
           can_view?: boolean | null
           created_at?: string | null
           id?: string
+          organization_id?: string | null
           phase_key: string
           role: Database["public"]["Enums"]["app_role"]
           updated_at?: string | null
@@ -2750,11 +2931,20 @@ export type Database = {
           can_view?: boolean | null
           created_at?: string | null
           id?: string
+          organization_id?: string | null
           phase_key?: string
           role?: Database["public"]["Enums"]["app_role"]
           updated_at?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "phase_permissions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {
@@ -2767,6 +2957,7 @@ export type Database = {
           is_manager: boolean | null
           last_login: string | null
           location: string | null
+          organization_id: string | null
           updated_at: string
           whatsapp: string | null
         }
@@ -2780,6 +2971,7 @@ export type Database = {
           is_manager?: boolean | null
           last_login?: string | null
           location?: string | null
+          organization_id?: string | null
           updated_at?: string
           whatsapp?: string | null
         }
@@ -2793,10 +2985,19 @@ export type Database = {
           is_manager?: boolean | null
           last_login?: string | null
           location?: string | null
+          organization_id?: string | null
           updated_at?: string
           whatsapp?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "profiles_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       purchase_request_items: {
         Row: {
@@ -2883,6 +3084,7 @@ export type Database = {
           notification_recipients: string[] | null
           notification_sent_at: string | null
           order_id: string | null
+          organization_id: string | null
           purchase_order_number: string
           rejection_reason: string | null
           request_type: string
@@ -2903,6 +3105,7 @@ export type Database = {
           notification_recipients?: string[] | null
           notification_sent_at?: string | null
           order_id?: string | null
+          organization_id?: string | null
           purchase_order_number: string
           rejection_reason?: string | null
           request_type?: string
@@ -2923,6 +3126,7 @@ export type Database = {
           notification_recipients?: string[] | null
           notification_sent_at?: string | null
           order_id?: string | null
+          organization_id?: string | null
           purchase_order_number?: string
           rejection_reason?: string | null
           request_type?: string
@@ -2944,6 +3148,13 @@ export type Database = {
             columns: ["order_id"]
             isOneToOne: false
             referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_requests_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
           {
@@ -3172,22 +3383,33 @@ export type Database = {
         Row: {
           created_at: string | null
           id: string
+          organization_id: string | null
           role: Database["public"]["Enums"]["app_role"]
           user_id: string
         }
         Insert: {
           created_at?: string | null
           id?: string
+          organization_id?: string | null
           role: Database["public"]["Enums"]["app_role"]
           user_id: string
         }
         Update: {
           created_at?: string | null
           id?: string
+          organization_id?: string | null
           role?: Database["public"]["Enums"]["app_role"]
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "user_roles_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       whatsapp_authorized_users: {
         Row: {
@@ -3238,6 +3460,7 @@ export type Database = {
           id: string
           instance_key: string
           name: string | null
+          organization_id: string | null
           phone_number: string | null
           qrcode: string | null
           qrcode_updated_at: string | null
@@ -3250,6 +3473,7 @@ export type Database = {
           id?: string
           instance_key: string
           name?: string | null
+          organization_id?: string | null
           phone_number?: string | null
           qrcode?: string | null
           qrcode_updated_at?: string | null
@@ -3262,13 +3486,22 @@ export type Database = {
           id?: string
           instance_key?: string
           name?: string | null
+          organization_id?: string | null
           phone_number?: string | null
           qrcode?: string | null
           qrcode_updated_at?: string | null
           status?: string | null
           updated_at?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_instances_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       whatsapp_media: {
         Row: {
@@ -3393,6 +3626,15 @@ export type Database = {
         Returns: boolean
       }
       cleanup_old_activity_logs: { Args: never; Returns: undefined }
+      create_organization_with_defaults: {
+        Args: {
+          _org_name: string
+          _owner_user_id: string
+          _plan?: string
+          _slug: string
+        }
+        Returns: string
+      }
       generate_purchase_order_number: { Args: never; Returns: string }
       get_app_roles: {
         Args: never
@@ -3402,6 +3644,8 @@ export type Database = {
       }
       get_phase_from_order: { Args: { _order_id: string }; Returns: string }
       get_phase_from_status: { Args: { _status: string }; Returns: string }
+      get_user_org_role: { Args: { _user_id?: string }; Returns: string }
+      get_user_organization_id: { Args: { _user_id?: string }; Returns: string }
       get_user_phases: {
         Args: { _user_id: string }
         Returns: {
@@ -3418,6 +3662,7 @@ export type Database = {
         Returns: boolean
       }
       is_ai_agent_admin: { Args: { _user_id: string }; Returns: boolean }
+      is_org_admin: { Args: { _user_id?: string }; Returns: boolean }
       is_user_approved: { Args: { _user_id: string }; Returns: boolean }
       log_user_activity: {
         Args: {
@@ -3433,6 +3678,10 @@ export type Database = {
       subtract_business_days: {
         Args: { business_days: number; start_date: string }
         Returns: string
+      }
+      user_belongs_to_org: {
+        Args: { _org_id: string; _user_id?: string }
+        Returns: boolean
       }
       user_can_modify_order: { Args: { order_uuid: string }; Returns: boolean }
     }
