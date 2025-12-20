@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Shield } from "lucide-react";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
+import Landing from "./pages/Landing";
 import NotFound from "./pages/NotFound";
 import Metrics from "./pages/Metrics";
 import Production from "./pages/Production";
@@ -134,6 +135,7 @@ const App = () => {
           <Sonner />
           <BrowserRouter>
             <Routes>
+              <Route path="/landing" element={<Landing />} />
               <Route path="/auth" element={<Auth />} />
               <Route path="/" element={
                 <ProtectedRoute>

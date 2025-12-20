@@ -2991,6 +2991,51 @@ export type Database = {
         }
         Relationships: []
       }
+      saas_leads: {
+        Row: {
+          company_name: string
+          contact_name: string
+          created_at: string | null
+          email: string
+          id: string
+          monthly_volume: string | null
+          notes: string | null
+          segment: string | null
+          source: string | null
+          status: string | null
+          updated_at: string | null
+          whatsapp: string
+        }
+        Insert: {
+          company_name: string
+          contact_name: string
+          created_at?: string | null
+          email: string
+          id?: string
+          monthly_volume?: string | null
+          notes?: string | null
+          segment?: string | null
+          source?: string | null
+          status?: string | null
+          updated_at?: string | null
+          whatsapp: string
+        }
+        Update: {
+          company_name?: string
+          contact_name?: string
+          created_at?: string | null
+          email?: string
+          id?: string
+          monthly_volume?: string | null
+          notes?: string | null
+          segment?: string | null
+          source?: string | null
+          status?: string | null
+          updated_at?: string | null
+          whatsapp?: string
+        }
+        Relationships: []
+      }
       stock_movements: {
         Row: {
           created_at: string | null
