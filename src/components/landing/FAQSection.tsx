@@ -7,8 +7,16 @@ import {
 
 const faqs = [
   {
+    question: "Funciona para outros tipos de processo além de pedidos?",
+    answer: "Sim! O V.I.V.O. funciona para qualquer tipo de processo: pedidos de venda, ordens de serviço, ordens de produção, projetos, cargas, chamados técnicos. Você configura as fases do seu jeito.",
+  },
+  {
+    question: "Posso configurar as fases do meu jeito?",
+    answer: "Totalmente. Você pode criar até 20 fases com nomes personalizados, definir a ordem, atribuir responsáveis por etapa e configurar notificações. O sistema se adapta à sua operação, não o contrário.",
+  },
+  {
     question: "Quanto tempo leva para começar a usar?",
-    answer: "Em média, 1 dia útil. Fazemos a configuração inicial junto com você, importamos seus pedidos e treinamos a IA com o contexto da sua operação.",
+    answer: "Em média, 1 dia útil. Fazemos a configuração inicial junto com você, importamos seus processos e treinamos a IA com o contexto da sua operação.",
   },
   {
     question: "Preciso ter conhecimento técnico?",
@@ -16,7 +24,7 @@ const faqs = [
   },
   {
     question: "Como a IA responde os clientes?",
-    answer: "A IA é treinada com o contexto da sua operação. Ela entende as fases, consulta o status do pedido e responde de forma natural e personalizada via WhatsApp.",
+    answer: "A IA é treinada com o contexto da sua operação. Ela entende as fases, consulta o status do processo e responde de forma natural e personalizada via WhatsApp. Funciona 24/7.",
   },
   {
     question: "Posso cancelar a qualquer momento?",
@@ -34,7 +42,7 @@ const faqs = [
 
 export function FAQSection() {
   return (
-    <section className="py-24 bg-background">
+    <section className="py-24 bg-muted/30">
       <div className="container mx-auto px-4">
         <div className="text-center max-w-2xl mx-auto mb-16">
           <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">

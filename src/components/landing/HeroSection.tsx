@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { MessageCircle, ArrowRight, Sparkles } from "lucide-react";
 
@@ -5,7 +6,25 @@ interface HeroSectionProps {
   onCtaClick: () => void;
 }
 
+const processExamples = [
+  { type: "Pedido", id: "#12345", phase: "Produção", step: "3 de 5", date: "22/12" },
+  { type: "OS", id: "#4521", phase: "Montagem", step: "4 de 6", date: "23/12" },
+  { type: "Projeto", id: "ALFA-01", phase: "Execução", step: "2 de 4", date: "28/12" },
+  { type: "Carga", id: "#789", phase: "Trânsito", step: "5 de 6", date: "20/12" },
+];
+
 export function HeroSection({ onCtaClick }: HeroSectionProps) {
+  const [currentExample, setCurrentExample] = useState(0);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentExample((prev) => (prev + 1) % processExamples.length);
+    }, 3000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const example = processExamples[currentExample];
+
   return (
     <section className="relative min-h-[90vh] flex items-center justify-center overflow-hidden bg-gradient-to-br from-background via-background to-primary/5">
       {/* Background decorations */}
@@ -20,23 +39,24 @@ export function HeroSection({ onCtaClick }: HeroSectionProps) {
           {/* Badge */}
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20 text-primary text-sm font-medium">
             <Sparkles className="w-4 h-4" />
-            <span>Controle Operacional com IA</span>
+            <span>V.I.V.O. CORE — Controle Operacional Inteligente</span>
           </div>
 
           {/* Headline */}
           <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight text-foreground leading-tight">
-            Seus clientes perguntam{" "}
-            <span className="text-primary">"onde está meu pedido?"</span>
+            Saber exatamente onde cada{" "}
+            <span className="text-primary">processo</span> está.
             <br />
             <span className="bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-              A IA responde no WhatsApp.
+              Em tempo real.
             </span>
           </h1>
 
           {/* Subheadline */}
           <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-            Controle operacional com rastreio em tempo real, fases customizáveis 
-            e atendimento automatizado. Setup em 1 dia. Sem complexidade.
+            Controle operacional com IA + WhatsApp. Fases customizáveis, responsáveis 
+            por etapa, métricas automáticas. Funciona para pedidos, OS, projetos, cargas. 
+            Setup em 1 dia. Sem complexidade.
           </p>
 
           {/* CTA Buttons */}
@@ -64,7 +84,7 @@ export function HeroSection({ onCtaClick }: HeroSectionProps) {
           <div className="pt-8 flex items-center justify-center gap-8 text-sm text-muted-foreground">
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-              <span>+1.000 pedidos rastreados</span>
+              <span>+1.000 processos controlados</span>
             </div>
             <div className="hidden sm:block w-px h-4 bg-border" />
             <div className="hidden sm:flex items-center gap-2">
@@ -88,15 +108,17 @@ export function HeroSection({ onCtaClick }: HeroSectionProps) {
                   👤
                 </div>
                 <div className="bg-muted rounded-2xl rounded-tl-none px-4 py-3 max-w-xs">
-                  <p className="text-sm">Olá! Onde está meu pedido #12345?</p>
+                  <p className="text-sm transition-all duration-500">
+                    Olá! Qual o status d{example.type === "Carga" ? "a" : "o"} {example.type} {example.id}?
+                  </p>
                   <span className="text-xs text-muted-foreground">10:30</span>
                 </div>
               </div>
               <div className="flex gap-3 justify-end">
                 <div className="bg-primary text-primary-foreground rounded-2xl rounded-tr-none px-4 py-3 max-w-sm">
-                  <p className="text-sm">
-                    Olá! 👋 Seu pedido #12345 está em <strong>Produção</strong>, 
-                    fase 3 de 5. Previsão de entrega: 22/12. 
+                  <p className="text-sm transition-all duration-500">
+                    Olá! 👋 {example.type === "Carga" ? "A" : "O"} {example.type} {example.id} está em <strong>{example.phase}</strong>, 
+                    fase {example.step}. Previsão: {example.date}. 
                     Acompanhe em tempo real! 📦
                   </p>
                   <span className="text-xs opacity-80">10:30 ✓✓</span>
@@ -106,6 +128,17 @@ export function HeroSection({ onCtaClick }: HeroSectionProps) {
                 </div>
               </div>
             </div>
+          </div>
+          {/* Process type indicators */}
+          <div className="flex justify-center gap-2 mt-4">
+            {processExamples.map((_, idx) => (
+              <div 
+                key={idx}
+                className={`w-2 h-2 rounded-full transition-all ${
+                  idx === currentExample ? "bg-primary w-6" : "bg-muted"
+                }`}
+              />
+            ))}
           </div>
         </div>
       </div>

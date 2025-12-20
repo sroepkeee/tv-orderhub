@@ -4,26 +4,26 @@ const steps = [
   {
     icon: Upload,
     number: "01",
-    title: "Importe seus pedidos",
-    description: "Via CSV, formulário ou integração. Seus pedidos entram no sistema em segundos.",
+    title: "Importe seus processos",
+    description: "Via CSV, formulário ou integração. Pedidos, OS, projetos, cargas — qualquer coisa entra em segundos.",
   },
   {
     icon: Zap,
     number: "02",
-    title: "Configure suas fases",
-    description: "Defina o fluxo da sua operação. A IA aprende e começa a responder automaticamente.",
+    title: "Configure seu fluxo",
+    description: "Defina as fases da sua operação. Responsáveis por etapa. A IA aprende e começa a responder automaticamente.",
   },
   {
     icon: TrendingUp,
     number: "03",
-    title: "Acompanhe e escale",
-    description: "Métricas em tempo real. Clientes satisfeitos. Operação sob controle.",
+    title: "Acompanhe e aja",
+    description: "Métricas em tempo real. Gargalos identificados. WhatsApp funcionando. Operação sob controle.",
   },
 ];
 
 export function HowItWorks() {
   return (
-    <section className="py-24 bg-background">
+    <section className="py-24 bg-muted/30">
       <div className="container mx-auto px-4">
         <div className="text-center max-w-2xl mx-auto mb-16">
           <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
@@ -40,7 +40,7 @@ export function HowItWorks() {
             <div className="hidden md:block absolute top-1/2 left-0 right-0 h-0.5 bg-gradient-to-r from-primary/20 via-primary to-primary/20 -translate-y-1/2" />
 
             <div className="grid md:grid-cols-3 gap-8">
-              {steps.map((step, index) => (
+              {steps.map((step) => (
                 <div key={step.number} className="relative">
                   <div className="flex flex-col items-center text-center space-y-4">
                     {/* Number bubble */}
