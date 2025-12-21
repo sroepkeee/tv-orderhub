@@ -7,14 +7,13 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import {
-  SidebarGroup,
-  SidebarGroupLabel,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarMenuSub,
   SidebarMenuSubButton,
   SidebarMenuSubItem,
+  SidebarSeparator,
 } from "@/components/ui/sidebar";
 
 export interface NavItem {
@@ -40,25 +39,27 @@ const NavMain = ({ groups }: NavMainProps) => {
   const location = useLocation();
 
   return (
-    <>
-      {groups.map((group) => {
+    <div className="flex flex-col px-2 py-1">
+      {groups.map((group, groupIndex) => {
         const GroupIcon = group.icon;
         const hasActiveItem = group.items.some(item => location.pathname === item.path);
         
         return (
-          <SidebarGroup key={group.id}>
-            <SidebarGroupLabel className="text-[10px] uppercase tracking-wider text-sidebar-foreground/60">
-              {group.label}
-            </SidebarGroupLabel>
-            <SidebarMenu>
+          <div key={group.id}>
+            {/* Separador entre grupos (exceto o primeiro) */}
+            {groupIndex > 0 && (
+              <SidebarSeparator className="my-1 mx-0" />
+            )}
+            
+            <SidebarMenu className="gap-0.5">
               {group.items.length > 4 ? (
                 <Collapsible asChild defaultOpen={hasActiveItem} className="group/collapsible">
                   <SidebarMenuItem>
                     <CollapsibleTrigger asChild>
-                      <SidebarMenuButton tooltip={group.label}>
-                        <GroupIcon className="h-4 w-4" />
-                        <span>{group.label}</span>
-                        <ChevronRight className="ml-auto h-4 w-4 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
+                      <SidebarMenuButton tooltip={group.label} size="sm">
+                        <GroupIcon className="h-3.5 w-3.5" />
+                        <span className="text-xs">{group.label}</span>
+                        <ChevronRight className="ml-auto h-3.5 w-3.5 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
                       </SidebarMenuButton>
                     </CollapsibleTrigger>
                     <CollapsibleContent>
@@ -70,10 +71,10 @@ const NavMain = ({ groups }: NavMainProps) => {
                           return (
                             <SidebarMenuSubItem key={item.path}>
                               <SidebarMenuSubButton asChild isActive={isActive}>
-                                <Link to={item.path}>
+                                <Link to={item.path} className="text-xs">
                                   <span>{item.label}</span>
                                   {hasBadge && (
-                                    <Badge variant="destructive" className="ml-auto h-5 px-1.5 text-[10px] animate-pulse">
+                                    <Badge variant="destructive" className="ml-auto h-4 px-1 text-[9px] animate-pulse">
                                       {item.badge}
                                     </Badge>
                                   )}
@@ -94,12 +95,12 @@ const NavMain = ({ groups }: NavMainProps) => {
                   
                   return (
                     <SidebarMenuItem key={item.path}>
-                      <SidebarMenuButton asChild tooltip={item.label} isActive={isActive}>
+                      <SidebarMenuButton asChild tooltip={item.label} isActive={isActive} size="sm">
                         <Link to={item.path}>
-                          <ItemIcon className="h-4 w-4" />
-                          <span>{item.label}</span>
+                          <ItemIcon className="h-3.5 w-3.5" />
+                          <span className="text-xs">{item.label}</span>
                           {hasBadge && (
-                            <Badge variant="destructive" className="ml-auto h-5 px-1.5 text-[10px] animate-pulse">
+                            <Badge variant="destructive" className="ml-auto h-4 px-1 text-[9px] animate-pulse">
                               {item.badge}
                             </Badge>
                           )}
@@ -110,10 +111,10 @@ const NavMain = ({ groups }: NavMainProps) => {
                 })
               )}
             </SidebarMenu>
-          </SidebarGroup>
+          </div>
         );
       })}
-    </>
+    </div>
   );
 };
 

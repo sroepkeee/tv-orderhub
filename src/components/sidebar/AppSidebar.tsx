@@ -169,16 +169,16 @@ const AppSidebar = ({
 
   return (
     <Sidebar collapsible="icon" {...props}>
-      {/* Header com Logo */}
-      <SidebarHeader className="border-b border-sidebar-border">
-        <Link to="/" className="flex items-center gap-2 px-2 py-1.5">
+      {/* Header compacto com Logo */}
+      <SidebarHeader className="border-b border-sidebar-border p-1.5">
+        <Link to="/" className="flex items-center gap-1.5 px-1">
           <img 
             src={logo} 
             alt="Logo" 
-            className="h-8 w-8 object-contain"
+            className="h-6 w-6 object-contain"
           />
           {!isCollapsed && (
-            <span className="font-semibold text-sidebar-foreground">
+            <span className="font-semibold text-sm text-sidebar-foreground">
               Imply OMS
             </span>
           )}
@@ -197,67 +197,52 @@ const AppSidebar = ({
         {/* Navegação Principal */}
         <NavMain groups={menuGroups} />
 
-        <SidebarSeparator />
-
-        {/* Configurações de Visualização */}
-        {!isCollapsed && (
-          <div className="px-2 py-2">
-            <ViewSettingsPopover
-              viewMode={viewMode}
-              kanbanDensity={kanbanDensity}
-              kanbanAutoDetect={kanbanAutoDetect}
-              onViewModeChange={onViewModeChange || (() => {})}
-              onKanbanDensityChange={onKanbanDensityChange || (() => {})}
-              onKanbanAutoDetectChange={onKanbanAutoDetectChange || (() => {})}
-            />
-          </div>
-        )}
       </SidebarContent>
 
-      {/* Footer com User Menu */}
-      <SidebarFooter className="border-t border-sidebar-border">
+      {/* Footer compacto com User Menu */}
+      <SidebarFooter className="border-t border-sidebar-border p-1.5">
         <SidebarMenu>
           <SidebarMenuItem>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <SidebarMenuButton
-                  size="lg"
-                  className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+                  size="sm"
+                  className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground h-7"
                 >
-                  <Avatar className="h-8 w-8">
-                    <AvatarFallback className="bg-sidebar-primary text-sidebar-primary-foreground text-xs">
+                  <Avatar className="h-5 w-5">
+                    <AvatarFallback className="bg-sidebar-primary text-sidebar-primary-foreground text-[9px]">
                       {userInitials}
                     </AvatarFallback>
                   </Avatar>
                   {!isCollapsed && (
-                    <div className="flex flex-col gap-0.5 leading-none flex-1 text-left">
-                      <span className="font-medium text-xs truncate max-w-[140px]">
-                        {user?.email}
+                    <div className="flex items-center gap-1 flex-1 text-left min-w-0">
+                      <span className="font-medium text-[10px] truncate flex-1">
+                        {user?.email?.split('@')[0]}
                       </span>
-                      <span className="text-[10px] text-sidebar-foreground/60">
-                        {isAdmin ? "Administrador" : "Usuário"}
+                      <span className="text-[9px] text-sidebar-foreground/60 shrink-0">
+                        {isAdmin ? "Admin" : "User"}
                       </span>
                     </div>
                   )}
                 </SidebarMenuButton>
               </DropdownMenuTrigger>
               <DropdownMenuContent
-                className="w-56 bg-popover border border-border"
+                className="w-48 bg-popover border border-border"
                 side="top"
                 align="start"
-                sideOffset={8}
+                sideOffset={4}
               >
-                <DropdownMenuItem onClick={toggleTheme}>
-                  {isDark ? <Sun className="mr-2 h-4 w-4" /> : <Moon className="mr-2 h-4 w-4" />}
+                <DropdownMenuItem onClick={toggleTheme} className="text-xs">
+                  {isDark ? <Sun className="mr-2 h-3.5 w-3.5" /> : <Moon className="mr-2 h-3.5 w-3.5" />}
                   {isDark ? "Modo Claro" : "Modo Escuro"}
                 </DropdownMenuItem>
-                <DropdownMenuItem>
-                  <KeyRound className="mr-2 h-4 w-4" />
+                <DropdownMenuItem className="text-xs">
+                  <KeyRound className="mr-2 h-3.5 w-3.5" />
                   Alterar Senha
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={handleLogout} className="text-destructive focus:text-destructive">
-                  <LogOut className="mr-2 h-4 w-4" />
+                <DropdownMenuItem onClick={handleLogout} className="text-destructive focus:text-destructive text-xs">
+                  <LogOut className="mr-2 h-3.5 w-3.5" />
                   Sair
                 </DropdownMenuItem>
               </DropdownMenuContent>
