@@ -6,7 +6,6 @@ import { ArrowUpDown, Filter, Layers } from "lucide-react";
 import { Order } from "./Dashboard";
 import { KanbanDensity } from "@/hooks/useKanbanDensity";
 import { ViewSettingsPopover } from "./ViewSettingsPopover";
-
 export type SortOption = "priority" | "deadline" | "created" | "status";
 export type GroupOption = "priority" | "phase" | "type" | "category" | "none";
 export type PhaseFilter = "all" | "preparation" | "production" | "packaging" | "logistics" | "completion";
@@ -14,7 +13,6 @@ export type ViewMode = "list" | "kanban" | "matrix";
 export type CategoryFilter = "all" | "reposicao" | "vendas" | "operacoes_especiais";
 export type StatusFilter = "all" | "high_priority" | "medium_priority" | "low_priority" | "critical_deadline" | "new_today" | "on_hold" | "delayed" | "preparation" | "production" | "packaging" | "invoicing" | "shipping" | "completed" | "ecommerce";
 export type CardViewMode = "full" | "compact" | "micro";
-
 interface ViewControlsProps {
   sortBy: SortOption;
   groupBy: GroupOption;
@@ -37,7 +35,6 @@ interface ViewControlsProps {
   onKanbanDensityChange?: (density: KanbanDensity) => void;
   onKanbanAutoDetectChange?: (enabled: boolean) => void;
 }
-
 export const ViewControls = ({
   sortBy,
   groupBy,
@@ -180,247 +177,6 @@ export const ViewControls = ({
     return counts;
   }, [orders]);
   return <TooltipProvider>
-      <div className="flex items-center gap-1.5 mb-4 flex-wrap">
-        {/* Status Cards - Linha 1: Métricas Gerais */}
-        {orders.length > 0 && <>
-            <div className="flex items-center gap-1 mr-2 px-2 py-0.5 bg-muted/50 rounded-md border">
-              <div className="flex items-center gap-1 text-xs">
-                <span className="text-muted-foreground font-medium">Ativos:</span>
-                <span className="font-bold text-foreground">{statusCounts.total}</span>
-                <span className="text-[10px] text-muted-foreground ml-0.5">
-                  ({statusCounts.totalWithCompleted} total)
-                </span>
-              </div>
-              <div className="h-3 w-px bg-border mx-1" />
-              
-              <Button variant="ghost" size="sm" onClick={() => onStatusFilterChange?.(statusFilter === "high_priority" ? "all" : "high_priority")} className={`flex items-center gap-1 px-1.5 py-0.5 h-auto rounded transition-all hover:bg-red-100 dark:hover:bg-red-900/30 ${statusFilter === "high_priority" ? "bg-red-100 dark:bg-red-900/40" : ""}`}>
-                <span className="text-[10px] text-muted-foreground font-medium">🔴 Alta:</span>
-                <span className="text-[10px] font-bold text-[hsl(var(--priority-high))]">{statusCounts.highPriority}</span>
-              </Button>
-              
-              <div className="h-3 w-px bg-border mx-1" />
-              
-              <Button variant="ghost" size="sm" onClick={() => onStatusFilterChange?.(statusFilter === "medium_priority" ? "all" : "medium_priority")} className={`flex items-center gap-1 px-1.5 py-0.5 h-auto rounded transition-all hover:bg-orange-100 dark:hover:bg-orange-900/30 ${statusFilter === "medium_priority" ? "bg-orange-100 dark:bg-orange-900/40" : ""}`}>
-                <span className="text-[10px] text-muted-foreground font-medium">🟡 Média:</span>
-                <span className="text-[10px] font-bold text-[hsl(var(--priority-medium))]">{statusCounts.mediumPriority}</span>
-              </Button>
-              
-              <div className="h-3 w-px bg-border mx-1" />
-              
-              <Button variant="ghost" size="sm" onClick={() => onStatusFilterChange?.(statusFilter === "low_priority" ? "all" : "low_priority")} className={`flex items-center gap-1 px-1.5 py-0.5 h-auto rounded transition-all hover:bg-green-100 dark:hover:bg-green-900/30 ${statusFilter === "low_priority" ? "bg-green-100 dark:bg-green-900/40" : ""}`}>
-                <span className="text-[10px] text-muted-foreground font-medium">🟢 Baixa:</span>
-                <span className="text-[10px] font-bold text-[hsl(var(--priority-low))]">{statusCounts.lowPriority}</span>
-              </Button>
-              {statusCounts.criticalDeadline > 0 && <>
-                  <div className="h-3 w-px bg-border mx-1" />
-                  <div className="flex items-center gap-1 text-xs">
-                    <span className="text-muted-foreground font-medium">🔥 Prazo Crítico:</span>
-                    <span className="font-bold text-orange-600 dark:text-orange-400 animate-pulse">{statusCounts.criticalDeadline}</span>
-                  </div>
-                </>}
-              {statusCounts.newToday > 0 && <>
-                  <div className="h-3 w-px bg-border mx-1" />
-                  <div className="flex items-center gap-1 text-xs">
-                    <span className="text-muted-foreground font-medium">📅 Novos Hoje:</span>
-                    <span className="font-bold text-blue-600 dark:text-blue-400">{statusCounts.newToday}</span>
-                  </div>
-                </>}
-              {statusCounts.onHold > 0 && <>
-                  <div className="h-3 w-px bg-border mx-1" />
-                  <div className="flex items-center gap-1 text-xs">
-                    <span className="text-muted-foreground font-medium">⏱️ Aguardando:</span>
-                    <span className="font-bold text-yellow-600 dark:text-yellow-400">{statusCounts.onHold}</span>
-                  </div>
-                </>}
-              {statusCounts.delayed > 0 && <>
-                  <div className="h-3 w-px bg-border mx-1" />
-                  <div className="flex items-center gap-1 text-xs">
-                    <span className="text-muted-foreground font-medium">⚠️ Atrasados:</span>
-                    <span className="font-bold text-[hsl(var(--progress-critical))] animate-pulse">{statusCounts.delayed}</span>
-                  </div>
-                </>}
-            </div>
-
-            {/* Status Cards - Linha 2: Fases do Processo */}
-            
-
-            {/* Seção de Indicadores de Concluídos */}
-            <div className="flex items-center gap-1 mr-2 px-2 py-1 bg-green-50/50 dark:bg-green-950/20 rounded-md border border-green-200 dark:border-green-800">
-              <Button variant="ghost" size="sm" onClick={() => onStatusFilterChange?.(statusFilter === "completed" ? "all" : "completed")} className={`flex items-center gap-1 px-2 py-0.5 h-auto rounded transition-all hover:bg-green-100 dark:hover:bg-green-900/30 ${statusFilter === "completed" ? "bg-green-100 dark:bg-green-900/40" : ""}`}>
-                <span className="text-xs text-green-700 dark:text-green-300 font-medium">✓ Concluídos:</span>
-                <span className="text-xs font-bold text-[hsl(var(--progress-good))]">{statusCounts.completed}</span>
-              </Button>
-              
-              <div className="h-3 w-px bg-green-300 dark:bg-green-700 mx-1" />
-              
-              <div className="flex items-center gap-1 text-xs">
-                <span className="text-green-700 dark:text-green-300 font-medium">% Total:</span>
-                <span className="font-bold text-[hsl(var(--progress-good))]">{statusCounts.completionRate}%</span>
-              </div>
-              
-              <div className="h-3 w-px bg-green-300 dark:bg-green-700 mx-1" />
-              
-              <div className="flex items-center gap-1 text-xs">
-                <span className="text-green-700 dark:text-green-300 font-medium">✓ No Prazo:</span>
-                <span className="font-bold text-emerald-600 dark:text-emerald-400">{statusCounts.completedOnTime}</span>
-              </div>
-              
-              <div className="h-3 w-px bg-green-300 dark:bg-green-700 mx-1" />
-              
-              <div className="flex items-center gap-1 text-xs">
-                <span className="text-green-700 dark:text-green-300 font-medium">Taxa Prazo:</span>
-                <span className={`font-bold ${statusCounts.onTimeRate >= 90 ? 'text-emerald-600 dark:text-emerald-400' : statusCounts.onTimeRate >= 70 ? 'text-yellow-600 dark:text-yellow-400' : 'text-orange-600 dark:text-orange-400'}`}>
-                  {statusCounts.onTimeRate}%
-                </span>
-              </div>
-            </div>
-
-            {/* E-commerce Insights Card */}
-            {(() => {
-          const ecommerceOrders = orders.filter(o => o.type === 'ecommerce');
-          const ecomTotal = ecommerceOrders.length;
-          const ecomHigh = ecommerceOrders.filter(o => o.priority === 'high').length;
-          const ecomInProgress = ecommerceOrders.filter(o => !["delivered", "completed", "cancelled"].includes(o.status)).length;
-          const ecomCritical = ecommerceOrders.filter(o => {
-            if (!o.deliveryDeadline || ["delivered", "completed", "cancelled"].includes(o.status)) return false;
-            const deadline = new Date(o.deliveryDeadline);
-            const now = new Date();
-            const daysUntil = Math.ceil((deadline.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-            return daysUntil <= 2 && daysUntil >= 0;
-          }).length;
-          const ecomCompleted = ecommerceOrders.filter(o => ["delivered", "completed"].includes(o.status)).length;
-          const ecomCompletionRate = ecomTotal > 0 ? Math.round(ecomCompleted / ecomTotal * 100) : 0;
-          if (ecomTotal === 0) return null;
-          return <Button variant="ghost" size="sm" onClick={() => onStatusFilterChange?.(statusFilter === "ecommerce" ? "all" : "ecommerce")} className={`flex items-center gap-1 mr-2 px-2 py-0.5 h-auto rounded-md border transition-all hover:shadow-md ${statusFilter === "ecommerce" ? "bg-blue-100 dark:bg-blue-900/40 border-blue-400 dark:border-blue-600" : "bg-blue-50/50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800"}`}>
-                  <div className="flex items-center gap-1 text-xs">
-                    <span className="text-blue-700 dark:text-blue-300 font-medium">🛒 E-commerce:</span>
-                    <span className="font-bold text-blue-900 dark:text-blue-100">{ecomTotal}</span>
-                  </div>
-                  {ecomHigh > 0 && <>
-                      <div className="h-3 w-px bg-blue-300 dark:bg-blue-700 mx-1" />
-                      <div className="flex items-center gap-1 text-xs">
-                        <span className="text-blue-700 dark:text-blue-300 font-medium">🔴 Prioritários:</span>
-                        <span className="font-bold text-red-600 dark:text-red-400">{ecomHigh}</span>
-                      </div>
-                    </>}
-                  {ecomInProgress > 0 && <>
-                      <div className="h-3 w-px bg-blue-300 dark:bg-blue-700 mx-1" />
-                      <div className="flex items-center gap-1 text-xs">
-                        <span className="text-blue-700 dark:text-blue-300 font-medium">⚙️ Em Andamento:</span>
-                        <span className="font-bold text-blue-900 dark:text-blue-100">{ecomInProgress}</span>
-                      </div>
-                    </>}
-                  {ecomCritical > 0 && <>
-                      <div className="h-3 w-px bg-blue-300 dark:bg-blue-700 mx-1" />
-                      <div className="flex items-center gap-1 text-xs">
-                        <span className="text-blue-700 dark:text-blue-300 font-medium">⏰ Prazo Urgente:</span>
-                        <span className="font-bold text-orange-600 dark:text-orange-400 animate-pulse">{ecomCritical}</span>
-                      </div>
-                    </>}
-                  <div className="h-3 w-px bg-blue-300 dark:bg-blue-700 mx-1" />
-                  <div className="flex items-center gap-1 text-xs">
-                    <span className="text-blue-700 dark:text-blue-300 font-medium">✓ Taxa:</span>
-                    <span className="font-bold text-green-600 dark:text-green-400">{ecomCompletionRate}%</span>
-                  </div>
-                </Button>;
-        })()}
-          </>}
-        
-        {/* View Settings Popover - Unified control */}
-        <ViewSettingsPopover
-          viewMode={viewMode}
-          kanbanDensity={kanbanDensity}
-          kanbanAutoDetect={kanbanAutoDetect}
-          kanbanSuggestedDensity={kanbanSuggestedDensity}
-          onViewModeChange={onViewModeChange}
-          onKanbanDensityChange={onKanbanDensityChange || (() => {})}
-          onKanbanAutoDetectChange={onKanbanAutoDetectChange || (() => {})}
-        />
-
-        {/* Sort Control (hidden in Kanban view) */}
-        {viewMode === "list" && <Tooltip>
-          <DropdownMenu>
-            <TooltipTrigger asChild>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="icon" className="h-7 w-7">
-                  <ArrowUpDown className="h-3.5 w-3.5" />
-                </Button>
-              </DropdownMenuTrigger>
-            </TooltipTrigger>
-            <DropdownMenuContent align="start" className="w-56">
-              <DropdownMenuLabel>Ordenar por</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              {sortOptions.map(option => <DropdownMenuItem key={option.value} onClick={() => onSortChange(option.value)} className={sortBy === option.value ? "bg-accent" : ""}>
-                  {option.label}
-                </DropdownMenuItem>)}
-            </DropdownMenuContent>
-          </DropdownMenu>
-          <TooltipContent>Ordenar</TooltipContent>
-        </Tooltip>}
-
-        {/* Group Control (hidden in Kanban view) */}
-        {viewMode === "list" && <Tooltip>
-          <DropdownMenu>
-            <TooltipTrigger asChild>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="icon" className="h-7 w-7">
-                  <Layers className="h-3.5 w-3.5" />
-                </Button>
-              </DropdownMenuTrigger>
-            </TooltipTrigger>
-            <DropdownMenuContent align="start" className="w-56">
-              <DropdownMenuLabel>Agrupar por</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              {groupOptions.map(option => <DropdownMenuItem key={option.value} onClick={() => onGroupChange(option.value)} className={groupBy === option.value ? "bg-accent" : ""}>
-                  {option.label}
-                </DropdownMenuItem>)}
-            </DropdownMenuContent>
-          </DropdownMenu>
-          <TooltipContent>Agrupar</TooltipContent>
-        </Tooltip>}
-
-        {/* Category Filter */}
-        {onCategoryFilterChange && <Tooltip>
-            <DropdownMenu>
-              <TooltipTrigger asChild>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="icon" className="h-7 w-7">
-                    <span className="text-sm">{categoryFilters.find(o => o.value === categoryFilter)?.icon}</span>
-                  </Button>
-                </DropdownMenuTrigger>
-              </TooltipTrigger>
-              <DropdownMenuContent align="start" className="w-56">
-                <DropdownMenuLabel>Filtrar por Categoria</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                {categoryFilters.map(option => <DropdownMenuItem key={option.value} onClick={() => onCategoryFilterChange(option.value)} className={categoryFilter === option.value ? "bg-accent" : ""}>
-                    <span className="mr-2">{option.icon}</span>
-                    {option.label}
-                  </DropdownMenuItem>)}
-              </DropdownMenuContent>
-            </DropdownMenu>
-            <TooltipContent>Filtrar por Categoria</TooltipContent>
-          </Tooltip>}
-
-        {/* Phase Filter */}
-        <Tooltip>
-          <DropdownMenu>
-            <TooltipTrigger asChild>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="icon" className="h-7 w-7">
-                  <Filter className="h-3.5 w-3.5" />
-                </Button>
-              </DropdownMenuTrigger>
-            </TooltipTrigger>
-            <DropdownMenuContent align="start" className="w-56">
-              <DropdownMenuLabel>Filtrar por Fase</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              {phaseFilters.map(option => <DropdownMenuItem key={option.value} onClick={() => onPhaseFilterChange(option.value)} className={phaseFilter === option.value ? "bg-accent" : ""}>
-                  {option.label}
-                </DropdownMenuItem>)}
-            </DropdownMenuContent>
-          </DropdownMenu>
-          <TooltipContent>Filtrar por Fase</TooltipContent>
-        </Tooltip>
-      </div>
+      
     </TooltipProvider>;
 };
