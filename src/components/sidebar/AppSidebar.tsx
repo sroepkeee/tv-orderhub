@@ -160,7 +160,7 @@ const AppSidebar = ({
   const userInitials = user?.email?.slice(0, 2).toUpperCase() || "??";
   return <Sidebar collapsible="icon" {...props}>
       {/* Header compacto com Logo */}
-      <SidebarHeader className="border-b border-sidebar-border p-1.5">
+      <SidebarHeader className="border-b border-sidebar-border p-1.5 bg-popover">
         <Link to="/" className="flex items-center justify-center px-1">
           <img src={logo} alt="Logo" className="h-10 w-10 object-contain" />
         </Link>
