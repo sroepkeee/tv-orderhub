@@ -494,20 +494,60 @@ Deno.serve(async (req) => {
     const payload = await req.json();
     console.log('Webhook received:', JSON.stringify(payload, null, 2));
 
-    // Validar instância - buscar no banco em vez de secret fixo
+    // ✅ SECURITY: Validar instância - OBRIGATÓRIO
     const instanceKey = payload.instance_key || payload.instance;
     console.log('🔑 Instance key received:', instanceKey);
     
-    const { data: validInstance } = await supabase
+    if (!instanceKey) {
+      console.error('❌ SECURITY: No instance key provided');
+      return new Response(
+        JSON.stringify({ success: false, error: 'Unauthorized - Missing instance key' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
+    // Verificar se a instância está registrada no banco
+    const { data: validInstance, error: instanceError } = await supabase
       .from('whatsapp_instances')
-      .select('instance_key')
+      .select('instance_key, is_active')
       .eq('instance_key', instanceKey)
       .maybeSingle();
     
-    if (!validInstance) {
-      console.warn('⚠️ Unknown instance:', instanceKey);
-      // Continuar processando mas logar warning
+    if (instanceError) {
+      console.error('❌ Error checking instance:', instanceError);
     }
+    
+    if (!validInstance) {
+      console.error('❌ SECURITY: Unknown instance attempted to connect:', instanceKey);
+      // Logar tentativa de acesso não autorizado (fire and forget)
+      supabase.from('ai_notification_log').insert({
+        channel: 'webhook',
+        recipient: 'system',
+        message_content: `Tentativa de webhook com instance_key desconhecida: ${instanceKey}`,
+        status: 'blocked',
+        metadata: { 
+          security_event: 'unknown_instance',
+          instance_key: instanceKey,
+          ip: req.headers.get('x-forwarded-for') || 'unknown'
+        }
+      });
+      
+      return new Response(
+        JSON.stringify({ success: false, error: 'Unauthorized - Invalid instance' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
+    // Verificar se a instância está ativa
+    if (validInstance.is_active === false) {
+      console.warn('⚠️ Instance is inactive:', instanceKey);
+      return new Response(
+        JSON.stringify({ success: false, error: 'Instance is inactive' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
+    console.log('✅ Instance validated:', instanceKey);
 
     // Processar QR Code Update
     const qrcode = 
