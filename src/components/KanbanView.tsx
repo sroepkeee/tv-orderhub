@@ -36,6 +36,8 @@ import { toast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { KanbanDensity } from "@/hooks/useKanbanDensity";
+import { cn } from "@/lib/utils";
 
 export type Phase = "almox_ssm" | "order_generation" | "purchases" | "almox_general" | "production_client" | "production_stock" | "balance_generation" | "laboratory" | "packaging" | "freight_quote" | "ready_to_invoice" | "invoicing" | "logistics" | "in_transit" | "completion";
 
@@ -44,9 +46,16 @@ interface KanbanViewProps {
   onEdit: (order: Order) => void;
   onStatusChange: (orderId: string, newStatus: Order["status"]) => void;
   cardViewMode?: CardViewMode;
+  density?: KanbanDensity;
 }
 
-export const KanbanView = ({ orders, onEdit, onStatusChange, cardViewMode = "full" }: KanbanViewProps) => {
+export const KanbanView = ({ 
+  orders, 
+  onEdit, 
+  onStatusChange, 
+  cardViewMode = "full",
+  density = "comfortable"
+}: KanbanViewProps) => {
   const [activeId, setActiveId] = React.useState<string | null>(null);
   const [optimisticOrders, setOptimisticOrders] = React.useState<Order[]>(orders);
   const [recentlyMovedCards, setRecentlyMovedCards] = React.useState<Set<string>>(new Set());
@@ -568,6 +577,12 @@ export const KanbanView = ({ orders, onEdit, onStatusChange, cardViewMode = "ful
     );
   }
 
+  // Determine card view mode based on density
+  const effectiveCardViewMode: CardViewMode = 
+    density === 'tv' ? 'micro' : 
+    density === 'compact' ? 'compact' : 
+    cardViewMode;
+
   return (
     <DndContext
       sensors={sensors}
@@ -576,8 +591,17 @@ export const KanbanView = ({ orders, onEdit, onStatusChange, cardViewMode = "ful
       onDragEnd={handleDragEnd}
       onDragCancel={handleDragCancel}
     >
-      <div className="kanban-view">
-        <div className="kanban-container flex gap-2 lg:gap-3 overflow-x-auto pb-4 min-h-[calc(100vh-200px)]">
+      <div className={cn(
+        "kanban-view",
+        density === 'tv' && "kanban-view-tv",
+        density === 'compact' && "kanban-view-compact"
+      )}>
+        <div className={cn(
+          "kanban-container flex overflow-x-auto pb-4",
+          density === 'tv' && "kanban-container-tv gap-1 min-h-[calc(100vh-120px)]",
+          density === 'compact' && "kanban-container-compact gap-2 min-h-[calc(100vh-160px)]",
+          density === 'comfortable' && "gap-2 lg:gap-3 min-h-[calc(100vh-200px)]"
+        )}>
           {visibleColumns.map((column) => {
             const phaseDetails = getPhaseDetails(column.id);
             const canDrag = canEditPhase(column.id) || userRoles.includes('admin');
@@ -599,7 +623,8 @@ export const KanbanView = ({ orders, onEdit, onStatusChange, cardViewMode = "ful
                 canDrag={canDrag}
                 linkTo={column.id === "purchases" ? "/compras" : undefined}
                 animatedCardIds={recentlyMovedCards}
-                cardViewMode={cardViewMode}
+                cardViewMode={effectiveCardViewMode}
+                density={density}
               />
             );
           })}
@@ -612,7 +637,7 @@ export const KanbanView = ({ orders, onEdit, onStatusChange, cardViewMode = "ful
               order={activeOrder}
               onEdit={onEdit}
               onStatusChange={onStatusChange}
-              viewMode={cardViewMode}
+              viewMode={effectiveCardViewMode}
             />
           </div>
         ) : null}

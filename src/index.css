@@ -881,3 +881,81 @@ All colors MUST be HSL.
 .minimal-mode * {
   transition-duration: 150ms !important;
 }
+
+/* ==========================================
+   KANBAN DENSITY MODES
+   ========================================== */
+
+/* Compact Mode */
+.kanban-view-compact .kanban-column {
+  min-width: 160px !important;
+  max-width: 200px !important;
+  flex: 0 0 auto;
+}
+
+.kanban-view-compact .kanban-cards-container {
+  max-height: calc(100vh - 180px);
+}
+
+.kanban-column-compact {
+  min-width: 160px !important;
+  max-width: 200px !important;
+}
+
+/* TV/Dashboard Mode */
+.kanban-view-tv {
+  height: calc(100vh - 140px);
+  overflow: hidden;
+}
+
+.kanban-view-tv .kanban-column {
+  min-width: 80px !important;
+  max-width: none !important;
+  flex: 1 1 0;
+  height: 100%;
+}
+
+.kanban-container-tv {
+  display: flex;
+  flex-wrap: nowrap;
+  height: 100%;
+}
+
+.kanban-column-tv {
+  min-width: 80px !important;
+  flex: 1 1 0 !important;
+}
+
+.kanban-column-tv .kanban-cards-container {
+  max-height: calc(100vh - 180px);
+  scrollbar-width: none;
+}
+
+.kanban-column-tv .kanban-cards-container::-webkit-scrollbar {
+  display: none;
+}
+
+/* Micro card styles */
+.kanban-card-micro {
+  min-height: 28px !important;
+  max-height: 28px !important;
+}
+
+/* Card pop-in animation */
+@keyframes cardPopIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  50% {
+    transform: scale(1.02);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-card-pop-in {
+  animation: cardPopIn 0.25s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}

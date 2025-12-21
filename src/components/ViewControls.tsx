@@ -14,9 +14,11 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { ArrowUpDown, Filter, Layers, LayoutGrid, List, Maximize2, Minimize2, Palette, Circle, Table2 } from "lucide-react";
+import { ArrowUpDown, Filter, Layers, LayoutGrid, List, Maximize2, Minimize2, Palette, Circle, Table2, Monitor, Columns3 } from "lucide-react";
 import { Order } from "./Dashboard";
 import { useVisualMode } from "@/hooks/useVisualMode";
+import { KanbanDensity } from "@/hooks/useKanbanDensity";
+import { cn } from "@/lib/utils";
 
 export type SortOption = "priority" | "deadline" | "created" | "status";
 export type GroupOption = "priority" | "phase" | "type" | "category" | "none";
@@ -24,7 +26,7 @@ export type PhaseFilter = "all" | "preparation" | "production" | "packaging" | "
 export type ViewMode = "list" | "kanban" | "matrix";
 export type CategoryFilter = "all" | "reposicao" | "vendas" | "operacoes_especiais";
 export type StatusFilter = "all" | "high_priority" | "medium_priority" | "low_priority" | "critical_deadline" | "new_today" | "on_hold" | "delayed" | "preparation" | "production" | "packaging" | "invoicing" | "shipping" | "completed" | "ecommerce";
-export type CardViewMode = "full" | "compact";
+export type CardViewMode = "full" | "compact" | "micro";
 
 interface ViewControlsProps {
   sortBy: SortOption;
@@ -35,6 +37,7 @@ interface ViewControlsProps {
   statusFilter?: StatusFilter;
   cardViewMode?: CardViewMode;
   orders?: Order[];
+  kanbanDensity?: KanbanDensity;
   onSortChange: (sort: SortOption) => void;
   onGroupChange: (group: GroupOption) => void;
   onPhaseFilterChange: (phase: PhaseFilter) => void;
@@ -42,6 +45,7 @@ interface ViewControlsProps {
   onCategoryFilterChange?: (category: CategoryFilter) => void;
   onStatusFilterChange?: (status: StatusFilter) => void;
   onCardViewModeChange?: (mode: CardViewMode) => void;
+  onKanbanDensityChange?: (density: KanbanDensity) => void;
 }
 
 export const ViewControls = ({
@@ -53,6 +57,7 @@ export const ViewControls = ({
   statusFilter = "all",
   cardViewMode = "full",
   orders = [],
+  kanbanDensity = "comfortable",
   onSortChange,
   onGroupChange,
   onPhaseFilterChange,
@@ -60,6 +65,7 @@ export const ViewControls = ({
   onCategoryFilterChange,
   onStatusFilterChange,
   onCardViewModeChange,
+  onKanbanDensityChange,
 }: ViewControlsProps) => {
   const sortOptions = [
     { value: "priority" as SortOption, label: "Prioridade" },
@@ -485,30 +491,67 @@ export const ViewControls = ({
             </TooltipTrigger>
             <TooltipContent>Matriz de Fases</TooltipContent>
           </Tooltip>
-          
-          {/* Card View Mode Toggle (only in Kanban view) */}
-          {viewMode === "kanban" && onCardViewModeChange && (
+        </div>
+        
+        {/* Kanban Density Controls (only in Kanban view) */}
+        {viewMode === "kanban" && onKanbanDensityChange && (
+          <div className="flex items-center gap-0.5 border rounded-md p-0.5 bg-muted/30">
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
-                  variant={cardViewMode === "compact" ? "default" : "outline"}
+                  variant={kanbanDensity === "comfortable" ? "default" : "ghost"}
                   size="icon"
                   className="h-7 w-7"
-                  onClick={() => onCardViewModeChange(cardViewMode === "full" ? "compact" : "full")}
+                  onClick={() => onKanbanDensityChange("comfortable")}
                 >
-                  {cardViewMode === "compact" ? (
-                    <Maximize2 className="h-3.5 w-3.5" />
-                  ) : (
-                    <Minimize2 className="h-3.5 w-3.5" />
-                  )}
+                  <Maximize2 className="h-3.5 w-3.5" />
                 </Button>
               </TooltipTrigger>
               <TooltipContent>
-                {cardViewMode === "compact" ? "Cards Completos" : "Cards Compactos"}
+                <div className="text-center">
+                  <p className="font-medium">Confortável</p>
+                  <p className="text-xs text-muted-foreground">Cards completos (Ctrl+1)</p>
+                </div>
               </TooltipContent>
             </Tooltip>
-          )}
-        </div>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant={kanbanDensity === "compact" ? "default" : "ghost"}
+                  size="icon"
+                  className="h-7 w-7"
+                  onClick={() => onKanbanDensityChange("compact")}
+                >
+                  <Columns3 className="h-3.5 w-3.5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <div className="text-center">
+                  <p className="font-medium">Compacto</p>
+                  <p className="text-xs text-muted-foreground">Ver mais fases (Ctrl+2)</p>
+                </div>
+              </TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant={kanbanDensity === "tv" ? "default" : "ghost"}
+                  size="icon"
+                  className="h-7 w-7"
+                  onClick={() => onKanbanDensityChange("tv")}
+                >
+                  <Monitor className="h-3.5 w-3.5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <div className="text-center">
+                  <p className="font-medium">TV/Dashboard</p>
+                  <p className="text-xs text-muted-foreground">Visão geral (Ctrl+3)</p>
+                </div>
+              </TooltipContent>
+            </Tooltip>
+          </div>
+        )}
         
         {/* Visual Mode Toggle */}
         <VisualModeToggle />

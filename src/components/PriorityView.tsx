@@ -8,6 +8,7 @@ import { ViewControls, SortOption, GroupOption, PhaseFilter, ViewMode, StatusFil
 import { KanbanView } from "./KanbanView";
 import { MatrixView } from "./MatrixView";
 import { ClipboardList, PackageCheck, Microscope, Boxes, Truck, CheckCircle2 } from "lucide-react";
+import { useKanbanDensity } from "@/hooks/useKanbanDensity";
 
 interface PriorityViewProps {
   orders: Order[];
@@ -40,6 +41,9 @@ export const PriorityView = ({
     const saved = localStorage.getItem("cardViewMode");
     return (saved as CardViewMode) || "full";
   });
+  
+  // Kanban density hook
+  const { density, setDensity } = useKanbanDensity();
 
   const handleViewModeChange = (mode: ViewMode) => {
     setViewMode(mode);
