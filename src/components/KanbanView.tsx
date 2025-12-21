@@ -592,7 +592,7 @@ export const KanbanView = ({
       onDragCancel={handleDragCancel}
     >
       <div className={cn(
-        "kanban-view h-full",
+        "kanban-view h-full min-h-0",
         density === 'tv' && "kanban-view-tv",
         density === 'compact' && "kanban-view-compact"
       )}>
