@@ -44,7 +44,7 @@ export function AddPhaseDialog({ open, onOpenChange, onAdd, existingKeys }: AddP
     onAdd({
       display_name: displayName.trim(),
       phase_key: phaseKey.trim().toLowerCase().replace(/\s+/g, '_'),
-      responsible_role: responsibleRole || null,
+      responsible_role: responsibleRole === "__none__" ? null : responsibleRole || null,
     });
 
     // Reset form
@@ -119,7 +119,7 @@ export function AddPhaseDialog({ open, onOpenChange, onAdd, existingKeys }: AddP
                 <SelectValue placeholder="Selecione um papel" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Nenhum</SelectItem>
+                <SelectItem value="__none__">Nenhum</SelectItem>
                 {availableRoles.map(([key, roleInfo]) => (
                   <SelectItem key={key} value={key}>
                     {roleInfo.name}
