@@ -20,6 +20,7 @@ import AIAgent from "./pages/AIAgent";
 import Customers from "./pages/Customers";
 import Onboarding from "./pages/Onboarding";
 import PhaseSettings from "./pages/PhaseSettings";
+import Files from "./pages/Files";
 import { CarriersChatRoute } from "./components/CarriersChatRoute";
 import { useAuth } from "./hooks/useAuth";
 import { useAdminAuth } from "./hooks/useAdminAuth";
@@ -200,6 +201,11 @@ const App = () => {
                   <Route path="/customers" element={
                     <ProtectedRoute>
                       <Customers />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/files" element={
+                    <ProtectedRoute>
+                      <Files />
                     </ProtectedRoute>
                   } />
                   <Route path="/settings/phases" element={
