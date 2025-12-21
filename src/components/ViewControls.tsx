@@ -2,11 +2,11 @@ import React from "react";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { ArrowUpDown, Filter, Layers, LayoutGrid, List, Maximize2, Minimize2, Palette, Circle, Table2, Monitor, Columns3, Wand2 } from "lucide-react";
+import { ArrowUpDown, Filter, Layers } from "lucide-react";
 import { Order } from "./Dashboard";
-import { useVisualMode } from "@/hooks/useVisualMode";
 import { KanbanDensity } from "@/hooks/useKanbanDensity";
-import { cn } from "@/lib/utils";
+import { ViewSettingsPopover } from "./ViewSettingsPopover";
+
 export type SortOption = "priority" | "deadline" | "created" | "status";
 export type GroupOption = "priority" | "phase" | "type" | "category" | "none";
 export type PhaseFilter = "all" | "preparation" | "production" | "packaging" | "logistics" | "completion";
@@ -14,6 +14,7 @@ export type ViewMode = "list" | "kanban" | "matrix";
 export type CategoryFilter = "all" | "reposicao" | "vendas" | "operacoes_especiais";
 export type StatusFilter = "all" | "high_priority" | "medium_priority" | "low_priority" | "critical_deadline" | "new_today" | "on_hold" | "delayed" | "preparation" | "production" | "packaging" | "invoicing" | "shipping" | "completed" | "ecommerce";
 export type CardViewMode = "full" | "compact" | "micro";
+
 interface ViewControlsProps {
   sortBy: SortOption;
   groupBy: GroupOption;
@@ -36,6 +37,7 @@ interface ViewControlsProps {
   onKanbanDensityChange?: (density: KanbanDensity) => void;
   onKanbanAutoDetectChange?: (enabled: boolean) => void;
 }
+
 export const ViewControls = ({
   sortBy,
   groupBy,
@@ -324,98 +326,16 @@ export const ViewControls = ({
         })()}
           </>}
         
-        {/* View Mode Toggle */}
-        <div className="flex items-center gap-0.5 border rounded-md p-0.5">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button variant={viewMode === "list" ? "default" : "ghost"} size="icon" className="h-7 w-7" onClick={() => onViewModeChange("list")}>
-                <List className="h-3.5 w-3.5" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Lista</TooltipContent>
-          </Tooltip>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button variant={viewMode === "kanban" ? "default" : "ghost"} size="icon" className="h-7 w-7" onClick={() => onViewModeChange("kanban")}>
-                <LayoutGrid className="h-3.5 w-3.5" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Kanban</TooltipContent>
-          </Tooltip>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button variant={viewMode === "matrix" ? "default" : "ghost"} size="icon" className="h-7 w-7" onClick={() => onViewModeChange("matrix")}>
-                <Table2 className="h-3.5 w-3.5" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Matriz de Fases</TooltipContent>
-          </Tooltip>
-        </div>
-        
-        {/* Kanban Density Controls (only in Kanban view) */}
-        {viewMode === "kanban" && onKanbanDensityChange && <div className="flex items-center gap-0.5 border rounded-md p-0.5 bg-muted/30">
-            {/* Auto-detect toggle */}
-            {onKanbanAutoDetectChange && <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button variant={kanbanAutoDetect ? "default" : "ghost"} size="icon" className={cn("h-7 w-7", kanbanAutoDetect && "bg-primary/80")} onClick={() => onKanbanAutoDetectChange(!kanbanAutoDetect)}>
-                    <Wand2 className="h-3.5 w-3.5" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <div className="text-center">
-                    <p className="font-medium">Auto-detectar</p>
-                    <p className="text-xs text-muted-foreground">
-                      {kanbanAutoDetect ? `Ativo: usando "${kanbanSuggestedDensity === 'comfortable' ? 'Confortável' : kanbanSuggestedDensity === 'compact' ? 'Compacto' : 'TV'}"` : "Clique para ativar (Ctrl+0)"}
-                    </p>
-                  </div>
-                </TooltipContent>
-              </Tooltip>}
-            
-            <div className="h-4 w-px bg-border mx-0.5" />
-            
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant={kanbanDensity === "comfortable" && !kanbanAutoDetect ? "default" : "ghost"} size="icon" className={cn("h-7 w-7", kanbanAutoDetect && kanbanSuggestedDensity === "comfortable" && "ring-2 ring-primary/50")} onClick={() => onKanbanDensityChange("comfortable")}>
-                  <Maximize2 className="h-3.5 w-3.5" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <div className="text-center">
-                  <p className="font-medium">Confortável</p>
-                  <p className="text-xs text-muted-foreground">Cards completos (Ctrl+1)</p>
-                </div>
-              </TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant={kanbanDensity === "compact" && !kanbanAutoDetect ? "default" : "ghost"} size="icon" className={cn("h-7 w-7", kanbanAutoDetect && kanbanSuggestedDensity === "compact" && "ring-2 ring-primary/50")} onClick={() => onKanbanDensityChange("compact")}>
-                  <Columns3 className="h-3.5 w-3.5" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <div className="text-center">
-                  <p className="font-medium">Compacto</p>
-                  <p className="text-xs text-muted-foreground">Ver mais fases (Ctrl+2)</p>
-                </div>
-              </TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant={kanbanDensity === "tv" && !kanbanAutoDetect ? "default" : "ghost"} size="icon" className={cn("h-7 w-7", kanbanAutoDetect && kanbanSuggestedDensity === "tv" && "ring-2 ring-primary/50")} onClick={() => onKanbanDensityChange("tv")}>
-                  <Monitor className="h-3.5 w-3.5" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <div className="text-center">
-                  <p className="font-medium">TV/Dashboard</p>
-                  <p className="text-xs text-muted-foreground">Visão geral (Ctrl+3)</p>
-                </div>
-              </TooltipContent>
-            </Tooltip>
-          </div>}
-        
-        {/* Visual Mode Toggle */}
-        <VisualModeToggle />
+        {/* View Settings Popover - Unified control */}
+        <ViewSettingsPopover
+          viewMode={viewMode}
+          kanbanDensity={kanbanDensity}
+          kanbanAutoDetect={kanbanAutoDetect}
+          kanbanSuggestedDensity={kanbanSuggestedDensity}
+          onViewModeChange={onViewModeChange}
+          onKanbanDensityChange={onKanbanDensityChange || (() => {})}
+          onKanbanAutoDetectChange={onKanbanAutoDetectChange || (() => {})}
+        />
 
         {/* Sort Control (hidden in Kanban view) */}
         {viewMode === "list" && <Tooltip>
@@ -502,26 +422,5 @@ export const ViewControls = ({
           <TooltipContent>Filtrar por Fase</TooltipContent>
         </Tooltip>
       </div>
-    </TooltipProvider>;
-};
-
-// Visual Mode Toggle Component
-const VisualModeToggle = () => {
-  const {
-    mode,
-    toggleMode,
-    isMinimal
-  } = useVisualMode();
-  return <TooltipProvider>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button variant="outline" size="icon" className="h-7 w-7" onClick={toggleMode}>
-            {isMinimal ? <Palette className="h-3.5 w-3.5" /> : <Circle className="h-3.5 w-3.5" />}
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>
-          {isMinimal ? "Modo Colorido" : "Modo Minimalista"}
-        </TooltipContent>
-      </Tooltip>
     </TooltipProvider>;
 };
