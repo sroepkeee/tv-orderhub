@@ -597,10 +597,10 @@ export const KanbanView = ({
         density === 'compact' && "kanban-view-compact"
       )}>
         <div className={cn(
-          "kanban-container flex overflow-x-auto pb-4",
-          density === 'tv' && "kanban-container-tv gap-1 min-h-[calc(100vh-120px)]",
-          density === 'compact' && "kanban-container-compact gap-2 min-h-[calc(100vh-160px)]",
-          density === 'comfortable' && "gap-2 lg:gap-3 min-h-[calc(100vh-200px)]"
+          "kanban-container flex overflow-x-auto h-full pb-4",
+          density === 'tv' && "kanban-container-tv gap-1",
+          density === 'compact' && "kanban-container-compact gap-2",
+          density === 'comfortable' && "gap-2 lg:gap-3"
         )}>
           {visibleColumns.map((column) => {
             const phaseDetails = getPhaseDetails(column.id);
