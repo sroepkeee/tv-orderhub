@@ -25,6 +25,7 @@ import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { useAdminAuth } from "@/hooks/useAdminAuth";
 import { usePhaseAuthorization } from "@/hooks/usePhaseAuthorization";
+import { usePhaseManagerNotification } from "@/hooks/usePhaseManagerNotification";
 import { supabase } from "@/integrations/supabase/client";
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
 import AppSidebar from "@/components/sidebar/AppSidebar";
@@ -1888,6 +1889,22 @@ export const Dashboard = () => {
       // 🔔 PASSO 4: Notificação PROATIVA ao cliente (executada FORA do Promise.all)
       console.log('🔔 [Notify] PASSO 4 - Chamando triggerProactiveNotification');
       await triggerProactiveNotification(orderId, newStatus, order?.orderNumber || '');
+
+      // 🔔 PASSO 5: Notificar gestor da fase via WhatsApp (fire-and-forget)
+      supabase.functions.invoke('notify-phase-manager', {
+        body: {
+          orderId,
+          oldStatus: previousStatus,
+          newStatus,
+          orderType: order?.type,
+          orderCategory: order?.order_category,
+          notificationType: 'status_change'
+        }
+      }).then(({ data }) => {
+        if (data?.notifications_sent > 0) {
+          console.log(`📱 [PhaseManager] ${data.notifications_sent} gestor(es) notificado(s)`);
+        }
+      }).catch(err => console.log('⚠️ Erro ao notificar gestor:', err));
       const description = isMovingToOrderGeneration && updateData.delivery_date ? `Pedido ${order?.orderNumber} movido para ${getStatusLabel(newStatus)} - Prazo calculado automaticamente` : `Pedido ${order?.orderNumber} movido para ${getStatusLabel(newStatus)}`;
       toast({
         title: "Status atualizado",

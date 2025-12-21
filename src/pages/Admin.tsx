@@ -8,7 +8,8 @@ import { UserSessionsTable } from "@/components/admin/UserSessionsTable";
 import { LoginAuditTable } from "@/components/admin/LoginAuditTable";
 import { ManagementReportSettings } from "@/components/admin/ManagementReportSettings";
 import { MessageQueueDashboard } from "@/components/admin/MessageQueueDashboard";
-import { Shield, ArrowLeft, BarChart3, MessageSquare, Settings2 } from "lucide-react";
+import { PhaseManagersConfig } from "@/components/admin/PhaseManagersConfig";
+import { Shield, ArrowLeft, BarChart3, MessageSquare, Settings2, UserCog } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 
@@ -37,8 +38,12 @@ const Admin = () => {
         </div>
 
         <Tabs defaultValue="users" className="w-full">
-          <TabsList className="grid w-full grid-cols-6 mb-4">
+          <TabsList className="grid w-full grid-cols-7 mb-4">
             <TabsTrigger value="users">Usuários</TabsTrigger>
+            <TabsTrigger value="managers" className="flex items-center gap-1">
+              <UserCog className="h-3 w-3" />
+              Gestores
+            </TabsTrigger>
             <TabsTrigger value="monitoring">Monitoramento</TabsTrigger>
             <TabsTrigger value="audit">Auditoria</TabsTrigger>
             <TabsTrigger value="reports" className="flex items-center gap-1">
@@ -57,6 +62,10 @@ const Admin = () => {
 
           <TabsContent value="users" className="space-y-4">
             <UserManagementTable />
+          </TabsContent>
+
+          <TabsContent value="managers" className="space-y-4">
+            <PhaseManagersConfig />
           </TabsContent>
 
           <TabsContent value="monitoring" className="space-y-4">
