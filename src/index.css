@@ -476,7 +476,6 @@ All colors MUST be HSL.
     overflow-y: hidden;
     scrollbar-width: thin;
     scrollbar-color: hsl(var(--muted-foreground)) hsl(var(--muted));
-    scrollbar-gutter: stable;
   }
 
   .kanban-container::-webkit-scrollbar {

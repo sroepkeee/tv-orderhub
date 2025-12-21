@@ -44,7 +44,7 @@ const SidebarMetrics = ({ orders }: SidebarMetricsProps) => {
               </div>
             </TooltipTrigger>
             <TooltipContent side="right">
-              <p>{metrics.total} ativos | {metrics.completed} ✓ | {metrics.criticalDeadline}🔥</p>
+              <p>{metrics.total} Ativos | {metrics.completed} Concluídos | {metrics.criticalDeadline} Críticos</p>
             </TooltipContent>
           </Tooltip>
         </div>
@@ -52,27 +52,43 @@ const SidebarMetrics = ({ orders }: SidebarMetricsProps) => {
     );
   }
 
-  // Ultra-compact: uma única linha com todas as métricas
   return (
-    <SidebarGroup className="py-1 px-2">
-      <div className="bg-sidebar-accent/30 rounded-md px-2 py-1.5 border border-sidebar-border/50">
-        {/* Linha principal */}
-        <div className="flex items-center justify-between text-[11px]">
-          <span className="font-semibold text-sidebar-foreground">{metrics.total}</span>
-          <span className="text-sidebar-foreground/60">|</span>
-          <span className="text-[hsl(var(--progress-good))] font-medium">✓{metrics.completed}</span>
-          <span className="text-sidebar-foreground/60">|</span>
-          {metrics.criticalDeadline > 0 ? (
-            <span className="text-orange-500 font-medium animate-pulse">🔥{metrics.criticalDeadline}</span>
-          ) : (
-            <span className="text-sidebar-foreground/40">🔥0</span>
-          )}
+    <SidebarGroup className="py-2 px-2">
+      <div className="bg-sidebar-accent/30 rounded-md p-2.5 border border-sidebar-border/50 space-y-2">
+        {/* Título */}
+        <div className="text-[10px] font-semibold text-sidebar-foreground/70 uppercase tracking-wide">
+          Pedidos
         </div>
-        {/* Sub-linha de prioridades */}
-        <div className="flex items-center gap-2 mt-0.5 text-[10px]">
-          <span className="text-[hsl(var(--priority-high))]">🔴{metrics.highPriority}</span>
-          <span className="text-[hsl(var(--priority-medium))]">🟡{metrics.mediumPriority}</span>
-          <span className="text-[hsl(var(--priority-low))]">🟢{metrics.lowPriority}</span>
+        
+        {/* Métricas principais */}
+        <div className="grid grid-cols-2 gap-2">
+          <div className="flex flex-col">
+            <span className="text-lg font-bold text-sidebar-foreground">{metrics.total}</span>
+            <span className="text-[10px] text-sidebar-foreground/60">Ativos</span>
+          </div>
+          <div className="flex flex-col">
+            <span className="text-lg font-bold text-[hsl(var(--progress-good))]">{metrics.completed}</span>
+            <span className="text-[10px] text-sidebar-foreground/60">Concluídos</span>
+          </div>
+        </div>
+        
+        {/* Críticos */}
+        {metrics.criticalDeadline > 0 && (
+          <div className="flex items-center gap-1.5 text-orange-500 text-xs animate-pulse">
+            <span>🔥</span>
+            <span className="font-medium">{metrics.criticalDeadline}</span>
+            <span className="text-[10px] opacity-80">Críticos</span>
+          </div>
+        )}
+        
+        {/* Prioridades com legenda */}
+        <div className="pt-1.5 border-t border-sidebar-border/30">
+          <div className="text-[10px] text-sidebar-foreground/50 mb-1">Prioridade:</div>
+          <div className="flex items-center gap-2 text-[10px]">
+            <span className="text-[hsl(var(--priority-high))]">🔴 {metrics.highPriority} Alta</span>
+            <span className="text-[hsl(var(--priority-medium))]">🟡 {metrics.mediumPriority} Média</span>
+            <span className="text-[hsl(var(--priority-low))]">🟢 {metrics.lowPriority} Baixa</span>
+          </div>
         </div>
       </div>
     </SidebarGroup>
