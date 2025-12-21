@@ -3,7 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-api-key',
 };
 
 interface CarrierResponse {
@@ -19,6 +19,25 @@ interface CarrierResponse {
   carrier_identifier?: string; // email ou whatsapp para identificar transportadora
 }
 
+// Função para validar API Key (N8N ou sistema externo)
+function validateApiKey(req: Request): boolean {
+  const apiKey = req.headers.get('x-api-key') || req.headers.get('X-API-Key');
+  const expectedKey = Deno.env.get('N8N_API_KEY');
+  
+  if (!expectedKey) {
+    console.warn('⚠️ N8N_API_KEY not configured - security risk!');
+    return false;
+  }
+  
+  if (!apiKey) {
+    console.warn('⚠️ No API key provided in request');
+    return false;
+  }
+  
+  // Comparação segura (timing-safe não disponível em Deno, mas minimizamos risco)
+  return apiKey === expectedKey;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -26,6 +45,20 @@ serve(async (req) => {
 
   try {
     console.log('receive-carrier-response: Processing webhook');
+    
+    // ✅ SECURITY: Validar API Key antes de processar
+    if (!validateApiKey(req)) {
+      console.error('❌ SECURITY: Invalid or missing API key');
+      return new Response(JSON.stringify({ 
+        success: false,
+        error: 'Unauthorized - Invalid API key' 
+      }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+    
+    console.log('✅ API key validated successfully');
     
     const payload: CarrierResponse = await req.json();
     console.log('Payload received:', JSON.stringify(payload, null, 2));
