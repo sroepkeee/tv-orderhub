@@ -28,9 +28,16 @@ export function CompactItemSLATable({ items }: CompactItemSLATableProps) {
       'separating': 'Separação',
       'separated': 'Separado',
       'in_production': 'Produção',
+      'in_process': 'Em Processo',
+      'awaiting_production': 'Aguard. Produção',
       'produced': 'Produzido',
+      'quality_check': 'Qualidade',
+      'in_stock': 'Em Estoque',
+      'purchase_required': 'Requer Compra',
+      'purchase_requested': 'Compra Solicitada',
       'shipped': 'Expedido',
-      'delivered': 'Entregue'
+      'delivered': 'Entregue',
+      'completed': 'Concluído'
     };
     return labels[phase || ''] || phase || 'N/A';
   };
