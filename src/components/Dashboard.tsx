@@ -2086,10 +2086,10 @@ export const Dashboard = () => {
           onKanbanDensityChange={setKanbanDensity}
           onKanbanAutoDetectChange={setKanbanAutoDetect}
         />
-        <SidebarInset className="flex-1">
-          <div className="min-h-screen bg-background p-4 lg:p-6">
-            {/* Simplified Header */}
-            <div className="flex items-center justify-between mb-4 lg:mb-6">
+        <SidebarInset className="flex-1 overflow-hidden">
+          <div className="h-screen flex flex-col bg-background overflow-hidden">
+            {/* Header - fixed height */}
+            <header className="flex-shrink-0 flex items-center justify-between px-4 lg:px-6 py-4">
               <div className="flex items-center gap-2">
                 <SidebarTrigger className="-ml-1" />
                 <h1 className="text-base md:text-lg lg:text-xl font-bold text-dashboard-header tracking-tight">
@@ -2140,14 +2140,11 @@ export const Dashboard = () => {
                 
                 <AddOrderDialog onAddOrder={handleAddOrder} />
               </div>
-            </div>
+            </header>
 
-            {/* Tab Navigation - Compacta */}
-            <div className="mb-3">
-              
-            </div>
-
-      {/* Content */}
+            {/* Main Content - scrollable */}
+            <main className="flex-1 overflow-auto px-4 lg:px-6 pb-4">
+              {/* Content */}
       {loading ? <div className="flex items-center justify-center py-20">
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
@@ -2252,23 +2249,24 @@ export const Dashboard = () => {
               </Button>
             </div>}
         </div>}
+            </main>
 
-      {/* Refresh indicator - discreto */}
-      {refreshing && (
-        <div className="fixed bottom-4 right-4 bg-primary text-primary-foreground px-4 py-2 rounded-lg shadow-lg flex items-center gap-2 animate-fade-in z-50">
-          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary-foreground"></div>
-          <span className="text-sm">Atualizando...</span>
-        </div>
-      )}
+            {/* Refresh indicator - discreto */}
+            {refreshing && (
+              <div className="fixed bottom-4 right-4 bg-primary text-primary-foreground px-4 py-2 rounded-lg shadow-lg flex items-center gap-2 animate-fade-in z-50">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary-foreground"></div>
+                <span className="text-sm">Atualizando...</span>
+              </div>
+            )}
 
-      {/* Edit Dialog with integrated History */}
-      {selectedOrder && <EditOrderDialog order={selectedOrder} open={showEditDialog} onOpenChange={setShowEditDialog} onSave={handleEditOrder} onDelete={handleDeleteOrder} />}
+            {/* Edit Dialog with integrated History */}
+            {selectedOrder && <EditOrderDialog order={selectedOrder} open={showEditDialog} onOpenChange={setShowEditDialog} onSave={handleEditOrder} onDelete={handleDeleteOrder} />}
 
-      {/* Import Dialog */}
-      <ImportOrderDialog open={showImportDialog} onOpenChange={setShowImportDialog} onImportSuccess={queueRefresh} />
+            {/* Import Dialog */}
+            <ImportOrderDialog open={showImportDialog} onOpenChange={setShowImportDialog} onImportSuccess={queueRefresh} />
 
-      {/* Rateio Upload Dialog */}
-      <RateioUploadDialog open={showRateioDialog} onOpenChange={setShowRateioDialog} onSuccess={queueRefresh} />
+            {/* Rateio Upload Dialog */}
+            <RateioUploadDialog open={showRateioDialog} onOpenChange={setShowRateioDialog} onSuccess={queueRefresh} />
           </div>
         </SidebarInset>
       </div>
