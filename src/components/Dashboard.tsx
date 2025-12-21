@@ -30,6 +30,7 @@ import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/s
 import AppSidebar from "@/components/sidebar/AppSidebar";
 import { useKanbanDensity, KanbanDensity } from "@/hooks/useKanbanDensity";
 import { ViewMode } from "./ViewControls";
+import { ViewSettingsPopover } from "./ViewSettingsPopover";
 
 // Types
 type Priority = "high" | "medium" | "low";
@@ -2107,6 +2108,14 @@ export const Dashboard = () => {
                   />
                 </div>
                 <DateRangeFilter dateRange={dateRange} onDateRangeChange={setDateRange} />
+                <ViewSettingsPopover
+                  viewMode={viewMode}
+                  kanbanDensity={kanbanDensity}
+                  kanbanAutoDetect={kanbanAutoDetect}
+                  onViewModeChange={setViewMode}
+                  onKanbanDensityChange={setKanbanDensity}
+                  onKanbanAutoDetectChange={setKanbanAutoDetect}
+                />
                 <ColumnSettings visibility={columnVisibility} onVisibilityChange={setColumnVisibility} />
                 <RealtimeIndicator status={realtimeStatus} lastUpdateTime={lastUpdateTime} />
                 <NotificationCenter />

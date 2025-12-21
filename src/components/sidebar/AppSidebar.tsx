@@ -171,17 +171,12 @@ const AppSidebar = ({
     <Sidebar collapsible="icon" {...props}>
       {/* Header compacto com Logo */}
       <SidebarHeader className="border-b border-sidebar-border p-1.5">
-        <Link to="/" className="flex items-center gap-1.5 px-1">
+        <Link to="/" className="flex items-center justify-center px-1">
           <img 
             src={logo} 
             alt="Logo" 
-            className="h-9 w-9 object-contain"
+            className="h-10 w-10 object-contain"
           />
-          {!isCollapsed && (
-            <span className="font-semibold text-sm text-sidebar-foreground">
-              Imply OMS
-            </span>
-          )}
         </Link>
       </SidebarHeader>
 
