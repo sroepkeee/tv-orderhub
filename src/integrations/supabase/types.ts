@@ -3880,6 +3880,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      can_access_carrier_conversation: {
+        Args: { p_carrier_id: string }
+        Returns: boolean
+      }
       can_edit_phase: {
         Args: { _phase: string; _user_id: string }
         Returns: boolean
