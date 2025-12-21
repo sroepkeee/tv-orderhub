@@ -1,5 +1,5 @@
 import { Link, useNavigate } from "react-router-dom";
-import { LayoutDashboard, BarChart3, Factory, Truck, MessageSquare, ShoppingCart, Users, UserCog, Bot, Settings, LogOut, Moon, Sun, KeyRound, FolderOpen } from "lucide-react";
+import { LayoutDashboard, BarChart3, Factory, Truck, MessageSquare, ShoppingCart, Users, UserCog, Bot, Settings, LogOut, Moon, Sun, KeyRound, FolderOpen, Eye, EyeOff } from "lucide-react";
 import logo from "@/assets/logo.png";
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarRail, SidebarSeparator, SidebarMenu, SidebarMenuItem, SidebarMenuButton, useSidebar } from "@/components/ui/sidebar";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -10,6 +10,7 @@ import { ViewSettingsPopover } from "@/components/ViewSettingsPopover";
 import { Order } from "@/components/Dashboard";
 import { useAuth } from "@/hooks/useAuth";
 import { useAdminAuth } from "@/hooks/useAdminAuth";
+import { usePrivacyMode } from "@/hooks/usePrivacyMode";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
@@ -49,6 +50,7 @@ const AppSidebar = ({
   const {
     state
   } = useSidebar();
+  const { isPrivacyMode, togglePrivacyMode } = usePrivacyMode();
   const navigate = useNavigate();
   const [isDark, setIsDark] = useState(false);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
@@ -205,6 +207,12 @@ const AppSidebar = ({
                   {isDark ? <Sun className="mr-2 h-3.5 w-3.5" /> : <Moon className="mr-2 h-3.5 w-3.5" />}
                   {isDark ? "Modo Claro" : "Modo Escuro"}
                 </DropdownMenuItem>
+                {isAdmin && (
+                  <DropdownMenuItem onClick={togglePrivacyMode} className="text-xs">
+                    {isPrivacyMode ? <Eye className="mr-2 h-3.5 w-3.5" /> : <EyeOff className="mr-2 h-3.5 w-3.5" />}
+                    {isPrivacyMode ? "Mostrar Dados" : "Ocultar Dados"}
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuItem className="text-xs">
                   <KeyRound className="mr-2 h-3.5 w-3.5" />
                   Alterar Senha

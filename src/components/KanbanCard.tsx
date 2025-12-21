@@ -12,6 +12,7 @@ import { ROLE_LABELS } from "@/lib/roleLabels";
 import { cn } from "@/lib/utils";
 import { getSenderById } from "@/lib/senderOptions";
 import { useVisualMode } from "@/hooks/useVisualMode";
+import { usePrivacyMode } from "@/hooks/usePrivacyMode";
 // Configuração de áreas de negócio
 const BUSINESS_AREA_CONFIG: Record<string, { label: string; icon: typeof Wrench; className: string }> = {
   ssm: { 
@@ -56,6 +57,7 @@ export const KanbanCard = ({
   const [clickStart, setClickStart] = useState<number>(0);
   const { getPhaseInfo } = usePhaseInfo();
   const { isMinimal } = useVisualMode();
+  const { maskText } = usePrivacyMode();
   const phaseInfo = getPhaseInfo(order.status);
   
   const {
@@ -224,7 +226,7 @@ export const KanbanCard = ({
           <TooltipContent side="right" className="max-w-xs">
             <div className="space-y-1 text-xs">
               <p className="font-bold">#{order.orderNumber}</p>
-              <p><span className="text-muted-foreground">Cliente:</span> {order.client}</p>
+              <p><span className="text-muted-foreground">Cliente:</span> {maskText(order.client, 'name')}</p>
               <p><span className="text-muted-foreground">Prazo:</span> {new Date(order.deliveryDeadline).toLocaleDateString("pt-BR")}</p>
               <p><span className="text-muted-foreground">Itens:</span> {order.items?.length || 0}</p>
               <p><span className="text-muted-foreground">Prioridade:</span> {getPriorityLabel(order.priority)}</p>
@@ -329,7 +331,7 @@ export const KanbanCard = ({
           
           {/* Line 2: Client truncated */}
           <p className="text-[9px] text-muted-foreground line-clamp-1 mt-0.5">
-            {order.client} • {order.items?.length || 0} itens
+            {maskText(order.client, 'name')} • {order.items?.length || 0} itens
           </p>
         </Card>
       </div>
@@ -419,8 +421,8 @@ export const KanbanCard = ({
 
         {/* Line 2: Client + Items count + Source indicators */}
         <div className="flex items-center gap-1 mt-0.5 text-[10px]">
-          <span className="text-muted-foreground truncate flex-1" title={order.client}>
-            {order.client}
+          <span className="text-muted-foreground truncate flex-1" title={maskText(order.client, 'name')}>
+            {maskText(order.client, 'name')}
           </span>
           <span className="text-muted-foreground flex-shrink-0">
             • {order.items?.length || 1} {(order.items?.length || 1) === 1 ? 'item' : 'itens'}
