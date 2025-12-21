@@ -35,7 +35,7 @@ const BUSINESS_AREA_CONFIG: Record<string, { label: string; icon: typeof Wrench;
     className: 'bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-950/50 dark:text-orange-300 dark:border-orange-800' 
   }
 };
-export type CardViewMode = "full" | "compact";
+export type CardViewMode = "full" | "compact" | "micro";
 
 interface KanbanCardProps {
   order: Order;
@@ -175,6 +175,66 @@ export const KanbanCard = ({
     i => i.item_status === 'purchase_required' || i.item_status === 'purchase_requested'
   ).length || 0;
   
+  // Micro view rendering (TV/Dashboard mode)
+  if (viewMode === "micro") {
+    const getPriorityColor = () => {
+      if (isMinimal) return "bg-muted-foreground";
+      switch (order.priority) {
+        case "high": return "bg-priority-high";
+        case "medium": return "bg-priority-medium";
+        case "low": return "bg-priority-low";
+        default: return "bg-muted-foreground";
+      }
+    };
+
+    return (
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div ref={setNodeRef} style={style} className={isDragging ? "dragging" : ""}>
+              <Card 
+                className={cn(
+                  "kanban-card kanban-card-micro p-1 flex items-center gap-1.5 cursor-pointer transition-all h-7",
+                  isDragging ? 'opacity-50' : 'hover:bg-accent',
+                  isAnimating && 'animate-card-pop-in'
+                )}
+                onClick={handleCardClick}
+                onMouseDown={() => setClickStart(Date.now())}
+              >
+                {/* Priority indicator */}
+                <div className={cn("w-2 h-2 rounded-full flex-shrink-0", getPriorityColor())} />
+                
+                {/* Order number */}
+                <span className="font-bold text-[10px] flex-shrink-0">
+                  #{order.orderNumber.slice(-4)}
+                </span>
+                
+                {/* Days indicator */}
+                <span className={cn(
+                  "text-[9px] font-medium ml-auto flex-shrink-0",
+                  daysRemaining < 0 ? "text-destructive" : 
+                  daysRemaining <= 2 ? "text-priority-medium" : 
+                  "text-muted-foreground"
+                )}>
+                  {daysRemaining < 0 ? `${Math.abs(daysRemaining)}↓` : daysRemaining === 0 ? "•" : `${daysRemaining}d`}
+                </span>
+              </Card>
+            </div>
+          </TooltipTrigger>
+          <TooltipContent side="right" className="max-w-xs">
+            <div className="space-y-1 text-xs">
+              <p className="font-bold">#{order.orderNumber}</p>
+              <p><span className="text-muted-foreground">Cliente:</span> {order.client}</p>
+              <p><span className="text-muted-foreground">Prazo:</span> {new Date(order.deliveryDeadline).toLocaleDateString("pt-BR")}</p>
+              <p><span className="text-muted-foreground">Itens:</span> {order.items?.length || 0}</p>
+              <p><span className="text-muted-foreground">Prioridade:</span> {getPriorityLabel(order.priority)}</p>
+            </div>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    );
+  }
+
   // Compact view rendering
   if (viewMode === "compact") {
     const sourceCounts = countItemsBySource(order.items);
@@ -184,7 +244,7 @@ export const KanbanCard = ({
       <div ref={setNodeRef} style={style} className={isDragging ? "dragging" : ""}>
         <Card 
           className={cn(
-            "relative kanban-card p-1.5 transition-all duration-200",
+            "relative kanban-card kanban-card-compact p-1.5 transition-all duration-200",
             !isEcommerce && !isMinimal && getPriorityClass(order.priority),
             isMinimal && "border-l border-l-border",
             isDragging ? 'cursor-grabbing opacity-50 scale-105 shadow-2xl' : 'cursor-pointer hover:shadow-md hover:scale-[1.01]',
