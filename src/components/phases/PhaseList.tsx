@@ -16,16 +16,17 @@ import {
 } from "@dnd-kit/sortable";
 import { PhaseCard } from "./PhaseCard";
 import { EditPhaseDialog } from "./EditPhaseDialog";
-import type { PhaseConfig } from "@/pages/PhaseSettings";
+import type { PhaseConfig, UserByRole } from "@/pages/PhaseSettings";
 
 interface PhaseListProps {
   phases: PhaseConfig[];
+  usersByRole: Record<string, UserByRole[]>;
   onReorder: (phases: PhaseConfig[]) => void;
   onUpdate: (phase: PhaseConfig) => void;
   onDelete: (phaseId: string) => void;
 }
 
-export function PhaseList({ phases, onReorder, onUpdate, onDelete }: PhaseListProps) {
+export function PhaseList({ phases, usersByRole, onReorder, onUpdate, onDelete }: PhaseListProps) {
   const [editingPhase, setEditingPhase] = useState<PhaseConfig | null>(null);
 
   const sensors = useSensors(
@@ -63,6 +64,7 @@ export function PhaseList({ phases, onReorder, onUpdate, onDelete }: PhaseListPr
                 key={phase.id}
                 phase={phase}
                 index={index}
+                users={phase.responsible_role ? usersByRole[phase.responsible_role] || [] : []}
                 onEdit={() => setEditingPhase(phase)}
                 onDelete={() => onDelete(phase.id)}
               />
@@ -79,6 +81,7 @@ export function PhaseList({ phases, onReorder, onUpdate, onDelete }: PhaseListPr
           onUpdate(updated);
           setEditingPhase(null);
         }}
+        usersByRole={usersByRole}
       />
     </>
   );
