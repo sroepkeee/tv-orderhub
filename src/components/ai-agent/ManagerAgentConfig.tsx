@@ -25,12 +25,16 @@ const MANAGER_COMMANDS = [
   { command: 'status [número]', description: 'Consultar status de um pedido', icon: Package },
   { command: 'métricas', description: 'Ver dashboard de performance', icon: BarChart3 },
   { command: 'atrasados', description: 'Listar pedidos atrasados', icon: AlertTriangle },
-  { command: 'rateio [código]', description: 'Consultar projeto de rateio', icon: FileText },
-  { command: 'volumes [número]', description: 'Ver volumes do pedido', icon: Truck },
-  { command: 'cotações [número]', description: 'Ver cotações de frete', icon: TrendingUp },
-  { command: 'histórico [número]', description: 'Ver timeline de alterações', icon: History },
+  { command: 'risco semana', description: 'Previsão de atrasos 7d', icon: AlertTriangle },
+  { command: 'valor por fase', description: 'Distribuição financeira', icon: TrendingUp },
+  { command: 'lead time', description: 'Tempo médio de ciclo', icon: Clock },
+  { command: 'top clientes', description: 'Ranking por valor', icon: TrendingUp },
+  { command: 'capacidade', description: 'Carga vs capacidade', icon: BarChart3 },
   { command: 'gargalos', description: 'Identificar bottlenecks', icon: Clock },
   { command: 'tendência', description: 'Comparativo semanal', icon: TrendingUp },
+  { command: 'itens críticos', description: 'Importados/urgentes', icon: AlertTriangle },
+  { command: 'performance transportadora', description: 'Ranking carriers', icon: Truck },
+  { command: 'custo frete', description: 'Análise de custos', icon: FileText },
 ];
 
 const DEFAULT_ALERT_CONFIG = {

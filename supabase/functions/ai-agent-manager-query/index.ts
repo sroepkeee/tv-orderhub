@@ -9,7 +9,11 @@ interface QueryIntent {
   type: 'order_status' | 'daily_summary' | 'delayed_orders' | 'orders_by_phase' | 'top_orders' | 
         'search_customer' | 'help' | 'general' | 'rateio' | 'volumes' | 'cotacoes' | 
         'historico' | 'anexos' | 'metricas' | 'tendencia' | 'gargalos' | 'transportadora' | 'alertas' |
-        'item_details' | 'overdue_items' | 'stuck_items';
+        'item_details' | 'overdue_items' | 'stuck_items' |
+        // Novos comandos avançados
+        'value_by_phase' | 'lead_time' | 'top_customers' | 'risk_forecast' | 
+        'capacity_analysis' | 'carrier_performance' | 'freight_cost' | 'destination_analysis' |
+        'critical_items' | 'pending_materials' | 'weekend_deliveries';
   params: Record<string, any>;
 }
 
@@ -61,7 +65,75 @@ function detectManagerIntent(message: string): QueryIntent {
   const correctedMessage = fuzzyMatch(message);
   const messageLower = correctedMessage.toLowerCase().trim();
 
-  // ===================== NOVOS COMANDOS DE ITENS =====================
+  // ===================== COMANDOS AVANÇADOS DE ANÁLISE =====================
+  
+  // Valor por fase
+  if (messageLower.includes('valor por fase') || messageLower.includes('valor fase') || 
+      messageLower.includes('distribuição valor') || messageLower.includes('value by phase')) {
+    return { type: 'value_by_phase', params: {} };
+  }
+
+  // Lead time
+  if (messageLower.includes('lead time') || messageLower.includes('tempo ciclo') || 
+      messageLower.includes('tempo médio') || messageLower.includes('cycle time')) {
+    return { type: 'lead_time', params: {} };
+  }
+
+  // Top clientes
+  if (messageLower.includes('top clientes') || messageLower.includes('maiores clientes') || 
+      messageLower.includes('ranking clientes') || messageLower.includes('clientes valor')) {
+    return { type: 'top_customers', params: { limit: 10 } };
+  }
+
+  // Risco semana / previsão
+  if (messageLower.includes('risco semana') || messageLower.includes('previsão atraso') || 
+      messageLower.includes('risk forecast') || messageLower.includes('vão atrasar')) {
+    return { type: 'risk_forecast', params: {} };
+  }
+
+  // Capacidade
+  if (messageLower.includes('capacidade') || messageLower.includes('carga fase') || 
+      messageLower.includes('capacity') || messageLower.includes('sobrecarga')) {
+    return { type: 'capacity_analysis', params: {} };
+  }
+
+  // Performance transportadoras
+  if (messageLower.includes('performance transportadora') || messageLower.includes('ranking transportadora') ||
+      messageLower.includes('melhor transportadora') || messageLower.includes('carrier performance')) {
+    return { type: 'carrier_performance', params: {} };
+  }
+
+  // Custo frete
+  if (messageLower.includes('custo frete') || messageLower.includes('frete médio') || 
+      messageLower.includes('freight cost') || messageLower.includes('análise frete')) {
+    return { type: 'freight_cost', params: {} };
+  }
+
+  // Destinos / geografia
+  if (messageLower.includes('destinos') || messageLower.includes('geografia') || 
+      messageLower.includes('regiões') || messageLower.includes('concentração')) {
+    return { type: 'destination_analysis', params: {} };
+  }
+
+  // Itens críticos (importados, urgentes)
+  if (messageLower.includes('itens críticos') || messageLower.includes('itens importados') || 
+      messageLower.includes('itens urgentes') || messageLower.includes('critical items')) {
+    return { type: 'critical_items', params: {} };
+  }
+
+  // Materiais pendentes
+  if (messageLower.includes('materiais pendentes') || messageLower.includes('pendente compra') || 
+      messageLower.includes('aguardando material') || messageLower.includes('pending materials')) {
+    return { type: 'pending_materials', params: {} };
+  }
+
+  // Entregas fim de semana
+  if (messageLower.includes('fim de semana') || messageLower.includes('weekend') || 
+      messageLower.includes('entrega sábado') || messageLower.includes('entrega domingo')) {
+    return { type: 'weekend_deliveries', params: {} };
+  }
+
+  // ===================== COMANDOS DE ITENS =====================
   
   // Item específico: "item 1234567" ou "código 1234567"
   const itemMatch = messageLower.match(/(?:item|código|codigo|cod)\s*#?\s*([a-zA-Z0-9\-]+)/i);
@@ -1401,6 +1473,735 @@ async function getStuckItems(supabase: any, thresholdDays: number = 5): Promise<
   return response;
 }
 
+// ==================== NOVAS FUNÇÕES DE ANÁLISE AVANÇADA ====================
+
+// Análise de valor por fase
+async function getValueByPhase(supabase: any): Promise<string> {
+  const { data: orders } = await supabase
+    .from('orders')
+    .select('id, status, order_items(total_value, unit_price, requested_quantity)')
+    .not('status', 'in', '("completed","cancelled","delivered")');
+
+  const phaseMap: Record<string, string> = {
+    'almox_ssm_pending': '📥 Almox SSM', 'almox_ssm_received': '📥 Almox SSM',
+    'order_generation_pending': '📋 Gerar Ordem', 'order_in_creation': '📋 Gerar Ordem', 'order_generated': '📋 Gerar Ordem',
+    'purchase_pending': '🛒 Compras', 'purchase_quoted': '🛒 Compras', 'purchase_ordered': '🛒 Compras',
+    'almox_general_separating': '📦 Almox Geral', 'almox_general_ready': '📦 Almox Geral',
+    'in_production': '🔧 Produção', 'separation_started': '🔧 Produção', 'awaiting_material': '🔧 Produção',
+    'awaiting_lab': '🔬 Laboratório', 'in_lab_analysis': '🔬 Laboratório',
+    'in_packaging': '📦 Embalagem', 'ready_for_shipping': '📦 Embalagem',
+    'freight_quote_requested': '💰 Cotação', 'freight_quote_received': '💰 Cotação',
+    'ready_to_invoice': '💳 À Faturar', 'pending_invoice_request': '💳 À Faturar',
+    'invoice_requested': '🧾 Faturamento', 'awaiting_invoice': '🧾 Faturamento',
+    'released_for_shipping': '📤 Expedição', 'in_expedition': '📤 Expedição',
+    'in_transit': '🚚 Trânsito', 'collected': '🚚 Trânsito',
+  };
+
+  const calcOrderValue = (order: any) => {
+    return (order.order_items || []).reduce((sum: number, item: any) => {
+      const itemValue = item.total_value || (item.unit_price * item.requested_quantity) || 0;
+      return sum + Number(itemValue);
+    }, 0);
+  };
+
+  const phaseValues: Record<string, { count: number; value: number }> = {};
+  let totalValue = 0;
+
+  (orders || []).forEach((order: any) => {
+    const phase = phaseMap[order.status] || '📋 Outros';
+    const value = calcOrderValue(order);
+    totalValue += value;
+    
+    if (!phaseValues[phase]) phaseValues[phase] = { count: 0, value: 0 };
+    phaseValues[phase].count++;
+    phaseValues[phase].value += value;
+  });
+
+  const sorted = Object.entries(phaseValues).sort((a, b) => b[1].value - a[1].value);
+
+  let response = `💰 *Valor por Fase*
+━━━━━━━━━━━━━━━━━━
+💼 Total em Produção: *R$ ${totalValue.toLocaleString('pt-BR', { minimumFractionDigits: 0 })}*
+📦 Pedidos Ativos: ${(orders || []).length}
+
+*Distribuição:*`;
+
+  sorted.forEach(([phase, data]) => {
+    const percent = totalValue > 0 ? Math.round((data.value / totalValue) * 100) : 0;
+    response += `\n${phase}: R$ ${data.value.toLocaleString('pt-BR', { minimumFractionDigits: 0 })} (${percent}%)
+   └ ${data.count} pedidos`;
+  });
+
+  return response;
+}
+
+// Análise de lead time
+async function getLeadTimeAnalysis(supabase: any): Promise<string> {
+  const today = new Date();
+
+  const { data: completedOrders } = await supabase
+    .from('orders')
+    .select('id, created_at, updated_at, order_type, status')
+    .in('status', ['completed', 'delivered'])
+    .gte('updated_at', new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString())
+    .limit(100);
+
+  if (!completedOrders || completedOrders.length === 0) {
+    return `⏱️ *Análise de Lead Time*
+━━━━━━━━━━━━━━━━━━
+_Sem pedidos concluídos nos últimos 30 dias para análise._`;
+  }
+
+  const leadTimes: number[] = [];
+  const byType: Record<string, number[]> = {};
+
+  completedOrders.forEach((order: any) => {
+    const created = new Date(order.created_at);
+    const completed = new Date(order.updated_at);
+    const days = Math.ceil((completed.getTime() - created.getTime()) / (1000 * 60 * 60 * 24));
+    
+    leadTimes.push(days);
+    
+    const type = order.order_type || 'standard';
+    if (!byType[type]) byType[type] = [];
+    byType[type].push(days);
+  });
+
+  const avgDays = Math.round(leadTimes.reduce((a, b) => a + b, 0) / leadTimes.length);
+  const sortedLT = [...leadTimes].sort((a, b) => a - b);
+  const medianDays = sortedLT[Math.floor(sortedLT.length / 2)];
+  const minDays = Math.min(...leadTimes);
+  const maxDays = Math.max(...leadTimes);
+
+  let response = `⏱️ *Análise de Lead Time (30 dias)*
+━━━━━━━━━━━━━━━━━━
+📊 Amostra: ${completedOrders.length} pedidos concluídos
+
+📈 *Estatísticas Gerais:*
+• Média: *${avgDays} dias*
+• Mediana: ${medianDays} dias
+• Mínimo: ${minDays} dias
+• Máximo: ${maxDays} dias
+
+📦 *Por Tipo de Pedido:*`;
+
+  Object.entries(byType).forEach(([type, times]) => {
+    const avg = Math.round(times.reduce((a, b) => a + b, 0) / times.length);
+    response += `\n• ${type}: ${avg} dias (${times.length} pedidos)`;
+  });
+
+  // Avaliar performance
+  const targetDays = 10; // SLA target
+  const onTarget = leadTimes.filter(d => d <= targetDays).length;
+  const onTargetRate = Math.round((onTarget / leadTimes.length) * 100);
+
+  response += `\n\n🎯 *Performance vs Meta (${targetDays}d):*
+• Taxa de cumprimento: ${onTargetRate}%
+• ${onTarget}/${leadTimes.length} pedidos no prazo`;
+
+  return response;
+}
+
+// Top clientes por valor
+async function getTopCustomers(supabase: any, limit: number = 10): Promise<string> {
+  const { data: orders } = await supabase
+    .from('orders')
+    .select('id, customer_name, status, order_items(total_value, unit_price, requested_quantity)')
+    .not('status', 'in', '("completed","cancelled","delivered")');
+
+  const calcOrderValue = (order: any) => {
+    return (order.order_items || []).reduce((sum: number, item: any) => {
+      const itemValue = item.total_value || (item.unit_price * item.requested_quantity) || 0;
+      return sum + Number(itemValue);
+    }, 0);
+  };
+
+  const customerData: Record<string, { count: number; value: number; delayed: number }> = {};
+  const today = new Date();
+
+  (orders || []).forEach((order: any) => {
+    const customer = order.customer_name || 'N/A';
+    const value = calcOrderValue(order);
+    
+    if (!customerData[customer]) {
+      customerData[customer] = { count: 0, value: 0, delayed: 0 };
+    }
+    customerData[customer].count++;
+    customerData[customer].value += value;
+  });
+
+  const sorted = Object.entries(customerData)
+    .sort((a, b) => b[1].value - a[1].value)
+    .slice(0, limit);
+
+  const totalValue = sorted.reduce((sum, [, data]) => sum + data.value, 0);
+
+  let response = `👥 *Top ${limit} Clientes (por Valor)*
+━━━━━━━━━━━━━━━━━━
+💰 Valor Total: R$ ${totalValue.toLocaleString('pt-BR', { minimumFractionDigits: 0 })}`;
+
+  sorted.forEach(([customer, data], idx) => {
+    const percent = totalValue > 0 ? Math.round((data.value / totalValue) * 100) : 0;
+    response += `\n
+${idx + 1}. *${customer.substring(0, 25)}*
+   💰 R$ ${data.value.toLocaleString('pt-BR', { minimumFractionDigits: 0 })} (${percent}%)
+   📦 ${data.count} pedidos ativos`;
+  });
+
+  return response;
+}
+
+// Previsão de risco para próxima semana
+async function getRiskForecast(supabase: any): Promise<string> {
+  const today = new Date();
+  const nextWeek = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
+
+  const { data: orders } = await supabase
+    .from('orders')
+    .select('id, order_number, customer_name, status, delivery_date, updated_at, order_items(total_value, unit_price, requested_quantity)')
+    .not('status', 'in', '("completed","cancelled","delivered")')
+    .lte('delivery_date', nextWeek.toISOString().split('T')[0])
+    .order('delivery_date', { ascending: true });
+
+  const calcOrderValue = (order: any) => {
+    return (order.order_items || []).reduce((sum: number, item: any) => {
+      const itemValue = item.total_value || (item.unit_price * item.requested_quantity) || 0;
+      return sum + Number(itemValue);
+    }, 0);
+  };
+
+  // Fases iniciais/médias que indicam risco
+  const riskyStatuses = [
+    'almox_ssm_pending', 'almox_ssm_received', 'order_generation_pending', 'order_in_creation',
+    'purchase_pending', 'purchase_quoted', 'in_production', 'awaiting_material'
+  ];
+
+  const atRisk: any[] = [];
+  let totalRiskValue = 0;
+
+  (orders || []).forEach((order: any) => {
+    const deliveryDate = new Date(order.delivery_date);
+    const daysUntil = Math.ceil((deliveryDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+    const updatedAt = new Date(order.updated_at);
+    const daysInPhase = Math.ceil((today.getTime() - updatedAt.getTime()) / (1000 * 60 * 60 * 24));
+    
+    // Critérios de risco:
+    // 1. Prazo < 3 dias e status inicial
+    // 2. Parado na fase > 3 dias com prazo < 5 dias
+    // 3. Já atrasado
+    
+    const isRisky = 
+      (daysUntil < 3 && riskyStatuses.includes(order.status)) ||
+      (daysInPhase > 3 && daysUntil < 5) ||
+      (daysUntil < 0);
+    
+    if (isRisky) {
+      const value = calcOrderValue(order);
+      totalRiskValue += value;
+      atRisk.push({
+        ...order,
+        daysUntil,
+        daysInPhase,
+        value,
+        riskLevel: daysUntil < 0 ? 'ATRASADO' : daysUntil < 2 ? 'CRÍTICO' : 'ALTO'
+      });
+    }
+  });
+
+  if (atRisk.length === 0) {
+    return `🔮 *Previsão de Risco (7 dias)*
+━━━━━━━━━━━━━━━━━━
+
+✅ Nenhum pedido com risco elevado de atraso!
+Todos os pedidos estão progredindo adequadamente.`;
+  }
+
+  atRisk.sort((a, b) => a.daysUntil - b.daysUntil);
+
+  let response = `🔮 *Previsão de Risco (7 dias)*
+━━━━━━━━━━━━━━━━━━
+⚠️ *${atRisk.length} pedidos com risco de atraso*
+💰 Valor em risco: R$ ${totalRiskValue.toLocaleString('pt-BR', { minimumFractionDigits: 0 })}
+
+*Pedidos críticos:*`;
+
+  atRisk.slice(0, 8).forEach((order, idx) => {
+    const icon = order.riskLevel === 'ATRASADO' ? '🔴' : order.riskLevel === 'CRÍTICO' ? '🟡' : '🟠';
+    response += `\n
+${idx + 1}. ${icon} *#${order.order_number}* [${order.riskLevel}]
+   👤 ${order.customer_name.substring(0, 20)}
+   📍 ${order.status} (${order.daysInPhase}d na fase)
+   📅 ${order.daysUntil < 0 ? `${Math.abs(order.daysUntil)}d atrasado` : `Vence em ${order.daysUntil}d`}
+   💰 R$ ${order.value.toLocaleString('pt-BR', { minimumFractionDigits: 0 })}`;
+  });
+
+  if (atRisk.length > 8) {
+    response += `\n\n... e mais ${atRisk.length - 8} pedidos em risco`;
+  }
+
+  response += `\n\n⚡ _Ação preventiva recomendada!_`;
+
+  return response;
+}
+
+// Análise de capacidade por fase
+async function getCapacityAnalysis(supabase: any): Promise<string> {
+  const today = new Date();
+
+  const { data: orders } = await supabase
+    .from('orders')
+    .select('id, status, updated_at')
+    .not('status', 'in', '("completed","cancelled","delivered")');
+
+  const phaseMap: Record<string, string> = {
+    'in_production': 'Produção', 'separation_started': 'Produção', 'awaiting_material': 'Produção',
+    'awaiting_lab': 'Laboratório', 'in_lab_analysis': 'Laboratório',
+    'in_packaging': 'Embalagem', 'ready_for_shipping': 'Embalagem',
+    'invoice_requested': 'Faturamento', 'awaiting_invoice': 'Faturamento',
+    'released_for_shipping': 'Expedição', 'in_expedition': 'Expedição',
+  };
+
+  // Capacidades históricas (baseado em dados típicos)
+  const capacityLimits: Record<string, number> = {
+    'Produção': 25,
+    'Laboratório': 10,
+    'Embalagem': 15,
+    'Faturamento': 20,
+    'Expedição': 15,
+  };
+
+  const phaseLoad: Record<string, { count: number; avgDays: number }> = {};
+
+  (orders || []).forEach((order: any) => {
+    const phase = phaseMap[order.status];
+    if (!phase) return;
+    
+    const updatedAt = new Date(order.updated_at);
+    const daysInPhase = Math.ceil((today.getTime() - updatedAt.getTime()) / (1000 * 60 * 60 * 24));
+    
+    if (!phaseLoad[phase]) phaseLoad[phase] = { count: 0, avgDays: 0 };
+    phaseLoad[phase].count++;
+    phaseLoad[phase].avgDays += daysInPhase;
+  });
+
+  // Calcular médias
+  Object.keys(phaseLoad).forEach(phase => {
+    if (phaseLoad[phase].count > 0) {
+      phaseLoad[phase].avgDays = Math.round(phaseLoad[phase].avgDays / phaseLoad[phase].count);
+    }
+  });
+
+  let response = `📊 *Análise de Capacidade*
+━━━━━━━━━━━━━━━━━━
+
+*Carga Atual por Fase:*`;
+
+  let hasOverload = false;
+
+  Object.entries(capacityLimits).forEach(([phase, limit]) => {
+    const load = phaseLoad[phase] || { count: 0, avgDays: 0 };
+    const utilizationPercent = Math.round((load.count / limit) * 100);
+    
+    let icon = '🟢';
+    let status = 'Normal';
+    if (utilizationPercent > 100) {
+      icon = '🔴';
+      status = 'SOBRECARGA';
+      hasOverload = true;
+    } else if (utilizationPercent > 80) {
+      icon = '🟡';
+      status = 'Atenção';
+    }
+
+    response += `\n
+${icon} *${phase}*
+   📦 ${load.count}/${limit} (${utilizationPercent}%) - ${status}
+   ⏱️ Tempo médio: ${load.avgDays}d`;
+  });
+
+  if (hasOverload) {
+    response += `\n\n⚠️ _Fases com sobrecarga identificadas!_
+_Considere realocar recursos ou priorizar._`;
+  } else {
+    response += `\n\n✅ _Todas as fases com capacidade adequada._`;
+  }
+
+  return response;
+}
+
+// Performance de transportadoras
+async function getCarrierPerformanceAnalysis(supabase: any): Promise<string> {
+  const { data: quotes } = await supabase
+    .from('freight_quotes')
+    .select(`
+      id, status, created_at, carriers(name),
+      freight_quote_responses(freight_value, delivery_time_days, is_selected)
+    `)
+    .gte('created_at', new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString())
+    .limit(200);
+
+  const carrierStats: Record<string, {
+    totalQuotes: number;
+    responded: number;
+    selected: number;
+    avgValue: number;
+    avgDays: number;
+    totalValue: number;
+  }> = {};
+
+  (quotes || []).forEach((quote: any) => {
+    const carrierName = quote.carriers?.name || 'Desconhecida';
+    
+    if (!carrierStats[carrierName]) {
+      carrierStats[carrierName] = {
+        totalQuotes: 0, responded: 0, selected: 0,
+        avgValue: 0, avgDays: 0, totalValue: 0
+      };
+    }
+    
+    carrierStats[carrierName].totalQuotes++;
+    
+    const responses = quote.freight_quote_responses || [];
+    if (responses.length > 0) {
+      carrierStats[carrierName].responded++;
+      
+      responses.forEach((r: any) => {
+        if (r.is_selected) {
+          carrierStats[carrierName].selected++;
+          carrierStats[carrierName].totalValue += Number(r.freight_value) || 0;
+        }
+      });
+    }
+  });
+
+  // Calcular médias
+  Object.keys(carrierStats).forEach(carrier => {
+    const stats = carrierStats[carrier];
+    if (stats.selected > 0) {
+      stats.avgValue = stats.totalValue / stats.selected;
+    }
+  });
+
+  const sorted = Object.entries(carrierStats)
+    .filter(([, stats]) => stats.totalQuotes >= 3)
+    .sort((a, b) => b[1].selected - a[1].selected)
+    .slice(0, 10);
+
+  if (sorted.length === 0) {
+    return `🚛 *Performance de Transportadoras*
+━━━━━━━━━━━━━━━━━━
+_Dados insuficientes para análise (últimos 60 dias)._`;
+  }
+
+  let response = `🚛 *Performance de Transportadoras (60d)*
+━━━━━━━━━━━━━━━━━━`;
+
+  sorted.forEach(([carrier, stats], idx) => {
+    const responseRate = stats.totalQuotes > 0 ? Math.round((stats.responded / stats.totalQuotes) * 100) : 0;
+    const winRate = stats.responded > 0 ? Math.round((stats.selected / stats.responded) * 100) : 0;
+    
+    const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `${idx + 1}.`;
+    
+    response += `\n
+${medal} *${carrier.substring(0, 20)}*
+   📊 Cotações: ${stats.totalQuotes} | Taxa resposta: ${responseRate}%
+   🏆 Selecionada: ${stats.selected}x (${winRate}% win rate)`;
+    
+    if (stats.avgValue > 0) {
+      response += `\n   💰 Média: R$ ${stats.avgValue.toLocaleString('pt-BR', { minimumFractionDigits: 0 })}`;
+    }
+  });
+
+  return response;
+}
+
+// Análise de custo de frete
+async function getFreightCostAnalysis(supabase: any): Promise<string> {
+  const { data: responses } = await supabase
+    .from('freight_quote_responses')
+    .select(`
+      freight_value, delivery_time_days, is_selected, created_at,
+      freight_quotes(orders(destination_state, destination_city))
+    `)
+    .eq('is_selected', true)
+    .gte('created_at', new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString())
+    .limit(200);
+
+  if (!responses || responses.length === 0) {
+    return `💰 *Análise de Custo de Frete*
+━━━━━━━━━━━━━━━━━━
+_Sem dados de frete aprovados nos últimos 90 dias._`;
+  }
+
+  const values: number[] = responses.map((r: any) => Number(r.freight_value) || 0).filter((v: number) => v > 0);
+  const totalFreight = values.reduce((a: number, b: number) => a + b, 0);
+  const avgFreight = Math.round(totalFreight / values.length);
+  const sortedValues = [...values].sort((a, b) => a - b);
+  const medianFreight = sortedValues[Math.floor(sortedValues.length / 2)];
+  const minFreight = Math.min(...values);
+  const maxFreight = Math.max(...values);
+
+  // Por estado
+  const byState: Record<string, { count: number; total: number }> = {};
+  responses.forEach((r: any) => {
+    const state = r.freight_quotes?.orders?.destination_state || 'N/A';
+    const value = Number(r.freight_value) || 0;
+    
+    if (!byState[state]) byState[state] = { count: 0, total: 0 };
+    byState[state].count++;
+    byState[state].total += value;
+  });
+
+  let response = `💰 *Análise de Custo de Frete (90d)*
+━━━━━━━━━━━━━━━━━━
+📊 Amostra: ${values.length} fretes aprovados
+💵 Total gasto: R$ ${totalFreight.toLocaleString('pt-BR', { minimumFractionDigits: 0 })}
+
+📈 *Estatísticas:*
+• Média: R$ ${avgFreight.toLocaleString('pt-BR')}
+• Mediana: R$ ${medianFreight.toLocaleString('pt-BR')}
+• Mínimo: R$ ${minFreight.toLocaleString('pt-BR')}
+• Máximo: R$ ${maxFreight.toLocaleString('pt-BR')}
+
+🗺️ *Por Estado (Top 5):*`;
+
+  const sortedStates = Object.entries(byState)
+    .sort((a, b) => b[1].total - a[1].total)
+    .slice(0, 5);
+
+  sortedStates.forEach(([state, data]) => {
+    const avg = Math.round(data.total / data.count);
+    response += `\n• ${state}: R$ ${avg.toLocaleString('pt-BR')} (${data.count} envios)`;
+  });
+
+  return response;
+}
+
+// Análise de destinos
+async function getDestinationAnalysis(supabase: any): Promise<string> {
+  const { data: orders } = await supabase
+    .from('orders')
+    .select('id, destination_state, destination_city, order_items(total_value, unit_price, requested_quantity)')
+    .not('status', 'in', '("completed","cancelled","delivered")');
+
+  const calcOrderValue = (order: any) => {
+    return (order.order_items || []).reduce((sum: number, item: any) => {
+      const itemValue = item.total_value || (item.unit_price * item.requested_quantity) || 0;
+      return sum + Number(itemValue);
+    }, 0);
+  };
+
+  const byState: Record<string, { count: number; value: number }> = {};
+  const byCity: Record<string, { count: number; value: number; state: string }> = {};
+
+  (orders || []).forEach((order: any) => {
+    const state = order.destination_state || 'N/A';
+    const city = order.destination_city || 'N/A';
+    const value = calcOrderValue(order);
+
+    if (!byState[state]) byState[state] = { count: 0, value: 0 };
+    byState[state].count++;
+    byState[state].value += value;
+
+    const cityKey = `${city}/${state}`;
+    if (!byCity[cityKey]) byCity[cityKey] = { count: 0, value: 0, state };
+    byCity[cityKey].count++;
+    byCity[cityKey].value += value;
+  });
+
+  const sortedStates = Object.entries(byState)
+    .sort((a, b) => b[1].count - a[1].count)
+    .slice(0, 8);
+
+  const sortedCities = Object.entries(byCity)
+    .sort((a, b) => b[1].count - a[1].count)
+    .slice(0, 5);
+
+  const totalOrders = (orders || []).length;
+  const totalValue = Object.values(byState).reduce((sum, s) => sum + s.value, 0);
+
+  let response = `🗺️ *Análise de Destinos*
+━━━━━━━━━━━━━━━━━━
+📦 Pedidos Ativos: ${totalOrders}
+💰 Valor Total: R$ ${totalValue.toLocaleString('pt-BR', { minimumFractionDigits: 0 })}
+
+📍 *Por Estado:*`;
+
+  sortedStates.forEach(([state, data]) => {
+    const percent = totalOrders > 0 ? Math.round((data.count / totalOrders) * 100) : 0;
+    response += `\n• ${state}: ${data.count} (${percent}%) - R$ ${data.value.toLocaleString('pt-BR', { minimumFractionDigits: 0 })}`;
+  });
+
+  response += `\n\n🏙️ *Top Cidades:*`;
+  sortedCities.forEach(([city, data]) => {
+    response += `\n• ${city}: ${data.count} pedidos`;
+  });
+
+  return response;
+}
+
+// Itens críticos (importados, urgentes)
+async function getCriticalItems(supabase: any): Promise<string> {
+  const today = new Date();
+  const threeDaysAhead = new Date(today.getTime() + 3 * 24 * 60 * 60 * 1000);
+
+  const { data: items } = await supabase
+    .from('order_items')
+    .select(`
+      id, item_code, item_description, item_source_type, sla_deadline, 
+      is_imported, import_lead_time_days, current_phase, unit_price, total_value, requested_quantity,
+      orders(order_number, customer_name)
+    `)
+    .or('is_imported.eq.true,item_source_type.eq.out_of_stock')
+    .not('item_status', 'in', '("completed","delivered","cancelled")')
+    .lte('sla_deadline', threeDaysAhead.toISOString().split('T')[0])
+    .order('sla_deadline', { ascending: true })
+    .limit(20);
+
+  if (!items || items.length === 0) {
+    return `🚨 *Itens Críticos*
+━━━━━━━━━━━━━━━━━━
+
+✅ Nenhum item importado/compra com SLA crítico!`;
+  }
+
+  let totalValue = 0;
+  
+  let response = `🚨 *Itens Críticos (Importados/Compra)*
+━━━━━━━━━━━━━━━━━━
+⚠️ ${items.length} itens com SLA ≤ 3 dias`;
+
+  items.slice(0, 10).forEach((item: any, idx: number) => {
+    const itemValue = item.total_value || (item.unit_price * item.requested_quantity) || 0;
+    totalValue += Number(itemValue);
+    
+    const slaDate = new Date(item.sla_deadline);
+    const daysToSla = Math.ceil((slaDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 1000));
+    const icon = daysToSla < 0 ? '🔴' : daysToSla === 0 ? '🟡' : '🟠';
+    const source = item.is_imported ? '🌍 Importado' : '🛒 Compra';
+    
+    response += `\n
+${idx + 1}. ${icon} *${item.item_code}*
+   ${source} | Pedido: #${item.orders?.order_number || 'N/A'}
+   ⏱️ SLA: ${daysToSla < 0 ? `${Math.abs(daysToSla)}d vencido` : `${daysToSla}d`}
+   💰 R$ ${Number(itemValue).toLocaleString('pt-BR')}`;
+  });
+
+  response += `\n\n💰 *Valor em risco:* R$ ${totalValue.toLocaleString('pt-BR', { minimumFractionDigits: 0 })}`;
+
+  return response;
+}
+
+// Materiais pendentes
+async function getPendingMaterials(supabase: any): Promise<string> {
+  const today = new Date();
+
+  const { data: items } = await supabase
+    .from('order_items')
+    .select(`
+      id, item_code, item_description, item_source_type, created_at, current_phase,
+      unit_price, total_value, requested_quantity,
+      orders(order_number, customer_name, delivery_date)
+    `)
+    .eq('item_source_type', 'out_of_stock')
+    .not('item_status', 'in', '("completed","delivered","cancelled")')
+    .order('created_at', { ascending: true })
+    .limit(30);
+
+  if (!items || items.length === 0) {
+    return `📦 *Materiais Pendentes*
+━━━━━━━━━━━━━━━━━━
+
+✅ Nenhum item aguardando compra/material!`;
+  }
+
+  let totalValue = 0;
+
+  let response = `📦 *Materiais Pendentes de Compra*
+━━━━━━━━━━━━━━━━━━
+⚠️ ${items.length} itens aguardando material`;
+
+  items.slice(0, 10).forEach((item: any, idx: number) => {
+    const itemValue = item.total_value || (item.unit_price * item.requested_quantity) || 0;
+    totalValue += Number(itemValue);
+    
+    const createdAt = new Date(item.created_at);
+    const daysWaiting = Math.ceil((today.getTime() - createdAt.getTime()) / (1000 * 60 * 60 * 1000));
+    const deliveryDate = item.orders?.delivery_date ? new Date(item.orders.delivery_date).toLocaleDateString('pt-BR') : 'N/A';
+    
+    response += `\n
+${idx + 1}. 📦 *${item.item_code}*
+   Pedido: #${item.orders?.order_number || 'N/A'}
+   ⏱️ Aguardando há ${daysWaiting}d | Entrega: ${deliveryDate}`;
+  });
+
+  response += `\n\n💰 *Valor pendente:* R$ ${totalValue.toLocaleString('pt-BR', { minimumFractionDigits: 0 })}
+📞 _Acionar fornecedores!_`;
+
+  return response;
+}
+
+// Entregas de fim de semana
+async function getWeekendDeliveries(supabase: any): Promise<string> {
+  const today = new Date();
+  const dayOfWeek = today.getDay(); // 0=Dom, 6=Sáb
+  
+  // Calcular próximo fim de semana
+  const daysUntilSaturday = (6 - dayOfWeek + 7) % 7 || 7;
+  const saturday = new Date(today.getTime() + daysUntilSaturday * 24 * 60 * 60 * 1000);
+  const sunday = new Date(saturday.getTime() + 24 * 60 * 60 * 1000);
+  
+  saturday.setHours(0, 0, 0, 0);
+  sunday.setHours(23, 59, 59, 999);
+
+  const { data: orders } = await supabase
+    .from('orders')
+    .select('id, order_number, customer_name, delivery_date, status, order_items(total_value, unit_price, requested_quantity)')
+    .not('status', 'in', '("completed","cancelled","delivered")')
+    .gte('delivery_date', saturday.toISOString().split('T')[0])
+    .lte('delivery_date', sunday.toISOString().split('T')[0]);
+
+  if (!orders || orders.length === 0) {
+    return `📅 *Entregas de Fim de Semana*
+━━━━━━━━━━━━━━━━━━
+📆 ${saturday.toLocaleDateString('pt-BR')} - ${sunday.toLocaleDateString('pt-BR')}
+
+✅ Nenhuma entrega programada para o fim de semana!`;
+  }
+
+  const calcOrderValue = (order: any) => {
+    return (order.order_items || []).reduce((sum: number, item: any) => {
+      const itemValue = item.total_value || (item.unit_price * item.requested_quantity) || 0;
+      return sum + Number(itemValue);
+    }, 0);
+  };
+
+  let totalValue = 0;
+
+  let response = `📅 *Entregas de Fim de Semana*
+━━━━━━━━━━━━━━━━━━
+📆 ${saturday.toLocaleDateString('pt-BR')} - ${sunday.toLocaleDateString('pt-BR')}
+⚠️ ${orders.length} pedidos programados`;
+
+  orders.forEach((order: any, idx: number) => {
+    const value = calcOrderValue(order);
+    totalValue += value;
+    const deliveryDate = new Date(order.delivery_date);
+    const dayName = deliveryDate.getDay() === 6 ? 'Sábado' : 'Domingo';
+    
+    response += `\n
+${idx + 1}. 📦 *#${order.order_number}*
+   👤 ${order.customer_name.substring(0, 20)}
+   📍 ${order.status} | ${dayName}
+   💰 R$ ${value.toLocaleString('pt-BR')}`;
+  });
+
+  response += `\n\n💰 *Total:* R$ ${totalValue.toLocaleString('pt-BR', { minimumFractionDigits: 0 })}
+⚠️ _Verificar disponibilidade de entrega!_`;
+
+  return response;
+}
+
 // Gerar resumo do dia
 async function getDailySummary(supabase: any): Promise<string> {
   const today = new Date();
@@ -1793,6 +2594,21 @@ function getHelpMessage(): string {
 • "item CODIGO" - Detalhes do item
 • "itens atrasados" - SLA vencido
 • "itens parados" - Travados >5 dias
+• "itens críticos" - Importados/urgentes
+• "materiais pendentes" - Aguardando compra
+
+📈 *Análise Avançada:*
+• "valor por fase" - Distribuição financeira
+• "lead time" - Tempo médio de ciclo
+• "top clientes" - Ranking por valor
+• "risco semana" - Previsão de atrasos
+• "capacidade" - Carga vs histórico
+
+🚛 *Análise Logística:*
+• "performance transportadora" - Ranking
+• "custo frete" - Análise de custos
+• "destinos" - Concentração geográfica
+• "fim de semana" - Entregas no weekend
 
 🔍 *Buscas:*
 • "resumo" - Dashboard do dia
@@ -2045,7 +2861,41 @@ Deno.serve(async (req) => {
       case 'stuck_items':
         responseMessage = await getStuckItems(supabase);
         break;
-      // ===================== FIM NOVOS COMANDOS =====================
+      // ===================== COMANDOS AVANÇADOS =====================
+      case 'value_by_phase':
+        responseMessage = await getValueByPhase(supabase);
+        break;
+      case 'lead_time':
+        responseMessage = await getLeadTimeAnalysis(supabase);
+        break;
+      case 'top_customers':
+        responseMessage = await getTopCustomers(supabase, intent.params.limit || 10);
+        break;
+      case 'risk_forecast':
+        responseMessage = await getRiskForecast(supabase);
+        break;
+      case 'capacity_analysis':
+        responseMessage = await getCapacityAnalysis(supabase);
+        break;
+      case 'carrier_performance':
+        responseMessage = await getCarrierPerformanceAnalysis(supabase);
+        break;
+      case 'freight_cost':
+        responseMessage = await getFreightCostAnalysis(supabase);
+        break;
+      case 'destination_analysis':
+        responseMessage = await getDestinationAnalysis(supabase);
+        break;
+      case 'critical_items':
+        responseMessage = await getCriticalItems(supabase);
+        break;
+      case 'pending_materials':
+        responseMessage = await getPendingMaterials(supabase);
+        break;
+      case 'weekend_deliveries':
+        responseMessage = await getWeekendDeliveries(supabase);
+        break;
+      // ===================== FIM COMANDOS =====================
       case 'help':
         responseMessage = getHelpMessage();
         break;
