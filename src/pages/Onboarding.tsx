@@ -195,6 +195,39 @@ export default function Onboarding() {
     }
   };
 
+  const handleSkip = async () => {
+    if (step === 'company') {
+      // Pular todo onboarding, ir direto pro Kanban
+      navigate('/');
+      return;
+    }
+    
+    if (step === 'phases') {
+      // Se tem nome da empresa, criar com fases padrão
+      // Se não tem, ir direto pro Kanban (pode configurar depois)
+      if (companyName.trim() && slug.trim()) {
+        setLoading(true);
+        try {
+          await supabase.rpc('create_organization_with_defaults', {
+            _org_name: companyName,
+            _slug: slug,
+            _owner_user_id: user?.id,
+            _plan: 'starter'
+          });
+          toast.success('Organização criada com fases padrão!');
+          navigate('/');
+        } catch (error: any) {
+          console.error('Error creating organization:', error);
+          toast.error('Erro ao criar organização');
+        } finally {
+          setLoading(false);
+        }
+      } else {
+        navigate('/');
+      }
+    }
+  };
+
   const createOrganization = async () => {
     if (!user) return;
     
@@ -447,9 +480,10 @@ export default function Onboarding() {
               
               <Button
                 variant="outline"
-                onClick={() => navigate('/')}
+                onClick={handleSkip}
+                disabled={loading}
               >
-                Pular
+                {step === 'phases' ? 'Pular Fases' : 'Pular'}
               </Button>
             </div>
             
