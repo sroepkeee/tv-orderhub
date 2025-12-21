@@ -8,7 +8,7 @@ import { ViewControls, SortOption, GroupOption, PhaseFilter, ViewMode, StatusFil
 import { KanbanView } from "./KanbanView";
 import { MatrixView } from "./MatrixView";
 import { ClipboardList, PackageCheck, Microscope, Boxes, Truck, CheckCircle2 } from "lucide-react";
-import { useKanbanDensity } from "@/hooks/useKanbanDensity";
+import { useKanbanDensity, KanbanDensity } from "@/hooks/useKanbanDensity";
 
 interface PriorityViewProps {
   orders: Order[];
@@ -18,6 +18,11 @@ interface PriorityViewProps {
   onCancel: (orderId: string) => void;
   onRowClick?: (order: Order) => void;
   onStatusChange: (orderId: string, newStatus: Order["status"]) => void;
+  // External control props (optional - falls back to internal state if not provided)
+  viewMode?: ViewMode;
+  kanbanDensity?: KanbanDensity;
+  onViewModeChange?: (mode: ViewMode) => void;
+  onKanbanDensityChange?: (density: KanbanDensity) => void;
 }
 
 export const PriorityView = ({ 
@@ -27,13 +32,18 @@ export const PriorityView = ({
   onApprove, 
   onCancel,
   onRowClick,
-  onStatusChange
+  onStatusChange,
+  viewMode: externalViewMode,
+  kanbanDensity: externalDensity,
+  onViewModeChange: externalOnViewModeChange,
+  onKanbanDensityChange: externalOnDensityChange,
 }: PriorityViewProps) => {
   const [sortBy, setSortBy] = React.useState<SortOption>("priority");
   const [groupBy, setGroupBy] = React.useState<GroupOption>("priority");
   const [phaseFilter, setPhaseFilter] = React.useState<PhaseFilter>("all");
   const [statusFilter, setStatusFilter] = React.useState<StatusFilter>("all");
-  const [viewMode, setViewMode] = React.useState<ViewMode>(() => {
+  // Internal state (used as fallback when external props not provided)
+  const [internalViewMode, setInternalViewMode] = React.useState<ViewMode>(() => {
     const saved = localStorage.getItem("viewMode");
     return (saved as ViewMode) || "kanban";
   });
@@ -42,9 +52,16 @@ export const PriorityView = ({
     return (saved as CardViewMode) || "full";
   });
 
+  // Use external props if provided, otherwise internal state
+  const viewMode = externalViewMode ?? internalViewMode;
+  
   const handleViewModeChange = (mode: ViewMode) => {
-    setViewMode(mode);
-    localStorage.setItem("viewMode", mode);
+    if (externalOnViewModeChange) {
+      externalOnViewModeChange(mode);
+    } else {
+      setInternalViewMode(mode);
+      localStorage.setItem("viewMode", mode);
+    }
   };
   
   const handleCardViewModeChange = (mode: CardViewMode) => {
@@ -439,14 +456,25 @@ export const PriorityView = ({
     return 15;
   }, []);
 
-  // Kanban density hook with phase count
+  // Kanban density hook with phase count (used as fallback)
   const { 
-    density, 
-    setDensity, 
+    density: internalDensity, 
+    setDensity: setInternalDensity, 
     autoDetect, 
     setAutoDetect, 
     suggestedDensity 
   } = useKanbanDensity({ phaseCount });
+
+  // Use external density if provided, otherwise internal
+  const density = externalDensity ?? internalDensity;
+  
+  const handleDensityChange = (newDensity: KanbanDensity) => {
+    if (externalOnDensityChange) {
+      externalOnDensityChange(newDensity);
+    } else {
+      setInternalDensity(newDensity);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -468,7 +496,7 @@ export const PriorityView = ({
         onStatusFilterChange={setStatusFilter}
         onViewModeChange={handleViewModeChange}
         onCardViewModeChange={handleCardViewModeChange}
-        onKanbanDensityChange={setDensity}
+        onKanbanDensityChange={handleDensityChange}
         onKanbanAutoDetectChange={setAutoDetect}
       />
       

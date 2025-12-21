@@ -2170,7 +2170,11 @@ export const Dashboard = () => {
           onRowClick={order => {
             setSelectedOrder(order);
             setShowEditDialog(true);
-          }} 
+          }}
+          viewMode={viewMode}
+          kanbanDensity={kanbanDensity}
+          onViewModeChange={setViewMode}
+          onKanbanDensityChange={setKanbanDensity}
         /> : <div className="bg-card rounded-lg border overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full">
