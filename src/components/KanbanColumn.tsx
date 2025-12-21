@@ -57,22 +57,22 @@ export const KanbanColumn = ({
   const isTV = density === "tv";
   const isCompact = density === "compact";
 
-  // Dynamic styles based on density
+  // Dynamic styles based on density - minimalist design
   const headerStyles = canDrag 
-    ? `${colorClass} border-l-4 shadow-lg` 
-    : `bg-muted/20 text-muted-foreground border-l-2 border-muted shadow-sm`;
+    ? `bg-background border-b border-border/50` 
+    : `bg-muted/10 text-muted-foreground/70 border-b border-border/30`;
   
-  const iconSize = isTV ? "h-3.5 w-3.5" : isCompact ? "h-4 w-4" : "h-5 w-5";
-  const iconOpacity = canDrag ? "opacity-100" : "opacity-60";
-  const titleOpacity = canDrag ? "opacity-100" : "opacity-70";
-  const badgeVariant = canDrag ? "default" : "secondary";
-  const pulseClass = canDrag && hasHighPriority && !isTV ? "animate-pulse-slow" : "";
-  const containerBg = canDrag ? "bg-muted/30" : "bg-muted/10";
-  const containerBorder = canDrag ? "border-l-4 border-l-primary/20" : "";
+  const iconSize = isTV ? "h-3 w-3" : isCompact ? "h-3.5 w-3.5" : "h-4 w-4";
+  const iconOpacity = canDrag ? "opacity-70" : "opacity-40";
+  const titleOpacity = canDrag ? "opacity-90" : "opacity-60";
+  const badgeVariant = canDrag ? "secondary" : "outline";
+  const pulseClass = ""; // Remove pulse animation for minimal design
+  const containerBg = "bg-background/50";
+  const containerBorder = "";
   
-  const headerHeight = isTV ? "h-7" : isCompact ? "h-9" : "h-12";
-  const headerPadding = isTV ? "p-1 px-2" : isCompact ? "p-2" : "p-3";
-  const cardGap = isTV ? "gap-1" : isCompact ? "gap-1.5" : "gap-2";
+  const headerHeight = isTV ? "h-6" : isCompact ? "h-7" : "h-8";
+  const headerPadding = isTV ? "p-1 px-1.5" : isCompact ? "p-1.5" : "p-2";
+  const cardGap = isTV ? "gap-0.5" : isCompact ? "gap-1" : "gap-1";
 
   const {
     setNodeRef,
@@ -158,32 +158,30 @@ export const KanbanColumn = ({
             )}
           </div>
           
-          {/* Badge count */}
-          <Badge 
-            variant={badgeVariant} 
+          {/* Count - text only, no badge */}
+          <span 
             className={cn(
-              "flex-shrink-0",
-              isTV ? "text-[10px] h-4 px-1.5" : "text-xs h-5 px-2"
+              "flex-shrink-0 font-mono tabular-nums text-muted-foreground/70",
+              isTV ? "text-[9px]" : "text-[10px]"
             )}
           >
             {orders.length}
-          </Badge>
+          </span>
         </div>
       </div>
 
-      {/* Cards Container */}
+      {/* Cards Container - with subtle dividers */}
       <div className={cn(
-        "kanban-cards-container flex-1 rounded-b-lg overflow-y-auto animate-fade-in transition-all duration-200",
+        "kanban-cards-container flex-1 overflow-y-auto transition-all duration-150",
         containerBg,
-        containerBorder,
-        isTV ? "p-1 space-y-1" : isCompact ? "p-1.5 space-y-1.5" : "p-2 space-y-2"
+        isTV ? "p-0.5 divide-y divide-border/20" : isCompact ? "p-1 divide-y divide-border/20" : "p-1.5 divide-y divide-border/30"
       )}>
         {orders.length === 0 ? (
           <div className={cn(
-            "text-center text-muted-foreground",
-            isTV ? "text-[10px] py-2" : "text-sm py-8"
+            "text-center text-muted-foreground/50",
+            isTV ? "text-[9px] py-2" : "text-xs py-6"
           )}>
-            {isTV ? "—" : "Nenhum pedido"}
+            {isTV ? "—" : "—"}
           </div>
         ) : (
           <>

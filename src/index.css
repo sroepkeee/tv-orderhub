@@ -534,14 +534,16 @@ All colors MUST be HSL.
     @apply bg-muted-foreground/50 rounded;
   }
 
+  /* Kanban card - minimal design */
   .kanban-card {
-    @apply transition-all duration-200;
-    animation: fadeIn 0.3s ease-out;
+    @apply transition-all duration-150 border-border/40;
+    animation: fadeIn 0.2s ease-out;
     touch-action: none;
   }
 
+  /* Hover - subtle background change only */
   .kanban-card:hover {
-    @apply scale-[1.02];
+    @apply bg-accent/30;
   }
 
   /* Card sendo arrastado */
@@ -550,13 +552,12 @@ All colors MUST be HSL.
     cursor: grabbing;
   }
 
-  /* Overlay do drag */
+  /* Overlay do drag - subtle */
   .kanban-drag-overlay {
-    opacity: 0.95;
-    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
-    transform: rotate(2deg) scale(1.02);
+    opacity: 0.9;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    transform: rotate(1deg);
     cursor: grabbing;
-    animation: dragPulse 0.5s ease-in-out;
   }
 
   @keyframes dragPulse {
@@ -611,38 +612,38 @@ All colors MUST be HSL.
     animation: highlight-comment 2s ease-in-out 3;
   }
 
-  /* Kanban card styles */
+  /* Kanban card styles - minimal */
   .kanban-card {
     cursor: pointer;
-    transition: all 0.2s;
-  }
-
-  .kanban-card:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+    transition: background-color 0.15s ease;
   }
 
   /* Animação de entrada suave quando card aparece em nova coluna */
   @keyframes popIn {
     0% {
       opacity: 0;
-      transform: scale(0.95);
+      transform: translateY(-4px);
     }
     100% {
       opacity: 1;
-      transform: scale(1);
+      transform: translateY(0);
     }
   }
 
   .kanban-card-enter {
-    animation: popIn 0.2s ease-out forwards;
+    animation: popIn 0.15s ease-out forwards;
   }
 
-  /* Card sendo arrastado - feedback visual */
+  /* Card sendo arrastado - subtle feedback */
   .kanban-card.dragging {
-    transform: rotate(2deg) scale(1.02);
-    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.12);
+    transform: rotate(1deg);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
     z-index: 1000;
+  }
+  
+  /* Minimal badge style */
+  .minimal-badge {
+    @apply border-transparent bg-transparent text-muted-foreground font-normal;
   }
 
   /* Container dos cards com transição */
