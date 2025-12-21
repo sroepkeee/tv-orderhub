@@ -1230,6 +1230,7 @@ export type Database = {
           old_date: string
           order_id: string
           order_item_id: string | null
+          organization_id: string | null
           reason: string | null
         }
         Insert: {
@@ -1247,6 +1248,7 @@ export type Database = {
           old_date: string
           order_id: string
           order_item_id?: string | null
+          organization_id?: string | null
           reason?: string | null
         }
         Update: {
@@ -1264,6 +1266,7 @@ export type Database = {
           old_date?: string
           order_id?: string
           order_item_id?: string | null
+          organization_id?: string | null
           reason?: string | null
         }
         Relationships: [
@@ -1279,6 +1282,13 @@ export type Database = {
             columns: ["order_item_id"]
             isOneToOne: false
             referencedRelation: "order_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_date_changes_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
         ]
@@ -1590,6 +1600,7 @@ export type Database = {
           image_version: string | null
           order_id: string
           order_item_id: string
+          organization_id: string | null
           repair_parts: Json | null
           started_at: string | null
           tests_performed: Json | null
@@ -1610,6 +1621,7 @@ export type Database = {
           image_version?: string | null
           order_id: string
           order_item_id: string
+          organization_id?: string | null
           repair_parts?: Json | null
           started_at?: string | null
           tests_performed?: Json | null
@@ -1630,6 +1642,7 @@ export type Database = {
           image_version?: string | null
           order_id?: string
           order_item_id?: string
+          organization_id?: string | null
           repair_parts?: Json | null
           started_at?: string | null
           tests_performed?: Json | null
@@ -1649,6 +1662,13 @@ export type Database = {
             columns: ["order_item_id"]
             isOneToOne: true
             referencedRelation: "order_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lab_item_work_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
         ]
@@ -1753,6 +1773,7 @@ export type Database = {
           mentioned_user_id: string
           notification_id: string | null
           order_id: string
+          organization_id: string | null
         }
         Insert: {
           comment_id: string
@@ -1762,6 +1783,7 @@ export type Database = {
           mentioned_user_id: string
           notification_id?: string | null
           order_id: string
+          organization_id?: string | null
         }
         Update: {
           comment_id?: string
@@ -1771,6 +1793,7 @@ export type Database = {
           mentioned_user_id?: string
           notification_id?: string | null
           order_id?: string
+          organization_id?: string | null
         }
         Relationships: [
           {
@@ -1792,6 +1815,13 @@ export type Database = {
             columns: ["order_id"]
             isOneToOne: false
             referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mention_tags_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
         ]
@@ -1980,6 +2010,7 @@ export type Database = {
           file_type: string
           id: string
           order_id: string | null
+          organization_id: string | null
           uploaded_at: string | null
           uploaded_by: string
         }
@@ -1991,6 +2022,7 @@ export type Database = {
           file_type?: string
           id?: string
           order_id?: string | null
+          organization_id?: string | null
           uploaded_at?: string | null
           uploaded_by: string
         }
@@ -2002,6 +2034,7 @@ export type Database = {
           file_type?: string
           id?: string
           order_id?: string | null
+          organization_id?: string | null
           uploaded_at?: string | null
           uploaded_by?: string
         }
@@ -2020,6 +2053,13 @@ export type Database = {
             referencedRelation: "orders"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "order_attachments_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
         ]
       }
       order_changes: {
@@ -2033,6 +2073,7 @@ export type Database = {
           new_value: string | null
           old_value: string | null
           order_id: string
+          organization_id: string | null
         }
         Insert: {
           change_category?: string | null
@@ -2044,6 +2085,7 @@ export type Database = {
           new_value?: string | null
           old_value?: string | null
           order_id: string
+          organization_id?: string | null
         }
         Update: {
           change_category?: string | null
@@ -2055,6 +2097,7 @@ export type Database = {
           new_value?: string | null
           old_value?: string | null
           order_id?: string
+          organization_id?: string | null
         }
         Relationships: [
           {
@@ -2062,6 +2105,13 @@ export type Database = {
             columns: ["order_id"]
             isOneToOne: false
             referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_changes_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
         ]
@@ -2072,6 +2122,7 @@ export type Database = {
           created_at: string
           id: string
           order_id: string
+          organization_id: string | null
           updated_at: string
           user_id: string
         }
@@ -2080,6 +2131,7 @@ export type Database = {
           created_at?: string
           id?: string
           order_id: string
+          organization_id?: string | null
           updated_at?: string
           user_id: string
         }
@@ -2088,6 +2140,7 @@ export type Database = {
           created_at?: string
           id?: string
           order_id?: string
+          organization_id?: string | null
           updated_at?: string
           user_id?: string
         }
@@ -2099,6 +2152,13 @@ export type Database = {
             referencedRelation: "orders"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "order_comments_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
         ]
       }
       order_completion_notes: {
@@ -2107,6 +2167,7 @@ export type Database = {
           id: string
           note: string
           order_id: string
+          organization_id: string | null
           pending_items: Json | null
           user_id: string
         }
@@ -2115,6 +2176,7 @@ export type Database = {
           id?: string
           note: string
           order_id: string
+          organization_id?: string | null
           pending_items?: Json | null
           user_id: string
         }
@@ -2123,6 +2185,7 @@ export type Database = {
           id?: string
           note?: string
           order_id?: string
+          organization_id?: string | null
           pending_items?: Json | null
           user_id?: string
         }
@@ -2134,6 +2197,13 @@ export type Database = {
             referencedRelation: "orders"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "order_completion_notes_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
         ]
       }
       order_history: {
@@ -2143,6 +2213,7 @@ export type Database = {
           new_status: string
           old_status: string
           order_id: string
+          organization_id: string | null
           user_id: string
         }
         Insert: {
@@ -2151,6 +2222,7 @@ export type Database = {
           new_status: string
           old_status: string
           order_id: string
+          organization_id?: string | null
           user_id: string
         }
         Update: {
@@ -2159,6 +2231,7 @@ export type Database = {
           new_status?: string
           old_status?: string
           order_id?: string
+          organization_id?: string | null
           user_id?: string
         }
         Relationships: [
@@ -2167,6 +2240,13 @@ export type Database = {
             columns: ["order_id"]
             isOneToOne: false
             referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_history_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
         ]
@@ -2181,6 +2261,7 @@ export type Database = {
           old_value: string | null
           order_id: string
           order_item_id: string
+          organization_id: string | null
           user_id: string
         }
         Insert: {
@@ -2192,6 +2273,7 @@ export type Database = {
           old_value?: string | null
           order_id: string
           order_item_id: string
+          organization_id?: string | null
           user_id: string
         }
         Update: {
@@ -2203,6 +2285,7 @@ export type Database = {
           old_value?: string | null
           order_id?: string
           order_item_id?: string
+          organization_id?: string | null
           user_id?: string
         }
         Relationships: [
@@ -2218,6 +2301,13 @@ export type Database = {
             columns: ["order_item_id"]
             isOneToOne: false
             referencedRelation: "order_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_item_history_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
         ]
@@ -2241,6 +2331,7 @@ export type Database = {
           material_type: string | null
           ncm_code: string | null
           order_id: string
+          organization_id: string | null
           phase_started_at: string | null
           production_estimated_date: string | null
           production_order_number: string | null
@@ -2276,6 +2367,7 @@ export type Database = {
           material_type?: string | null
           ncm_code?: string | null
           order_id: string
+          organization_id?: string | null
           phase_started_at?: string | null
           production_estimated_date?: string | null
           production_order_number?: string | null
@@ -2311,6 +2403,7 @@ export type Database = {
           material_type?: string | null
           ncm_code?: string | null
           order_id?: string
+          organization_id?: string | null
           phase_started_at?: string | null
           production_estimated_date?: string | null
           production_order_number?: string | null
@@ -2336,6 +2429,13 @@ export type Database = {
             referencedRelation: "orders"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "order_items_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
         ]
       }
       order_occurrences: {
@@ -2346,6 +2446,7 @@ export type Database = {
           id: string
           occurrence_type: string
           order_id: string | null
+          organization_id: string | null
           resolved: boolean | null
           resolved_at: string | null
           resolved_by: string | null
@@ -2360,6 +2461,7 @@ export type Database = {
           id?: string
           occurrence_type: string
           order_id?: string | null
+          organization_id?: string | null
           resolved?: boolean | null
           resolved_at?: string | null
           resolved_by?: string | null
@@ -2374,6 +2476,7 @@ export type Database = {
           id?: string
           occurrence_type?: string
           order_id?: string | null
+          organization_id?: string | null
           resolved?: boolean | null
           resolved_at?: string | null
           resolved_by?: string | null
@@ -2387,6 +2490,13 @@ export type Database = {
             columns: ["order_id"]
             isOneToOne: false
             referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_occurrences_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
           {
@@ -2522,6 +2632,7 @@ export type Database = {
           id: string
           length_cm: number
           order_id: string
+          organization_id: string | null
           packaging_type: string | null
           quantity: number
           updated_at: string | null
@@ -2537,6 +2648,7 @@ export type Database = {
           id?: string
           length_cm: number
           order_id: string
+          organization_id?: string | null
           packaging_type?: string | null
           quantity?: number
           updated_at?: string | null
@@ -2552,6 +2664,7 @@ export type Database = {
           id?: string
           length_cm?: number
           order_id?: string
+          organization_id?: string | null
           packaging_type?: string | null
           quantity?: number
           updated_at?: string | null
@@ -2565,6 +2678,13 @@ export type Database = {
             columns: ["order_id"]
             isOneToOne: false
             referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_volumes_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
         ]
@@ -4001,6 +4121,7 @@ export type Database = {
         Args: { p_carrier_id: string }
         Returns: boolean
       }
+      can_access_order: { Args: { _order_id: string }; Returns: boolean }
       can_edit_phase: {
         Args: { _phase: string; _user_id: string }
         Returns: boolean
@@ -4025,6 +4146,10 @@ export type Database = {
         Returns: {
           role: string
         }[]
+      }
+      get_order_organization_id: {
+        Args: { _order_id: string }
+        Returns: string
       }
       get_phase_from_order: { Args: { _order_id: string }; Returns: string }
       get_phase_from_status: { Args: { _status: string }; Returns: string }
