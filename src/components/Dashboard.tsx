@@ -2142,8 +2142,8 @@ export const Dashboard = () => {
               </div>
             </header>
 
-            {/* Main Content - scrollable */}
-            <main className="flex-1 overflow-auto px-4 lg:px-6 pb-4">
+            {/* Main Content - contained, scroll inside kanban */}
+            <main className="flex-1 overflow-hidden px-4 lg:px-6 pb-4">
               {/* Content */}
       {loading ? <div className="flex items-center justify-center py-20">
           <div className="text-center">

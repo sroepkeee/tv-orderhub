@@ -592,12 +592,12 @@ export const KanbanView = ({
       onDragCancel={handleDragCancel}
     >
       <div className={cn(
-        "kanban-view",
+        "kanban-view h-full",
         density === 'tv' && "kanban-view-tv",
         density === 'compact' && "kanban-view-compact"
       )}>
         <div className={cn(
-          "kanban-container flex overflow-x-auto h-full pb-4",
+          "kanban-container",
           density === 'tv' && "kanban-container-tv gap-1",
           density === 'compact' && "kanban-container-compact gap-2",
           density === 'comfortable' && "gap-2 lg:gap-3"

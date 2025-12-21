@@ -466,13 +466,17 @@ All colors MUST be HSL.
 
   /* Kanban Styles */
   .kanban-view {
-    @apply w-full;
+    @apply w-full h-full flex flex-col;
+    overflow-y: hidden;
   }
 
   .kanban-container {
-    @apply flex gap-4 overflow-x-auto pb-4;
+    @apply flex gap-4 pb-4 flex-1;
+    overflow-x: auto;
+    overflow-y: hidden;
     scrollbar-width: thin;
     scrollbar-color: hsl(var(--muted-foreground)) hsl(var(--muted));
+    scrollbar-gutter: stable;
   }
 
   .kanban-container::-webkit-scrollbar {
