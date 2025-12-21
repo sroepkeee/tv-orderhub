@@ -1322,6 +1322,7 @@ export type Database = {
           freight_value: number | null
           id: string
           is_selected: boolean | null
+          organization_id: string | null
           quote_id: string
           received_at: string | null
           responded_by: string | null
@@ -1334,6 +1335,7 @@ export type Database = {
           freight_value?: number | null
           id?: string
           is_selected?: boolean | null
+          organization_id?: string | null
           quote_id: string
           received_at?: string | null
           responded_by?: string | null
@@ -1346,12 +1348,20 @@ export type Database = {
           freight_value?: number | null
           id?: string
           is_selected?: boolean | null
+          organization_id?: string | null
           quote_id?: string
           received_at?: string | null
           responded_by?: string | null
           response_text?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "freight_quote_responses_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "freight_quote_responses_quote_id_fkey"
             columns: ["quote_id"]
@@ -1370,6 +1380,7 @@ export type Database = {
           id: string
           n8n_conversation_id: string | null
           order_id: string
+          organization_id: string | null
           quote_request_data: Json
           requested_at: string | null
           response_received_at: string | null
@@ -1385,6 +1396,7 @@ export type Database = {
           id?: string
           n8n_conversation_id?: string | null
           order_id: string
+          organization_id?: string | null
           quote_request_data: Json
           requested_at?: string | null
           response_received_at?: string | null
@@ -1400,6 +1412,7 @@ export type Database = {
           id?: string
           n8n_conversation_id?: string | null
           order_id?: string
+          organization_id?: string | null
           quote_request_data?: Json
           requested_at?: string | null
           response_received_at?: string | null
@@ -1420,6 +1433,13 @@ export type Database = {
             columns: ["order_id"]
             isOneToOne: false
             referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "freight_quotes_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
         ]
@@ -1840,6 +1860,7 @@ export type Database = {
           message_content: string
           message_type: string
           metadata: Json | null
+          organization_id: string | null
           priority: number
           recipient_name: string | null
           recipient_whatsapp: string
@@ -1861,6 +1882,7 @@ export type Database = {
           message_content: string
           message_type?: string
           metadata?: Json | null
+          organization_id?: string | null
           priority?: number
           recipient_name?: string | null
           recipient_whatsapp: string
@@ -1882,6 +1904,7 @@ export type Database = {
           message_content?: string
           message_type?: string
           metadata?: Json | null
+          organization_id?: string | null
           priority?: number
           recipient_name?: string | null
           recipient_whatsapp?: string
@@ -1890,7 +1913,15 @@ export type Database = {
           status?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "message_queue_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       message_queue_stats: {
         Row: {
@@ -1898,6 +1929,7 @@ export type Database = {
           created_at: string
           id: string
           messages_per_hour: Json | null
+          organization_id: string | null
           stat_date: string
           total_failed: number | null
           total_queued: number | null
@@ -1909,6 +1941,7 @@ export type Database = {
           created_at?: string
           id?: string
           messages_per_hour?: Json | null
+          organization_id?: string | null
           stat_date?: string
           total_failed?: number | null
           total_queued?: number | null
@@ -1920,13 +1953,22 @@ export type Database = {
           created_at?: string
           id?: string
           messages_per_hour?: Json | null
+          organization_id?: string | null
           stat_date?: string
           total_failed?: number | null
           total_queued?: number | null
           total_sent?: number | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "message_queue_stats_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       notifications: {
         Row: {
@@ -3757,6 +3799,7 @@ export type Database = {
           notes: string | null
           order_id: string
           order_item_id: string | null
+          organization_id: string | null
           quantity: number
           user_id: string
           warehouse_from: string | null
@@ -3771,6 +3814,7 @@ export type Database = {
           notes?: string | null
           order_id: string
           order_item_id?: string | null
+          organization_id?: string | null
           quantity: number
           user_id: string
           warehouse_from?: string | null
@@ -3785,6 +3829,7 @@ export type Database = {
           notes?: string | null
           order_id?: string
           order_item_id?: string | null
+          organization_id?: string | null
           quantity?: number
           user_id?: string
           warehouse_from?: string | null
@@ -3803,6 +3848,13 @@ export type Database = {
             columns: ["order_item_id"]
             isOneToOne: false
             referencedRelation: "order_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_movements_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
         ]
@@ -4020,6 +4072,7 @@ export type Database = {
           media_key: string | null
           media_type: string
           mime_type: string | null
+          organization_id: string | null
           storage_path: string | null
           thumbnail_base64: string | null
           updated_at: string | null
@@ -4040,6 +4093,7 @@ export type Database = {
           media_key?: string | null
           media_type: string
           mime_type?: string | null
+          organization_id?: string | null
           storage_path?: string | null
           thumbnail_base64?: string | null
           updated_at?: string | null
@@ -4060,6 +4114,7 @@ export type Database = {
           media_key?: string | null
           media_type?: string
           mime_type?: string | null
+          organization_id?: string | null
           storage_path?: string | null
           thumbnail_base64?: string | null
           updated_at?: string | null
@@ -4072,6 +4127,13 @@ export type Database = {
             referencedRelation: "carrier_conversations"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "whatsapp_media_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
         ]
       }
       whatsapp_message_log: {
@@ -4081,6 +4143,7 @@ export type Database = {
           error_message: string | null
           id: string
           mega_message_id: string | null
+          organization_id: string | null
           status: string | null
           updated_at: string | null
         }
@@ -4090,6 +4153,7 @@ export type Database = {
           error_message?: string | null
           id?: string
           mega_message_id?: string | null
+          organization_id?: string | null
           status?: string | null
           updated_at?: string | null
         }
@@ -4099,6 +4163,7 @@ export type Database = {
           error_message?: string | null
           id?: string
           mega_message_id?: string | null
+          organization_id?: string | null
           status?: string | null
           updated_at?: string | null
         }
@@ -4108,6 +4173,13 @@ export type Database = {
             columns: ["conversation_id"]
             isOneToOne: false
             referencedRelation: "carrier_conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_message_log_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
         ]
