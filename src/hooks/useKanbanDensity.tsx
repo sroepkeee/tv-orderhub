@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 
 export type KanbanDensity = 'comfortable' | 'compact' | 'tv';
 
@@ -51,20 +51,99 @@ const DENSITY_CONFIGS: Record<KanbanDensity, KanbanDensityConfig> = {
 };
 
 const STORAGE_KEY = 'kanban-density-preference';
+const AUTO_DETECT_KEY = 'kanban-density-auto-detect';
 
-export function useKanbanDensity() {
-  const [density, setDensityState] = useState<KanbanDensity>(() => {
-    if (typeof window === 'undefined') return 'comfortable';
+// Calculate optimal density based on screen width and phase count
+function calculateOptimalDensity(screenWidth: number, phaseCount: number): KanbanDensity {
+  // Column widths for each mode (approximate with gaps)
+  const comfortableColWidth = 300; // 280px + gap
+  const compactColWidth = 190;     // 180px + gap
+  const tvColWidth = 110;          // 100px + gap
+
+  // Calculate how many columns fit in each mode
+  const comfortableFit = Math.floor(screenWidth / comfortableColWidth);
+  const compactFit = Math.floor(screenWidth / compactColWidth);
+  const tvFit = Math.floor(screenWidth / tvColWidth);
+
+  // Decision logic:
+  // 1. If all phases fit comfortably (with room), use comfortable
+  // 2. If phases fit in compact mode, use compact
+  // 3. Otherwise, use TV mode
+  
+  if (comfortableFit >= phaseCount && screenWidth >= 1440) {
+    return 'comfortable';
+  }
+  
+  if (compactFit >= phaseCount || screenWidth >= 1280) {
+    return 'compact';
+  }
+  
+  if (phaseCount > 10 || screenWidth < 1280) {
+    return 'tv';
+  }
+  
+  return 'compact';
+}
+
+interface UseKanbanDensityOptions {
+  phaseCount?: number;
+}
+
+export function useKanbanDensity(options: UseKanbanDensityOptions = {}) {
+  const { phaseCount = 15 } = options;
+  
+  const [autoDetect, setAutoDetectState] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return true;
+    const stored = localStorage.getItem(AUTO_DETECT_KEY);
+    return stored === null ? true : stored === 'true';
+  });
+
+  const [manualDensity, setManualDensity] = useState<KanbanDensity | null>(() => {
+    if (typeof window === 'undefined') return null;
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored && ['comfortable', 'compact', 'tv'].includes(stored)) {
       return stored as KanbanDensity;
     }
-    return 'comfortable';
+    return null;
   });
 
+  const [screenWidth, setScreenWidth] = useState<number>(() => {
+    if (typeof window === 'undefined') return 1920;
+    return window.innerWidth;
+  });
+
+  // Track screen width changes
+  useEffect(() => {
+    const handleResize = () => {
+      setScreenWidth(window.innerWidth);
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Calculate auto density
+  const autoDensity = useMemo(() => {
+    return calculateOptimalDensity(screenWidth, phaseCount);
+  }, [screenWidth, phaseCount]);
+
+  // Final density based on auto or manual
+  const density = autoDetect ? autoDensity : (manualDensity || autoDensity);
+
   const setDensity = useCallback((newDensity: KanbanDensity) => {
-    setDensityState(newDensity);
+    setManualDensity(newDensity);
+    setAutoDetectState(false);
     localStorage.setItem(STORAGE_KEY, newDensity);
+    localStorage.setItem(AUTO_DETECT_KEY, 'false');
+  }, []);
+
+  const setAutoDetect = useCallback((enabled: boolean) => {
+    setAutoDetectState(enabled);
+    localStorage.setItem(AUTO_DETECT_KEY, String(enabled));
+    if (enabled) {
+      localStorage.removeItem(STORAGE_KEY);
+      setManualDensity(null);
+    }
   }, []);
 
   const cycleDensity = useCallback(() => {
@@ -89,13 +168,20 @@ export function useKanbanDensity() {
         } else if (e.key === '3') {
           e.preventDefault();
           setDensity('tv');
+        } else if (e.key === '0') {
+          e.preventDefault();
+          setAutoDetect(true);
         }
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [setDensity]);
+  }, [setDensity, setAutoDetect]);
+
+  // Suggested density for UI hints
+  const suggestedDensity = autoDensity;
+  const isUsingOptimal = density === autoDensity;
 
   return {
     density,
@@ -105,5 +191,11 @@ export function useKanbanDensity() {
     isComfortable: density === 'comfortable',
     isCompact: density === 'compact',
     isTV: density === 'tv',
+    // Auto-detect features
+    autoDetect,
+    setAutoDetect,
+    suggestedDensity,
+    isUsingOptimal,
+    screenWidth,
   };
 }

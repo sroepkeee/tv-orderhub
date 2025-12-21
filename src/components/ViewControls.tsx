@@ -14,7 +14,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { ArrowUpDown, Filter, Layers, LayoutGrid, List, Maximize2, Minimize2, Palette, Circle, Table2, Monitor, Columns3 } from "lucide-react";
+import { ArrowUpDown, Filter, Layers, LayoutGrid, List, Maximize2, Minimize2, Palette, Circle, Table2, Monitor, Columns3, Wand2 } from "lucide-react";
 import { Order } from "./Dashboard";
 import { useVisualMode } from "@/hooks/useVisualMode";
 import { KanbanDensity } from "@/hooks/useKanbanDensity";
@@ -38,6 +38,8 @@ interface ViewControlsProps {
   cardViewMode?: CardViewMode;
   orders?: Order[];
   kanbanDensity?: KanbanDensity;
+  kanbanAutoDetect?: boolean;
+  kanbanSuggestedDensity?: KanbanDensity;
   onSortChange: (sort: SortOption) => void;
   onGroupChange: (group: GroupOption) => void;
   onPhaseFilterChange: (phase: PhaseFilter) => void;
@@ -46,6 +48,7 @@ interface ViewControlsProps {
   onStatusFilterChange?: (status: StatusFilter) => void;
   onCardViewModeChange?: (mode: CardViewMode) => void;
   onKanbanDensityChange?: (density: KanbanDensity) => void;
+  onKanbanAutoDetectChange?: (enabled: boolean) => void;
 }
 
 export const ViewControls = ({
@@ -58,6 +61,8 @@ export const ViewControls = ({
   cardViewMode = "full",
   orders = [],
   kanbanDensity = "comfortable",
+  kanbanAutoDetect = true,
+  kanbanSuggestedDensity,
   onSortChange,
   onGroupChange,
   onPhaseFilterChange,
@@ -66,6 +71,7 @@ export const ViewControls = ({
   onStatusFilterChange,
   onCardViewModeChange,
   onKanbanDensityChange,
+  onKanbanAutoDetectChange,
 }: ViewControlsProps) => {
   const sortOptions = [
     { value: "priority" as SortOption, label: "Prioridade" },
@@ -496,12 +502,47 @@ export const ViewControls = ({
         {/* Kanban Density Controls (only in Kanban view) */}
         {viewMode === "kanban" && onKanbanDensityChange && (
           <div className="flex items-center gap-0.5 border rounded-md p-0.5 bg-muted/30">
+            {/* Auto-detect toggle */}
+            {onKanbanAutoDetectChange && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant={kanbanAutoDetect ? "default" : "ghost"}
+                    size="icon"
+                    className={cn(
+                      "h-7 w-7",
+                      kanbanAutoDetect && "bg-primary/80"
+                    )}
+                    onClick={() => onKanbanAutoDetectChange(!kanbanAutoDetect)}
+                  >
+                    <Wand2 className="h-3.5 w-3.5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <div className="text-center">
+                    <p className="font-medium">Auto-detectar</p>
+                    <p className="text-xs text-muted-foreground">
+                      {kanbanAutoDetect 
+                        ? `Ativo: usando "${kanbanSuggestedDensity === 'comfortable' ? 'Confortável' : kanbanSuggestedDensity === 'compact' ? 'Compacto' : 'TV'}"` 
+                        : "Clique para ativar (Ctrl+0)"
+                      }
+                    </p>
+                  </div>
+                </TooltipContent>
+              </Tooltip>
+            )}
+            
+            <div className="h-4 w-px bg-border mx-0.5" />
+            
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
-                  variant={kanbanDensity === "comfortable" ? "default" : "ghost"}
+                  variant={kanbanDensity === "comfortable" && !kanbanAutoDetect ? "default" : "ghost"}
                   size="icon"
-                  className="h-7 w-7"
+                  className={cn(
+                    "h-7 w-7",
+                    kanbanAutoDetect && kanbanSuggestedDensity === "comfortable" && "ring-2 ring-primary/50"
+                  )}
                   onClick={() => onKanbanDensityChange("comfortable")}
                 >
                   <Maximize2 className="h-3.5 w-3.5" />
@@ -517,9 +558,12 @@ export const ViewControls = ({
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
-                  variant={kanbanDensity === "compact" ? "default" : "ghost"}
+                  variant={kanbanDensity === "compact" && !kanbanAutoDetect ? "default" : "ghost"}
                   size="icon"
-                  className="h-7 w-7"
+                  className={cn(
+                    "h-7 w-7",
+                    kanbanAutoDetect && kanbanSuggestedDensity === "compact" && "ring-2 ring-primary/50"
+                  )}
                   onClick={() => onKanbanDensityChange("compact")}
                 >
                   <Columns3 className="h-3.5 w-3.5" />
@@ -535,9 +579,12 @@ export const ViewControls = ({
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
-                  variant={kanbanDensity === "tv" ? "default" : "ghost"}
+                  variant={kanbanDensity === "tv" && !kanbanAutoDetect ? "default" : "ghost"}
                   size="icon"
-                  className="h-7 w-7"
+                  className={cn(
+                    "h-7 w-7",
+                    kanbanAutoDetect && kanbanSuggestedDensity === "tv" && "ring-2 ring-primary/50"
+                  )}
                   onClick={() => onKanbanDensityChange("tv")}
                 >
                   <Monitor className="h-3.5 w-3.5" />
