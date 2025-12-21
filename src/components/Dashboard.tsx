@@ -2074,7 +2074,7 @@ export const Dashboard = () => {
 
   return (
     <SidebarProvider>
-      <div className="flex min-h-screen w-full">
+      <div className="flex h-screen w-full overflow-hidden">
         <AppSidebar 
           orders={orders}
           unreadConversationsCount={unreadConversationsCount}
@@ -2086,8 +2086,8 @@ export const Dashboard = () => {
           onKanbanDensityChange={setKanbanDensity}
           onKanbanAutoDetectChange={setKanbanAutoDetect}
         />
-        <SidebarInset className="flex-1 overflow-hidden">
-          <div className="h-screen flex flex-col bg-background overflow-hidden">
+        <SidebarInset className="flex-1 flex flex-col overflow-hidden">
+          <div className="flex-1 flex flex-col bg-background overflow-hidden">
             {/* Header - fixed height */}
             <header className="flex-shrink-0 flex items-center justify-between px-4 lg:px-6 py-4">
               <div className="flex items-center gap-2">
@@ -2143,7 +2143,7 @@ export const Dashboard = () => {
             </header>
 
             {/* Main Content - contained, scroll inside kanban */}
-            <main className="flex-1 overflow-hidden px-4 lg:px-6 pb-4">
+            <main className="flex-1 min-h-0 overflow-hidden px-4 lg:px-6 pb-4">
               {/* Content */}
       {loading ? <div className="flex items-center justify-center py-20">
           <div className="text-center">
