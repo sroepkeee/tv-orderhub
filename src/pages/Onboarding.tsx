@@ -435,14 +435,23 @@ export default function Onboarding() {
         {/* Navigation */}
         {step !== 'complete' && (
           <div className="flex justify-between mt-8">
-            <Button
-              variant="ghost"
-              onClick={handleBack}
-              disabled={step === 'company'}
-            >
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Voltar
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                variant="ghost"
+                onClick={handleBack}
+                disabled={step === 'company'}
+              >
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Voltar
+              </Button>
+              
+              <Button
+                variant="outline"
+                onClick={() => navigate('/')}
+              >
+                Pular
+              </Button>
+            </div>
             
             <Button onClick={handleNext} disabled={loading}>
               {loading ? (
