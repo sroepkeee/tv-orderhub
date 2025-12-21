@@ -90,9 +90,13 @@ export function OrderPhaseTimeline({ orderId, currentStatus }: OrderPhaseTimelin
           const startDate = history.changed_at;
           const endDate = index < data.length - 1 ? data[index + 1].changed_at : null;
           
-          const daysInPhase = endDate 
-            ? Math.ceil((new Date(endDate).getTime() - new Date(startDate).getTime()) / (1000 * 60 * 60 * 24))
-            : Math.ceil((new Date().getTime() - new Date(startDate).getTime()) / (1000 * 60 * 60 * 24));
+          // Usar Math.floor para evitar arredondamento excessivo (+1 dia extra)
+          // Fases concluídas: mínimo 1 dia, fase atual: mínimo 0 dias
+          const diffMs = endDate 
+            ? new Date(endDate).getTime() - new Date(startDate).getTime()
+            : new Date().getTime() - new Date(startDate).getTime();
+          const rawDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+          const daysInPhase = endDate ? Math.max(1, rawDays) : Math.max(0, rawDays);
 
           phaseMap.set(phase, {
             phase,
