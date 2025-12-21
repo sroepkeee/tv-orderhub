@@ -53,36 +53,38 @@ const DENSITY_CONFIGS: Record<KanbanDensity, KanbanDensityConfig> = {
 const STORAGE_KEY = 'kanban-density-preference';
 const AUTO_DETECT_KEY = 'kanban-density-auto-detect';
 
-// Calculate optimal density based on screen width and phase count
-function calculateOptimalDensity(screenWidth: number, phaseCount: number): KanbanDensity {
+// Sidebar width constants (must match sidebar.tsx)
+const SIDEBAR_WIDTH_OPEN = 224; // 14rem = 224px
+const SIDEBAR_WIDTH_COLLAPSED = 56; // 3.5rem = 56px
+
+// Calculate optimal density based on available width and phase count
+function calculateOptimalDensity(
+  screenWidth: number, 
+  phaseCount: number,
+  sidebarOpen: boolean = true
+): KanbanDensity {
+  // Calculate available width after sidebar and padding
+  const sidebarWidth = sidebarOpen ? SIDEBAR_WIDTH_OPEN : SIDEBAR_WIDTH_COLLAPSED;
+  const availableWidth = screenWidth - sidebarWidth - 48; // 48px for padding
+
   // Column widths for each mode (approximate with gaps)
   const comfortableColWidth = 300; // 280px + gap
   const compactColWidth = 190;     // 180px + gap
-  const tvColWidth = 110;          // 100px + gap
 
   // Calculate how many columns fit in each mode
-  const comfortableFit = Math.floor(screenWidth / comfortableColWidth);
-  const compactFit = Math.floor(screenWidth / compactColWidth);
-  const tvFit = Math.floor(screenWidth / tvColWidth);
+  const comfortableFit = Math.floor(availableWidth / comfortableColWidth);
+  const compactFit = Math.floor(availableWidth / compactColWidth);
 
-  // Decision logic:
-  // 1. If all phases fit comfortably (with room), use comfortable
-  // 2. If phases fit in compact mode, use compact
-  // 3. Otherwise, use TV mode
-  
-  if (comfortableFit >= phaseCount && screenWidth >= 1440) {
+  // Decision logic based on available width (not screen width)
+  if (comfortableFit >= phaseCount && availableWidth >= 1200) {
     return 'comfortable';
   }
   
-  if (compactFit >= phaseCount || screenWidth >= 1280) {
+  if (compactFit >= phaseCount || availableWidth >= 1000) {
     return 'compact';
   }
   
-  if (phaseCount > 10 || screenWidth < 1280) {
-    return 'tv';
-  }
-  
-  return 'compact';
+  return 'tv';
 }
 
 interface UseKanbanDensityOptions {
