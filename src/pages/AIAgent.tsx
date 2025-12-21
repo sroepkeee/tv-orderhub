@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useAIAgentAdmin } from "@/hooks/useAIAgentAdmin";
 import { cn } from "@/lib/utils";
-import { Loader2, Bot, ShieldAlert, BarChart3, MessageSquare, CalendarDays, FolderOpen, Shield, Users, Link2, Book, ChevronLeft, ChevronRight, Settings, FileText, Brain } from "lucide-react";
+import { Loader2, Bot, ShieldAlert, BarChart3, MessageSquare, CalendarDays, Shield, Users, Link2, Book, ChevronLeft, ChevronRight, Settings, FileText, Brain } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -14,7 +14,7 @@ import { AIAgentConnectionsTab } from "@/components/ai-agent/AIAgentConnectionsT
 import { AIAgentLogsTab } from "@/components/ai-agent/AIAgentLogsTab";
 import { AIAgentContactsTab } from "@/components/ai-agent/AIAgentContactsTab";
 import { AIAgentMessagesTab } from "@/components/ai-agent/AIAgentMessagesTab";
-import { AIAgentFilesTab } from "@/components/ai-agent/AIAgentFilesTab";
+
 import { AIAgentComplianceTab } from "@/components/ai-agent/AIAgentComplianceTab";
 import { AIAgentConfigTab } from "@/components/ai-agent/AIAgentConfigTab";
 import { AIAgentPoliciesTab } from "@/components/ai-agent/AIAgentPoliciesTab";
@@ -36,7 +36,6 @@ const NAV_ITEMS: NavItem[] = [
   { id: 'knowledge', label: 'Base de Conhecimento', icon: <Book className="h-5 w-5" />, description: 'RAG e documentos' },
   { id: 'messages', label: 'Mensagens', icon: <MessageSquare className="h-5 w-5" />, description: 'Conversas dos agentes' },
   { id: 'logs', label: 'Eventos', icon: <CalendarDays className="h-5 w-5" />, description: 'Log de eventos' },
-  { id: 'files', label: 'Arquivos', icon: <FolderOpen className="h-5 w-5" />, description: 'Arquivos enviados' },
   { id: 'rules', label: 'Regras', icon: <Shield className="h-5 w-5" />, description: 'Regras de compliance' },
   { id: 'policies', label: 'Políticas', icon: <FileText className="h-5 w-5" />, description: 'Políticas de negócio' },
   { id: 'contacts', label: 'Contatos', icon: <Users className="h-5 w-5" />, description: 'Gerenciar contatos' },
@@ -113,8 +112,6 @@ export default function AIAgent() {
         return <AIAgentQuoteTab />;
       case 'logs':
         return <AIAgentLogsTab logs={logs} onRefresh={loadLogs} />;
-      case 'files':
-        return <AIAgentFilesTab />;
       case 'rules':
         return <AIAgentComplianceTab />;
       case 'policies':

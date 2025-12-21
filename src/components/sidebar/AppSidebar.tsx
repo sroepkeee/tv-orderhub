@@ -14,6 +14,7 @@ import {
   Moon,
   Sun,
   KeyRound,
+  FolderOpen,
 } from "lucide-react";
 import logo from "@/assets/logo.png";
 import {
@@ -128,6 +129,7 @@ const AppSidebar = ({
         { path: "/", icon: LayoutDashboard, label: "Dashboard" },
         { path: "/metrics", icon: BarChart3, label: "Indicadores" },
         { path: "/producao", icon: Factory, label: "Produção" },
+        { path: "/files", icon: FolderOpen, label: "Arquivos" },
       ]
     },
     {
