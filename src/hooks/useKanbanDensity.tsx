@@ -39,7 +39,7 @@ const DENSITY_CONFIGS: Record<KanbanDensity, KanbanDensityConfig> = {
   },
   tv: {
     columnWidth: '1fr',
-    columnMinWidth: '90px',
+    columnMinWidth: '110px',
     columnMaxWidth: '1fr',
     cardHeight: '24px',
     headerHeight: '24px',

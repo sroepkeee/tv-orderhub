@@ -110,20 +110,27 @@ export const KanbanColumn = ({
           >
             <Icon className={cn(iconSize, iconOpacity, "transition-all flex-shrink-0")} />
             
-            {/* Title - Hidden in TV mode, truncated in compact */}
-            {!isTV && (
-              <h3 className={cn(
-                "font-semibold truncate",
-                titleOpacity,
-                isCompact ? "text-xs max-w-[80px]" : "text-sm"
-              )}>
-                {title}
-              </h3>
-            )}
+            {/* Title - Truncated in TV/compact modes, full in comfortable */}
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <h3 className={cn(
+                    "font-semibold truncate cursor-default",
+                    titleOpacity,
+                    isTV ? "text-[9px] max-w-[55px] leading-tight" : isCompact ? "text-xs max-w-[80px]" : "text-sm"
+                  )}>
+                    {isTV ? title.split(' ')[0].substring(0, 7) : title}
+                  </h3>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="text-xs">
+                  {title}
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
             
             {linkTo && !isTV && <ExternalLink className="h-3 w-3 opacity-60 flex-shrink-0" />}
             
-            {/* Info icon - Hidden in TV mode */}
+            {/* Info icon with tooltip - Hidden in TV mode */}
             {!isTV && (
               <TooltipProvider>
                 <Tooltip>
