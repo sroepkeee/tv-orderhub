@@ -91,7 +91,7 @@ const AppSidebar = ({
     items: [{
       path: "/",
       icon: LayoutDashboard,
-      label: "Dashboard"
+      label: "Kanban"
     }, {
       path: "/metrics",
       icon: BarChart3,
