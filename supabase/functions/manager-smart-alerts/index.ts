@@ -252,6 +252,111 @@ ${stuckOrders.slice(0, 5).map(o => `• #${o.order_number}`).join('\n')}
       }
     }
 
+    // ===================== NOVOS ALERTAS DE ITENS =====================
+
+    // 7. ITENS COM SLA VENCIDO
+    const { data: overdueItems } = await supabase
+      .from('order_items')
+      .select(`
+        id, item_code, item_description, sla_deadline, current_phase,
+        unit_price, total_value, requested_quantity,
+        orders(order_number, customer_name)
+      `)
+      .lt('sla_deadline', today.toISOString().split('T')[0])
+      .not('item_status', 'in', '("completed","delivered","cancelled")')
+      .limit(20);
+
+    if (overdueItems && overdueItems.length >= 5) {
+      let totalItemValue = 0;
+      
+      let message = `📦 *ALERTA: ${overdueItems.length} ITENS COM SLA VENCIDO*
+━━━━━━━━━━━━━━━━━━
+
+*Itens críticos:*`;
+
+      overdueItems.slice(0, 5).forEach((item: any) => {
+        const itemValue = item.total_value || (item.unit_price * item.requested_quantity) || 0;
+        totalItemValue += Number(itemValue);
+        const slaDate = new Date(item.sla_deadline);
+        const daysLate = Math.ceil((today.getTime() - slaDate.getTime()) / (1000 * 60 * 60 * 24));
+        
+        message += `\n• ${item.item_code} - #${item.orders?.order_number || 'N/A'}
+   ⏱️ ${daysLate}d atrasado | Fase: ${item.current_phase || 'N/A'}`;
+      });
+
+      if (overdueItems.length > 5) {
+        message += `\n... e mais ${overdueItems.length - 5} itens`;
+      }
+
+      message += `\n\n💰 Valor em risco: R$ ${totalItemValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+⚠️ _Priorizar itens com SLA vencido!_`;
+
+      alerts.push({
+        type: 'overdue_items',
+        priority: 1,
+        message,
+        metadata: { count: overdueItems.length, totalValue: totalItemValue },
+      });
+    }
+
+    // 8. ITENS PARADOS NA MESMA FASE > 5 DIAS
+    const fiveDaysAgo = new Date(today.getTime() - 5 * 24 * 60 * 60 * 1000);
+    const { data: allItems } = await supabase
+      .from('order_items')
+      .select(`
+        id, item_code, current_phase, phase_started_at, created_at,
+        orders(order_number)
+      `)
+      .not('item_status', 'in', '("completed","delivered","cancelled")')
+      .limit(100);
+
+    // Filtrar itens parados há mais de 5 dias
+    const stuckItems = (allItems || []).filter((item: any) => {
+      const phaseStarted = item.phase_started_at ? new Date(item.phase_started_at) : new Date(item.created_at);
+      return phaseStarted < fiveDaysAgo;
+    });
+
+    if (stuckItems.length >= 5) {
+      // Agrupar por fase
+      const byPhase: Record<string, any[]> = {};
+      stuckItems.forEach((item: any) => {
+        const phase = item.current_phase || 'Indefinido';
+        if (!byPhase[phase]) byPhase[phase] = [];
+        byPhase[phase].push(item);
+      });
+
+      let message = `⏰ *ALERTA: ${stuckItems.length} ITENS PARADOS (>5 dias)*
+━━━━━━━━━━━━━━━━━━
+
+*Por fase:*`;
+
+      Object.entries(byPhase)
+        .sort((a, b) => b[1].length - a[1].length)
+        .slice(0, 4)
+        .forEach(([phase, items]) => {
+          const emoji = phase.includes('Produção') ? '🔧' : 
+                        phase.includes('Lab') ? '🔬' : 
+                        phase.includes('Embalagem') ? '📦' : '📋';
+          message += `\n\n${emoji} *${phase}:* ${items.length} itens`;
+          items.slice(0, 2).forEach((item: any) => {
+            const phaseStarted = item.phase_started_at ? new Date(item.phase_started_at) : new Date(item.created_at);
+            const daysStuck = Math.ceil((today.getTime() - phaseStarted.getTime()) / (1000 * 60 * 60 * 24));
+            message += `\n   • ${item.item_code} - #${item.orders?.order_number || 'N/A'} (${daysStuck}d)`;
+          });
+        });
+
+      message += `\n\n🔍 _Verificar gargalos operacionais!_`;
+
+      alerts.push({
+        type: 'stuck_items',
+        priority: 2,
+        message,
+        metadata: { count: stuckItems.length, phases: Object.keys(byPhase).length },
+      });
+    }
+
+    // ===================== FIM NOVOS ALERTAS =====================
+
     // Se não há alertas
     if (alerts.length === 0) {
       console.log('✅ No alerts to send');
