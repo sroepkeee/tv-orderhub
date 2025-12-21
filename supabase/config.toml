@@ -95,3 +95,6 @@ verify_jwt = false
 
 [functions.manager-smart-alerts]
 verify_jwt = false
+
+[functions.notify-phase-manager]
+verify_jwt = true

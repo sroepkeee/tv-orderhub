@@ -2958,6 +2958,123 @@ export type Database = {
           },
         ]
       }
+      phase_manager_notifications: {
+        Row: {
+          created_at: string | null
+          delivered_at: string | null
+          error_message: string | null
+          id: string
+          message_content: string | null
+          metadata: Json | null
+          notification_type: string
+          order_id: string | null
+          phase_manager_id: string | null
+          sent_at: string | null
+          status: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          delivered_at?: string | null
+          error_message?: string | null
+          id?: string
+          message_content?: string | null
+          metadata?: Json | null
+          notification_type: string
+          order_id?: string | null
+          phase_manager_id?: string | null
+          sent_at?: string | null
+          status?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          delivered_at?: string | null
+          error_message?: string | null
+          id?: string
+          message_content?: string | null
+          metadata?: Json | null
+          notification_type?: string
+          order_id?: string | null
+          phase_manager_id?: string | null
+          sent_at?: string | null
+          status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "phase_manager_notifications_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "phase_manager_notifications_phase_manager_id_fkey"
+            columns: ["phase_manager_id"]
+            isOneToOne: false
+            referencedRelation: "phase_managers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      phase_managers: {
+        Row: {
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          notification_priority: number | null
+          organization_id: string | null
+          phase_key: string
+          receive_daily_summary: boolean | null
+          receive_new_orders: boolean | null
+          receive_urgent_alerts: boolean | null
+          updated_at: string | null
+          user_id: string
+          whatsapp: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          notification_priority?: number | null
+          organization_id?: string | null
+          phase_key: string
+          receive_daily_summary?: boolean | null
+          receive_new_orders?: boolean | null
+          receive_urgent_alerts?: boolean | null
+          updated_at?: string | null
+          user_id: string
+          whatsapp: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          notification_priority?: number | null
+          organization_id?: string | null
+          phase_key?: string
+          receive_daily_summary?: boolean | null
+          receive_new_orders?: boolean | null
+          receive_urgent_alerts?: boolean | null
+          updated_at?: string | null
+          user_id?: string
+          whatsapp?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "phase_managers_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "phase_managers_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       phase_permissions: {
         Row: {
           can_advance: boolean | null
@@ -3911,6 +4028,16 @@ export type Database = {
       }
       get_phase_from_order: { Args: { _order_id: string }; Returns: string }
       get_phase_from_status: { Args: { _status: string }; Returns: string }
+      get_phase_manager: {
+        Args: { _org_id?: string; _phase_key: string }
+        Returns: {
+          full_name: string
+          receive_new_orders: boolean
+          receive_urgent_alerts: boolean
+          user_id: string
+          whatsapp: string
+        }[]
+      }
       get_user_org_role: { Args: { _user_id?: string }; Returns: string }
       get_user_organization_id: { Args: { _user_id?: string }; Returns: string }
       get_user_phases: {
