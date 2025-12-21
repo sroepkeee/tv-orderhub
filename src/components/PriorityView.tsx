@@ -41,9 +41,6 @@ export const PriorityView = ({
     const saved = localStorage.getItem("cardViewMode");
     return (saved as CardViewMode) || "full";
   });
-  
-  // Kanban density hook
-  const { density, setDensity } = useKanbanDensity();
 
   const handleViewModeChange = (mode: ViewMode) => {
     setViewMode(mode);
@@ -436,6 +433,21 @@ export const PriorityView = ({
     );
   };
 
+  // Get phase count for auto-detection (estimating based on unique phases in orders)
+  const phaseCount = React.useMemo(() => {
+    // Estimate 15 phases as default for the system
+    return 15;
+  }, []);
+
+  // Kanban density hook with phase count
+  const { 
+    density, 
+    setDensity, 
+    autoDetect, 
+    setAutoDetect, 
+    suggestedDensity 
+  } = useKanbanDensity({ phaseCount });
+
   return (
     <div className="space-y-6">
 
@@ -447,12 +459,17 @@ export const PriorityView = ({
         viewMode={viewMode}
         cardViewMode={cardViewMode}
         orders={sortedOrders}
+        kanbanDensity={density}
+        kanbanAutoDetect={autoDetect}
+        kanbanSuggestedDensity={suggestedDensity}
         onSortChange={setSortBy}
         onGroupChange={setGroupBy}
         onPhaseFilterChange={setPhaseFilter}
         onStatusFilterChange={setStatusFilter}
         onViewModeChange={handleViewModeChange}
         onCardViewModeChange={handleCardViewModeChange}
+        onKanbanDensityChange={setDensity}
+        onKanbanAutoDetectChange={setAutoDetect}
       />
       
       {/* Orders Display */}
@@ -462,6 +479,7 @@ export const PriorityView = ({
           onEdit={(order) => onRowClick ? onRowClick(order) : onEdit(order)}
           onStatusChange={onStatusChange}
           cardViewMode={cardViewMode}
+          density={density}
         />
       ) : viewMode === "matrix" ? (
         <MatrixView
