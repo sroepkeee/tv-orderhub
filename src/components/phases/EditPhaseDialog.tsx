@@ -34,7 +34,7 @@ export function EditPhaseDialog({ phase, open, onOpenChange, onSave }: EditPhase
   useEffect(() => {
     if (phase) {
       setDisplayName(phase.display_name);
-      setResponsibleRole(phase.responsible_role || "");
+      setResponsibleRole(phase.responsible_role || "__none__");
     }
   }, [phase]);
 
@@ -46,7 +46,7 @@ export function EditPhaseDialog({ phase, open, onOpenChange, onSave }: EditPhase
     onSave({
       ...phase,
       display_name: displayName.trim(),
-      responsible_role: responsibleRole || null,
+      responsible_role: responsibleRole === "__none__" ? null : responsibleRole || null,
     });
   };
 
@@ -94,7 +94,7 @@ export function EditPhaseDialog({ phase, open, onOpenChange, onSave }: EditPhase
                 <SelectValue placeholder="Selecione um papel" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Nenhum</SelectItem>
+                <SelectItem value="__none__">Nenhum</SelectItem>
                 {availableRoles.map(([key, roleInfo]) => (
                   <SelectItem key={key} value={key}>
                     {roleInfo.name}
