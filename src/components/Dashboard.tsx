@@ -1,11 +1,10 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useLocation } from "react-router-dom";
-import logo from "@/assets/logo.png";
 import { DateRange } from "react-day-picker";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Search, Calendar, BarChart3, FileSpreadsheet, Plus, ChevronDown, MessageSquare, Truck, Package, ShoppingCart, Users } from "lucide-react";
+import { Search, Calendar, FileSpreadsheet, Plus, ChevronDown } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { cleanItemDescription } from "@/lib/utils";
 import { getStatusLabel } from "@/lib/statusLabels";
@@ -18,7 +17,6 @@ import { PriorityView } from "./PriorityView";
 import { PhaseButtons } from "./PhaseButtons";
 import { ColumnSettings, ColumnVisibility } from "./ColumnSettings";
 import { DateRangeFilter } from "./DateRangeFilter";
-import { UserMenu } from "./UserMenu";
 import { NotificationCenter } from "./NotificationCenter";
 import { ImportOrderDialog } from "./ImportOrderDialog";
 import { RateioUploadDialog } from "./RateioUploadDialog";
@@ -28,7 +26,10 @@ import { useAuth } from "@/hooks/useAuth";
 import { useAdminAuth } from "@/hooks/useAdminAuth";
 import { usePhaseAuthorization } from "@/hooks/usePhaseAuthorization";
 import { supabase } from "@/integrations/supabase/client";
-import { Shield } from "lucide-react";
+import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
+import AppSidebar from "@/components/sidebar/AppSidebar";
+import { useKanbanDensity, KanbanDensity } from "@/hooks/useKanbanDensity";
+import { ViewMode } from "./ViewControls";
 
 // Types
 type Priority = "high" | "medium" | "low";
@@ -2067,135 +2068,84 @@ export const Dashboard = () => {
     setSelectedOrder(order);
     setShowEditDialog(true);
   };
-  return <div className="min-h-screen bg-background p-4 lg:p-6">
-      {/* Compact Header */}
-      <div className="flex items-center justify-between mb-4 lg:mb-6">
-        <div className="flex items-center gap-2 lg:gap-4">
-          <img src={logo} alt="Imply Logo" className="h-12 lg:h-16 w-auto" />
-          <h1 className="text-base md:text-lg lg:text-xl font-bold text-dashboard-header tracking-tight">Sistema Integrado de Produção e Logística SSM</h1>
-        </div>
-        <div className="flex items-center gap-1.5 lg:gap-2">
-          <div className="relative hidden sm:block">
-            <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 text-muted-foreground h-3.5 w-3.5" />
-            <Input placeholder="Buscar..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="pl-8 w-32 lg:w-40 h-8 text-sm" />
-          </div>
-          <DateRangeFilter dateRange={dateRange} onDateRangeChange={setDateRange} />
-          <ColumnSettings visibility={columnVisibility} onVisibilityChange={setColumnVisibility} />
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" className="gap-1.5 h-8 px-2 lg:px-3 relative" size="sm">
-                <BarChart3 className="h-3.5 w-3.5" />
-                <span className="hidden lg:inline">Análises</span>
-                <ChevronDown className="h-3.5 w-3.5" />
-                {unreadConversationsCount > 0 && <span className="absolute -top-1 -right-1 h-5 w-5 bg-destructive text-destructive-foreground text-xs rounded-full flex items-center justify-center">
-                    {unreadConversationsCount}
-                  </span>}
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => navigate('/metrics')}>
-                <BarChart3 className="h-4 w-4 mr-2" />
-                Indicadores
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => navigate('/producao')}>
-                <Package className="h-4 w-4 mr-2" />
-                Acessar Produção
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => navigate('/transportadoras')}>
-                <Truck className="h-4 w-4 mr-2" />
-                Transportadoras
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => navigate('/compras')}>
-                <ShoppingCart className="h-4 w-4 mr-2" />
-                Compras
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => navigate('/customers')}>
-                <Users className="h-4 w-4 mr-2" />
-                Clientes
-              </DropdownMenuItem>
-              {phasePermissions.some(p => p.phase_key === 'carriers_chat' && p.can_view) && (
-                <DropdownMenuItem onClick={() => navigate('/carriers-chat')} className="relative">
-                  <MessageSquare className="h-4 w-4 mr-2" />
-                  Conversas
-                  {unreadConversationsCount > 0 && <span className="ml-auto pl-2 text-xs font-semibold text-destructive">
-                      ({unreadConversationsCount})
-                    </span>}
-                </DropdownMenuItem>
-              )}
-              {isAdmin && (
-                <>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => navigate('/admin/users')} className="relative">
-                    <Shield className="h-4 w-4 mr-2" />
-                    Gerenciar Usuários
-                    {pendingApprovalsCount > 0 && (
-                      <span className="ml-auto pl-2 text-xs font-semibold text-destructive">
-                        ({pendingApprovalsCount})
-                      </span>
-                    )}
-                  </DropdownMenuItem>
-                </>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
-          {isAdmin && pendingApprovalsCount > 0 && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => navigate('/admin/users')}
-              className="gap-2 h-8 px-2 relative animate-pulse"
-            >
-              <Shield className="h-3.5 w-3.5" />
-              <span className="hidden lg:inline text-xs">Aprovações</span>
-              <Badge variant="destructive" className="h-5 min-w-5 px-1 flex items-center justify-center text-xs">
-                {pendingApprovalsCount}
-              </Badge>
-            </Button>
-          )}
-          <RealtimeIndicator status={realtimeStatus} lastUpdateTime={lastUpdateTime} />
-          <NotificationCenter />
-          <UserMenu />
-          {isBatchImporting && (
-            <Badge variant="secondary" className="animate-pulse gap-1 h-8 px-2">
-              📦 Importando...
-            </Badge>
-          )}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button className="gap-1.5 h-8 px-2 lg:px-3" size="sm" disabled={isBatchImporting}>
-                <Plus className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">Novo</span>
-                <ChevronDown className="h-3.5 w-3.5" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => {
-              const addButton = document.querySelector('[data-add-order-trigger]') as HTMLElement;
-              addButton?.click();
-            }} disabled={isBatchImporting}>
-                <Plus className="h-4 w-4 mr-2" />
-                Lançamento Manual
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setShowImportDialog(true)} disabled={isBatchImporting}>
-                <FileSpreadsheet className="h-4 w-4 mr-2" />
-                Importar do TOTVS
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => setShowRateioDialog(true)}>
-                <Package className="h-4 w-4 mr-2" />
-                Importar RATEIO (CSV)
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-          
-          <AddOrderDialog onAddOrder={handleAddOrder} />
-        </div>
-      </div>
+  // View mode state
+  const [viewMode, setViewMode] = useState<ViewMode>("kanban");
+  const { density: kanbanDensity, setDensity: setKanbanDensity, autoDetect: kanbanAutoDetect, setAutoDetect: setKanbanAutoDetect } = useKanbanDensity();
 
-      {/* Tab Navigation - Compacta */}
-      <div className="mb-3">
-        
-      </div>
+  return (
+    <SidebarProvider>
+      <div className="flex min-h-screen w-full">
+        <AppSidebar 
+          orders={orders}
+          unreadConversationsCount={unreadConversationsCount}
+          pendingApprovalsCount={pendingApprovalsCount}
+          viewMode={viewMode}
+          kanbanDensity={kanbanDensity}
+          kanbanAutoDetect={kanbanAutoDetect}
+          onViewModeChange={setViewMode}
+          onKanbanDensityChange={setKanbanDensity}
+          onKanbanAutoDetectChange={setKanbanAutoDetect}
+        />
+        <SidebarInset className="flex-1">
+          <div className="min-h-screen bg-background p-4 lg:p-6">
+            {/* Simplified Header */}
+            <div className="flex items-center justify-between mb-4 lg:mb-6">
+              <div className="flex items-center gap-2">
+                <SidebarTrigger className="-ml-1" />
+                <h1 className="text-base md:text-lg lg:text-xl font-bold text-dashboard-header tracking-tight">
+                  Gestão de Pedidos
+                </h1>
+              </div>
+              <div className="flex items-center gap-1.5 lg:gap-2">
+                <div className="relative hidden sm:block">
+                  <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 text-muted-foreground h-3.5 w-3.5" />
+                  <Input 
+                    placeholder="Buscar..." 
+                    value={searchQuery} 
+                    onChange={e => setSearchQuery(e.target.value)} 
+                    className="pl-8 w-32 lg:w-48 h-8 text-sm" 
+                  />
+                </div>
+                <DateRangeFilter dateRange={dateRange} onDateRangeChange={setDateRange} />
+                <ColumnSettings visibility={columnVisibility} onVisibilityChange={setColumnVisibility} />
+                <RealtimeIndicator status={realtimeStatus} lastUpdateTime={lastUpdateTime} />
+                <NotificationCenter />
+                {isBatchImporting && (
+                  <Badge variant="secondary" className="animate-pulse gap-1 h-8 px-2">
+                    📦 Importando...
+                  </Badge>
+                )}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button className="gap-1.5 h-8 px-2 lg:px-3" size="sm" disabled={isBatchImporting}>
+                      <Plus className="h-3.5 w-3.5" />
+                      <span className="hidden sm:inline">Novo</span>
+                      <ChevronDown className="h-3.5 w-3.5" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="bg-popover border border-border">
+                    <DropdownMenuItem onClick={() => {
+                      const addButton = document.querySelector('[data-add-order-trigger]') as HTMLElement;
+                      addButton?.click();
+                    }} disabled={isBatchImporting}>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Lançamento Manual
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setShowImportDialog(true)} disabled={isBatchImporting}>
+                      <FileSpreadsheet className="h-4 w-4 mr-2" />
+                      Importar do TOTVS
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                
+                <AddOrderDialog onAddOrder={handleAddOrder} />
+              </div>
+            </div>
+
+            {/* Tab Navigation - Compacta */}
+            <div className="mb-3">
+              
+            </div>
 
       {/* Content */}
       {loading ? <div className="flex items-center justify-center py-20">
@@ -2319,5 +2269,9 @@ export const Dashboard = () => {
 
       {/* Rateio Upload Dialog */}
       <RateioUploadDialog open={showRateioDialog} onOpenChange={setShowRateioDialog} onSuccess={queueRefresh} />
-    </div>;
+          </div>
+        </SidebarInset>
+      </div>
+    </SidebarProvider>
+  );
 };
