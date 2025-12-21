@@ -85,14 +85,27 @@ export const KanbanCard = ({
   // Verifica se é vendas e-commerce (somente vendas_ecommerce deve piscar)
   const isVendasEcommerce = order.type?.toLowerCase() === 'vendas_ecommerce';
   const isEcommerce = order.type?.toLowerCase().includes('ecommerce');
+  // Minimal priority border - 1px fine line
   const getPriorityClass = (priority: Order["priority"]) => {
     switch (priority) {
       case "high":
-        return "border-l-4 border-l-priority-high";
+        return "border-l border-l-priority-high/70";
       case "medium":
-        return "border-l-4 border-l-priority-medium";
+        return "border-l border-l-priority-medium/70";
       case "low":
-        return "border-l-4 border-l-priority-low";
+        return "border-l border-l-priority-low/70";
+    }
+  };
+  
+  // Priority dot for minimal indicator
+  const getPriorityDotClass = (priority: Order["priority"]) => {
+    switch (priority) {
+      case "high":
+        return "bg-priority-high";
+      case "medium":
+        return "bg-priority-medium";
+      case "low":
+        return "bg-priority-low";
     }
   };
   const getPriorityLabel = (priority: Order["priority"]) => {
@@ -244,98 +257,90 @@ export const KanbanCard = ({
     
     return (
       <div ref={setNodeRef} style={style} className={isDragging ? "dragging" : ""}>
-        <Card 
-          className={cn(
-            "relative kanban-card kanban-card-compact p-1.5 transition-all duration-200",
-            !isEcommerce && !isMinimal && getPriorityClass(order.priority),
-            isMinimal && "border-l border-l-border",
-            isDragging ? 'cursor-grabbing opacity-50 scale-105 shadow-2xl' : 'cursor-pointer hover:shadow-md hover:scale-[1.01]',
-            isVendasEcommerce && !isMinimal && 'animate-ecommerce-pulse border-[2px]',
-            isAnimating && 'animate-card-pop-in'
-          )}
-          onClick={handleCardClick}
-          onMouseDown={() => setClickStart(Date.now())}
+      <Card 
+        className={cn(
+          "group relative kanban-card kanban-card-compact p-1.5 transition-all duration-150 shadow-none",
+          !isEcommerce && !isMinimal && getPriorityClass(order.priority),
+          isMinimal && "border-l border-l-border/50",
+          isDragging ? 'cursor-grabbing opacity-50' : 'cursor-pointer hover:bg-accent/40',
+          isVendasEcommerce && !isMinimal && 'animate-ecommerce-pulse border',
+          isAnimating && 'animate-card-pop-in'
+        )}
+        onClick={handleCardClick}
+        onMouseDown={() => setClickStart(Date.now())}
+      >
+        {/* Drag handle - hidden by default, visible on hover */}
+        <div 
+          className="absolute right-0 top-0 p-0.5 rounded text-muted-foreground/40 cursor-grab active:cursor-grabbing transition-opacity opacity-0 group-hover:opacity-100"
+          {...listeners}
+          {...attributes}
+          onMouseDown={e => { e.stopPropagation(); setClickStart(Date.now() + 500); }}
+          onClick={e => e.stopPropagation()}
         >
-          {/* Drag handle - compact */}
-          <div 
-            className="absolute right-0 top-0 p-0.5 rounded hover:bg-primary/10 text-muted-foreground cursor-grab active:cursor-grabbing transition-colors"
-            {...listeners}
-            {...attributes}
-            onMouseDown={e => { e.stopPropagation(); setClickStart(Date.now() + 500); }}
-            onClick={e => e.stopPropagation()}
-          >
-            <GripVertical className="h-3 w-3" />
-          </div>
+          <GripVertical className="h-2.5 w-2.5" />
+        </div>
           
-          {/* Line 1: Order number, badges, indicators */}
-          <div className="flex items-center gap-1 flex-wrap pr-4">
-            {isEcommerce && !isMinimal && <span className="text-xs">🛒</span>}
-            <span className="font-bold text-[10px]">#{order.orderNumber}</span>
-            
-            {/* WhatsApp indicator */}
-            {(order as any).customer_whatsapp && (
-              <span className="text-[9px]" title="Cliente com WhatsApp cadastrado">📱</span>
-            )}
-            
-            {order.business_area && BUSINESS_AREA_CONFIG[order.business_area] && (
-              <Badge 
-                variant="outline" 
-                className={cn(
-                  "text-[8px] px-0.5 py-0 h-3",
-                  isMinimal ? "minimal-badge" : BUSINESS_AREA_CONFIG[order.business_area].className
-                )}
-              >
-                {BUSINESS_AREA_CONFIG[order.business_area].label}
-              </Badge>
-            )}
-            
-            {sender && (
-              <Badge 
-                variant="outline" 
-                className={cn(
-                  "text-[8px] px-0.5 py-0 h-3",
-                  isMinimal ? "minimal-badge" : "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-300 dark:border-emerald-800"
-                )}
-              >
-                {sender.state}
-              </Badge>
-            )}
-            
-            {/* Source indicators compact - text only in minimal */}
-            {sourceCounts.inStock > 0 && (
-              <span className="text-[9px] text-muted-foreground">
-                {isMinimal ? `${sourceCounts.inStock}ok` : `✓${sourceCounts.inStock}`}
-              </span>
-            )}
-            {sourceCounts.outOfStock > 0 && (
-              <span className={cn("text-[9px]", isMinimal ? "text-muted-foreground font-medium" : "text-red-500")}>
-                {isMinimal ? `${sourceCounts.outOfStock}p` : `⚠${sourceCounts.outOfStock}`}
-              </span>
-            )}
-            {purchaseItemsCount > 0 && (
-              <span className={cn("text-[9px]", isMinimal ? "text-muted-foreground" : "text-amber-600")}>
-                {isMinimal ? `${purchaseItemsCount}c` : `🛒${purchaseItemsCount}`}
-              </span>
-            )}
-            
-            {/* Deadline compact */}
-            <span className={cn(
-              "text-[9px] font-medium ml-auto",
-              isMinimal 
-                ? "text-muted-foreground"
-                : daysRemaining < 0 ? "text-red-500" : daysRemaining <= 2 ? "text-orange-500" : "text-muted-foreground"
-            )}>
-              {daysRemaining < 0 ? `${Math.abs(daysRemaining)}d↓` : daysRemaining === 0 ? "Hoje" : `${daysRemaining}d`}
+        {/* Line 1: Priority dot + Order number + minimal badges */}
+        <div className="flex items-center gap-1 flex-wrap pr-3">
+          {/* Priority dot - minimal indicator */}
+          {!isMinimal && order.priority !== 'low' && (
+            <div className={cn(
+              "w-1.5 h-1.5 rounded-full flex-shrink-0",
+              getPriorityDotClass(order.priority)
+            )} />
+          )}
+          
+          <span className="font-semibold text-[10px] text-foreground/90">#{order.orderNumber}</span>
+          
+          {/* WhatsApp indicator - subtle */}
+          {(order as any).customer_whatsapp && (
+            <span className="text-[8px] text-muted-foreground" title="WhatsApp">📱</span>
+          )}
+          
+          {/* Business area - text only */}
+          {order.business_area && BUSINESS_AREA_CONFIG[order.business_area] && (
+            <span className="text-[8px] text-muted-foreground font-medium">
+              {BUSINESS_AREA_CONFIG[order.business_area].label}
             </span>
-          </div>
+          )}
           
-          {/* Line 2: Client truncated */}
-          <p className="text-[9px] text-muted-foreground line-clamp-1 mt-0.5">
-            {maskText(order.client, 'name')} • {order.items?.length || 0} itens
-          </p>
-        </Card>
-      </div>
-    );
+          {/* State - text only */}
+          {sender && (
+            <span className="text-[8px] text-muted-foreground">
+              {sender.state}
+            </span>
+          )}
+            
+          {/* Source indicators - subtle text */}
+          {sourceCounts.outOfStock > 0 && (
+            <span className="text-[8px] text-destructive/70 font-medium">
+              {sourceCounts.outOfStock}p
+            </span>
+          )}
+          {purchaseItemsCount > 0 && (
+            <span className="text-[8px] text-muted-foreground">
+              {purchaseItemsCount}c
+            </span>
+          )}
+          
+          {/* Deadline - compact mono */}
+          <span className={cn(
+            "text-[9px] font-mono tabular-nums ml-auto",
+            daysRemaining < 0 ? "text-destructive/80" : 
+            daysRemaining <= 2 ? "text-priority-medium/80" : 
+            "text-muted-foreground/70"
+          )}>
+            {daysRemaining < 0 ? `-${Math.abs(daysRemaining)}` : daysRemaining === 0 ? "0" : `${daysRemaining}d`}
+          </span>
+        </div>
+        
+        {/* Line 2: Client + items - subtle */}
+        <p className="text-[9px] text-muted-foreground/80 line-clamp-1 mt-0.5">
+          {maskText(order.client, 'name')} · {order.items?.length || 0}
+        </p>
+      </Card>
+    </div>
+  );
   }
   
   // Full view rendering - SIMPLIFIED (3 lines only)
@@ -346,121 +351,92 @@ export const KanbanCard = ({
     <div ref={setNodeRef} style={style} className={isDragging ? "dragging" : ""}>
       <Card 
         className={cn(
-          "relative kanban-card p-1.5 transition-all duration-200",
+          "group relative kanban-card p-1.5 transition-all duration-150 shadow-none",
           !isEcommerce && !isMinimal && getPriorityClass(order.priority),
-          isMinimal && "border-l border-l-border",
-          isDragging ? 'cursor-grabbing opacity-50 scale-105 shadow-2xl' : 'cursor-pointer hover:shadow-md hover:scale-[1.01]',
-          isVendasEcommerce && !isMinimal && 'animate-ecommerce-pulse border-[2px]',
+          isMinimal && "border-l border-l-border/50",
+          isDragging ? 'cursor-grabbing opacity-50' : 'cursor-pointer hover:bg-accent/40',
+          isVendasEcommerce && !isMinimal && 'animate-ecommerce-pulse border',
           isAnimating && 'animate-card-pop-in'
         )} 
         onClick={handleCardClick} 
         onMouseDown={() => setClickStart(Date.now())}
       >
-        {/* Drag handle */}
+        {/* Drag handle - hidden by default */}
         <div 
-          className="absolute right-0 top-0 p-0.5 rounded hover:bg-primary/10 text-muted-foreground cursor-grab active:cursor-grabbing transition-colors" 
+          className="absolute right-0 top-0 p-0.5 rounded text-muted-foreground/40 cursor-grab active:cursor-grabbing transition-opacity opacity-0 group-hover:opacity-100" 
           {...listeners} 
           {...attributes} 
           onMouseDown={e => { e.stopPropagation(); setClickStart(Date.now() + 500); }} 
           onClick={e => e.stopPropagation()}
         >
-          <GripVertical className="h-3 w-3" />
+          <GripVertical className="h-2.5 w-2.5" />
         </div>
 
-        {/* Line 1: Order number + Area badge + Priority */}
-        <div className="flex items-center gap-1 pr-4 flex-wrap">
-          {isEcommerce && !isMinimal && <span className="text-xs">🛒</span>}
-          <span className="font-bold text-[11px]">#{order.orderNumber}</span>
+        {/* Line 1: Priority dot + Order number + minimal text badges */}
+        <div className="flex items-center gap-1 pr-3 flex-wrap">
+          {/* Priority dot */}
+          {!isMinimal && order.priority !== 'low' && (
+            <div className={cn(
+              "w-1.5 h-1.5 rounded-full flex-shrink-0",
+              getPriorityDotClass(order.priority)
+            )} />
+          )}
+          
+          <span className="font-semibold text-[10px] text-foreground/90">#{order.orderNumber}</span>
           
           {(order as any).customer_whatsapp && (
-            <span className="text-[9px]" title="WhatsApp">📱</span>
+            <span className="text-[8px] text-muted-foreground" title="WhatsApp">📱</span>
           )}
           
+          {/* Business area - text only */}
           {order.business_area && BUSINESS_AREA_CONFIG[order.business_area] && (
-            <Badge 
-              variant="outline" 
-              className={cn(
-                "text-[8px] px-0.5 py-0 h-3.5",
-                isMinimal ? "minimal-badge" : BUSINESS_AREA_CONFIG[order.business_area].className
-              )}
-            >
+            <span className="text-[8px] text-muted-foreground font-medium">
               {BUSINESS_AREA_CONFIG[order.business_area].label}
-            </Badge>
+            </span>
           )}
           
+          {/* State - text only */}
           {sender && (
-            <Badge 
-              variant="outline" 
-              className={cn(
-                "text-[8px] px-0.5 py-0 h-3.5",
-                isMinimal ? "minimal-badge" : "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-300 dark:border-emerald-800"
-              )}
-            >
+            <span className="text-[8px] text-muted-foreground">
               {sender.state}
-            </Badge>
-          )}
-          
-          {/* Priority badge - only high/medium */}
-          {order.priority === 'high' && (
-            <Badge className={cn(
-              "text-[8px] px-1 py-0 h-3.5 ml-auto",
-              isMinimal ? "minimal-badge" : "bg-red-500 text-white"
-            )}>
-              Alta
-            </Badge>
-          )}
-          {order.priority === 'medium' && (
-            <Badge variant="outline" className={cn(
-              "text-[8px] px-1 py-0 h-3.5 ml-auto",
-              isMinimal ? "minimal-badge" : "border-orange-400 text-orange-600 dark:text-orange-400"
-            )}>
-              Média
-            </Badge>
+            </span>
           )}
         </div>
 
-        {/* Line 2: Client + Items count + Source indicators */}
-        <div className="flex items-center gap-1 mt-0.5 text-[10px]">
-          <span className="text-muted-foreground truncate flex-1" title={maskText(order.client, 'name')}>
+        {/* Line 2: Client + items */}
+        <div className="flex items-center gap-1 mt-0.5 text-[9px]">
+          <span className="text-muted-foreground/80 truncate flex-1" title={maskText(order.client, 'name')}>
             {maskText(order.client, 'name')}
           </span>
-          <span className="text-muted-foreground flex-shrink-0">
-            • {order.items?.length || 1} {(order.items?.length || 1) === 1 ? 'item' : 'itens'}
+          <span className="text-muted-foreground/60 flex-shrink-0">
+            · {order.items?.length || 1}
           </span>
           
-          {/* Source indicators inline */}
+          {/* Source indicators - subtle */}
           {sourceCounts.outOfStock > 0 && (
-            <span className={cn("text-[9px] flex-shrink-0", isMinimal ? "font-medium" : "text-red-500")}>
-              ⚠{sourceCounts.outOfStock}
+            <span className="text-[8px] text-destructive/70 font-medium flex-shrink-0">
+              {sourceCounts.outOfStock}p
             </span>
           )}
           {purchaseItemsCount > 0 && (
-            <span className={cn("text-[9px] flex-shrink-0", isMinimal ? "" : "text-amber-600")}>
-              🛒{purchaseItemsCount}
+            <span className="text-[8px] text-muted-foreground flex-shrink-0">
+              {purchaseItemsCount}c
             </span>
           )}
         </div>
 
-        {/* Line 3: Deadline + Days remaining */}
-        <div className="flex items-center justify-between mt-0.5 text-[10px]">
-          <div className="flex items-center gap-0.5 text-muted-foreground">
-            <Clock className="h-2.5 w-2.5" />
-            <span>{new Date(order.deliveryDeadline).toLocaleDateString("pt-BR")}</span>
-          </div>
+        {/* Line 3: Deadline - compact */}
+        <div className="flex items-center justify-between mt-0.5 text-[9px]">
+          <span className="text-muted-foreground/60 font-mono text-[8px]">
+            {new Date(order.deliveryDeadline).toLocaleDateString("pt-BR", { day: '2-digit', month: '2-digit' })}
+          </span>
           <span className={cn(
-            "font-semibold",
-            isMinimal 
-              ? "text-muted-foreground"
-              : daysRemaining < 0 ? "text-red-500" 
-              : daysRemaining <= 2 ? "text-orange-500" 
-              : "text-muted-foreground"
+            "font-mono tabular-nums text-[9px]",
+            daysRemaining < 0 ? "text-destructive/80" : 
+            daysRemaining <= 2 ? "text-priority-medium/80" : 
+            "text-muted-foreground/60"
           )}>
-            {daysRemaining < 0 
-              ? `${Math.abs(daysRemaining)}d atraso` 
-              : daysRemaining === 0 
-              ? "Hoje" 
-              : `${daysRemaining}d`}
-            {daysRemaining < 3 && !isMinimal && <AlertCircle className="inline h-2.5 w-2.5 ml-0.5" />}
+            {daysRemaining < 0 ? `-${Math.abs(daysRemaining)}` : daysRemaining === 0 ? "0" : `${daysRemaining}d`}
           </span>
         </div>
       </Card>
