@@ -176,7 +176,6 @@ export const ViewControls = ({
     };
     return counts;
   }, [orders]);
-  return <TooltipProvider>
-      
-    </TooltipProvider>;
+  // Component is used for types export only - no UI rendered
+  return null;
 };

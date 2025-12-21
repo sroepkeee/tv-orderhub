@@ -8,7 +8,8 @@ const corsHeaders = {
 interface QueryIntent {
   type: 'order_status' | 'daily_summary' | 'delayed_orders' | 'orders_by_phase' | 'top_orders' | 
         'search_customer' | 'help' | 'general' | 'rateio' | 'volumes' | 'cotacoes' | 
-        'historico' | 'anexos' | 'metricas' | 'tendencia' | 'gargalos' | 'transportadora' | 'alertas';
+        'historico' | 'anexos' | 'metricas' | 'tendencia' | 'gargalos' | 'transportadora' | 'alertas' |
+        'item_details' | 'overdue_items' | 'stuck_items';
   params: Record<string, any>;
 }
 
@@ -59,6 +60,28 @@ function fuzzyMatch(input: string): string {
 function detectManagerIntent(message: string): QueryIntent {
   const correctedMessage = fuzzyMatch(message);
   const messageLower = correctedMessage.toLowerCase().trim();
+
+  // ===================== NOVOS COMANDOS DE ITENS =====================
+  
+  // Item específico: "item 1234567" ou "código 1234567"
+  const itemMatch = messageLower.match(/(?:item|código|codigo|cod)\s*#?\s*([a-zA-Z0-9\-]+)/i);
+  if (itemMatch) {
+    return { type: 'item_details', params: { itemCode: itemMatch[1] } };
+  }
+
+  // Itens com SLA vencido
+  if (messageLower.includes('itens atrasados') || messageLower.includes('itens vencidos') || 
+      messageLower.includes('sla vencido') || messageLower.includes('itens overdue')) {
+    return { type: 'overdue_items', params: {} };
+  }
+
+  // Itens parados/travados
+  if ((messageLower.includes('itens') || messageLower.includes('item')) && 
+      (messageLower.includes('parado') || messageLower.includes('travado') || messageLower.includes('stuck'))) {
+    return { type: 'stuck_items', params: {} };
+  }
+
+  // ===================== FIM NOVOS COMANDOS =====================
 
   // Rateio
   const rateioMatch = messageLower.match(/(?:rateio|projeto)\s*#?\s*(\d+)/i);
@@ -1011,6 +1034,7 @@ async function getOrderDetails(supabase: any, orderNumber: string): Promise<stri
 
   const items = order.order_items || [];
   const itemsCount = items.length;
+  const today = new Date();
   
   // Calcular valor total dos itens
   const calculatedValue = items.reduce((sum: number, item: any) => {
@@ -1020,8 +1044,11 @@ async function getOrderDetails(supabase: any, orderNumber: string): Promise<stri
   const totalValue = calculatedValue > 0 ? `R$ ${calculatedValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : 'Não informado';
   
   const deliveryDate = order.delivery_date ? new Date(order.delivery_date) : null;
-  const today = new Date();
   const daysUntilDelivery = deliveryDate ? Math.ceil((deliveryDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)) : null;
+  
+  // Calcular tempo na fase atual (usando updated_at como proxy para início da fase)
+  const orderUpdatedAt = new Date(order.updated_at || order.created_at);
+  const daysInCurrentPhase = Math.ceil((today.getTime() - orderUpdatedAt.getTime()) / (1000 * 60 * 60 * 24));
   
   let slaStatus = '⏳';
   if (daysUntilDelivery !== null) {
@@ -1093,22 +1120,40 @@ async function getOrderDetails(supabase: any, orderNumber: string): Promise<stri
   };
 
   const statusText = statusLabels[order.status] || order.status;
+  const currentPhase = getPhaseFromStatus(order.status);
 
   let response = `📦 *Pedido #${order.order_number}*
 ━━━━━━━━━━━━━━━━━━
 👤 Cliente: ${order.customer_name}
 📍 Status: ${statusText}
+🏷️ Fase: ${currentPhase} (${daysInCurrentPhase}d na fase)
 📅 Previsão: ${deliveryDate ? deliveryDate.toLocaleDateString('pt-BR') : 'Não definida'}
 💰 Valor: ${totalValue}
 ${slaStatus}
 
 📋 *Itens (${itemsCount}):*`;
 
+  // Mostrar itens com mais detalhes incluindo tempo na fase e valor
   items.slice(0, 5).forEach((item: any) => {
-    response += `\n• ${item.requested_quantity}x ${item.item_code}`;
-    if (item.item_description) {
-      response += ` - ${item.item_description.substring(0, 30)}`;
+    const itemValue = item.total_value || (item.unit_price * item.requested_quantity) || 0;
+    const itemPhaseStarted = item.phase_started_at ? new Date(item.phase_started_at) : new Date(item.created_at || order.created_at);
+    const itemDaysInPhase = Math.ceil((today.getTime() - itemPhaseStarted.getTime()) / (1000 * 60 * 60 * 24));
+    
+    // Calcular SLA do item
+    let itemSlaIcon = '⚪';
+    if (item.sla_deadline) {
+      const slaDate = new Date(item.sla_deadline);
+      const daysToSla = Math.ceil((slaDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+      if (daysToSla < 0) itemSlaIcon = '🔴';
+      else if (daysToSla <= 2) itemSlaIcon = '🟡';
+      else itemSlaIcon = '🟢';
     }
+    
+    response += `\n${itemSlaIcon} ${item.requested_quantity}x ${item.item_code}`;
+    if (item.item_description) {
+      response += `\n   📦 ${item.item_description.substring(0, 25)}`;
+    }
+    response += `\n   💰 R$ ${Number(itemValue).toLocaleString('pt-BR')} | ⏱️ ${itemDaysInPhase}d na fase`;
   });
 
   if (items.length > 5) {
@@ -1122,6 +1167,236 @@ ${slaStatus}
   if (order.freight_type) {
     response += `\n📦 Frete: ${order.freight_type}`;
   }
+
+  return response;
+}
+
+// ==================== NOVAS FUNÇÕES DE ITENS ====================
+
+// Buscar detalhes de um item específico
+async function getItemDetails(supabase: any, itemCode: string): Promise<string> {
+  const today = new Date();
+  
+  const { data: items } = await supabase
+    .from('order_items')
+    .select(`
+      id, item_code, item_description, requested_quantity, delivered_quantity, 
+      item_status, unit_price, total_value, delivery_date, sla_deadline, sla_days,
+      current_phase, phase_started_at, item_source_type, created_at,
+      orders(id, order_number, customer_name, status, delivery_date)
+    `)
+    .ilike('item_code', `%${itemCode}%`)
+    .limit(5);
+
+  if (!items || items.length === 0) {
+    return `❌ Item "${itemCode}" não encontrado.`;
+  }
+
+  // Se encontrou múltiplos, mostrar lista
+  if (items.length > 1) {
+    let response = `🔍 *${items.length} itens encontrados para "${itemCode}"*
+━━━━━━━━━━━━━━━━━━`;
+
+    items.forEach((item: any, idx: number) => {
+      const order = item.orders;
+      const itemValue = item.total_value || (item.unit_price * item.requested_quantity) || 0;
+      response += `\n\n${idx + 1}. 📦 *${item.item_code}*
+   Pedido: #${order?.order_number || 'N/A'}
+   Cliente: ${order?.customer_name?.substring(0, 20) || 'N/A'}
+   💰 R$ ${Number(itemValue).toLocaleString('pt-BR')}`;
+    });
+
+    response += `\n\n💡 _Use "item ${items[0].item_code}" para detalhes completos._`;
+    return response;
+  }
+
+  // Item único - mostrar detalhes completos
+  const item = items[0];
+  const order = item.orders;
+  const itemValue = item.total_value || (item.unit_price * item.requested_quantity) || 0;
+  
+  // Calcular tempo na fase
+  const phaseStarted = item.phase_started_at ? new Date(item.phase_started_at) : new Date(item.created_at);
+  const daysInPhase = Math.ceil((today.getTime() - phaseStarted.getTime()) / (1000 * 60 * 60 * 24));
+  
+  // Calcular SLA
+  let slaStatus = '⚪ Não definido';
+  let daysToSla = null;
+  if (item.sla_deadline) {
+    const slaDate = new Date(item.sla_deadline);
+    daysToSla = Math.ceil((slaDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+    if (daysToSla < 0) slaStatus = `🔴 Vencido há ${Math.abs(daysToSla)}d`;
+    else if (daysToSla === 0) slaStatus = '🟡 Vence hoje';
+    else if (daysToSla <= 2) slaStatus = `🟡 Vence em ${daysToSla}d`;
+    else slaStatus = `🟢 OK (${daysToSla}d)`;
+  }
+
+  const sourceLabels: Record<string, string> = {
+    'in_stock': '📦 Em Estoque',
+    'production': '🔧 Produção',
+    'out_of_stock': '🛒 Compra',
+  };
+  const sourceText = sourceLabels[item.item_source_type] || item.item_source_type || 'N/A';
+
+  const statusLabels: Record<string, string> = {
+    'pending': '⏳ Pendente',
+    'in_progress': '🔧 Em Andamento',
+    'completed': '✅ Concluído',
+    'delivered': '✅ Entregue',
+    'cancelled': '❌ Cancelado',
+  };
+  const statusText = statusLabels[item.item_status] || item.item_status || 'N/A';
+
+  return `📦 *Item: ${item.item_code}*
+━━━━━━━━━━━━━━━━━━
+📝 ${item.item_description || 'Sem descrição'}
+
+📋 *Pedido:* #${order?.order_number || 'N/A'}
+👤 *Cliente:* ${order?.customer_name || 'N/A'}
+📍 *Status Pedido:* ${order?.status || 'N/A'}
+
+💰 *Financeiro:*
+• Quantidade: ${item.requested_quantity} un
+• Preço Unit: R$ ${Number(item.unit_price || 0).toLocaleString('pt-BR')}
+• Valor Total: R$ ${Number(itemValue).toLocaleString('pt-BR')}
+
+⏱️ *Tempos:*
+• Origem: ${sourceText}
+• Fase Atual: ${item.current_phase || 'N/A'}
+• Tempo na Fase: ${daysInPhase} dias
+• SLA: ${slaStatus}
+
+📅 *Datas:*
+• Entrega Item: ${item.delivery_date ? new Date(item.delivery_date).toLocaleDateString('pt-BR') : 'N/A'}
+• Entrega Pedido: ${order?.delivery_date ? new Date(order.delivery_date).toLocaleDateString('pt-BR') : 'N/A'}`;
+}
+
+// Buscar itens com SLA vencido
+async function getOverdueItems(supabase: any): Promise<string> {
+  const today = new Date();
+  const todayStr = today.toISOString().split('T')[0];
+
+  const { data: items } = await supabase
+    .from('order_items')
+    .select(`
+      id, item_code, item_description, sla_deadline, current_phase, phase_started_at,
+      unit_price, total_value, requested_quantity,
+      orders(order_number, customer_name, status)
+    `)
+    .lt('sla_deadline', todayStr)
+    .not('item_status', 'in', '("completed","delivered","cancelled")')
+    .order('sla_deadline', { ascending: true })
+    .limit(15);
+
+  if (!items || items.length === 0) {
+    return `✅ *Itens com SLA*
+━━━━━━━━━━━━━━━━━━
+
+🎉 Nenhum item com SLA vencido!
+Todos os itens estão dentro do prazo.`;
+  }
+
+  let totalValue = 0;
+  let response = `🔴 *${items.length} Itens com SLA Vencido*
+━━━━━━━━━━━━━━━━━━`;
+
+  items.slice(0, 10).forEach((item: any, idx: number) => {
+    const order = item.orders;
+    const itemValue = item.total_value || (item.unit_price * item.requested_quantity) || 0;
+    totalValue += Number(itemValue);
+    
+    const slaDate = new Date(item.sla_deadline);
+    const daysOverdue = Math.ceil((today.getTime() - slaDate.getTime()) / (1000 * 60 * 60 * 24));
+    
+    response += `\n\n${idx + 1}. 📦 *${item.item_code}*
+   Pedido: #${order?.order_number || 'N/A'}
+   Fase: ${item.current_phase || 'N/A'}
+   ⏱️ ${daysOverdue}d atrasado | 💰 R$ ${Number(itemValue).toLocaleString('pt-BR')}`;
+  });
+
+  if (items.length > 10) {
+    response += `\n\n... e mais ${items.length - 10} itens`;
+  }
+
+  response += `\n\n━━━━━━━━━━━━━━━━━━
+💰 *Valor em Risco:* R$ ${totalValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+
+⚠️ _Ação imediata necessária!_`;
+
+  return response;
+}
+
+// Buscar itens parados na mesma fase
+async function getStuckItems(supabase: any, thresholdDays: number = 5): Promise<string> {
+  const today = new Date();
+  const thresholdDate = new Date(today.getTime() - thresholdDays * 24 * 60 * 60 * 1000);
+
+  const { data: items } = await supabase
+    .from('order_items')
+    .select(`
+      id, item_code, item_description, current_phase, phase_started_at, created_at,
+      unit_price, total_value, requested_quantity, item_status,
+      orders(order_number, customer_name, status)
+    `)
+    .not('item_status', 'in', '("completed","delivered","cancelled")')
+    .order('phase_started_at', { ascending: true })
+    .limit(50);
+
+  if (!items || items.length === 0) {
+    return `✅ *Itens Parados*
+━━━━━━━━━━━━━━━━━━
+
+🎉 Nenhum item parado encontrado!`;
+  }
+
+  // Filtrar itens parados há mais de X dias
+  const stuckItems = items.filter((item: any) => {
+    const phaseStarted = item.phase_started_at ? new Date(item.phase_started_at) : new Date(item.created_at);
+    return phaseStarted < thresholdDate;
+  });
+
+  if (stuckItems.length === 0) {
+    return `✅ *Itens Parados (>${thresholdDays} dias)*
+━━━━━━━━━━━━━━━━━━
+
+🎉 Nenhum item parado há mais de ${thresholdDays} dias!`;
+  }
+
+  // Agrupar por fase
+  const byPhase: Record<string, any[]> = {};
+  stuckItems.forEach((item: any) => {
+    const phase = item.current_phase || 'Indefinido';
+    if (!byPhase[phase]) byPhase[phase] = [];
+    byPhase[phase].push(item);
+  });
+
+  let response = `⏰ *${stuckItems.length} Itens Parados (>${thresholdDays}d)*
+━━━━━━━━━━━━━━━━━━`;
+
+  Object.entries(byPhase)
+    .sort((a, b) => b[1].length - a[1].length)
+    .forEach(([phase, phaseItems]) => {
+      const emoji = phase.includes('Produção') ? '🔧' : 
+                    phase.includes('Lab') ? '🔬' : 
+                    phase.includes('Embalagem') ? '📦' : 
+                    phase.includes('Faturamento') ? '💳' : '📋';
+      
+      response += `\n\n${emoji} *${phase}* (${phaseItems.length})`;
+      
+      phaseItems.slice(0, 3).forEach((item: any) => {
+        const order = item.orders;
+        const phaseStarted = item.phase_started_at ? new Date(item.phase_started_at) : new Date(item.created_at);
+        const daysStuck = Math.ceil((today.getTime() - phaseStarted.getTime()) / (1000 * 60 * 60 * 24));
+        
+        response += `\n   • ${item.item_code} - #${order?.order_number || 'N/A'} (${daysStuck}d)`;
+      });
+
+      if (phaseItems.length > 3) {
+        response += `\n   ... +${phaseItems.length - 3} itens`;
+      }
+    });
+
+  response += `\n\n🔍 _Verificar gargalos operacionais!_`;
 
   return response;
 }
@@ -1514,6 +1789,11 @@ function getHelpMessage(): string {
 • "gargalos" - Identificar bottlenecks
 • "alertas" - Ver alertas pendentes
 
+📦 *Itens:*
+• "item CODIGO" - Detalhes do item
+• "itens atrasados" - SLA vencido
+• "itens parados" - Travados >5 dias
+
 🔍 *Buscas:*
 • "resumo" - Dashboard do dia
 • "atrasados" - Lista de atrasos
@@ -1755,6 +2035,17 @@ Deno.serve(async (req) => {
       case 'alertas':
         responseMessage = await getPendingAlerts(supabase);
         break;
+      // ===================== NOVOS COMANDOS DE ITENS =====================
+      case 'item_details':
+        responseMessage = await getItemDetails(supabase, intent.params.itemCode);
+        break;
+      case 'overdue_items':
+        responseMessage = await getOverdueItems(supabase);
+        break;
+      case 'stuck_items':
+        responseMessage = await getStuckItems(supabase);
+        break;
+      // ===================== FIM NOVOS COMANDOS =====================
       case 'help':
         responseMessage = getHelpMessage();
         break;
