@@ -60,26 +60,23 @@ const SidebarMetrics = ({ orders }: SidebarMetricsProps) => {
           Pedidos
         </div>
         
-        {/* Métricas principais */}
-        <div className="grid grid-cols-2 gap-2">
+        {/* Métricas principais - 3 colunas */}
+        <div className="grid grid-cols-3 gap-1.5">
           <div className="flex flex-col">
-            <span className="text-lg font-bold text-sidebar-foreground">{metrics.total}</span>
-            <span className="text-[10px] text-sidebar-foreground/60">Ativos</span>
+            <span className="text-base font-bold text-sidebar-foreground">{metrics.total}</span>
+            <span className="text-[9px] text-sidebar-foreground/60">Ativos</span>
           </div>
           <div className="flex flex-col">
-            <span className="text-lg font-bold text-[hsl(var(--progress-good))]">{metrics.completed}</span>
-            <span className="text-[10px] text-sidebar-foreground/60">Concluídos</span>
+            <span className="text-base font-bold text-[hsl(var(--progress-good))]">{metrics.completed}</span>
+            <span className="text-[9px] text-sidebar-foreground/60">Concluídos</span>
+          </div>
+          <div className="flex flex-col">
+            <span className={`text-base font-bold ${metrics.criticalDeadline > 0 ? 'text-orange-500' : 'text-sidebar-foreground/40'}`}>
+              {metrics.criticalDeadline > 0 && '🔥'}{metrics.criticalDeadline}
+            </span>
+            <span className="text-[9px] text-sidebar-foreground/60">Críticos</span>
           </div>
         </div>
-        
-        {/* Críticos */}
-        {metrics.criticalDeadline > 0 && (
-          <div className="flex items-center gap-1.5 text-orange-500 text-xs animate-pulse">
-            <span>🔥</span>
-            <span className="font-medium">{metrics.criticalDeadline}</span>
-            <span className="text-[10px] opacity-80">Críticos</span>
-          </div>
-        )}
         
         {/* Prioridades com legenda */}
         <div className="pt-1.5 border-t border-sidebar-border/30">
