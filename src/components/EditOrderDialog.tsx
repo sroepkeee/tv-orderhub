@@ -2133,73 +2133,74 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
   };
   return <>
       <Dialog open={open} onOpenChange={handleCloseAttempt}>
-        <DialogContent className="max-w-[95vw] max-h-[95vh] p-4">
-          <DialogHeader className="pb-3">
+        <DialogContent className="max-w-[95vw] max-h-[95vh] p-3">
+          <DialogHeader className="pb-2">
             <div className="flex items-center justify-between">
               <div>
-                <DialogTitle>Pedido #{order?.orderNumber}</DialogTitle>
-                <DialogDescription>
-                  Visualize e edite os detalhes do pedido ou acompanhe seu histórico de movimentações
+                <DialogTitle className="text-base">Pedido #{order?.orderNumber}</DialogTitle>
+                <DialogDescription className="text-xs">
+                  Visualize e edite os detalhes do pedido
                 </DialogDescription>
               </div>
-              <Button variant="outline" size="sm" onClick={downloadOrderSummary} className="gap-2">
-                <Download className="h-4 w-4" />
-                Baixar Resumo
+              <Button variant="outline" size="sm" onClick={downloadOrderSummary} className="gap-1.5 h-7 text-xs">
+                <Download className="h-3.5 w-3.5" />
+                Baixar
               </Button>
             </div>
           </DialogHeader>
 
         <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-          <TabsList className="grid w-full grid-cols-8 h-9">
-            <TabsTrigger value="edit" className="flex items-center gap-1.5 data-[state=active]:bg-blue-500 data-[state=active]:text-white text-xs">
-              <Edit className="h-3.5 w-3.5" />
+          <TabsList className="grid w-full grid-cols-8 h-8">
+            <TabsTrigger value="edit" className="flex items-center gap-1 data-[state=active]:bg-blue-500 data-[state=active]:text-white text-[11px] px-1">
+              <Edit className="h-3 w-3" />
               Editar
             </TabsTrigger>
-            <TabsTrigger value="indicators" className="flex items-center gap-1.5 data-[state=active]:bg-indigo-500 data-[state=active]:text-white text-xs">
-              <BarChart3 className="h-3.5 w-3.5" />
+            <TabsTrigger value="indicators" className="flex items-center gap-1 data-[state=active]:bg-indigo-500 data-[state=active]:text-white text-[11px] px-1">
+              <BarChart3 className="h-3 w-3" />
               Indicadores
             </TabsTrigger>
-            <TabsTrigger value="lab" className="flex items-center gap-1.5 data-[state=active]:bg-purple-500 data-[state=active]:text-white text-xs">
-              <FileText className="h-3.5 w-3.5" />
-              Laboratório
+            <TabsTrigger value="lab" className="flex items-center gap-1 data-[state=active]:bg-purple-500 data-[state=active]:text-white text-[11px] px-1">
+              <FileText className="h-3 w-3" />
+              Lab
             </TabsTrigger>
-            <TabsTrigger value="volumes" className="flex items-center gap-1.5 data-[state=active]:bg-amber-500 data-[state=active]:text-white text-xs">
-              <Package className="h-3.5 w-3.5" />
+            <TabsTrigger value="volumes" className="flex items-center gap-1 data-[state=active]:bg-amber-500 data-[state=active]:text-white text-[11px] px-1">
+              <Package className="h-3 w-3" />
               Volumes
             </TabsTrigger>
-            <TabsTrigger value="carriers" className="flex items-center gap-1.5 data-[state=active]:bg-teal-500 data-[state=active]:text-white text-xs">
-              <Send className="h-3.5 w-3.5" />
-              Transportadoras
+            <TabsTrigger value="carriers" className="flex items-center gap-1 data-[state=active]:bg-teal-500 data-[state=active]:text-white text-[11px] px-1">
+              <Send className="h-3 w-3" />
+              Transp.
             </TabsTrigger>
-            <TabsTrigger value="history" className="flex items-center gap-1.5 data-[state=active]:bg-green-500 data-[state=active]:text-white text-xs">
-              <History className="h-3.5 w-3.5" />
+            <TabsTrigger value="history" className="flex items-center gap-1 data-[state=active]:bg-green-500 data-[state=active]:text-white text-[11px] px-1">
+              <History className="h-3 w-3" />
               Histórico
             </TabsTrigger>
-            <TabsTrigger value="comments" className="flex items-center gap-1.5 data-[state=active]:bg-orange-500 data-[state=active]:text-white text-xs">
-              <MessageSquare className="h-3.5 w-3.5" />
-              Comentários
+            <TabsTrigger value="comments" className="flex items-center gap-1 data-[state=active]:bg-orange-500 data-[state=active]:text-white text-[11px] px-1">
+              <MessageSquare className="h-3 w-3" />
+              Coment.
             </TabsTrigger>
-            <TabsTrigger value="attachments" className="flex items-center gap-1.5 data-[state=active]:bg-red-500 data-[state=active]:text-white text-xs">
-              <FileText className="h-3.5 w-3.5" />
+            <TabsTrigger value="attachments" className="flex items-center gap-1 data-[state=active]:bg-red-500 data-[state=active]:text-white text-[11px] px-1">
+              <FileText className="h-3 w-3" />
               Anexos
-              {attachments.length > 0 && <Badge variant="secondary" className="ml-1 text-xs">{attachments.length}</Badge>}
+              {attachments.length > 0 && <Badge variant="secondary" className="ml-0.5 text-[10px] h-4 px-1">{attachments.length}</Badge>}
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="edit" className="mt-3">
-            <ScrollArea className="h-[calc(95vh-200px)] pr-3">
-              <form onSubmit={handleSubmit(onSubmit)} className="space-y-3">
-                <div className="grid grid-cols-2 gap-3">
+          <TabsContent value="edit" className="mt-2">
+            <ScrollArea className="h-[calc(95vh-180px)] pr-2">
+              <form onSubmit={handleSubmit(onSubmit)} className="space-y-2">
+                {/* Linha 1: Tipo, Prioridade, Cliente, Prazo */}
+                <div className="grid grid-cols-4 gap-2">
                   <div>
-                    <Label htmlFor="type">Tipo de Pedido</Label>
+                    <Label htmlFor="type" className="text-xs">Tipo</Label>
                     <Controller name="type" control={control} render={({
                       field
                     }) => <OrderTypeSelector value={field.value} onValueChange={field.onChange} />} />
                   </div>
                   <div>
-                    <Label htmlFor="priority">Prioridade</Label>
+                    <Label htmlFor="priority" className="text-xs">Prioridade</Label>
                     <Select onValueChange={value => setValue("priority", value as any)} defaultValue={order?.priority}>
-                      <SelectTrigger>
+                      <SelectTrigger className="h-8 text-xs">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -2209,127 +2210,89 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                       </SelectContent>
                     </Select>
                   </div>
-                </div>
-
-                <div className="grid grid-cols-3 gap-3">
                   <div>
-                    <Label htmlFor="client">Cliente</Label>
-                    <Input {...register("client", {
-                      required: true
-                    })} />
+                    <Label htmlFor="client" className="text-xs">Cliente</Label>
+                    <Input {...register("client", { required: true })} className="h-8 text-xs" />
                   </div>
                   <div>
-                    <Label htmlFor="customer_whatsapp" className="flex items-center gap-1">
-                      📱 WhatsApp do Cliente
+                    <Label htmlFor="deliveryDeadline" className="text-xs">Prazo Entrega</Label>
+                    <Input {...register("deliveryDeadline", { required: true })} type="date" className="h-8 text-xs" />
+                  </div>
+                </div>
+
+                {/* Linha 2: WhatsApp, Desk, TOTVS, Data Emissão */}
+                <div className="grid grid-cols-4 gap-2">
+                  <div>
+                    <Label htmlFor="customer_whatsapp" className="text-xs flex items-center gap-1">
+                      📱 WhatsApp
                     </Label>
                     <Input 
                       {...register("customer_whatsapp" as any)} 
                       placeholder="51999999999"
                       maxLength={20}
                       type="tel"
+                      className="h-8 text-xs"
                     />
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      Para notificações automáticas
-                    </p>
                   </div>
                   <div>
-                    <Label htmlFor="deskTicket">Nº Chamado Desk</Label>
-                    <Input {...register("deskTicket", {
-                      required: true
-                    })} />
+                    <Label htmlFor="deskTicket" className="text-xs">Chamado Desk</Label>
+                    <Input {...register("deskTicket", { required: true })} className="h-8 text-xs" />
                   </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <Label htmlFor="totvsOrderNumber">Nº Pedido TOTVS</Label>
-                    <Input {...register("totvsOrderNumber" as any)} placeholder="Ex: 123456" maxLength={50} />
+                    <Label htmlFor="totvsOrderNumber" className="text-xs">Pedido TOTVS</Label>
+                    <Input {...register("totvsOrderNumber" as any)} placeholder="123456" maxLength={50} className="h-8 text-xs" />
                   </div>
-                {order.issueDate && <div>
-                      <Label htmlFor="issueDate">Data de Emissão (TOTVS)</Label>
-                      <Input type="date" value={order.issueDate ? order.issueDate.split('T')[0] : ''} disabled className="bg-muted cursor-not-allowed" />
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        Data original do pedido (não editável)
-                      </p>
-                    </div>}
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <Label htmlFor="deliveryDeadline">Prazo de Entrega</Label>
-                    <Input {...register("deliveryDeadline", {
-                      required: true
-                    })} type="date" />
-                  </div>
-                </div>
-
-                {/* Seção Empresa Emissora + RATEIO */}
-                <Card className="p-4 border-dashed border-blue-200 dark:border-blue-800 bg-blue-50/30 dark:bg-blue-950/20">
-                  {/* Empresa Emissora */}
-                  <div className="mb-4">
-                    <div className="flex items-center gap-2 mb-2">
-                      <MapPin className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-                      <h4 className="font-semibold text-sm text-emerald-900 dark:text-emerald-100">Empresa Emissora</h4>
-                    </div>
-                    <Select 
-                      value={(watch('sender_company' as any) || '')} 
-                      onValueChange={(value) => {
-                        const newValue = value === 'none' ? '' : value;
-                        setValue('sender_company' as any, newValue);
-                        // Derivar business_area automaticamente baseado na empresa + centro de custo
-                        handleBusinessAreaDerivation(newValue, watch('cost_center' as any) || '');
-                      }}
-                    >
-                      <SelectTrigger className="bg-white dark:bg-slate-900">
-                        <SelectValue placeholder="Selecionar empresa..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">Nenhuma</SelectItem>
-                        {SENDER_OPTIONS.map(sender => (
-                          <SelectItem key={sender.id} value={sender.id}>
-                            <div className="flex items-center gap-2">
-                              <span className="font-medium">{sender.shortName}</span>
-                              <span className="text-xs text-muted-foreground">({sender.state})</span>
-                            </div>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    {watch('sender_company' as any) && (
-                      <div className="mt-2 text-xs text-muted-foreground bg-muted/50 rounded-md p-2">
-                        {(() => {
-                          const sender = SENDER_OPTIONS.find(s => s.id === watch('sender_company' as any));
-                          return sender ? (
-                            <div className="space-y-0.5">
-                              <p className="font-medium">{sender.name}</p>
-                              <p>CNPJ: {sender.cnpj}</p>
-                              <p className="line-clamp-1">{sender.address}</p>
-                            </div>
-                          ) : null;
-                        })()}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Divider */}
-                  <div className="border-t border-blue-200 dark:border-blue-800 my-3" />
-
-                  {/* RATEIO */}
-                  <div className="flex items-center gap-2 mb-3">
-                    <Building2 className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                    <h4 className="font-semibold text-sm text-blue-900 dark:text-blue-100">RATEIO</h4>
-                  </div>
-                  
-                  <div className="grid grid-cols-3 gap-4">
-                    {/* BU (Business Unit) */}
+                  {order.issueDate && (
                     <div>
-                      <Label className="text-xs text-muted-foreground">BU (Business Unit)</Label>
+                      <Label htmlFor="issueDate" className="text-xs">Emissão TOTVS</Label>
+                      <Input type="date" value={order.issueDate ? order.issueDate.split('T')[0] : ''} disabled className="h-8 text-xs bg-muted cursor-not-allowed" />
+                    </div>
+                  )}
+                </div>
+
+                {/* Seção Empresa Emissora + RATEIO - Compacta */}
+                <Card className="p-2.5 border-dashed border-blue-200 dark:border-blue-800 bg-blue-50/30 dark:bg-blue-950/20">
+                  <div className="grid grid-cols-4 gap-2">
+                    {/* Empresa Emissora */}
+                    <div>
+                      <Label className="text-xs flex items-center gap-1 mb-1">
+                        <MapPin className="h-3 w-3 text-emerald-600" />
+                        Empresa
+                      </Label>
+                      <Select 
+                        value={(watch('sender_company' as any) || '')} 
+                        onValueChange={(value) => {
+                          const newValue = value === 'none' ? '' : value;
+                          setValue('sender_company' as any, newValue);
+                          handleBusinessAreaDerivation(newValue, watch('cost_center' as any) || '');
+                        }}
+                      >
+                        <SelectTrigger className="h-8 text-xs bg-white dark:bg-slate-900">
+                          <SelectValue placeholder="Selecionar..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">Nenhuma</SelectItem>
+                          {SENDER_OPTIONS.map(sender => (
+                            <SelectItem key={sender.id} value={sender.id}>
+                              <span className="text-xs">{sender.shortName}</span>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    
+                    {/* BU */}
+                    <div>
+                      <Label className="text-xs flex items-center gap-1 mb-1">
+                        <Building2 className="h-3 w-3 text-blue-600" />
+                        BU
+                      </Label>
                       <Select 
                         value={watch('business_unit' as any) || ''} 
                         onValueChange={(value) => setValue('business_unit' as any, value === 'none' ? '' : value)}
                       >
-                        <SelectTrigger className="mt-1">
-                          <SelectValue placeholder="Selecionar BU..." />
+                        <SelectTrigger className="h-8 text-xs">
+                          <SelectValue placeholder="Selecionar..." />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="none">Nenhum</SelectItem>
@@ -2343,45 +2306,44 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                     
                     {/* Centro de Custo */}
                     <div>
-                      <Label className="text-xs text-muted-foreground">Centro de Custo</Label>
+                      <Label className="text-xs mb-1 block">Centro Custo</Label>
                       <Select 
                         value={watch('cost_center' as any) || ''} 
                         onValueChange={(value) => {
                           const newValue = value === 'none' ? '' : value;
                           setValue('cost_center' as any, newValue);
-                          // Derivar business_area automaticamente baseado na empresa + centro de custo
                           handleBusinessAreaDerivation(watch('sender_company' as any) || '', newValue);
                         }}
                       >
-                        <SelectTrigger className="mt-1">
-                          <SelectValue placeholder="Selecionar Centro..." />
+                        <SelectTrigger className="h-8 text-xs">
+                          <SelectValue placeholder="Selecionar..." />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="none">Nenhum</SelectItem>
                           {COST_CENTERS.map(cc => (
                             <SelectItem key={cc.code} value={cc.name}>
-                              {cc.name}
+                              <span className="text-xs">{cc.name}</span>
                             </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
                     </div>
                     
-                    {/* Projeto (Item Conta) */}
+                    {/* Projeto */}
                     <div>
-                      <Label className="text-xs text-muted-foreground">Projeto (Item Conta)</Label>
+                      <Label className="text-xs mb-1 block">Projeto</Label>
                       <Input 
-                        className="mt-1"
-                        placeholder="Informe o projeto..."
+                        className="h-8 text-xs"
+                        placeholder="Item conta..."
                         {...register('account_item' as any)}
                       />
                     </div>
                   </div>
                 </Card>
 
-                <div className="pt-3 border-t">
-                  <Label className="text-sm font-medium mb-2 block">Status do Pedido</Label>
-                  <div className="w-full max-w-md">
+                <div className="pt-2 border-t">
+                  <Label className="text-xs font-medium mb-1.5 block">Status</Label>
+                  <div className="w-full max-w-sm">
                     <UnifiedStatusSelector
                       currentStatus={getValues("status") || order.status}
                       orderCategory={order.order_category}
@@ -2390,20 +2352,19 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                   </div>
                 </div>
                 
-                {/* Hidden input para garantir que o status seja enviado no formulário */}
                 <input type="hidden" {...register("status")} />
 
-                <div className="space-y-3 pt-3">
+                <div className="space-y-1.5 pt-2">
                   <div className="flex items-center justify-between">
-                    <Label className="text-lg font-semibold">Itens do Pedido</Label>
+                    <Label className="text-sm font-semibold">Itens do Pedido</Label>
                     <div className="flex items-center gap-2">
                       {/* Botão de envio de e-mail de compras */}
                       {purchaseItemsCount > 0 && (
                         <div className="flex items-center gap-2">
-                          {purchaseEmailSent && purchaseEmailDate && (
-                            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 dark:bg-green-950 dark:text-green-300 dark:border-green-800 gap-1">
-                              <CheckCircle className="h-3 w-3" />
-                              Enviado {format(new Date(purchaseEmailDate), 'dd/MM HH:mm')}
+                      {purchaseEmailSent && purchaseEmailDate && (
+                            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 dark:bg-green-950 dark:text-green-300 dark:border-green-800 gap-1 text-[10px] h-5">
+                              <CheckCircle className="h-2.5 w-2.5" />
+                              {format(new Date(purchaseEmailDate), 'dd/MM HH:mm')}
                             </Badge>
                           )}
                           <Button
@@ -2413,20 +2374,17 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                             size="sm"
                             variant={purchaseEmailSent ? "outline" : "default"}
                             className={cn(
-                              "gap-2",
+                              "gap-1 h-6 text-xs px-2",
                               !purchaseEmailSent && "bg-orange-600 hover:bg-orange-700 text-white"
                             )}
                           >
                             {sendingPurchaseEmail ? (
-                              <>
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                                Enviando...
-                              </>
+                              <Loader2 className="h-3 w-3 animate-spin" />
                             ) : (
                               <>
-                                <Send className="h-4 w-4" />
-                                {purchaseEmailSent ? 'Reenviar' : 'Enviar Compras'}
-                                <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-xs">
+                                <Send className="h-3 w-3" />
+                                {purchaseEmailSent ? 'Reenviar' : 'Compras'}
+                                <Badge variant="secondary" className="ml-0.5 h-4 px-1 text-[10px]">
                                   {purchaseItemsCount}
                                 </Badge>
                               </>
@@ -2434,83 +2392,67 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                           </Button>
                         </div>
                       )}
-                      <Button type="button" onClick={addItem} size="sm" className="gap-2">
-                        <Plus className="h-4 w-4" />
-                        Adicionar Item
+                      <Button type="button" onClick={addItem} size="sm" className="gap-1 h-6 text-xs">
+                        <Plus className="h-3 w-3" />
+                        + Item
                       </Button>
                     </div>
                   </div>
 
-                  {items.length === 0 ? <Card className="p-4 text-center text-muted-foreground text-sm">
-                      Nenhum item adicionado. Clique em "Adicionar Item" para começar.
-                    </Card> : <div className="border rounded-lg">
+                  {items.length === 0 ? <Card className="p-3 text-center text-muted-foreground text-xs">
+                      Nenhum item. Clique em "+ Item" para adicionar.
+                    </Card> : <div className="border rounded-md overflow-hidden">
                       <Table>
                         <TableHeader>
-                          <TableRow>
-                            <TableHead className="w-[120px]">
-                              <div className="flex items-center gap-1.5">
-                                <Package className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
-                                <span>Código</span>
+                          <TableRow className="bg-muted/30">
+                            <TableHead className="w-[90px] h-7 px-1.5 text-[11px]">
+                              <div className="flex items-center gap-1">
+                                <Package className="h-3 w-3 text-blue-600" />
+                                Código
                               </div>
                             </TableHead>
-                            <TableHead className="min-w-[200px]">
-                              <div className="flex items-center gap-1.5">
-                                <FileText className="h-3.5 w-3.5" />
-                                <span>Descrição</span>
+                            <TableHead className="min-w-[150px] h-7 px-1.5 text-[11px]">Descrição</TableHead>
+                            <TableHead className="w-[50px] h-7 px-1.5 text-[11px]">UND</TableHead>
+                            <TableHead className="w-[60px] h-7 px-1.5 text-[11px]">Qtd</TableHead>
+                            <TableHead className="w-[60px] h-7 px-1.5 text-[11px]">Arm.</TableHead>
+                            <TableHead className="w-[100px] h-7 px-1.5 text-[11px]">
+                              <div className="flex items-center gap-1">
+                                <Calendar className="h-3 w-3 text-purple-600" />
+                                Data
                               </div>
                             </TableHead>
-                            <TableHead className="w-[80px]">UND</TableHead>
-                            <TableHead className="w-[100px]">Qtd. Sol.</TableHead>
-                            <TableHead className="w-[100px]">
-                              <div className="flex items-center gap-1.5">
-                                <Package className="h-3.5 w-3.5 text-teal-600 dark:text-teal-400" />
-                                <span>Armazém</span>
-                              </div>
-                            </TableHead>
-                            <TableHead className="w-[140px]">
-                              <div className="flex items-center gap-1.5">
-                                <Calendar className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" />
-                                <span>Data Entrega</span>
-                              </div>
-                            </TableHead>
-                            <TableHead className="w-[120px]">
-                              <div className="flex items-center gap-1.5">
-                                <FileText className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
-                                <span>Nº Ordem</span>
-                              </div>
-                            </TableHead>
-                            <TableHead className="w-[180px]">Situação</TableHead>
-                            <TableHead className="w-[140px]">Compra/Import.</TableHead>
-                            <TableHead className="w-[120px]">Qtd. Recebida</TableHead>
-                            <TableHead className="w-[100px]">Ações</TableHead>
+                            <TableHead className="w-[80px] h-7 px-1.5 text-[11px]">Ordem</TableHead>
+                            <TableHead className="w-[120px] h-7 px-1.5 text-[11px]">Status</TableHead>
+                            <TableHead className="w-[100px] h-7 px-1.5 text-[11px]">Compra</TableHead>
+                            <TableHead className="w-[70px] h-7 px-1.5 text-[11px]">Receb.</TableHead>
+                            <TableHead className="w-[60px] h-7 px-1.5 text-[11px]">Ações</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
                           {items.map((item, index) => <TableRow key={index} data-status={item.item_status} className={`
-                                transition-colors
-                                ${item.item_status === 'completed' ? 'bg-green-50 dark:bg-green-950/20 hover:bg-green-100 dark:hover:bg-green-900/30' : item.deliveredQuantity > 0 && item.deliveredQuantity < item.requestedQuantity ? 'bg-yellow-50 dark:bg-yellow-950/20 hover:bg-yellow-100 dark:hover:bg-yellow-900/30 border-l-4 border-l-yellow-500' : 'hover:bg-muted/50'}
-                                ${item.deliveredQuantity >= item.requestedQuantity && item.deliveredQuantity > 0 ? 'border-l-4 border-l-green-500' : ''}
+                                transition-colors text-xs
+                                ${item.item_status === 'completed' ? 'bg-green-50 dark:bg-green-950/20 hover:bg-green-100 dark:hover:bg-green-900/30' : item.deliveredQuantity > 0 && item.deliveredQuantity < item.requestedQuantity ? 'bg-yellow-50 dark:bg-yellow-950/20 hover:bg-yellow-100 dark:hover:bg-yellow-900/30 border-l-2 border-l-yellow-500' : 'hover:bg-muted/50'}
+                                ${item.deliveredQuantity >= item.requestedQuantity && item.deliveredQuantity > 0 ? 'border-l-2 border-l-green-500' : ''}
                               `}>
-                              <TableCell>
-                                <div className="flex flex-col gap-1">
+                              <TableCell className="p-1 px-1.5">
+                                <div className="flex flex-col gap-0.5">
                                   <Input 
                                     value={item.itemCode} 
                                     onChange={e => updateItem(index, "itemCode", e.target.value)} 
-                                    placeholder="ITEM-001" 
-                                    className="h-8 text-sm font-mono bg-blue-50 dark:bg-blue-950/50 border-blue-200 dark:border-blue-800 focus-visible:ring-blue-400" 
+                                    placeholder="ITEM" 
+                                    className="h-6 text-xs font-mono bg-blue-50 dark:bg-blue-950/50 border-blue-200 dark:border-blue-800" 
                                   />
-                                  {/* Badge de Tipo Material (PA, ME, MP, etc.) */}
                                   {(item as any).material_type && (
                                     <Badge 
                                       variant="outline" 
                                       className={cn(
-                                        "text-xs px-1.5 py-0 w-fit font-mono",
-                                        (item as any).material_type === 'PA' && "bg-green-100 text-green-700 border-green-300 dark:bg-green-900/30 dark:text-green-400 dark:border-green-700",
-                                        (item as any).material_type === 'ME' && "bg-blue-100 text-blue-700 border-blue-300 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-700",
-                                        (item as any).material_type === 'MP' && "bg-orange-100 text-orange-700 border-orange-300 dark:bg-orange-900/30 dark:text-orange-400 dark:border-orange-700",
-                                        (item as any).material_type === 'MC' && "bg-purple-100 text-purple-700 border-purple-300 dark:bg-purple-900/30 dark:text-purple-400 dark:border-purple-700",
-                                        (item as any).material_type === 'PI' && "bg-yellow-100 text-yellow-700 border-yellow-300 dark:bg-yellow-900/30 dark:text-yellow-400 dark:border-yellow-700",
-                                        (item as any).material_type === 'BN' && "bg-gray-100 text-gray-700 border-gray-300 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-600"
+                                        "text-[10px] px-1 py-0 w-fit font-mono",
+                                        (item as any).material_type === 'PA' && "bg-green-100 text-green-700 border-green-300 dark:bg-green-900/30 dark:text-green-400",
+                                        (item as any).material_type === 'ME' && "bg-blue-100 text-blue-700 border-blue-300 dark:bg-blue-900/30 dark:text-blue-400",
+                                        (item as any).material_type === 'MP' && "bg-orange-100 text-orange-700 border-orange-300 dark:bg-orange-900/30 dark:text-orange-400",
+                                        (item as any).material_type === 'MC' && "bg-purple-100 text-purple-700 border-purple-300 dark:bg-purple-900/30 dark:text-purple-400",
+                                        (item as any).material_type === 'PI' && "bg-yellow-100 text-yellow-700 border-yellow-300 dark:bg-yellow-900/30 dark:text-yellow-400",
+                                        (item as any).material_type === 'BN' && "bg-gray-100 text-gray-700 border-gray-300 dark:bg-gray-800 dark:text-gray-400"
                                       )}
                                     >
                                       {(item as any).material_type}
@@ -2518,125 +2460,89 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                                   )}
                                 </div>
                               </TableCell>
-                              <TableCell>
-                                <div className="flex flex-col gap-1">
-                                  <Input 
-                                    value={item.itemDescription} 
-                                    onChange={e => updateItem(index, "itemDescription", e.target.value)} 
-                                    placeholder="Descrição" 
-                                    className="h-8 text-sm bg-background/80 dark:bg-muted/40" 
-                                  />
-                                  {(item as any).ncm_code && 
-                                   (item as any).ncm_code !== '0' && 
-                                   String((item as any).ncm_code).length >= 6 && (
-                                    <span className="text-xs text-muted-foreground font-mono">
-                                      NCM: {(item as any).ncm_code}
-                                    </span>
-                                  )}
-                                </div>
+                              <TableCell className="p-1 px-1.5">
+                                <Input 
+                                  value={item.itemDescription} 
+                                  onChange={e => updateItem(index, "itemDescription", e.target.value)} 
+                                  placeholder="Descrição" 
+                                  className="h-6 text-xs bg-background/80 dark:bg-muted/40" 
+                                />
                               </TableCell>
-                              <TableCell>
+                              <TableCell className="p-1 px-1.5">
                                 <Input 
                                   value={item.unit} 
                                   onChange={e => updateItem(index, "unit", e.target.value)} 
-                                  placeholder="UND" 
-                                  className="h-8 text-sm bg-background/80 dark:bg-muted/40" 
+                                  placeholder="UN" 
+                                  className="h-6 text-xs bg-background/80 dark:bg-muted/40 w-full" 
                                 />
                               </TableCell>
-                              <TableCell>
+                              <TableCell className="p-1 px-1.5">
                                 <Input 
                                   type="number" 
                                   step="0.01" 
                                   value={item.requestedQuantity} 
                                   onChange={e => updateItem(index, "requestedQuantity", parseFloat(e.target.value) || 0)} 
                                   min="0" 
-                                  className="h-8 text-sm bg-background/80 dark:bg-muted/40" 
+                                  className="h-6 text-xs bg-background/80 dark:bg-muted/40 w-full" 
                                 />
                               </TableCell>
-                              <TableCell className="p-1">
-                                <div className="flex items-center gap-1.5">
-                                  <div className="w-2 h-2 rounded-full bg-teal-500 flex-shrink-0" />
-                                  <Input 
-                                    value={item.warehouse} 
-                                    onChange={e => updateItem(index, "warehouse", e.target.value)} 
-                                    placeholder="Armazém" 
-                                    className="h-8 text-sm bg-teal-50 dark:bg-teal-950/50 border-teal-200 dark:border-teal-800 focus-visible:ring-teal-400" 
-                                  />
-                                </div>
+                              <TableCell className="p-1 px-1.5">
+                                <Input 
+                                  value={item.warehouse} 
+                                  onChange={e => updateItem(index, "warehouse", e.target.value)} 
+                                  placeholder="Arm" 
+                                  className="h-6 text-xs bg-teal-50 dark:bg-teal-950/50 border-teal-200 dark:border-teal-800 w-full" 
+                                />
                               </TableCell>
-                              <TableCell>
+                              <TableCell className="p-1 px-1.5">
                                 <Input 
                                   type="date" 
                                   value={item.deliveryDate} 
                                   onChange={e => updateItem(index, "deliveryDate", e.target.value)} 
-                                  className="h-8 text-sm bg-purple-50 dark:bg-purple-950/50 border-purple-200 dark:border-purple-800 focus-visible:ring-purple-400" 
+                                  className="h-6 text-xs bg-purple-50 dark:bg-purple-950/50 border-purple-200 dark:border-purple-800 w-full" 
                                 />
                               </TableCell>
-                              <TableCell>
+                              <TableCell className="p-1 px-1.5">
                                 <div className="relative">
-                                  {/* Label dinâmica baseada no status */}
-                                  {(item.item_status === 'purchase_required' || item.item_status === 'purchase_requested') && (
-                                    <div className="flex items-center gap-1 mb-1">
-                                      <ShoppingCart className="h-3 w-3 text-orange-500" />
-                                      <span className="text-xs text-orange-600 dark:text-orange-400 font-medium">O.C</span>
-                                    </div>
-                                  )}
-                                  {item.item_status === 'awaiting_production' && (
-                                    <div className="flex items-center gap-1 mb-1">
-                                      <Factory className="h-3 w-3 text-blue-500" />
-                                      <span className="text-xs text-blue-600 dark:text-blue-400 font-medium">O.P</span>
-                                    </div>
-                                  )}
                                   <Input 
                                     value={item.production_order_number || ''} 
                                     onChange={e => updateItem(index, "production_order_number", e.target.value)} 
-                                    placeholder={
-                                      (item.item_status === 'purchase_required' || item.item_status === 'purchase_requested') 
-                                        ? "OC-000" 
-                                        : "OP-000"
-                                    }
+                                    placeholder={(item.item_status === 'purchase_required' || item.item_status === 'purchase_requested') ? "OC" : "OP"}
                                     className={cn(
-                                      "h-8 text-sm font-mono",
+                                      "h-6 text-xs font-mono w-full",
                                       (item.item_status === 'purchase_required' || item.item_status === 'purchase_requested')
-                                        ? "bg-orange-50 dark:bg-orange-950/50 border-orange-200 dark:border-orange-800 focus-visible:ring-orange-400"
+                                        ? "bg-orange-50 dark:bg-orange-950/50 border-orange-200"
                                         : item.item_status === 'awaiting_production'
-                                        ? "bg-blue-50 dark:bg-blue-950/50 border-blue-200 dark:border-blue-800 focus-visible:ring-blue-400"
-                                        : "bg-amber-50 dark:bg-amber-950/50 border-amber-200 dark:border-amber-800 focus-visible:ring-amber-400",
-                                      item.id && isFieldModified(item.id, 'production_order_number') && "ring-2 ring-orange-400 border-orange-400"
+                                        ? "bg-blue-50 dark:bg-blue-950/50 border-blue-200"
+                                        : "bg-amber-50 dark:bg-amber-950/50 border-amber-200",
+                                      item.id && isFieldModified(item.id, 'production_order_number') && "ring-1 ring-orange-400"
                                     )}
                                   />
-                                  {item.id && isFieldModified(item.id, 'production_order_number') && (
-                                    <span 
-                                      className="absolute -top-1 -right-1 w-2 h-2 bg-orange-500 rounded-full" 
-                                      title="Campo modificado - não salvo" 
-                                    />
-                                  )}
                                 </div>
                               </TableCell>
-                              <TableCell>
+                              <TableCell className="p-1 px-1.5">
                                 <Select value={item.item_status || 'in_stock'} onValueChange={(value: 'pending' | 'in_stock' | 'awaiting_production' | 'purchase_required' | 'purchase_requested' | 'completed') => updateItem(index, "item_status", value)}>
-                                  <SelectTrigger className={`h-8 text-sm ${
-                                    item.item_status === 'completed' ? 'bg-green-100 dark:bg-green-900/50 border-green-400 text-green-900 dark:text-green-100' :
-                                    item.item_status === 'purchase_required' || item.item_status === 'purchase_requested' ? 'bg-orange-100 dark:bg-orange-900/50 border-orange-400 text-orange-900 dark:text-orange-100' :
-                                    item.item_status === 'awaiting_production' ? 'bg-blue-100 dark:bg-blue-900/50 border-blue-400 text-blue-900 dark:text-blue-100' :
+                                  <SelectTrigger className={`h-6 text-[10px] ${
+                                    item.item_status === 'completed' ? 'bg-green-100 dark:bg-green-900/50 border-green-400 text-green-900' :
+                                    item.item_status === 'purchase_required' || item.item_status === 'purchase_requested' ? 'bg-orange-100 dark:bg-orange-900/50 border-orange-400 text-orange-900' :
+                                    item.item_status === 'awaiting_production' ? 'bg-blue-100 dark:bg-blue-900/50 border-blue-400 text-blue-900' :
                                     'bg-muted/50'
                                   }`}>
                                     <SelectValue />
                                   </SelectTrigger>
                                   <SelectContent>
-                                    <SelectItem value="pending">⏳ Pendente</SelectItem>
-                                    <SelectItem value="in_stock">✅ Disponível em Estoque</SelectItem>
-                                    <SelectItem value="awaiting_production">🏭 Aguardando Produção</SelectItem>
-                                    <SelectItem value="purchase_required">🛒 Solicitar Compra</SelectItem>
-                                    <SelectItem value="purchase_requested">🛒 Solicitado Compra</SelectItem>
-                                    <SelectItem value="completed">✓ Concluído</SelectItem>
+                                    <SelectItem value="pending" className="text-xs">⏳ Pendente</SelectItem>
+                                    <SelectItem value="in_stock" className="text-xs">✅ Estoque</SelectItem>
+                                    <SelectItem value="awaiting_production" className="text-xs">🏭 Produção</SelectItem>
+                                    <SelectItem value="purchase_required" className="text-xs">🛒 Compra</SelectItem>
+                                    <SelectItem value="purchase_requested" className="text-xs">🛒 Solicitado</SelectItem>
+                                    <SelectItem value="completed" className="text-xs">✓ OK</SelectItem>
                                   </SelectContent>
                                 </Select>
                               </TableCell>
-                              <TableCell>
-                                <div className="flex flex-col gap-1.5">
-                                  {/* Checkbox para confirmar andamento na compra */}
-                                  <div className="flex items-center gap-2 px-1 py-0.5 rounded hover:bg-muted/50 transition-colors">
+                              <TableCell className="p-1 px-1.5">
+                                <div className="flex flex-col gap-1">
+                                  <div className="flex items-center gap-1 px-0.5 rounded hover:bg-muted/50">
                                     <Checkbox
                                       id={`purchase-${index}`}
                                       checked={item.purchase_action_started || false}
@@ -2705,18 +2611,18 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                                           updateItem(index, "item_status", isChecked ? 'purchase_requested' : 'purchase_required');
                                         }
                                       }}
-                                      className="h-4 w-4"
+                                      className="h-3 w-3"
                                       disabled={!item.id}
                                     />
                                     <Label 
                                       htmlFor={`purchase-${index}`} 
-                                      className={`text-xs cursor-pointer select-none ${
+                                      className={`text-[10px] cursor-pointer select-none ${
                                         item.purchase_action_started 
                                           ? 'text-green-600 dark:text-green-400 font-semibold' 
                                           : 'text-muted-foreground'
                                       }`}
                                     >
-                                      {item.purchase_action_started ? '✓ Compra OK' : 'Iniciar compra'}
+                                      {item.purchase_action_started ? '✓OK' : 'Ini.'}
                                     </Label>
                                   </div>
 
@@ -2814,14 +2720,13 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                                   )}
                                 </div>
                               </TableCell>
-                              <TableCell>
-                                <div className="flex gap-1">
-                                  <Button type="button" variant="outline" size="sm" onClick={() => handleMarkAsCompleted(item)} disabled={!item.id || item.item_status === 'completed'} className="h-8 gap-1 text-green-700 border-green-300 hover:bg-green-50" title="Marcar como totalmente recebido e concluído">
-                                    <CheckCircle className="h-3 w-3" />
-                                    OK
+                              <TableCell className="p-1 px-1.5">
+                                <div className="flex gap-0.5">
+                                  <Button type="button" variant="outline" size="sm" onClick={() => handleMarkAsCompleted(item)} disabled={!item.id || item.item_status === 'completed'} className="h-5 px-1.5 text-[10px] text-green-700 border-green-300 hover:bg-green-50" title="Concluir">
+                                    ✓
                                   </Button>
-                                  <Button type="button" variant="ghost" size="sm" onClick={() => removeItem(index)} className="h-8 w-8 p-0 text-destructive hover:text-destructive">
-                                    <Trash2 className="h-4 w-4" />
+                                  <Button type="button" variant="ghost" size="sm" onClick={() => removeItem(index)} className="h-5 w-5 p-0 text-destructive hover:text-destructive">
+                                    <Trash2 className="h-3 w-3" />
                                   </Button>
                                 </div>
                               </TableCell>
@@ -2831,23 +2736,23 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                     </div>}
                 </div>
 
-                <div className="flex justify-between items-center gap-2 pt-3 sticky bottom-0 bg-background">
-                  <Button type="button" variant="destructive" size="default" onClick={() => setShowDeleteConfirm(true)} className="gap-2 px-6 py-2 text-base">
-                    <Trash2 className="h-5 w-5" />
-                    Excluir Pedido
+                <div className="flex justify-between items-center gap-2 pt-2 sticky bottom-0 bg-background border-t mt-2">
+                  <Button type="button" variant="destructive" size="sm" onClick={() => setShowDeleteConfirm(true)} className="gap-1 h-7 text-xs">
+                    <Trash2 className="h-3.5 w-3.5" />
+                    Excluir
                   </Button>
                   <div className="flex gap-2">
-                    <Button type="button" variant="outline" size="default" onClick={() => handleCloseAttempt(false)} className="px-6 py-2 text-base">
+                    <Button type="button" variant="outline" size="sm" onClick={() => handleCloseAttempt(false)} className="h-7 text-xs">
                       Cancelar
                     </Button>
-                    <Button type="submit" size="default" className="gap-2 px-6 py-2 text-base">
-                      <Save className="h-5 w-5" />
+                    <Button type="submit" size="sm" className="gap-1 h-7 text-xs">
+                      <Save className="h-3.5 w-3.5" />
                       {modifiedFields.size > 0 && (
-                        <Badge variant="secondary" className="bg-orange-100 dark:bg-orange-900 text-orange-700 dark:text-orange-200">
+                        <Badge variant="secondary" className="bg-orange-100 dark:bg-orange-900 text-orange-700 dark:text-orange-200 h-4 px-1 text-[10px]">
                           {modifiedFields.size}
                         </Badge>
                       )}
-                      Salvar Alterações
+                      Salvar
                     </Button>
                   </div>
                 </div>
