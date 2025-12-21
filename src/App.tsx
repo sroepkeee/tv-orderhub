@@ -19,6 +19,7 @@ import WhatsAppSettings from "./pages/WhatsAppSettings";
 import AIAgent from "./pages/AIAgent";
 import Customers from "./pages/Customers";
 import Onboarding from "./pages/Onboarding";
+import PhaseSettings from "./pages/PhaseSettings";
 import { CarriersChatRoute } from "./components/CarriersChatRoute";
 import { useAuth } from "./hooks/useAuth";
 import { useAdminAuth } from "./hooks/useAdminAuth";
@@ -199,6 +200,13 @@ const App = () => {
                   <Route path="/customers" element={
                     <ProtectedRoute>
                       <Customers />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/settings/phases" element={
+                    <ProtectedRoute>
+                      <AdminRoute>
+                        <PhaseSettings />
+                      </AdminRoute>
                     </ProtectedRoute>
                   } />
                   {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

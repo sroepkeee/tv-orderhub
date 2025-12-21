@@ -1,0 +1,226 @@
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import { useOrganization } from "@/hooks/useOrganization";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { ArrowLeft, Settings2, Plus } from "lucide-react";
+import { toast } from "sonner";
+import { PhaseList } from "@/components/phases/PhaseList";
+import { AddPhaseDialog } from "@/components/phases/AddPhaseDialog";
+
+export interface PhaseConfig {
+  id: string;
+  phase_key: string;
+  display_name: string;
+  order_index: number;
+  responsible_role: string | null;
+  organization_id: string | null;
+}
+
+const PhaseSettings = () => {
+  const navigate = useNavigate();
+  const { organization } = useOrganization();
+  const [phases, setPhases] = useState<PhaseConfig[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [addDialogOpen, setAddDialogOpen] = useState(false);
+
+  const fetchPhases = async () => {
+    if (!organization?.id) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('phase_config')
+        .select('*')
+        .eq('organization_id', organization.id)
+        .order('order_index');
+
+      if (error) throw error;
+      setPhases(data || []);
+    } catch (error) {
+      console.error('Error fetching phases:', error);
+      toast.error('Erro ao carregar fases');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (organization?.id) {
+      fetchPhases();
+    }
+  }, [organization?.id]);
+
+  const handlePhasesReorder = async (reorderedPhases: PhaseConfig[]) => {
+    setPhases(reorderedPhases);
+
+    // Update order_index in database
+    try {
+      const updates = reorderedPhases.map((phase, index) => ({
+        id: phase.id,
+        order_index: index + 1,
+      }));
+
+      for (const update of updates) {
+        const { error } = await supabase
+          .from('phase_config')
+          .update({ order_index: update.order_index })
+          .eq('id', update.id);
+
+        if (error) throw error;
+      }
+
+      toast.success('Ordem das fases atualizada');
+    } catch (error) {
+      console.error('Error reordering phases:', error);
+      toast.error('Erro ao reordenar fases');
+      fetchPhases(); // Revert on error
+    }
+  };
+
+  const handlePhaseUpdate = async (updatedPhase: PhaseConfig) => {
+    try {
+      const { error } = await supabase
+        .from('phase_config')
+        .update({
+          display_name: updatedPhase.display_name,
+          responsible_role: updatedPhase.responsible_role as any,
+        })
+        .eq('id', updatedPhase.id);
+
+      if (error) throw error;
+
+      setPhases(phases.map(p => p.id === updatedPhase.id ? updatedPhase : p));
+      toast.success('Fase atualizada');
+    } catch (error) {
+      console.error('Error updating phase:', error);
+      toast.error('Erro ao atualizar fase');
+    }
+  };
+
+  const handlePhaseDelete = async (phaseId: string) => {
+    try {
+      const { error } = await supabase
+        .from('phase_config')
+        .delete()
+        .eq('id', phaseId);
+
+      if (error) throw error;
+
+      setPhases(phases.filter(p => p.id !== phaseId));
+      toast.success('Fase removida');
+    } catch (error) {
+      console.error('Error deleting phase:', error);
+      toast.error('Erro ao remover fase');
+    }
+  };
+
+  const handlePhaseAdd = async (newPhase: Omit<PhaseConfig, 'id' | 'order_index' | 'organization_id'>) => {
+    if (!organization?.id) return;
+
+    try {
+      const maxOrderIndex = phases.length > 0 
+        ? Math.max(...phases.map(p => p.order_index)) 
+        : 0;
+
+      const { data, error } = await supabase
+        .from('phase_config')
+        .insert({
+          phase_key: newPhase.phase_key,
+          display_name: newPhase.display_name,
+          responsible_role: newPhase.responsible_role as any,
+          organization_id: organization.id,
+          order_index: maxOrderIndex + 1,
+        } as any)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      setPhases([...phases, data]);
+      setAddDialogOpen(false);
+      toast.success('Fase adicionada');
+    } catch (error: any) {
+      console.error('Error adding phase:', error);
+      if (error.code === '23505') {
+        toast.error('Já existe uma fase com essa chave');
+      } else {
+        toast.error('Erro ao adicionar fase');
+      }
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-background">
+      <div className="w-full max-w-4xl mx-auto py-6 px-4">
+        <div className="mb-6">
+          <Button
+            variant="ghost"
+            onClick={() => navigate("/admin/users")}
+            className="mb-3"
+          >
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Voltar para Admin
+          </Button>
+          <div className="flex items-center gap-3 mb-2">
+            <Settings2 className="h-7 w-7 text-primary" />
+            <h1 className="text-3xl font-bold">Configuração de Fases</h1>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            Configure as fases do fluxo de trabalho da sua organização
+          </p>
+        </div>
+
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>Fases do Workflow</CardTitle>
+                <CardDescription>
+                  Arraste para reordenar. Cada fase representa um estágio do seu processo.
+                </CardDescription>
+              </div>
+              <Button onClick={() => setAddDialogOpen(true)}>
+                <Plus className="mr-2 h-4 w-4" />
+                Adicionar Fase
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {phases.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <Settings2 className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <p>Nenhuma fase configurada</p>
+                <p className="text-sm">Adicione fases para organizar seu fluxo de trabalho</p>
+              </div>
+            ) : (
+              <PhaseList
+                phases={phases}
+                onReorder={handlePhasesReorder}
+                onUpdate={handlePhaseUpdate}
+                onDelete={handlePhaseDelete}
+              />
+            )}
+          </CardContent>
+        </Card>
+
+        <AddPhaseDialog
+          open={addDialogOpen}
+          onOpenChange={setAddDialogOpen}
+          onAdd={handlePhaseAdd}
+          existingKeys={phases.map(p => p.phase_key)}
+        />
+      </div>
+    </div>
+  );
+};
+
+export default PhaseSettings;
