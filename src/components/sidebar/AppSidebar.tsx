@@ -175,7 +175,7 @@ const AppSidebar = ({
           <img 
             src={logo} 
             alt="Logo" 
-            className="h-6 w-6 object-contain"
+            className="h-9 w-9 object-contain"
           />
           {!isCollapsed && (
             <span className="font-semibold text-sm text-sidebar-foreground">
