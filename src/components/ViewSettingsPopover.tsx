@@ -152,42 +152,42 @@ export const ViewSettingsPopover = ({
                 />
               </div>
 
-              <div className="flex gap-1">
+              <div className="flex gap-1.5">
                 <Button
-                  variant={kanbanDensity === "comfortable" && !kanbanAutoDetect ? "default" : "outline"}
+                  variant={kanbanDensity === "comfortable" ? "default" : "outline"}
                   size="sm"
                   className={cn(
-                    "flex-1 h-9 flex-col py-1.5",
+                    "flex-1 h-12 flex-col gap-1 py-2",
                     kanbanAutoDetect && kanbanSuggestedDensity === "comfortable" && "ring-2 ring-primary/50"
                   )}
                   onClick={() => onKanbanDensityChange("comfortable")}
                 >
                   <Maximize2 className="h-4 w-4" />
-                  <span className="text-[10px] mt-0.5">Confortável</span>
+                  <span className="text-[10px]">Confortável</span>
                 </Button>
                 <Button
-                  variant={kanbanDensity === "compact" && !kanbanAutoDetect ? "default" : "outline"}
+                  variant={kanbanDensity === "compact" ? "default" : "outline"}
                   size="sm"
                   className={cn(
-                    "flex-1 h-9 flex-col py-1.5",
+                    "flex-1 h-12 flex-col gap-1 py-2",
                     kanbanAutoDetect && kanbanSuggestedDensity === "compact" && "ring-2 ring-primary/50"
                   )}
                   onClick={() => onKanbanDensityChange("compact")}
                 >
                   <Columns3 className="h-4 w-4" />
-                  <span className="text-[10px] mt-0.5">Compacto</span>
+                  <span className="text-[10px]">Compacto</span>
                 </Button>
                 <Button
-                  variant={kanbanDensity === "tv" && !kanbanAutoDetect ? "default" : "outline"}
+                  variant={kanbanDensity === "tv" ? "default" : "outline"}
                   size="sm"
                   className={cn(
-                    "flex-1 h-9 flex-col py-1.5",
+                    "flex-1 h-12 flex-col gap-1 py-2",
                     kanbanAutoDetect && kanbanSuggestedDensity === "tv" && "ring-2 ring-primary/50"
                   )}
                   onClick={() => onKanbanDensityChange("tv")}
                 >
                   <Monitor className="h-4 w-4" />
-                  <span className="text-[10px] mt-0.5">TV</span>
+                  <span className="text-[10px]">TV</span>
                 </Button>
               </div>
             </div>
