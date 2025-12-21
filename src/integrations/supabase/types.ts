@@ -2960,6 +2960,7 @@ export type Database = {
       }
       phase_permissions: {
         Row: {
+          can_advance: boolean | null
           can_delete: boolean | null
           can_edit: boolean | null
           can_view: boolean | null
@@ -2971,6 +2972,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          can_advance?: boolean | null
           can_delete?: boolean | null
           can_edit?: boolean | null
           can_view?: boolean | null
@@ -2982,6 +2984,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          can_advance?: boolean | null
           can_delete?: boolean | null
           can_edit?: boolean | null
           can_view?: boolean | null

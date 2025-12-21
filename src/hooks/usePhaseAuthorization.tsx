@@ -6,8 +6,12 @@ interface PhasePermission {
   phase_key: string;
   can_view: boolean;
   can_edit: boolean;
+  can_advance: boolean;
   can_delete: boolean;
 }
+
+// Roles que têm acesso total automaticamente
+const FULL_ACCESS_ROLES = ['admin', 'manager'];
 
 export const usePhaseAuthorization = () => {
   const { user } = useAuth();
@@ -56,6 +60,9 @@ export const usePhaseAuthorization = () => {
       console.log('🔐 [Phase Authorization] User Roles:', roles);
       setUserRoles(roles);
 
+      // Verificar se tem role com acesso total
+      const hasFullAccess = roles.some(role => FULL_ACCESS_ROLES.includes(role));
+
       // Carregar status de aprovação
       const { data: approvalData, error: approvalError } = await supabase
         .from('user_approval_status')
@@ -65,6 +72,14 @@ export const usePhaseAuthorization = () => {
 
       if (approvalError && approvalError.code !== 'PGRST116') throw approvalError;
       setIsApproved(approvalData?.status === 'approved');
+
+      // Se tem acesso total, não precisa buscar permissões granulares
+      if (hasFullAccess) {
+        console.log('✅ [Phase Authorization] User has full access role');
+        setPhasePermissions([]);
+        setLoading(false);
+        return;
+      }
 
       // Buscar permissões da tabela phase_permissions
       const { data: permissionsData, error: permissionsError } = await supabase
@@ -83,6 +98,7 @@ export const usePhaseAuthorization = () => {
         console.log(`   → Role "${perm.role}" → Phase "${perm.phase_key}":`, {
           view: perm.can_view,
           edit: perm.can_edit,
+          advance: perm.can_advance,
           delete: perm.can_delete
         });
         
@@ -93,6 +109,7 @@ export const usePhaseAuthorization = () => {
             phase_key: perm.phase_key,
             can_view: existing.can_view || perm.can_view,
             can_edit: existing.can_edit || perm.can_edit,
+            can_advance: existing.can_advance || (perm.can_advance ?? false),
             can_delete: existing.can_delete || perm.can_delete,
           });
         } else {
@@ -100,6 +117,7 @@ export const usePhaseAuthorization = () => {
             phase_key: perm.phase_key,
             can_view: perm.can_view,
             can_edit: perm.can_edit,
+            can_advance: perm.can_advance ?? false,
             can_delete: perm.can_delete,
           });
         }
@@ -107,8 +125,6 @@ export const usePhaseAuthorization = () => {
 
       const finalPermissions = Array.from(mergedPermissions.values());
       console.log('✅ [Phase Authorization] Final Permissions:', finalPermissions);
-      console.log('👁️ [Phase Authorization] Can view "invoicing"?', 
-        finalPermissions.find(p => p.phase_key === 'invoicing')?.can_view ?? false);
       
       setPhasePermissions(finalPermissions);
     } catch (error) {
@@ -121,26 +137,37 @@ export const usePhaseAuthorization = () => {
     }
   };
 
+  // Verificar se usuário tem role com acesso total
+  const hasFullAccess = (): boolean => {
+    return userRoles.some(role => FULL_ACCESS_ROLES.includes(role));
+  };
+
   const canViewPhase = (phase: string): boolean => {
-    if (userRoles.includes('admin')) return true;
+    if (hasFullAccess()) return true;
     const permission = phasePermissions.find(p => p.phase_key === phase);
     return permission?.can_view ?? false;
   };
 
   const canEditPhase = (phase: string): boolean => {
-    if (userRoles.includes('admin')) return true;
+    if (hasFullAccess()) return true;
     const permission = phasePermissions.find(p => p.phase_key === phase);
     return permission?.can_edit ?? false;
   };
 
+  const canAdvancePhase = (phase: string): boolean => {
+    if (hasFullAccess()) return true;
+    const permission = phasePermissions.find(p => p.phase_key === phase);
+    return permission?.can_advance ?? false;
+  };
+
   const canDeleteFromPhase = (phase: string): boolean => {
-    if (userRoles.includes('admin')) return true;
+    if (hasFullAccess()) return true;
     const permission = phasePermissions.find(p => p.phase_key === phase);
     return permission?.can_delete ?? false;
   };
 
   const hasRole = (role: string): boolean => {
-    return userRoles.includes(role) || userRoles.includes('admin');
+    return userRoles.includes(role) || hasFullAccess();
   };
 
   return { 
@@ -149,8 +176,10 @@ export const usePhaseAuthorization = () => {
     isApproved,
     canViewPhase, 
     canEditPhase, 
+    canAdvancePhase,
     canDeleteFromPhase,
-    hasRole, 
+    hasRole,
+    hasFullAccess,
     loading 
   };
 };

@@ -4,10 +4,12 @@ import { supabase } from "@/integrations/supabase/client";
 import { useOrganization } from "@/hooks/useOrganization";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, Settings2, Plus } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ArrowLeft, Settings2, Plus, Shield } from "lucide-react";
 import { toast } from "sonner";
 import { PhaseList } from "@/components/phases/PhaseList";
 import { AddPhaseDialog } from "@/components/phases/AddPhaseDialog";
+import { PhasePermissionsMatrix } from "@/components/admin/PhasePermissionsMatrix";
 
 export interface PhaseConfig {
   id: string;
@@ -18,10 +20,17 @@ export interface PhaseConfig {
   organization_id: string | null;
 }
 
+export interface UserByRole {
+  id: string;
+  full_name: string | null;
+  email: string | null;
+}
+
 const PhaseSettings = () => {
   const navigate = useNavigate();
   const { organization } = useOrganization();
   const [phases, setPhases] = useState<PhaseConfig[]>([]);
+  const [usersByRole, setUsersByRole] = useState<Record<string, UserByRole[]>>({});
   const [loading, setLoading] = useState(true);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
 
@@ -45,9 +54,60 @@ const PhaseSettings = () => {
     }
   };
 
+  const fetchUsersByRole = async () => {
+    try {
+      // Buscar user_roles com profiles
+      const { data: rolesData, error: rolesError } = await supabase
+        .from('user_roles')
+        .select('role, user_id');
+
+      if (rolesError) throw rolesError;
+
+      // Buscar profiles
+      const userIds = [...new Set(rolesData?.map(r => r.user_id) || [])];
+      
+      if (userIds.length === 0) {
+        setUsersByRole({});
+        return;
+      }
+
+      const { data: profilesData, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, full_name, email')
+        .in('id', userIds);
+
+      if (profilesError) throw profilesError;
+
+      // Agrupar por role
+      const grouped: Record<string, UserByRole[]> = {};
+      
+      rolesData?.forEach(roleEntry => {
+        const profile = profilesData?.find(p => p.id === roleEntry.user_id);
+        if (profile) {
+          if (!grouped[roleEntry.role]) {
+            grouped[roleEntry.role] = [];
+          }
+          // Evitar duplicatas
+          if (!grouped[roleEntry.role].find(u => u.id === profile.id)) {
+            grouped[roleEntry.role].push({
+              id: profile.id,
+              full_name: profile.full_name,
+              email: profile.email,
+            });
+          }
+        }
+      });
+
+      setUsersByRole(grouped);
+    } catch (error) {
+      console.error('Error fetching users by role:', error);
+    }
+  };
+
   useEffect(() => {
     if (organization?.id) {
       fetchPhases();
+      fetchUsersByRole();
     }
   }, [organization?.id]);
 
@@ -160,7 +220,7 @@ const PhaseSettings = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="w-full max-w-4xl mx-auto py-6 px-4">
+      <div className="w-full max-w-6xl mx-auto py-6 px-4">
         <div className="mb-6">
           <Button
             variant="ghost"
@@ -175,42 +235,62 @@ const PhaseSettings = () => {
             <h1 className="text-3xl font-bold">Configuração de Fases</h1>
           </div>
           <p className="text-sm text-muted-foreground">
-            Configure as fases do fluxo de trabalho da sua organização
+            Configure as fases do fluxo de trabalho e permissões da sua organização
           </p>
         </div>
 
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle>Fases do Workflow</CardTitle>
-                <CardDescription>
-                  Arraste para reordenar. Cada fase representa um estágio do seu processo.
-                </CardDescription>
-              </div>
-              <Button onClick={() => setAddDialogOpen(true)}>
-                <Plus className="mr-2 h-4 w-4" />
-                Adicionar Fase
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {phases.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                <Settings2 className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                <p>Nenhuma fase configurada</p>
-                <p className="text-sm">Adicione fases para organizar seu fluxo de trabalho</p>
-              </div>
-            ) : (
-              <PhaseList
-                phases={phases}
-                onReorder={handlePhasesReorder}
-                onUpdate={handlePhaseUpdate}
-                onDelete={handlePhaseDelete}
-              />
-            )}
-          </CardContent>
-        </Card>
+        <Tabs defaultValue="phases" className="space-y-4">
+          <TabsList>
+            <TabsTrigger value="phases" className="flex items-center gap-2">
+              <Settings2 className="h-4 w-4" />
+              Fases do Workflow
+            </TabsTrigger>
+            <TabsTrigger value="permissions" className="flex items-center gap-2">
+              <Shield className="h-4 w-4" />
+              Matriz de Permissões
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="phases">
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>Fases do Workflow</CardTitle>
+                    <CardDescription>
+                      Arraste para reordenar. Cada fase representa um estágio do seu processo.
+                    </CardDescription>
+                  </div>
+                  <Button onClick={() => setAddDialogOpen(true)}>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Adicionar Fase
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {phases.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Settings2 className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                    <p>Nenhuma fase configurada</p>
+                    <p className="text-sm">Adicione fases para organizar seu fluxo de trabalho</p>
+                  </div>
+                ) : (
+                  <PhaseList
+                    phases={phases}
+                    usersByRole={usersByRole}
+                    onReorder={handlePhasesReorder}
+                    onUpdate={handlePhaseUpdate}
+                    onDelete={handlePhaseDelete}
+                  />
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="permissions">
+            <PhasePermissionsMatrix />
+          </TabsContent>
+        </Tabs>
 
         <AddPhaseDialog
           open={addDialogOpen}

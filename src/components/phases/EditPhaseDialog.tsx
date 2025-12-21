@@ -17,17 +17,20 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Users } from "lucide-react";
 import { ROLE_LABELS } from "@/lib/roleLabels";
-import type { PhaseConfig } from "@/pages/PhaseSettings";
+import type { PhaseConfig, UserByRole } from "@/pages/PhaseSettings";
 
 interface EditPhaseDialogProps {
   phase: PhaseConfig | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSave: (phase: PhaseConfig) => void;
+  usersByRole?: Record<string, UserByRole[]>;
 }
 
-export function EditPhaseDialog({ phase, open, onOpenChange, onSave }: EditPhaseDialogProps) {
+export function EditPhaseDialog({ phase, open, onOpenChange, onSave, usersByRole = {} }: EditPhaseDialogProps) {
   const [displayName, setDisplayName] = useState("");
   const [responsibleRole, setResponsibleRole] = useState<string>("");
 
@@ -50,9 +53,19 @@ export function EditPhaseDialog({ phase, open, onOpenChange, onSave }: EditPhase
     });
   };
 
+  const getInitials = (name: string | null, email: string | null) => {
+    if (name) return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+    if (email) return email[0].toUpperCase();
+    return '?';
+  };
+
   const availableRoles = Object.entries(ROLE_LABELS).filter(
     ([key]) => !['admin'].includes(key)
   );
+
+  const currentRoleUsers = responsibleRole && responsibleRole !== "__none__" 
+    ? usersByRole[responsibleRole] || [] 
+    : [];
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -103,6 +116,29 @@ export function EditPhaseDialog({ phase, open, onOpenChange, onSave }: EditPhase
               </SelectContent>
             </Select>
           </div>
+
+          {currentRoleUsers.length > 0 && (
+            <div className="space-y-2 p-3 bg-muted/50 rounded-lg">
+              <div className="flex items-center gap-2 text-sm font-medium">
+                <Users className="h-4 w-4" />
+                <span>{currentRoleUsers.length} usuário{currentRoleUsers.length !== 1 ? 's' : ''} com esta função</span>
+              </div>
+              <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto">
+                {currentRoleUsers.map((user) => (
+                  <div key={user.id} className="flex items-center gap-1.5 bg-background px-2 py-1 rounded-full text-xs">
+                    <Avatar className="h-5 w-5">
+                      <AvatarFallback className="text-[8px]">
+                        {getInitials(user.full_name, user.email)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <span className="truncate max-w-[100px]">
+                      {user.full_name || user.email || 'Sem nome'}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
