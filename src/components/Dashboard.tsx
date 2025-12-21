@@ -222,8 +222,13 @@ export const Dashboard = () => {
   const {
     user
   } = useAuth();
-  const { isAdmin } = useAdminAuth();
-  const { phasePermissions, userRoles } = usePhaseAuthorization();
+  const {
+    isAdmin
+  } = useAdminAuth();
+  const {
+    phasePermissions,
+    userRoles
+  } = usePhaseAuthorization();
   const navigate = useNavigate();
   const location = useLocation();
   const [activeTab, setActiveTab] = useState("all");
@@ -241,7 +246,6 @@ export const Dashboard = () => {
   const [realtimeStatus, setRealtimeStatus] = useState<'synced' | 'updating' | 'disconnected'>('synced');
   const [lastUpdateTime, setLastUpdateTime] = useState<Date | null>(null);
   const [pendingApprovalsCount, setPendingApprovalsCount] = useState(0);
-  
   const isUpdatingRef = useRef(false);
   const loadingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isLoadingRef = useRef(false);
@@ -297,17 +301,21 @@ export const Dashboard = () => {
   // Listener para evento openOrder (notificações)
   useEffect(() => {
     const handleOpenOrder = (event: CustomEvent) => {
-      const { orderId, commentId } = event.detail;
-      
-      console.log('🔔 Evento openOrder recebido:', { orderId, commentId });
-      
+      const {
+        orderId,
+        commentId
+      } = event.detail;
+      console.log('🔔 Evento openOrder recebido:', {
+        orderId,
+        commentId
+      });
+
       // Buscar o pedido completo
       const order = orders.find(o => o.id === orderId);
-      
       if (order) {
         setSelectedOrder(order);
         setShowEditDialog(true);
-        
+
         // Se tem commentId, armazenar para scroll posterior
         if (commentId) {
           sessionStorage.setItem('scrollToComment', commentId);
@@ -315,68 +323,62 @@ export const Dashboard = () => {
         }
       } else {
         // Pedido não está na lista atual, fazer busca direta
-        supabase
-          .from('orders')
-          .select('*')
-          .eq('id', orderId)
-          .single()
-          .then(({ data, error }) => {
-            if (error || !data) {
-              toast({
-                title: 'Pedido não encontrado',
-                description: 'Não foi possível abrir o pedido.',
-                variant: 'destructive'
-              });
-              return;
-            }
-            
-            // Converter para formato Order e abrir
-            const formattedOrder: Order = {
-              id: data.id,
-              orderNumber: data.order_number,
-              type: data.order_type as OrderType,
-              priority: data.priority as Priority,
-              status: data.status as OrderStatus,
-              client: data.customer_name,
-              deliveryDeadline: data.delivery_date,
-              delivery_address: data.delivery_address,
-              createdDate: data.created_at,
-              issueDate: data.issue_date || undefined,
-              item: '',
-              description: '',
-              quantity: 0,
-              deskTicket: '',
-              totvsOrderNumber: data.totvs_order_number || undefined,
-              order_category: data.order_category || undefined,
-              requires_firmware: data.requires_firmware || false,
-              firmware_project_name: data.firmware_project_name || undefined,
-              requires_image: data.requires_image || false,
-              image_project_name: data.image_project_name || undefined,
-              freight_type: data.freight_type || undefined,
-              freight_value: data.freight_value || undefined,
-              freight_modality: data.freight_modality || undefined,
-              carrier_name: data.carrier_name || undefined,
-              tracking_code: data.tracking_code || undefined,
-              package_volumes: data.package_volumes || undefined,
-              package_weight_kg: data.package_weight_kg || undefined,
-              package_height_m: data.package_height_m || undefined,
-              package_width_m: data.package_width_m || undefined,
-              package_length_m: data.package_length_m || undefined,
-            };
-            
-            setSelectedOrder(formattedOrder);
-            setShowEditDialog(true);
-            
-            if (commentId) {
-              sessionStorage.setItem('scrollToComment', commentId);
-              sessionStorage.setItem('activeTab', 'comments');
-            }
-          });
+        supabase.from('orders').select('*').eq('id', orderId).single().then(({
+          data,
+          error
+        }) => {
+          if (error || !data) {
+            toast({
+              title: 'Pedido não encontrado',
+              description: 'Não foi possível abrir o pedido.',
+              variant: 'destructive'
+            });
+            return;
+          }
+
+          // Converter para formato Order e abrir
+          const formattedOrder: Order = {
+            id: data.id,
+            orderNumber: data.order_number,
+            type: data.order_type as OrderType,
+            priority: data.priority as Priority,
+            status: data.status as OrderStatus,
+            client: data.customer_name,
+            deliveryDeadline: data.delivery_date,
+            delivery_address: data.delivery_address,
+            createdDate: data.created_at,
+            issueDate: data.issue_date || undefined,
+            item: '',
+            description: '',
+            quantity: 0,
+            deskTicket: '',
+            totvsOrderNumber: data.totvs_order_number || undefined,
+            order_category: data.order_category || undefined,
+            requires_firmware: data.requires_firmware || false,
+            firmware_project_name: data.firmware_project_name || undefined,
+            requires_image: data.requires_image || false,
+            image_project_name: data.image_project_name || undefined,
+            freight_type: data.freight_type || undefined,
+            freight_value: data.freight_value || undefined,
+            freight_modality: data.freight_modality || undefined,
+            carrier_name: data.carrier_name || undefined,
+            tracking_code: data.tracking_code || undefined,
+            package_volumes: data.package_volumes || undefined,
+            package_weight_kg: data.package_weight_kg || undefined,
+            package_height_m: data.package_height_m || undefined,
+            package_width_m: data.package_width_m || undefined,
+            package_length_m: data.package_length_m || undefined
+          };
+          setSelectedOrder(formattedOrder);
+          setShowEditDialog(true);
+          if (commentId) {
+            sessionStorage.setItem('scrollToComment', commentId);
+            sessionStorage.setItem('activeTab', 'comments');
+          }
+        });
       }
     };
-    
     window.addEventListener('openOrder', handleOpenOrder as EventListener);
-    
     return () => {
       window.removeEventListener('openOrder', handleOpenOrder as EventListener);
     };
@@ -384,19 +386,21 @@ export const Dashboard = () => {
 
   // Listener para navegação de retorno do chat (auto-abrir pedido)
   useEffect(() => {
-    const navigationState = location.state as { openOrderId?: string; openOrderNumber?: string } | null;
+    const navigationState = location.state as {
+      openOrderId?: string;
+      openOrderNumber?: string;
+    } | null;
     if (navigationState?.openOrderId && orders.length > 0) {
       const order = orders.find(o => o.id === navigationState.openOrderId);
       if (order) {
         setSelectedOrder(order);
         setShowEditDialog(true);
-        
+
         // Limpar o state para não reabrir em navegações futuras
         window.history.replaceState({}, document.title);
       }
     }
   }, [location.state, orders]);
-  
   const loadUnreadCount = async () => {
     try {
       const {
@@ -414,28 +418,24 @@ export const Dashboard = () => {
   // Load pending approvals count for admin
   useEffect(() => {
     if (!isAdmin) return;
-    
     const loadPendingCount = async () => {
-      const { count } = await supabase
-        .from('user_approval_status')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'pending');
-      
+      const {
+        count
+      } = await supabase.from('user_approval_status').select('*', {
+        count: 'exact',
+        head: true
+      }).eq('status', 'pending');
       setPendingApprovalsCount(count || 0);
     };
-    
     loadPendingCount();
-    
+
     // Realtime subscription
-    const channel = supabase
-      .channel('pending-approvals')
-      .on('postgres_changes', 
-        { event: '*', schema: 'public', table: 'user_approval_status' },
-        loadPendingCount
-      )
-      .subscribe();
-    
-    return () => { 
+    const channel = supabase.channel('pending-approvals').on('postgres_changes', {
+      event: '*',
+      schema: 'public',
+      table: 'user_approval_status'
+    }, loadPendingCount).subscribe();
+    return () => {
       supabase.removeChannel(channel);
     };
   }, [isAdmin]);
@@ -451,17 +451,14 @@ export const Dashboard = () => {
   // Update seletivo de pedido individual
   const updateSingleOrder = async (orderId: string) => {
     try {
-      const { data, error } = await supabase
-        .from('orders')
-        .select(`
+      const {
+        data,
+        error
+      } = await supabase.from('orders').select(`
           *,
           order_items(*)
-        `)
-        .eq('id', orderId)
-        .single();
-        
+        `).eq('id', orderId).single();
       if (error) throw error;
-      
       if (data) {
         setOrders(prev => {
           const index = prev.findIndex(o => o.id === orderId);
@@ -487,10 +484,8 @@ export const Dashboard = () => {
             userId: item.user_id,
             production_order_number: item.production_order_number
           }));
-
           const firstItem = items[0];
           const totalRequested = items.reduce((sum, item) => sum + item.requestedQuantity, 0);
-
           const transformedOrder = {
             id: data.id,
             type: data.order_type,
@@ -520,7 +515,6 @@ export const Dashboard = () => {
             // Campo empresa emissora
             sender_company: data.sender_company || null
           } as Order;
-          
           if (index === -1) {
             return [...prev, transformedOrder];
           }
@@ -528,7 +522,6 @@ export const Dashboard = () => {
           updated[index] = transformedOrder;
           return updated;
         });
-        
         setRealtimeStatus('synced');
         setLastUpdateTime(new Date());
       }
@@ -540,18 +533,16 @@ export const Dashboard = () => {
 
   // Fila de Refresh com Smart Throttle (150ms)
   const lastEventTimeRef = useRef(0);
-  
   const queueRefresh = () => {
     // ✅ Ignorar eventos durante batch import
     if (isBatchImportingRef.current) {
       console.log('📦 [queueRefresh] Batch import em andamento, ignorando evento Realtime');
       return;
     }
-    
     const now = Date.now();
     const timeSinceLastEvent = now - lastEventTimeRef.current;
     lastEventTimeRef.current = now;
-    
+
     // ⚡ Se evento isolado (>2s desde último), reload imediato
     if (timeSinceLastEvent > 2000 && !pendingRefreshRef.current) {
       console.log('⚡ [queueRefresh] Evento isolado - reload imediato');
@@ -560,16 +551,13 @@ export const Dashboard = () => {
       }
       return;
     }
-    
+
     // 📦 Caso contrário, agrupar eventos com delay curto (150ms)
     if (pendingRefreshRef.current) return;
-    
     pendingRefreshRef.current = true;
-    
     if (refreshQueueRef.current) {
       clearTimeout(refreshQueueRef.current);
     }
-    
     refreshQueueRef.current = setTimeout(() => {
       pendingRefreshRef.current = false;
       if (!isLoadingRef.current && !isUpdatingRef.current) {
@@ -582,58 +570,50 @@ export const Dashboard = () => {
   // 📡 Realtime subscriptions com update seletivo
   useEffect(() => {
     if (!user) return;
-    
     console.log('📡 [Realtime] Iniciando subscriptions expandidas...');
     setRealtimeStatus('updating');
-    
-    const channel = supabase
-      .channel('orders-realtime')
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'orders'
-      }, (payload) => {
-        console.log('📡 [Realtime] Evento em orders:', payload.eventType);
-        
-        // Update seletivo para INSERT/UPDATE
-        if ((payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') && payload.new?.id) {
-          setRealtimeStatus('updating');
-          updateSingleOrder(payload.new.id as string);
-          return;
-        }
-        
-        // DELETE: reload completo
+    const channel = supabase.channel('orders-realtime').on('postgres_changes', {
+      event: '*',
+      schema: 'public',
+      table: 'orders'
+    }, payload => {
+      console.log('📡 [Realtime] Evento em orders:', payload.eventType);
+
+      // Update seletivo para INSERT/UPDATE
+      if ((payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') && payload.new?.id) {
+        setRealtimeStatus('updating');
+        updateSingleOrder(payload.new.id as string);
+        return;
+      }
+
+      // DELETE: reload completo
+      queueRefresh();
+    }).on('postgres_changes', {
+      event: '*',
+      schema: 'public',
+      table: 'order_items'
+    }, payload => {
+      console.log('📡 [Realtime] Evento em order_items:', payload.eventType);
+      if ((payload.new as any)?.order_id) {
+        updateSingleOrder((payload.new as any).order_id as string);
+      } else {
         queueRefresh();
-      })
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'order_items'
-      }, (payload) => {
-        console.log('📡 [Realtime] Evento em order_items:', payload.eventType);
-        if ((payload.new as any)?.order_id) {
-          updateSingleOrder((payload.new as any).order_id as string);
-        } else {
-          queueRefresh();
-        }
-      })
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'order_history'
-      }, (payload) => {
-        console.log('📡 [Realtime] Evento em order_history:', payload.eventType);
-        queueRefresh();
-      })
-      .subscribe((status) => {
-        console.log('📡 [Realtime] Status da conexão:', status);
-        if (status === 'SUBSCRIBED') {
-          setRealtimeStatus('synced');
-        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-          setRealtimeStatus('disconnected');
-        }
-      });
-    
+      }
+    }).on('postgres_changes', {
+      event: '*',
+      schema: 'public',
+      table: 'order_history'
+    }, payload => {
+      console.log('📡 [Realtime] Evento em order_history:', payload.eventType);
+      queueRefresh();
+    }).subscribe(status => {
+      console.log('📡 [Realtime] Status da conexão:', status);
+      if (status === 'SUBSCRIBED') {
+        setRealtimeStatus('synced');
+      } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+        setRealtimeStatus('disconnected');
+      }
+    });
     return () => {
       console.log('📡 [Realtime] Limpando subscriptions...');
       if (refreshQueueRef.current) clearTimeout(refreshQueueRef.current);
@@ -644,32 +624,36 @@ export const Dashboard = () => {
   // 📢 Broadcast channel para sincronização instantânea
   useEffect(() => {
     if (!user) return;
-
     console.log('📢 [Broadcast] Configurando canal de broadcast');
-    
-    const broadcastChannel = supabase
-      .channel('order-status-broadcast')
-      .on('broadcast', { event: 'status_changed' }, (payload) => {
-        const { orderId, newStatus, changedBy, orderNumber } = payload.payload;
-        
-        // Ignorar se foi mudança do próprio usuário
-        if (changedBy === user.id) return;
-        
-        console.log('📢 [Broadcast] Status mudou:', { orderNumber, newStatus });
-        
-        // Update imediato na UI
-        setOrders(prev => prev.map(o => 
-          o.id === orderId ? { ...o, status: newStatus as OrderStatus } : o
-        ));
-        
-        // Feedback visual
-        setRealtimeStatus('updating');
-        setTimeout(() => setRealtimeStatus('synced'), 1000);
-      })
-      .subscribe((status) => {
-        console.log('📢 [Broadcast] Status:', status);
+    const broadcastChannel = supabase.channel('order-status-broadcast').on('broadcast', {
+      event: 'status_changed'
+    }, payload => {
+      const {
+        orderId,
+        newStatus,
+        changedBy,
+        orderNumber
+      } = payload.payload;
+
+      // Ignorar se foi mudança do próprio usuário
+      if (changedBy === user.id) return;
+      console.log('📢 [Broadcast] Status mudou:', {
+        orderNumber,
+        newStatus
       });
-      
+
+      // Update imediato na UI
+      setOrders(prev => prev.map(o => o.id === orderId ? {
+        ...o,
+        status: newStatus as OrderStatus
+      } : o));
+
+      // Feedback visual
+      setRealtimeStatus('updating');
+      setTimeout(() => setRealtimeStatus('synced'), 1000);
+    }).subscribe(status => {
+      console.log('📢 [Broadcast] Status:', status);
+    });
     return () => {
       console.log('📢 [Broadcast] Cleanup: removendo canal');
       supabase.removeChannel(broadcastChannel);
@@ -683,7 +667,6 @@ export const Dashboard = () => {
       isBatchImportingRef.current = true;
       setIsBatchImporting(true);
     };
-    
     const handleBatchComplete = () => {
       console.log('✅ [Dashboard] Batch import concluído, recarregando lista');
       isBatchImportingRef.current = false;
@@ -700,10 +683,8 @@ export const Dashboard = () => {
         }, 100);
       }
     };
-    
     window.addEventListener('batchImportStart', handleBatchStart);
     window.addEventListener('batchImportComplete', handleBatchComplete);
-    
     return () => {
       window.removeEventListener('batchImportStart', handleBatchStart);
       window.removeEventListener('batchImportComplete', handleBatchComplete);
@@ -714,13 +695,17 @@ export const Dashboard = () => {
   // Toast consolidado e limitado
   const showLimitedToast = (title: string, description: string, variant: "default" | "destructive" = "default") => {
     const now = Date.now();
-    if (now - lastToastTimeRef.current < 300000) { // 5 minutos
+    if (now - lastToastTimeRef.current < 300000) {
+      // 5 minutos
       console.log('🔕 Toast suprimido (cooldown ativo)');
       return;
     }
-    
     lastToastTimeRef.current = now;
-    toast({ title, description, variant });
+    toast({
+      title,
+      description,
+      variant
+    });
   };
 
   // 🆕 Helper para mapear phase_key → statuses
@@ -755,16 +740,15 @@ export const Dashboard = () => {
     if (['released_for_shipping', 'in_expedition', 'in_transit', 'pickup_scheduled', 'awaiting_pickup', 'collected'].includes(status)) return 'logistics';
     return 'completion';
   };
-
   const loadOrders = async () => {
     if (!user) return;
-    
+
     // Evitar carregamentos concorrentes
     if (isLoadingRef.current) {
       console.log('⏭️ [loadOrders] Carregamento já em andamento, ignorando...');
       return;
     }
-    
+
     // Cancelar requisição anterior se existir
     if (abortControllerRef.current) {
       console.log('🛑 [loadOrders] Cancelando requisição anterior...');
@@ -774,33 +758,32 @@ export const Dashboard = () => {
     // Criar novo AbortController e requestId
     abortControllerRef.current = new AbortController();
     const currentRequestId = ++requestIdRef.current;
-    
     isLoadingRef.current = true;
     setRealtimeStatus('updating'); // 🔄 Indicar que está atualizando
     const startTime = performance.now();
-    
+
     // 🆕 Buscar fases permitidas do usuário
-    const { data: userPhases } = await supabase.rpc('get_user_phases', {
+    const {
+      data: userPhases
+    } = await supabase.rpc('get_user_phases', {
       _user_id: user.id
     });
-    
     const allowedPhases = userPhases?.map(p => p.phase_key) || [];
     const isAdminUser = userRoles.includes('admin');
-    
-    console.log('🔄 [loadOrders] Iniciando carregamento...', { 
-      userId: user.id, 
+    console.log('🔄 [loadOrders] Iniciando carregamento...', {
+      userId: user.id,
       requestId: currentRequestId,
       isAdmin: isAdminUser,
       allowedPhases
     });
-    
+
     // Loading state bifurcado
     if (!hasLoadedOnceRef.current) {
       setLoading(true);
     } else {
       setRefreshing(true);
     }
-    
+
     // Timeout de segurança por chamada
     loadingTimeoutRef.current = setTimeout(() => {
       console.error('⏱️ [loadOrders] Timeout de 15s atingido');
@@ -808,20 +791,13 @@ export const Dashboard = () => {
       setRefreshing(false);
       isLoadingRef.current = false;
       setRealtimeStatus('disconnected'); // ❌ Indicar desconexão
-      showLimitedToast(
-        "Carregamento lento",
-        "A conexão está demorando. Tente novamente.",
-        "default"
-      );
+      showLimitedToast("Carregamento lento", "A conexão está demorando. Tente novamente.", "default");
     }, 15000);
-    
     try {
       console.log('📡 [loadOrders] Executando query otimizada...');
-      
+
       // 🆕 Query base com filtro condicional de fases
-      let query = supabase
-        .from('orders')
-        .select(`
+      let query = supabase.from('orders').select(`
           id,
           order_number,
           customer_name,
@@ -889,30 +865,30 @@ export const Dashboard = () => {
             user_id
           )
         `);
-      
-      const { data, error } = await query
-        .range(0, 499)
-        .order('created_at', { ascending: false })
-        .abortSignal(abortControllerRef.current.signal)
-        .returns<any[]>();
+      const {
+        data,
+        error
+      } = await query.range(0, 499).order('created_at', {
+        ascending: false
+      }).abortSignal(abortControllerRef.current.signal).returns<any[]>();
 
       // Verificar se é a requisição mais recente
       if (currentRequestId !== requestIdRef.current) {
-        console.log('⏭️ [loadOrders] Resposta obsoleta, ignorando...', { currentRequestId, latestRequestId: requestIdRef.current });
+        console.log('⏭️ [loadOrders] Resposta obsoleta, ignorando...', {
+          currentRequestId,
+          latestRequestId: requestIdRef.current
+        });
         return;
       }
-
       const endTime = performance.now();
       const duration = endTime - startTime;
       const payloadSize = data ? JSON.stringify(data).length : 0;
-
       console.log('📊 [loadOrders] Métricas:', {
         duration: `${duration.toFixed(0)}ms`,
         payloadSize: `${(payloadSize / 1024).toFixed(1)}KB`,
         ordersCount: data?.length || 0,
         hasError: !!error
       });
-
       if (error) {
         // Verificar se foi cancelamento
         if (error.message?.includes('aborted')) {
@@ -925,11 +901,12 @@ export const Dashboard = () => {
       // Fallback para resultado vazio do JOIN
       if (!data || data.length === 0) {
         console.log('⚠️ [loadOrders] Resultado vazio no JOIN, aplicando fallback LEFT/N+1...');
-        
+
         // Fallback: buscar apenas orders
-        const { data: ordersData, error: ordersError } = await supabase
-          .from('orders')
-          .select(`
+        const {
+          data: ordersData,
+          error: ordersError
+        } = await supabase.from('orders').select(`
             id,
             order_number,
             customer_name,
@@ -966,108 +943,95 @@ export const Dashboard = () => {
             vehicle_plate,
             driver_name,
             customer_whatsapp
-          `)
-          .range(0, 99)
-          .order('created_at', { ascending: false })
-          .abortSignal(abortControllerRef.current.signal);
-
+          `).range(0, 99).order('created_at', {
+          ascending: false
+        }).abortSignal(abortControllerRef.current.signal);
         if (ordersError) throw ordersError;
 
         // Buscar order_items separadamente (N+1)
-        const ordersWithItems = await Promise.all(
-          (ordersData || []).map(async (dbOrder: any) => {
-            const { data: itemsData } = await supabase
-              .from('order_items')
-              .select('*')
-              .eq('order_id', dbOrder.id)
-              .abortSignal(abortControllerRef.current!.signal);
-
-            const items = (itemsData || []).map((item: any) => ({
-              id: item.id,
-              itemCode: item.item_code,
-              itemDescription: cleanItemDescription(item.item_description),
-              unit: item.unit,
-              requestedQuantity: item.requested_quantity,
-              warehouse: item.warehouse,
-              deliveryDate: item.delivery_date,
-              deliveredQuantity: item.delivered_quantity,
-              item_source_type: item.item_source_type as 'in_stock' | 'production' | 'out_of_stock',
-              item_status: item.item_status as 'pending' | 'in_stock' | 'awaiting_production' | 'purchase_required' | 'completed',
-              received_status: item.received_status as 'pending' | 'partial' | 'completed',
-              production_estimated_date: item.production_estimated_date,
-              sla_days: item.sla_days,
-              is_imported: item.is_imported,
-              import_lead_time_days: item.import_lead_time_days,
-              sla_deadline: item.sla_deadline,
-              current_phase: item.current_phase,
-              phase_started_at: item.phase_started_at,
-              userId: item.user_id,
-              production_order_number: item.production_order_number
-            }));
-
-            const totalRequested = items.reduce((sum, item) => sum + item.requestedQuantity, 0);
-            const firstItem = items[0];
-
-            return {
-              id: dbOrder.id,
-              type: dbOrder.order_type as OrderType,
-              priority: dbOrder.priority as Priority,
-              orderNumber: dbOrder.order_number,
-              item: firstItem ? `${firstItem.itemCode} (+${items.length - 1})` : dbOrder.customer_name,
-              description: firstItem?.itemDescription || dbOrder.notes || "",
-              quantity: totalRequested,
-              createdDate: new Date(dbOrder.created_at).toISOString().split('T')[0],
-              issueDate: dbOrder.issue_date || undefined,
-              status: dbOrder.status as OrderStatus,
-              client: dbOrder.customer_name,
-              deliveryDeadline: dbOrder.delivery_date,
-              delivery_address: dbOrder.delivery_address || dbOrder.customer_name,
-              deskTicket: dbOrder.notes || dbOrder.order_number,
-              totvsOrderNumber: dbOrder.totvs_order_number || undefined,
-              items,
-              order_category: dbOrder.order_category,
-              freight_modality: dbOrder.freight_modality || null,
-              carrier_name: dbOrder.carrier_name || null,
-              freight_type: dbOrder.freight_type || null,
-              freight_value: dbOrder.freight_value || null,
-              tracking_code: dbOrder.tracking_code || null,
-              package_volumes: dbOrder.package_volumes || null,
-              package_weight_kg: dbOrder.package_weight_kg || null,
-              package_length_m: dbOrder.package_length_m || null,
-              package_width_m: dbOrder.package_width_m || null,
-              package_height_m: dbOrder.package_height_m || null,
-              customer_document: dbOrder.customer_document || null,
-              municipality: dbOrder.municipality || null,
-              operation_code: dbOrder.operation_code || null,
-              executive_name: dbOrder.executive_name || null,
-              firmware_project_name: dbOrder.firmware_project_name || null,
-              image_project_name: dbOrder.image_project_name || null,
-              requires_firmware: dbOrder.requires_firmware || false,
-              requires_image: dbOrder.requires_image || false,
-              shipping_date: dbOrder.shipping_date || null,
-              vehicle_plate: dbOrder.vehicle_plate || null,
-              driver_name: dbOrder.driver_name || null,
-              updatedAt: dbOrder.updated_at || undefined,
-              customer_whatsapp: dbOrder.customer_whatsapp || null
-            };
-          })
-        );
-
-        console.log('✅ [loadOrders] Fallback concluído (empty result)', { 
-          totalProcessed: ordersWithItems.length, 
-          fallbackEmptyResult: true 
+        const ordersWithItems = await Promise.all((ordersData || []).map(async (dbOrder: any) => {
+          const {
+            data: itemsData
+          } = await supabase.from('order_items').select('*').eq('order_id', dbOrder.id).abortSignal(abortControllerRef.current!.signal);
+          const items = (itemsData || []).map((item: any) => ({
+            id: item.id,
+            itemCode: item.item_code,
+            itemDescription: cleanItemDescription(item.item_description),
+            unit: item.unit,
+            requestedQuantity: item.requested_quantity,
+            warehouse: item.warehouse,
+            deliveryDate: item.delivery_date,
+            deliveredQuantity: item.delivered_quantity,
+            item_source_type: item.item_source_type as 'in_stock' | 'production' | 'out_of_stock',
+            item_status: item.item_status as 'pending' | 'in_stock' | 'awaiting_production' | 'purchase_required' | 'completed',
+            received_status: item.received_status as 'pending' | 'partial' | 'completed',
+            production_estimated_date: item.production_estimated_date,
+            sla_days: item.sla_days,
+            is_imported: item.is_imported,
+            import_lead_time_days: item.import_lead_time_days,
+            sla_deadline: item.sla_deadline,
+            current_phase: item.current_phase,
+            phase_started_at: item.phase_started_at,
+            userId: item.user_id,
+            production_order_number: item.production_order_number
+          }));
+          const totalRequested = items.reduce((sum, item) => sum + item.requestedQuantity, 0);
+          const firstItem = items[0];
+          return {
+            id: dbOrder.id,
+            type: dbOrder.order_type as OrderType,
+            priority: dbOrder.priority as Priority,
+            orderNumber: dbOrder.order_number,
+            item: firstItem ? `${firstItem.itemCode} (+${items.length - 1})` : dbOrder.customer_name,
+            description: firstItem?.itemDescription || dbOrder.notes || "",
+            quantity: totalRequested,
+            createdDate: new Date(dbOrder.created_at).toISOString().split('T')[0],
+            issueDate: dbOrder.issue_date || undefined,
+            status: dbOrder.status as OrderStatus,
+            client: dbOrder.customer_name,
+            deliveryDeadline: dbOrder.delivery_date,
+            delivery_address: dbOrder.delivery_address || dbOrder.customer_name,
+            deskTicket: dbOrder.notes || dbOrder.order_number,
+            totvsOrderNumber: dbOrder.totvs_order_number || undefined,
+            items,
+            order_category: dbOrder.order_category,
+            freight_modality: dbOrder.freight_modality || null,
+            carrier_name: dbOrder.carrier_name || null,
+            freight_type: dbOrder.freight_type || null,
+            freight_value: dbOrder.freight_value || null,
+            tracking_code: dbOrder.tracking_code || null,
+            package_volumes: dbOrder.package_volumes || null,
+            package_weight_kg: dbOrder.package_weight_kg || null,
+            package_length_m: dbOrder.package_length_m || null,
+            package_width_m: dbOrder.package_width_m || null,
+            package_height_m: dbOrder.package_height_m || null,
+            customer_document: dbOrder.customer_document || null,
+            municipality: dbOrder.municipality || null,
+            operation_code: dbOrder.operation_code || null,
+            executive_name: dbOrder.executive_name || null,
+            firmware_project_name: dbOrder.firmware_project_name || null,
+            image_project_name: dbOrder.image_project_name || null,
+            requires_firmware: dbOrder.requires_firmware || false,
+            requires_image: dbOrder.requires_image || false,
+            shipping_date: dbOrder.shipping_date || null,
+            vehicle_plate: dbOrder.vehicle_plate || null,
+            driver_name: dbOrder.driver_name || null,
+            updatedAt: dbOrder.updated_at || undefined,
+            customer_whatsapp: dbOrder.customer_whatsapp || null
+          };
+        }));
+        console.log('✅ [loadOrders] Fallback concluído (empty result)', {
+          totalProcessed: ordersWithItems.length,
+          fallbackEmptyResult: true
         });
-        
         if (currentRequestId !== requestIdRef.current) {
           console.log('⏭️ [loadOrders] Fallback obsoleto, não atualizando...');
           return;
         }
-        
         setOrders(ordersWithItems);
         hasLoadedOnceRef.current = true;
         return; // Sair antes de processar dados vazios
       }
-
       console.log('🔧 [loadOrders] Processando dados (LEFT JOIN)...');
       // Processar dados com LEFT JOIN
       const ordersWithItems = (data || []).map((dbOrder: any) => {
@@ -1092,10 +1056,8 @@ export const Dashboard = () => {
           phase_started_at: item.phase_started_at,
           userId: item.user_id
         }));
-
         const totalRequested = items.reduce((sum, item) => sum + item.requestedQuantity, 0);
         const firstItem = items[0];
-
         return {
           id: dbOrder.id,
           type: dbOrder.order_type as OrderType,
@@ -1151,15 +1113,18 @@ export const Dashboard = () => {
           customer_whatsapp: dbOrder.customer_whatsapp || null
         };
       });
+      console.log('✅ [loadOrders] Processamento concluído', {
+        totalProcessed: ordersWithItems.length
+      });
 
-      console.log('✅ [loadOrders] Processamento concluído', { totalProcessed: ordersWithItems.length });
-      
       // Verificar novamente se ainda é a requisição mais recente antes de atualizar state
       if (currentRequestId !== requestIdRef.current) {
-        console.log('⏭️ [loadOrders] State obsoleto, não atualizando...', { currentRequestId, latestRequestId: requestIdRef.current });
+        console.log('⏭️ [loadOrders] State obsoleto, não atualizando...', {
+          currentRequestId,
+          latestRequestId: requestIdRef.current
+        });
         return;
       }
-      
       setOrders(ordersWithItems);
       hasLoadedOnceRef.current = true;
     } catch (err: any) {
@@ -1168,115 +1133,114 @@ export const Dashboard = () => {
         console.log('🛑 [loadOrders] Requisição cancelada (catch)');
         return;
       }
-      
+
       // Verificar se ainda é a requisição mais recente
       if (currentRequestId !== requestIdRef.current) {
-        console.log('⏭️ [loadOrders] Erro em requisição obsoleta, ignorando...', { currentRequestId, latestRequestId: requestIdRef.current });
+        console.log('⏭️ [loadOrders] Erro em requisição obsoleta, ignorando...', {
+          currentRequestId,
+          latestRequestId: requestIdRef.current
+        });
         return;
       }
-      
       console.warn('⚠️ [loadOrders] Query otimizada falhou, aplicando fallback...', err);
       try {
         console.log('📡 [loadOrders] Fallback: carregando pedidos (limit 50)...');
-        const { data: ordersData, error: ordersError } = await supabase
-          .from('orders')
-          .select('*')
-          .order('created_at', { ascending: false })
-          .limit(50)
-          .abortSignal(abortControllerRef.current!.signal);
-
+        const {
+          data: ordersData,
+          error: ordersError
+        } = await supabase.from('orders').select('*').order('created_at', {
+          ascending: false
+        }).limit(50).abortSignal(abortControllerRef.current!.signal);
         if (ordersError) throw ordersError;
-
         console.log('📡 [loadOrders] Fallback: carregando itens por pedido...');
-        const ordersWithItems = await Promise.all(
-          (ordersData || []).map(async (dbOrder: any) => {
-            const { data: itemsData, error: itemsError } = await supabase
-              .from('order_items')
-              .select('*')
-              .eq('order_id', dbOrder.id)
-              .abortSignal(abortControllerRef.current!.signal);
+        const ordersWithItems = await Promise.all((ordersData || []).map(async (dbOrder: any) => {
+          const {
+            data: itemsData,
+            error: itemsError
+          } = await supabase.from('order_items').select('*').eq('order_id', dbOrder.id).abortSignal(abortControllerRef.current!.signal);
+          if (itemsError) {
+            console.warn('⚠️ [loadOrders] Fallback: erro ao carregar itens do pedido', {
+              orderId: dbOrder.id,
+              error: itemsError.message
+            });
+          }
+          const items = (itemsData || []).map((item: any) => ({
+            id: item.id,
+            itemCode: item.item_code,
+            itemDescription: cleanItemDescription(item.item_description),
+            unit: item.unit,
+            requestedQuantity: item.requested_quantity,
+            warehouse: item.warehouse,
+            deliveryDate: item.delivery_date,
+            deliveredQuantity: item.delivered_quantity,
+            item_source_type: item.item_source_type as 'in_stock' | 'production' | 'out_of_stock',
+            item_status: item.item_status as 'pending' | 'in_stock' | 'awaiting_production' | 'purchase_required' | 'completed',
+            received_status: item.received_status as 'pending' | 'partial' | 'completed',
+            production_estimated_date: item.production_estimated_date,
+            sla_days: item.sla_days,
+            is_imported: item.is_imported,
+            import_lead_time_days: item.import_lead_time_days,
+            sla_deadline: item.sla_deadline,
+            current_phase: item.current_phase,
+            phase_started_at: item.phase_started_at,
+            userId: item.user_id,
+            production_order_number: item.production_order_number
+          }));
+          const totalRequested = items.reduce((sum, item) => sum + item.requestedQuantity, 0);
+          const firstItem = items[0];
+          return {
+            id: dbOrder.id,
+            type: dbOrder.order_type as OrderType,
+            priority: dbOrder.priority as Priority,
+            orderNumber: dbOrder.order_number,
+            item: firstItem ? `${firstItem.itemCode} (+${items.length - 1})` : dbOrder.customer_name,
+            description: firstItem?.itemDescription || dbOrder.notes || "",
+            quantity: totalRequested,
+            createdDate: new Date(dbOrder.created_at).toISOString().split('T')[0],
+            issueDate: (dbOrder as any).issue_date || undefined,
+            status: dbOrder.status as OrderStatus,
+            client: dbOrder.customer_name,
+            deliveryDeadline: dbOrder.delivery_date,
+            delivery_address: dbOrder.delivery_address || dbOrder.customer_name,
+            deskTicket: dbOrder.notes || dbOrder.order_number,
+            totvsOrderNumber: dbOrder.totvs_order_number || undefined,
+            items,
+            order_category: dbOrder.order_category,
+            freight_modality: dbOrder.freight_modality || null,
+            carrier_name: dbOrder.carrier_name || null,
+            freight_type: dbOrder.freight_type || null,
+            freight_value: dbOrder.freight_value || null,
+            tracking_code: dbOrder.tracking_code || null,
+            package_volumes: dbOrder.package_volumes || null,
+            package_weight_kg: dbOrder.package_weight_kg || null,
+            package_length_m: dbOrder.package_length_m || null,
+            package_width_m: dbOrder.package_width_m || null,
+            package_height_m: dbOrder.package_height_m || null,
+            customer_document: dbOrder.customer_document || null,
+            municipality: dbOrder.municipality || null,
+            operation_code: dbOrder.operation_code || null,
+            executive_name: dbOrder.executive_name || null,
+            firmware_project_name: dbOrder.firmware_project_name || null,
+            image_project_name: dbOrder.image_project_name || null,
+            requires_firmware: dbOrder.requires_firmware || false,
+            requires_image: dbOrder.requires_image || false,
+            shipping_date: dbOrder.shipping_date || null,
+            vehicle_plate: dbOrder.vehicle_plate || null,
+            driver_name: dbOrder.driver_name || null
+          };
+        }));
+        console.log('✅ [loadOrders] Fallback concluído', {
+          totalProcessed: ordersWithItems.length
+        });
 
-            if (itemsError) {
-              console.warn('⚠️ [loadOrders] Fallback: erro ao carregar itens do pedido', { orderId: dbOrder.id, error: itemsError.message });
-            }
-
-            const items = (itemsData || []).map((item: any) => ({
-              id: item.id,
-              itemCode: item.item_code,
-              itemDescription: cleanItemDescription(item.item_description),
-              unit: item.unit,
-              requestedQuantity: item.requested_quantity,
-              warehouse: item.warehouse,
-              deliveryDate: item.delivery_date,
-              deliveredQuantity: item.delivered_quantity,
-              item_source_type: item.item_source_type as 'in_stock' | 'production' | 'out_of_stock',
-              item_status: item.item_status as 'pending' | 'in_stock' | 'awaiting_production' | 'purchase_required' | 'completed',
-              received_status: item.received_status as 'pending' | 'partial' | 'completed',
-              production_estimated_date: item.production_estimated_date,
-              sla_days: item.sla_days,
-              is_imported: item.is_imported,
-              import_lead_time_days: item.import_lead_time_days,
-              sla_deadline: item.sla_deadline,
-              current_phase: item.current_phase,
-              phase_started_at: item.phase_started_at,
-              userId: item.user_id,
-              production_order_number: item.production_order_number
-            }));
-
-            const totalRequested = items.reduce((sum, item) => sum + item.requestedQuantity, 0);
-            const firstItem = items[0];
-
-            return {
-              id: dbOrder.id,
-              type: dbOrder.order_type as OrderType,
-              priority: dbOrder.priority as Priority,
-              orderNumber: dbOrder.order_number,
-              item: firstItem ? `${firstItem.itemCode} (+${items.length - 1})` : dbOrder.customer_name,
-              description: firstItem?.itemDescription || dbOrder.notes || "",
-              quantity: totalRequested,
-              createdDate: new Date(dbOrder.created_at).toISOString().split('T')[0],
-              issueDate: (dbOrder as any).issue_date || undefined,
-              status: dbOrder.status as OrderStatus,
-              client: dbOrder.customer_name,
-              deliveryDeadline: dbOrder.delivery_date,
-              delivery_address: dbOrder.delivery_address || dbOrder.customer_name,
-              deskTicket: dbOrder.notes || dbOrder.order_number,
-              totvsOrderNumber: dbOrder.totvs_order_number || undefined,
-              items,
-              order_category: dbOrder.order_category,
-              freight_modality: dbOrder.freight_modality || null,
-              carrier_name: dbOrder.carrier_name || null,
-              freight_type: dbOrder.freight_type || null,
-              freight_value: dbOrder.freight_value || null,
-              tracking_code: dbOrder.tracking_code || null,
-              package_volumes: dbOrder.package_volumes || null,
-              package_weight_kg: dbOrder.package_weight_kg || null,
-              package_length_m: dbOrder.package_length_m || null,
-              package_width_m: dbOrder.package_width_m || null,
-              package_height_m: dbOrder.package_height_m || null,
-              customer_document: dbOrder.customer_document || null,
-              municipality: dbOrder.municipality || null,
-              operation_code: dbOrder.operation_code || null,
-              executive_name: dbOrder.executive_name || null,
-              firmware_project_name: dbOrder.firmware_project_name || null,
-              image_project_name: dbOrder.image_project_name || null,
-              requires_firmware: dbOrder.requires_firmware || false,
-              requires_image: dbOrder.requires_image || false,
-              shipping_date: dbOrder.shipping_date || null,
-              vehicle_plate: dbOrder.vehicle_plate || null,
-              driver_name: dbOrder.driver_name || null
-            };
-          })
-        );
-
-        console.log('✅ [loadOrders] Fallback concluído', { totalProcessed: ordersWithItems.length });
-        
         // Verificar se ainda é a requisição mais recente
         if (currentRequestId !== requestIdRef.current) {
-          console.log('⏭️ [loadOrders] Fallback obsoleto, não atualizando...', { currentRequestId, latestRequestId: requestIdRef.current });
+          console.log('⏭️ [loadOrders] Fallback obsoleto, não atualizando...', {
+            currentRequestId,
+            latestRequestId: requestIdRef.current
+          });
           return;
         }
-        
         setOrders(ordersWithItems);
         hasLoadedOnceRef.current = true;
       } catch (fallbackError: any) {
@@ -1285,13 +1249,8 @@ export const Dashboard = () => {
           console.log('🛑 [loadOrders] Fallback cancelado');
           return;
         }
-        
         console.error('❌ [loadOrders] Erro no fallback:', fallbackError);
-        showLimitedToast(
-          "Erro ao carregar pedidos",
-          fallbackError.message || "Erro desconhecido ao carregar pedidos",
-          "destructive"
-        );
+        showLimitedToast("Erro ao carregar pedidos", fallbackError.message || "Erro desconhecido ao carregar pedidos", "destructive");
       }
     } finally {
       // Limpar timeout de segurança
@@ -1299,12 +1258,11 @@ export const Dashboard = () => {
         clearTimeout(loadingTimeoutRef.current);
         loadingTimeoutRef.current = null;
       }
-      
       console.log('🏁 [loadOrders] Finalizando');
       setLoading(false);
       setRefreshing(false);
       isLoadingRef.current = false;
-      
+
       // ✅ Indicar sincronização bem-sucedida
       setRealtimeStatus('synced');
       setLastUpdateTime(new Date());
@@ -1398,9 +1356,7 @@ export const Dashboard = () => {
     }
     // Busca direta por número de pedido (solução 1C)
     const isNumericSearch = /^\d+$/.test(searchQuery.trim());
-    const matchesSearch = isNumericSearch 
-      ? order.orderNumber.includes(searchQuery.trim()) || order.totvsOrderNumber?.includes(searchQuery.trim())
-      : order.orderNumber.toLowerCase().includes(searchQuery.toLowerCase()) || order.item.toLowerCase().includes(searchQuery.toLowerCase()) || order.client.toLowerCase().includes(searchQuery.toLowerCase()) || order.deskTicket.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesSearch = isNumericSearch ? order.orderNumber.includes(searchQuery.trim()) || order.totvsOrderNumber?.includes(searchQuery.trim()) : order.orderNumber.toLowerCase().includes(searchQuery.toLowerCase()) || order.item.toLowerCase().includes(searchQuery.toLowerCase()) || order.client.toLowerCase().includes(searchQuery.toLowerCase()) || order.deskTicket.toLowerCase().includes(searchQuery.toLowerCase());
 
     // Date range filter
     let matchesDate = true;
@@ -1753,7 +1709,7 @@ export const Dashboard = () => {
   const triggerProactiveNotification = async (orderId: string, newStatus: string, orderNumber: string) => {
     try {
       console.log('🔔 [Notify] Iniciando verificação para status:', newStatus);
-      
+
       // Mapear status para fases de notificação
       const statusToPhase: Record<string, string> = {
         // Fase: Pedido criado/recebido
@@ -1793,48 +1749,42 @@ export const Dashboard = () => {
         'released_for_shipping': 'ready_for_shipping',
         'in_expedition': 'ready_for_shipping'
       };
-      
       const phase = statusToPhase[newStatus];
       console.log('🔔 [Notify] Mapeamento:', newStatus, '→', phase || '(não mapeado)');
-      
       if (!phase) {
         console.log('⏭️ [Notify] Status não mapeado para notificação');
         return;
       }
-      
+
       // Buscar configuração do agente customer
-      const { data: agentConfig, error: configError } = await supabase
-        .from('ai_agent_config')
-        .select('is_active, notification_phases, test_phone')
-        .eq('agent_type', 'customer')
-        .limit(1)
-        .single();
-      
+      const {
+        data: agentConfig,
+        error: configError
+      } = await supabase.from('ai_agent_config').select('is_active, notification_phases, test_phone').eq('agent_type', 'customer').limit(1).single();
       if (configError) {
         console.error('❌ [Notify] Erro ao buscar config:', configError);
         return;
       }
-      
       console.log('🔔 [Notify] Config do agente:', {
         is_active: agentConfig?.is_active,
         notification_phases: agentConfig?.notification_phases,
         test_phone: agentConfig?.test_phone
       });
-      
       if (!agentConfig?.is_active) {
         console.log('⏭️ [Notify] Agente customer inativo');
         return;
       }
-      
       if (!agentConfig?.notification_phases?.includes(phase)) {
         console.log('⏭️ [Notify] Fase não habilitada:', phase, '| Habilitadas:', agentConfig.notification_phases);
         return;
       }
-      
+
       // ✅ Disparar notificação!
       console.log(`🚀 [Notify] Disparando notificação para fase: ${phase}`);
-      
-      const { data: notifyResult, error: notifyError } = await supabase.functions.invoke('ai-agent-notify', {
+      const {
+        data: notifyResult,
+        error: notifyError
+      } = await supabase.functions.invoke('ai-agent-notify', {
         body: {
           order_id: orderId,
           new_status: newStatus,
@@ -1842,7 +1792,6 @@ export const Dashboard = () => {
           agent_type: 'customer'
         }
       });
-      
       if (notifyError) {
         console.error('❌ [Notify] Erro na edge function:', notifyError);
         toast({
@@ -1854,31 +1803,28 @@ export const Dashboard = () => {
         console.log('✅ [Notify] Notificação enviada:', notifyResult);
         toast({
           title: "📱 Cliente notificado",
-          description: `Mensagem enviada sobre pedido ${orderNumber}`,
+          description: `Mensagem enviada sobre pedido ${orderNumber}`
         });
       }
     } catch (error: any) {
       console.error('⚠️ [Notify] Exceção:', error);
     }
   };
-
   const handleStatusChange = async (orderId: string, newStatus: OrderStatus) => {
     console.log('🎯 [StatusChange] INÍCIO - orderId:', orderId, 'newStatus:', newStatus);
-    
     if (!user) {
       console.log('🎯 [StatusChange] ABORTADO - Sem usuário');
       return;
     }
-    
     const order = orders.find(o => o.id === orderId);
     const previousStatus = order?.status;
     console.log('🎯 [StatusChange] Pedido encontrado:', order?.orderNumber, '| Status anterior:', previousStatus);
-    
-    // 🚀 PASSO 1: Atualizar estado local IMEDIATAMENTE (feedback instantâneo)
-    setOrders(orders.map(o => 
-      o.id === orderId ? { ...o, status: newStatus } : o
-    ));
 
+    // 🚀 PASSO 1: Atualizar estado local IMEDIATAMENTE (feedback instantâneo)
+    setOrders(orders.map(o => o.id === orderId ? {
+      ...o,
+      status: newStatus
+    } : o));
     try {
       // Detectar mudança para fase "Gerar Ordem"
       const orderGenerationStatuses = ['order_generation_pending', 'order_in_creation', 'order_generated'];
@@ -1902,7 +1848,7 @@ export const Dashboard = () => {
           console.log(`📅 Calculando prazo: hoje + ${orderTypeConfig.default_sla_days} dias = ${updateData.delivery_date}`);
         }
       }
-      
+
       // PASSO 2: Salvar no banco
       const {
         error
@@ -1911,43 +1857,37 @@ export const Dashboard = () => {
 
       // 🔥 PASSO 3: Operações secundárias em PARALELO (não bloqueantes)
       Promise.all([
-        // Broadcast para outros usuários
-        supabase
-          .channel('order-status-broadcast')
-          .send({
-            type: 'broadcast',
-            event: 'status_changed',
-            payload: {
-              orderId,
-              newStatus,
-              changedBy: user.id,
-              orderNumber: order?.orderNumber,
-              timestamp: new Date().toISOString()
-            }
-          }),
-        
-        // Salvar histórico
-        order && previousStatus ? saveOrderHistory(orderId, previousStatus, newStatus, order.orderNumber) : Promise.resolve(),
-        
-        // Registrar em order_changes
-        previousStatus !== newStatus ? supabase.from('order_changes').insert({
-          order_id: orderId,
-          field_name: 'status',
-          old_value: previousStatus,
-          new_value: newStatus,
-          changed_by: user.id,
-          change_category: 'status_change'
-        }) : Promise.resolve(),
-      ]).then(() => {
+      // Broadcast para outros usuários
+      supabase.channel('order-status-broadcast').send({
+        type: 'broadcast',
+        event: 'status_changed',
+        payload: {
+          orderId,
+          newStatus,
+          changedBy: user.id,
+          orderNumber: order?.orderNumber,
+          timestamp: new Date().toISOString()
+        }
+      }),
+      // Salvar histórico
+      order && previousStatus ? saveOrderHistory(orderId, previousStatus, newStatus, order.orderNumber) : Promise.resolve(),
+      // Registrar em order_changes
+      previousStatus !== newStatus ? supabase.from('order_changes').insert({
+        order_id: orderId,
+        field_name: 'status',
+        old_value: previousStatus,
+        new_value: newStatus,
+        changed_by: user.id,
+        change_category: 'status_change'
+      }) : Promise.resolve()]).then(() => {
         console.log('✅ Operações secundárias concluídas em background');
-      }).catch((error) => {
+      }).catch(error => {
         console.error('⚠️ Erro em operações secundárias (não crítico):', error);
       });
 
       // 🔔 PASSO 4: Notificação PROATIVA ao cliente (executada FORA do Promise.all)
       console.log('🔔 [Notify] PASSO 4 - Chamando triggerProactiveNotification');
       await triggerProactiveNotification(orderId, newStatus, order?.orderNumber || '');
-
       const description = isMovingToOrderGeneration && updateData.delivery_date ? `Pedido ${order?.orderNumber} movido para ${getStatusLabel(newStatus)} - Prazo calculado automaticamente` : `Pedido ${order?.orderNumber} movido para ${getStatusLabel(newStatus)}`;
       toast({
         title: "Status atualizado",
@@ -1955,10 +1895,10 @@ export const Dashboard = () => {
       });
     } catch (error: any) {
       // 🔄 ROLLBACK: Se falhar, reverter para estado anterior
-      setOrders(orders.map(o => 
-        o.id === orderId ? { ...o, status: previousStatus! } : o
-      ));
-      
+      setOrders(orders.map(o => o.id === orderId ? {
+        ...o,
+        status: previousStatus!
+      } : o));
       toast({
         title: "Erro ao atualizar status",
         description: error.message,
@@ -2071,22 +2011,15 @@ export const Dashboard = () => {
   };
   // View mode state
   const [viewMode, setViewMode] = useState<ViewMode>("kanban");
-  const { density: kanbanDensity, setDensity: setKanbanDensity, autoDetect: kanbanAutoDetect, setAutoDetect: setKanbanAutoDetect } = useKanbanDensity();
-
-  return (
-    <SidebarProvider>
+  const {
+    density: kanbanDensity,
+    setDensity: setKanbanDensity,
+    autoDetect: kanbanAutoDetect,
+    setAutoDetect: setKanbanAutoDetect
+  } = useKanbanDensity();
+  return <SidebarProvider>
       <div className="flex h-screen w-full overflow-hidden">
-        <AppSidebar 
-          orders={orders}
-          unreadConversationsCount={unreadConversationsCount}
-          pendingApprovalsCount={pendingApprovalsCount}
-          viewMode={viewMode}
-          kanbanDensity={kanbanDensity}
-          kanbanAutoDetect={kanbanAutoDetect}
-          onViewModeChange={setViewMode}
-          onKanbanDensityChange={setKanbanDensity}
-          onKanbanAutoDetectChange={setKanbanAutoDetect}
-        />
+        <AppSidebar orders={orders} unreadConversationsCount={unreadConversationsCount} pendingApprovalsCount={pendingApprovalsCount} viewMode={viewMode} kanbanDensity={kanbanDensity} kanbanAutoDetect={kanbanAutoDetect} onViewModeChange={setViewMode} onKanbanDensityChange={setKanbanDensity} onKanbanAutoDetectChange={setKanbanAutoDetect} />
         <SidebarInset className="flex-1 flex flex-col overflow-hidden">
           <div className="flex-1 flex flex-col bg-background overflow-hidden">
             {/* Header - fixed height */}
@@ -2094,36 +2027,22 @@ export const Dashboard = () => {
               <div className="flex items-center gap-2">
                 <SidebarTrigger className="-ml-1" />
                 <h1 className="text-base md:text-lg lg:text-xl font-bold text-dashboard-header tracking-tight">
-                  Gestão de Pedidos
+                  Sistema Integrado de Gestão de Pedidos
                 </h1>
               </div>
               <div className="flex items-center gap-1.5 lg:gap-2">
                 <div className="relative hidden sm:block">
                   <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 text-muted-foreground h-3.5 w-3.5" />
-                  <Input 
-                    placeholder="Buscar..." 
-                    value={searchQuery} 
-                    onChange={e => setSearchQuery(e.target.value)} 
-                    className="pl-8 w-32 lg:w-48 h-8 text-sm" 
-                  />
+                  <Input placeholder="Buscar..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="pl-8 w-32 lg:w-48 h-8 text-sm" />
                 </div>
                 <DateRangeFilter dateRange={dateRange} onDateRangeChange={setDateRange} />
-                <ViewSettingsPopover
-                  viewMode={viewMode}
-                  kanbanDensity={kanbanDensity}
-                  kanbanAutoDetect={kanbanAutoDetect}
-                  onViewModeChange={setViewMode}
-                  onKanbanDensityChange={setKanbanDensity}
-                  onKanbanAutoDetectChange={setKanbanAutoDetect}
-                />
+                <ViewSettingsPopover viewMode={viewMode} kanbanDensity={kanbanDensity} kanbanAutoDetect={kanbanAutoDetect} onViewModeChange={setViewMode} onKanbanDensityChange={setKanbanDensity} onKanbanAutoDetectChange={setKanbanAutoDetect} />
                 <ColumnSettings visibility={columnVisibility} onVisibilityChange={setColumnVisibility} />
                 <RealtimeIndicator status={realtimeStatus} lastUpdateTime={lastUpdateTime} />
                 <NotificationCenter />
-                {isBatchImporting && (
-                  <Badge variant="secondary" className="animate-pulse gap-1 h-8 px-2">
+                {isBatchImporting && <Badge variant="secondary" className="animate-pulse gap-1 h-8 px-2">
                     📦 Importando...
-                  </Badge>
-                )}
+                  </Badge>}
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button className="gap-1.5 h-8 px-2 lg:px-3" size="sm" disabled={isBatchImporting}>
@@ -2134,9 +2053,9 @@ export const Dashboard = () => {
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="bg-popover border border-border">
                     <DropdownMenuItem onClick={() => {
-                      const addButton = document.querySelector('[data-add-order-trigger]') as HTMLElement;
-                      addButton?.click();
-                    }} disabled={isBatchImporting}>
+                    const addButton = document.querySelector('[data-add-order-trigger]') as HTMLElement;
+                    addButton?.click();
+                  }} disabled={isBatchImporting}>
                       <Plus className="h-4 w-4 mr-2" />
                       Lançamento Manual
                     </DropdownMenuItem>
@@ -2160,22 +2079,10 @@ export const Dashboard = () => {
             <p className="text-muted-foreground">Carregando pedidos...</p>
             <p className="text-xs text-muted-foreground mt-1">Primeira carga - aguarde...</p>
           </div>
-        </div> : activeTab === "all" ? <PriorityView 
-          orders={filteredOrders} 
-          onEdit={handleEditOrder} 
-          onDuplicate={handleDuplicateOrder} 
-          onApprove={handleApproveOrder} 
-          onCancel={handleCancelOrder} 
-          onStatusChange={handleStatusChange} 
-          onRowClick={order => {
-            setSelectedOrder(order);
-            setShowEditDialog(true);
-          }}
-          viewMode={viewMode}
-          kanbanDensity={kanbanDensity}
-          onViewModeChange={setViewMode}
-          onKanbanDensityChange={setKanbanDensity}
-        /> : <div className="bg-card rounded-lg border overflow-hidden">
+        </div> : activeTab === "all" ? <PriorityView orders={filteredOrders} onEdit={handleEditOrder} onDuplicate={handleDuplicateOrder} onApprove={handleApproveOrder} onCancel={handleCancelOrder} onStatusChange={handleStatusChange} onRowClick={order => {
+              setSelectedOrder(order);
+              setShowEditDialog(true);
+            }} viewMode={viewMode} kanbanDensity={kanbanDensity} onViewModeChange={setViewMode} onKanbanDensityChange={setKanbanDensity} /> : <div className="bg-card rounded-lg border overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full">
                <thead className="dashboard-header">
@@ -2198,8 +2105,8 @@ export const Dashboard = () => {
               </thead>
               <tbody>
                 {filteredOrders.map(order => {
-              const daysRemaining = calculateDaysRemaining(order.deliveryDeadline);
-              return <tr key={order.id} onClick={e => handleRowClick(order, e)} className={`border-t transition-colors hover:bg-muted/50 cursor-pointer ${getPriorityClass(order.priority)}`}>
+                      const daysRemaining = calculateDaysRemaining(order.deliveryDeadline);
+                      return <tr key={order.id} onClick={e => handleRowClick(order, e)} className={`border-t transition-colors hover:bg-muted/50 cursor-pointer ${getPriorityClass(order.priority)}`}>
                       {columnVisibility.priority && <td className="p-4">
                           <span className={`font-medium ${order.priority === "high" ? "priority-blink" : ""}`}>
                             {getPriorityLabel(order.priority)}
@@ -2241,22 +2148,18 @@ export const Dashboard = () => {
                           <ActionButtons order={order} onEdit={handleEditOrder} onDuplicate={handleDuplicateOrder} onApprove={handleApproveOrder} onCancel={handleCancelOrder} />
                         </td>}
                     </tr>;
-            })}
+                    })}
               </tbody>
             </table>
           </div>
           {filteredOrders.length === 0 && <div className="text-center py-12 text-muted-foreground">
               <p className="text-lg mb-4">Nenhum pedido encontrado para os filtros aplicados.</p>
-              <Button 
-                variant="outline" 
-                onClick={() => {
+              <Button variant="outline" onClick={() => {
                   setSearchQuery("");
                   setDateRange(undefined);
                   setActiveTab("all");
                   queueRefresh();
-                }}
-                className="gap-2"
-              >
+                }} className="gap-2">
                 <Search className="h-4 w-4" />
                 Redefinir Filtros
               </Button>
@@ -2265,12 +2168,10 @@ export const Dashboard = () => {
             </main>
 
             {/* Refresh indicator - discreto */}
-            {refreshing && (
-              <div className="fixed bottom-4 right-4 bg-primary text-primary-foreground px-4 py-2 rounded-lg shadow-lg flex items-center gap-2 animate-fade-in z-50">
+            {refreshing && <div className="fixed bottom-4 right-4 bg-primary text-primary-foreground px-4 py-2 rounded-lg shadow-lg flex items-center gap-2 animate-fade-in z-50">
                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary-foreground"></div>
                 <span className="text-sm">Atualizando...</span>
-              </div>
-            )}
+              </div>}
 
             {/* Edit Dialog with integrated History */}
             {selectedOrder && <EditOrderDialog order={selectedOrder} open={showEditDialog} onOpenChange={setShowEditDialog} onSave={handleEditOrder} onDelete={handleDeleteOrder} />}
@@ -2283,6 +2184,5 @@ export const Dashboard = () => {
           </div>
         </SidebarInset>
       </div>
-    </SidebarProvider>
-  );
+    </SidebarProvider>;
 };
