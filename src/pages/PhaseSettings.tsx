@@ -19,6 +19,9 @@ export interface PhaseConfig {
   responsible_role: string | null;
   organization_id: string | null;
   manager_user_id?: string | null;
+  max_days_allowed?: number;
+  warning_days?: number;
+  stall_alerts_enabled?: boolean;
 }
 
 export interface UserByRole {
@@ -136,16 +139,58 @@ const PhaseSettings = () => {
 
   const handlePhaseUpdate = async (updatedPhase: PhaseConfig) => {
     try {
+      // 1. Atualizar phase_config com todos os campos
       const { error } = await supabase
         .from('phase_config')
         .update({
           display_name: updatedPhase.display_name,
           responsible_role: updatedPhase.responsible_role as any,
           manager_user_id: updatedPhase.manager_user_id,
+          max_days_allowed: updatedPhase.max_days_allowed,
+          warning_days: updatedPhase.warning_days,
+          stall_alerts_enabled: updatedPhase.stall_alerts_enabled,
         })
         .eq('id', updatedPhase.id);
 
       if (error) throw error;
+
+      // 2. Sincronizar gestor principal com phase_managers
+      if (updatedPhase.manager_user_id && organization?.id) {
+        // Buscar WhatsApp do gestor
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('whatsapp')
+          .eq('id', updatedPhase.manager_user_id)
+          .single();
+
+        const whatsapp = profile?.whatsapp?.replace(/\D/g, '') || '';
+
+        // Verificar se já existe entrada em phase_managers
+        const { data: existingManager } = await supabase
+          .from('phase_managers')
+          .select('id')
+          .eq('phase_key', updatedPhase.phase_key)
+          .eq('user_id', updatedPhase.manager_user_id)
+          .eq('organization_id', organization.id)
+          .maybeSingle();
+
+        if (!existingManager) {
+          // Criar entrada em phase_managers
+          await supabase
+            .from('phase_managers')
+            .insert({
+              phase_key: updatedPhase.phase_key,
+              user_id: updatedPhase.manager_user_id,
+              whatsapp: whatsapp,
+              organization_id: organization.id,
+              is_active: true,
+              receive_new_orders: true,
+              receive_urgent_alerts: true,
+              receive_daily_summary: false,
+              notification_priority: 1,
+            });
+        }
+      }
 
       setPhases(phases.map(p => p.id === updatedPhase.id ? updatedPhase : p));
       toast.success('Fase atualizada');

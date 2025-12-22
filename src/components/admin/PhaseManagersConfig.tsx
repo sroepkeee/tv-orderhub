@@ -11,7 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { toast } from 'sonner';
-import { Plus, Trash2, Bell, BellOff, UserCog, MessageSquare } from 'lucide-react';
+import { Plus, Trash2, Bell, BellOff, UserCog, MessageSquare, Crown } from 'lucide-react';
 
 interface PhaseManager {
   id: string;
@@ -33,21 +33,28 @@ interface Profile {
   id: string;
   full_name: string;
   email: string;
+  whatsapp?: string;
 }
 
-const PHASE_OPTIONS = [
-  { value: 'purchases', label: 'Compras', icon: '🛒', description: 'Solicitações de compra de materiais' },
-  { value: 'production_client', label: 'Produção Cliente', icon: '🔧', description: 'Pedidos de clientes em produção' },
-  { value: 'production_stock', label: 'Produção Estoque', icon: '📦', description: 'Ordens de reposição de estoque' },
-  { value: 'laboratory', label: 'Laboratório', icon: '🔬', description: 'Testes e verificações' },
-  { value: 'freight_quote', label: 'Cotação de Frete', icon: '🚚', description: 'Cotações com transportadoras' },
-  { value: 'logistics', label: 'Expedição', icon: '📤', description: 'Preparação e envio' },
-];
+interface PhaseConfig {
+  id: string;
+  phase_key: string;
+  display_name: string;
+  order_index: number;
+  manager_user_id: string | null;
+  manager_profile?: {
+    id: string;
+    full_name: string;
+    email: string;
+    whatsapp?: string;
+  };
+}
 
 export function PhaseManagersConfig() {
   const { organization } = useOrganization();
   const organizationId = organization?.id;
   const [managers, setManagers] = useState<PhaseManager[]>([]);
+  const [phases, setPhases] = useState<PhaseConfig[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -62,13 +69,49 @@ export function PhaseManagersConfig() {
 
   useEffect(() => {
     if (organizationId) {
-      loadManagers();
-      loadProfiles();
+      loadData();
     }
   }, [organizationId]);
 
-  const loadManagers = async () => {
+  const loadData = async () => {
     setLoading(true);
+    await Promise.all([loadPhases(), loadManagers(), loadProfiles()]);
+    setLoading(false);
+  };
+
+  const loadPhases = async () => {
+    const { data, error } = await supabase
+      .from('phase_config')
+      .select('id, phase_key, display_name, order_index, manager_user_id')
+      .eq('organization_id', organizationId)
+      .order('order_index');
+
+    if (error) {
+      console.error('Erro ao carregar fases:', error);
+      return;
+    }
+
+    // Buscar perfis dos gestores principais
+    const managerIds = data?.filter(p => p.manager_user_id).map(p => p.manager_user_id) || [];
+    
+    if (managerIds.length > 0) {
+      const { data: managerProfiles } = await supabase
+        .from('profiles')
+        .select('id, full_name, email, whatsapp')
+        .in('id', managerIds);
+
+      const phasesWithManagers = data?.map(phase => ({
+        ...phase,
+        manager_profile: managerProfiles?.find(p => p.id === phase.manager_user_id)
+      })) || [];
+
+      setPhases(phasesWithManagers);
+    } else {
+      setPhases(data || []);
+    }
+  };
+
+  const loadManagers = async () => {
     const { data, error } = await supabase
       .from('phase_managers')
       .select(`
@@ -84,13 +127,12 @@ export function PhaseManagersConfig() {
     } else {
       setManagers(data || []);
     }
-    setLoading(false);
   };
 
   const loadProfiles = async () => {
     const { data, error } = await supabase
       .from('profiles')
-      .select('id, full_name, email')
+      .select('id, full_name, email, whatsapp')
       .eq('organization_id', organizationId)
       .eq('is_active', true)
       .order('full_name');
@@ -108,7 +150,6 @@ export function PhaseManagersConfig() {
       return;
     }
 
-    // Normalizar WhatsApp
     const normalizedWhatsapp = whatsapp.replace(/\D/g, '');
 
     const { error } = await supabase
@@ -190,14 +231,19 @@ export function PhaseManagersConfig() {
     setReceiveDailySummary(false);
   };
 
-  const getPhaseInfo = (phaseKey: string) => {
-    return PHASE_OPTIONS.find(p => p.value === phaseKey) || { label: phaseKey, icon: '📋' };
+  const handleUserSelect = (userId: string) => {
+    setSelectedUser(userId);
+    const profile = profiles.find(p => p.id === userId);
+    if (profile?.whatsapp) {
+      setWhatsapp(profile.whatsapp);
+    }
   };
 
-  // Agrupar gestores por fase
-  const managersByPhase = PHASE_OPTIONS.map(phase => ({
+  // Agrupar por fase dinâmica
+  const managersByPhase = phases.map(phase => ({
     ...phase,
-    managers: managers.filter(m => m.phase_key === phase.value)
+    managers: managers.filter(m => m.phase_key === phase.phase_key),
+    isPrimaryManager: (userId: string) => phase.manager_user_id === userId
   }));
 
   return (
@@ -236,11 +282,10 @@ export function PhaseManagersConfig() {
                       <SelectValue placeholder="Selecione a fase" />
                     </SelectTrigger>
                     <SelectContent>
-                      {PHASE_OPTIONS.map(phase => (
-                        <SelectItem key={phase.value} value={phase.value}>
+                      {phases.map(phase => (
+                        <SelectItem key={phase.phase_key} value={phase.phase_key}>
                           <span className="flex items-center gap-2">
-                            <span>{phase.icon}</span>
-                            <span>{phase.label}</span>
+                            <span>{phase.display_name}</span>
                           </span>
                         </SelectItem>
                       ))}
@@ -250,7 +295,7 @@ export function PhaseManagersConfig() {
 
                 <div className="space-y-2">
                   <Label>Usuário *</Label>
-                  <Select value={selectedUser} onValueChange={setSelectedUser}>
+                  <Select value={selectedUser} onValueChange={handleUserSelect}>
                     <SelectTrigger>
                       <SelectValue placeholder="Selecione o usuário" />
                     </SelectTrigger>
@@ -320,99 +365,147 @@ export function PhaseManagersConfig() {
       <CardContent>
         {loading ? (
           <div className="text-center py-8 text-muted-foreground">Carregando...</div>
-        ) : managers.length === 0 ? (
+        ) : phases.length === 0 ? (
           <div className="text-center py-8">
             <MessageSquare className="h-12 w-12 mx-auto text-muted-foreground/50 mb-3" />
-            <p className="text-muted-foreground">Nenhum gestor configurado</p>
+            <p className="text-muted-foreground">Nenhuma fase configurada</p>
             <p className="text-sm text-muted-foreground/70">
-              Adicione gestores para receberem notificações WhatsApp
+              Configure fases em "Configuração de Fases" primeiro
             </p>
           </div>
         ) : (
           <div className="space-y-6">
-            {managersByPhase.filter(p => p.managers.length > 0).map(phase => (
-              <div key={phase.value} className="space-y-2">
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="text-lg">{phase.icon}</span>
-                  <h3 className="font-medium">{phase.label}</h3>
-                  <Badge variant="secondary" className="text-xs">
-                    {phase.managers.length} gestor(es)
-                  </Badge>
+            {managersByPhase.map(phase => {
+              const hasMainManager = phase.manager_user_id && phase.manager_profile;
+              const additionalManagers = phase.managers.filter(m => m.user_id !== phase.manager_user_id);
+              const hasAnyManager = hasMainManager || phase.managers.length > 0;
+
+              return (
+                <div key={phase.phase_key} className="space-y-2 border rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <h3 className="font-medium">{phase.display_name}</h3>
+                    <Badge variant="outline" className="text-xs">
+                      {phase.phase_key}
+                    </Badge>
+                    {hasMainManager && (
+                      <Badge className="text-xs bg-amber-500/10 text-amber-600 border-amber-500/30">
+                        <Crown className="h-3 w-3 mr-1" />
+                        Gestor Principal
+                      </Badge>
+                    )}
+                  </div>
+
+                  {!hasAnyManager ? (
+                    <p className="text-sm text-muted-foreground py-2">
+                      Nenhum gestor configurado para esta fase
+                    </p>
+                  ) : (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Gestor</TableHead>
+                          <TableHead>WhatsApp</TableHead>
+                          <TableHead className="text-center">Novos</TableHead>
+                          <TableHead className="text-center">Urgentes</TableHead>
+                          <TableHead className="text-center">Resumo</TableHead>
+                          <TableHead className="text-center">Status</TableHead>
+                          <TableHead className="w-[50px]"></TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {/* Gestor Principal de phase_config */}
+                        {hasMainManager && !phase.managers.some(m => m.user_id === phase.manager_user_id) && (
+                          <TableRow className="bg-amber-500/5">
+                            <TableCell>
+                              <div className="flex items-center gap-2">
+                                <Crown className="h-4 w-4 text-amber-500" />
+                                <div>
+                                  <p className="font-medium">{phase.manager_profile?.full_name || 'N/A'}</p>
+                                  <p className="text-xs text-muted-foreground">{phase.manager_profile?.email}</p>
+                                </div>
+                              </div>
+                            </TableCell>
+                            <TableCell className="font-mono text-sm">
+                              {phase.manager_profile?.whatsapp || '-'}
+                            </TableCell>
+                            <TableCell colSpan={4} className="text-center text-sm text-muted-foreground">
+                              Definido em "Fases do Workflow" - adicione abaixo para configurar notificações
+                            </TableCell>
+                            <TableCell></TableCell>
+                          </TableRow>
+                        )}
+
+                        {/* Gestores de phase_managers */}
+                        {phase.managers.map(manager => (
+                          <TableRow 
+                            key={manager.id} 
+                            className={`${!manager.is_active ? 'opacity-50' : ''} ${phase.isPrimaryManager(manager.user_id) ? 'bg-amber-500/5' : ''}`}
+                          >
+                            <TableCell>
+                              <div className="flex items-center gap-2">
+                                {phase.isPrimaryManager(manager.user_id) && (
+                                  <Crown className="h-4 w-4 text-amber-500" />
+                                )}
+                                <div>
+                                  <p className="font-medium">{manager.profiles?.full_name || 'N/A'}</p>
+                                  <p className="text-xs text-muted-foreground">{manager.profiles?.email}</p>
+                                </div>
+                              </div>
+                            </TableCell>
+                            <TableCell className="font-mono text-sm">
+                              {manager.whatsapp}
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <Switch
+                                checked={manager.receive_new_orders}
+                                onCheckedChange={() => handleTogglePreference(manager, 'receive_new_orders')}
+                                disabled={!manager.is_active}
+                              />
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <Switch
+                                checked={manager.receive_urgent_alerts}
+                                onCheckedChange={() => handleTogglePreference(manager, 'receive_urgent_alerts')}
+                                disabled={!manager.is_active}
+                              />
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <Switch
+                                checked={manager.receive_daily_summary}
+                                onCheckedChange={() => handleTogglePreference(manager, 'receive_daily_summary')}
+                                disabled={!manager.is_active}
+                              />
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleToggleActive(manager)}
+                              >
+                                {manager.is_active ? (
+                                  <Bell className="h-4 w-4 text-green-500" />
+                                ) : (
+                                  <BellOff className="h-4 w-4 text-muted-foreground" />
+                                )}
+                              </Button>
+                            </TableCell>
+                            <TableCell>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleDeleteManager(manager.id)}
+                              >
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  )}
                 </div>
-                
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Gestor</TableHead>
-                      <TableHead>WhatsApp</TableHead>
-                      <TableHead className="text-center">Novos</TableHead>
-                      <TableHead className="text-center">Urgentes</TableHead>
-                      <TableHead className="text-center">Resumo</TableHead>
-                      <TableHead className="text-center">Status</TableHead>
-                      <TableHead className="w-[50px]"></TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {phase.managers.map(manager => (
-                      <TableRow key={manager.id} className={!manager.is_active ? 'opacity-50' : ''}>
-                        <TableCell>
-                          <div>
-                            <p className="font-medium">{manager.profiles?.full_name || 'N/A'}</p>
-                            <p className="text-xs text-muted-foreground">{manager.profiles?.email}</p>
-                          </div>
-                        </TableCell>
-                        <TableCell className="font-mono text-sm">
-                          {manager.whatsapp}
-                        </TableCell>
-                        <TableCell className="text-center">
-                          <Switch
-                            checked={manager.receive_new_orders}
-                            onCheckedChange={() => handleTogglePreference(manager, 'receive_new_orders')}
-                            disabled={!manager.is_active}
-                          />
-                        </TableCell>
-                        <TableCell className="text-center">
-                          <Switch
-                            checked={manager.receive_urgent_alerts}
-                            onCheckedChange={() => handleTogglePreference(manager, 'receive_urgent_alerts')}
-                            disabled={!manager.is_active}
-                          />
-                        </TableCell>
-                        <TableCell className="text-center">
-                          <Switch
-                            checked={manager.receive_daily_summary}
-                            onCheckedChange={() => handleTogglePreference(manager, 'receive_daily_summary')}
-                            disabled={!manager.is_active}
-                          />
-                        </TableCell>
-                        <TableCell className="text-center">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleToggleActive(manager)}
-                          >
-                            {manager.is_active ? (
-                              <Bell className="h-4 w-4 text-green-500" />
-                            ) : (
-                              <BellOff className="h-4 w-4 text-muted-foreground" />
-                            )}
-                          </Button>
-                        </TableCell>
-                        <TableCell>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDeleteManager(manager.id)}
-                          >
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </CardContent>
