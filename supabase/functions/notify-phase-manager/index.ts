@@ -159,7 +159,7 @@ serve(async (req) => {
 
     console.log(`[notify-phase-manager] Target phase: ${targetPhase}`);
 
-    // Buscar dados do pedido
+    // Buscar dados do pedido com itens para calcular valor total
     const { data: order, error: orderError } = await supabase
       .from('orders')
       .select(`
@@ -167,11 +167,11 @@ serve(async (req) => {
         order_number,
         customer_name,
         delivery_date,
-        total_value,
         status,
         order_type,
         order_category,
-        organization_id
+        organization_id,
+        order_items(total_value)
       `)
       .eq('id', orderId)
       .single();
@@ -186,6 +186,15 @@ serve(async (req) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
+
+    // Calcular valor total do pedido a partir dos itens
+    const calculatedTotalValue = (order as any).order_items?.reduce(
+      (sum: number, item: { total_value: number | null }) => sum + (item.total_value || 0), 
+      0
+    ) || 0;
+
+    // Adicionar total_value calculado ao objeto order para uso no template
+    const orderWithTotal = { ...order, total_value: calculatedTotalValue };
 
     // Buscar gestor da fase
     const { data: managers, error: managerError } = await supabase
@@ -220,8 +229,8 @@ serve(async (req) => {
 
     console.log(`[notify-phase-manager] Found ${managers.length} managers for phase ${targetPhase}`);
 
-    // Gerar mensagem
-    const messageContent = customMessage || getMessageTemplate(targetPhase, order, notificationType);
+    // Gerar mensagem usando order com total calculado
+    const messageContent = customMessage || getMessageTemplate(targetPhase, orderWithTotal, notificationType);
 
     // Enviar notificação para cada gestor
     const notifications = [];
