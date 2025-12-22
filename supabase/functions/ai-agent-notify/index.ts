@@ -8,11 +8,14 @@ const corsHeaders = {
 };
 
 interface NotificationRequest {
-  order_id: string;
-  trigger_type: 'status_change' | 'deadline' | 'manual';
+  order_id?: string;
+  trigger_type?: 'status_change' | 'deadline' | 'manual';
   new_status?: string;
   custom_message?: string;
   channel?: 'whatsapp' | 'email' | 'both';
+  // Para reenvio
+  action?: 'resend';
+  notificationId?: string;
 }
 
 serve(async (req) => {
@@ -27,6 +30,68 @@ serve(async (req) => {
 
     const payload: NotificationRequest = await req.json();
     console.log('📬 AI Agent Notify - Payload:', payload);
+
+    // 🔄 Handler para reenvio de notificação
+    if (payload.action === 'resend' && payload.notificationId) {
+      console.log('🔄 Resending notification:', payload.notificationId);
+      
+      // Buscar notificação original
+      const { data: notification, error: notifError } = await supabase
+        .from('ai_notification_log')
+        .select('*')
+        .eq('id', payload.notificationId)
+        .single();
+
+      if (notifError || !notification) {
+        throw new Error('Notification not found: ' + (notifError?.message || 'Unknown error'));
+      }
+
+      console.log('📋 Original notification:', notification.channel, notification.recipient);
+
+      // Reenviar baseado no canal
+      if (notification.channel === 'whatsapp') {
+        try {
+          await sendWhatsAppMessage(
+            supabase, 
+            notification.recipient, 
+            notification.message_content, 
+            notification.id
+          );
+          
+          return new Response(JSON.stringify({ 
+            success: true, 
+            message: 'Notification resent successfully' 
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        } catch (resendError) {
+          console.error('❌ Resend failed:', resendError);
+          return new Response(JSON.stringify({ 
+            success: false, 
+            message: resendError instanceof Error ? resendError.message : 'Resend failed'
+          }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+      } else {
+        return new Response(JSON.stringify({ 
+          success: false, 
+          message: 'Email resend not implemented yet' 
+        }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+    }
+
+    // =====================================================
+    // FLUXO NORMAL: Notificação baseada em order_id
+    // =====================================================
+    
+    if (!payload.order_id) {
+      throw new Error('order_id is required for new notifications');
+    }
 
     // Buscar configuração do agente de clientes
     const { data: agentConfig } = await supabase

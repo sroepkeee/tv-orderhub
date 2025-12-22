@@ -3,10 +3,12 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { RefreshCw, History, MessageSquare, Mail, CheckCircle2, Clock, XCircle, Eye } from "lucide-react";
+import { RefreshCw, History, MessageSquare, Mail, CheckCircle2, Clock, XCircle, Eye, Send, Loader2 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 interface NotificationLog {
   id: string;
@@ -37,11 +39,50 @@ const STATUS_CONFIG: Record<string, { label: string; icon: any; className: strin
 export function AIAgentLogsTab({ logs, onRefresh }: Props) {
   const [refreshing, setRefreshing] = useState(false);
   const [selectedLog, setSelectedLog] = useState<NotificationLog | null>(null);
+  const [resending, setResending] = useState(false);
+  const { toast } = useToast();
 
   const handleRefresh = async () => {
     setRefreshing(true);
     await onRefresh();
     setRefreshing(false);
+  };
+
+  const handleResendNotification = async () => {
+    if (!selectedLog) return;
+
+    try {
+      setResending(true);
+
+      // Chamar edge function para reenviar a notificação
+      const { data, error } = await supabase.functions.invoke('ai-agent-notify', {
+        body: {
+          action: 'resend',
+          notificationId: selectedLog.id,
+        }
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Notificação reenviada",
+        description: "A notificação foi enviada novamente com sucesso",
+      });
+
+      // Atualizar lista
+      await onRefresh();
+      setSelectedLog(null);
+
+    } catch (error) {
+      console.error('Error resending notification:', error);
+      toast({
+        title: "Erro ao reenviar",
+        description: error instanceof Error ? error.message : "Não foi possível reenviar a notificação",
+        variant: "destructive",
+      });
+    } finally {
+      setResending(false);
+    }
   };
 
   const getStatusConfig = (status: string) => {
@@ -245,6 +286,29 @@ export function AIAgentLogsTab({ logs, onRefresh }: Props) {
                     {selectedLog.error_message}
                   </div>
                 </div>
+              )}
+
+              {/* Botão de reenviar para pendentes ou falhas */}
+              {(selectedLog.status === 'pending' || selectedLog.status === 'failed') && (
+                <DialogFooter>
+                  <Button 
+                    onClick={handleResendNotification}
+                    disabled={resending}
+                    className="w-full"
+                  >
+                    {resending ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Reenviando...
+                      </>
+                    ) : (
+                      <>
+                        <Send className="h-4 w-4 mr-2" />
+                        Reenviar Notificação
+                      </>
+                    )}
+                  </Button>
+                </DialogFooter>
               )}
             </div>
           )}
