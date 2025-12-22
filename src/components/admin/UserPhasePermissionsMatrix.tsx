@@ -8,7 +8,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useOrganization } from "@/hooks/useOrganization";
-import { Save, Info, Eye, Pencil, ArrowRight, Trash2, Users, Search, Wand2, RotateCcw } from "lucide-react";
+import { Save, Info, Eye, Pencil, ArrowRight, Trash2, Users, Search, Wand2, RotateCcw, CheckCircle2 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Input } from "@/components/ui/input";
 import {
@@ -263,6 +263,34 @@ export const UserPhasePermissionsMatrix = () => {
     });
   };
 
+  // Concede acesso total a um usuário específico
+  const grantFullAccessToUser = (userId: string) => {
+    const user = users.find(u => u.id === userId);
+    if (!user || hasFullAccessRole(user)) return;
+
+    setPermissions(prev => {
+      // Remove permissões existentes do usuário
+      const withoutUser = prev.filter(p => p.user_id !== userId);
+      
+      // Cria permissões completas para todas as fases
+      const fullPermissions = PHASES.map(phase => ({
+        user_id: userId,
+        phase_key: phase.key,
+        can_view: true,
+        can_edit: true,
+        can_advance: true,
+        can_delete: true,
+      }));
+      
+      return [...withoutUser, ...fullPermissions];
+    });
+
+    toast({
+      title: "Acesso completo concedido",
+      description: `${user.full_name || user.email} agora tem acesso a todas as fases`,
+    });
+  };
+
   const handleSave = async () => {
     if (!organization?.id) return;
 
@@ -458,10 +486,26 @@ export const UserPhasePermissionsMatrix = () => {
                               </span>
                             )}
                           </div>
-                          {hasFullAccess && (
+                          {hasFullAccess ? (
                             <Badge variant="secondary" className="text-[10px] px-1.5 py-0 ml-1 bg-primary/20">
                               Total
                             </Badge>
+                          ) : (
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button 
+                                    variant="ghost" 
+                                    size="icon" 
+                                    className="h-7 w-7 ml-1"
+                                    onClick={() => grantFullAccessToUser(user.id)}
+                                  >
+                                    <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>Conceder acesso a todas as fases</TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
                           )}
                         </div>
                       </TableCell>
