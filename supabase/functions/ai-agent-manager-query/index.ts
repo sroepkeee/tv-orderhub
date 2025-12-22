@@ -2907,15 +2907,80 @@ Deno.serve(async (req) => {
     const megaApiUrl = Deno.env.get('MEGA_API_URL') || '';
     const megaApiToken = Deno.env.get('MEGA_API_TOKEN') || '';
 
-    const { data: instance } = await supabase
+    console.log('🔍 [DIAGNOSTIC] Checking WhatsApp instance connection...');
+    console.log('🔍 [DIAGNOSTIC] MEGA_API_URL configured:', !!megaApiUrl);
+    console.log('🔍 [DIAGNOSTIC] MEGA_API_TOKEN configured:', !!megaApiToken);
+
+    const { data: instance, error: instanceError } = await supabase
       .from('whatsapp_instances')
-      .select('instance_key')
+      .select('instance_key, status, phone_number, connected_at')
       .eq('status', 'connected')
       .order('connected_at', { ascending: false })
       .limit(1)
       .maybeSingle();
 
-    if (instance?.instance_key && senderPhone) {
+    // Logging detalhado para diagnóstico
+    if (instanceError) {
+      console.error('❌ [DIAGNOSTIC] Error fetching instance:', instanceError);
+    }
+    
+    console.log('📱 [DIAGNOSTIC] Instance query result:', {
+      found: !!instance,
+      instance_key: instance?.instance_key || 'NONE',
+      status: instance?.status || 'NONE',
+      phone: instance?.phone_number || 'NONE',
+      connected_at: instance?.connected_at || 'NEVER',
+    });
+
+    // Se não encontrou instância conectada, buscar todas para diagnóstico
+    if (!instance) {
+      const { data: allInstances } = await supabase
+        .from('whatsapp_instances')
+        .select('instance_key, status, connected_at, updated_at')
+        .order('updated_at', { ascending: false })
+        .limit(5);
+      
+      console.log('⚠️ [DIAGNOSTIC] No connected instance! All instances:', allInstances?.map(i => ({
+        key: i.instance_key,
+        status: i.status,
+        connected: i.connected_at,
+        updated: i.updated_at
+      })) || 'NONE');
+    }
+
+    if (!instance?.instance_key) {
+      console.error('❌ [DIAGNOSTIC] CRITICAL: No connected WhatsApp instance found!');
+      console.error('❌ [DIAGNOSTIC] Manager message will NOT be sent.');
+      console.error('❌ [DIAGNOSTIC] Action required: Reconnect WhatsApp via QR Code scan');
+      
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          intent: intent.type,
+          response: responseMessage,
+          error: 'NO_WHATSAPP_INSTANCE',
+          diagnostic: 'WhatsApp não está conectado. Escaneie o QR Code para reconectar.',
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
+    if (!senderPhone) {
+      console.error('❌ [DIAGNOSTIC] No sender phone provided');
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: 'NO_SENDER_PHONE',
+          intent: intent.type,
+          response: responseMessage,
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Prosseguir com envio
+    console.log('✅ [DIAGNOSTIC] Instance connected, proceeding to send message');
+    {
       let normalizedUrl = megaApiUrl.trim();
       if (!normalizedUrl.startsWith('http://') && !normalizedUrl.startsWith('https://')) {
         normalizedUrl = `https://${normalizedUrl}`;

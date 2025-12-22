@@ -456,26 +456,50 @@ async function checkIfManager(supabase: any, phoneNumber: string): Promise<boole
     // Criar variações do número para busca flexível
     const phoneClean = phoneNumber.replace(/\D/g, '');
     const lastDigits = phoneClean.slice(-8);
+    const last9Digits = phoneClean.slice(-9);
+    
+    console.log('🔍 [DIAGNOSTIC] checkIfManager called with:', phoneNumber);
+    console.log('🔍 [DIAGNOSTIC] Phone variations:', { phoneClean, lastDigits, last9Digits });
     
     // Buscar na tabela profiles onde is_manager = true
-    const { data: manager, error } = await supabase
+    const { data: managers, error } = await supabase
       .from('profiles')
       .select('id, full_name, is_manager, whatsapp')
-      .eq('is_manager', true)
-      .or(`whatsapp.ilike.%${lastDigits}%,whatsapp.ilike.%${phoneClean}%`)
-      .limit(1)
-      .maybeSingle();
+      .eq('is_manager', true);
     
     if (error) {
-      console.error('Error checking manager status:', error);
+      console.error('❌ [DIAGNOSTIC] Error fetching managers:', error);
       return false;
     }
     
-    const isManager = !!manager;
-    console.log(`👔 Manager check for ${phoneNumber}: ${isManager ? 'YES' : 'NO'}${manager ? ` (${manager.full_name})` : ''}`);
+    console.log('🔍 [DIAGNOSTIC] Found managers:', managers?.length || 0);
+    managers?.forEach((m: any) => {
+      console.log(`   - ${m.full_name}: whatsapp=${m.whatsapp}, is_manager=${m.is_manager}`);
+    });
+    
+    // Verificar se algum gestor corresponde ao número
+    const matchedManager = managers?.find((m: any) => {
+      if (!m.whatsapp) return false;
+      const managerPhone = m.whatsapp.replace(/\D/g, '');
+      
+      // Tentar múltiplas formas de match
+      const matches = 
+        managerPhone.includes(lastDigits) ||
+        managerPhone.includes(last9Digits) ||
+        phoneClean.includes(managerPhone.slice(-8)) ||
+        managerPhone === phoneClean;
+      
+      if (matches) {
+        console.log(`🔍 [DIAGNOSTIC] Match found! Manager phone: ${managerPhone}`);
+      }
+      return matches;
+    });
+    
+    const isManager = !!matchedManager;
+    console.log(`👔 [DIAGNOSTIC] Manager check result for ${phoneNumber}: ${isManager ? 'YES' : 'NO'}${matchedManager ? ` (${matchedManager.full_name})` : ''}`);
     return isManager;
   } catch (err) {
-    console.error('Exception in checkIfManager:', err);
+    console.error('❌ [DIAGNOSTIC] Exception in checkIfManager:', err);
     return false;
   }
 }
@@ -1091,7 +1115,9 @@ Deno.serve(async (req) => {
 
       // 🤖 VERIFICAR SE É GESTOR - Resposta instantânea sem debounce
       // Gestores cadastrados em management_report_recipients recebem respostas imediatas
+      console.log('🔍 [DIAGNOSTIC] Checking if sender is manager:', phoneNumber);
       const isManager = await checkIfManager(supabase, phoneNumber);
+      console.log('🔍 [DIAGNOSTIC] isManager result:', isManager);
       
       // 🤖 DEBOUNCE: Adicionar mensagem ao buffer ao invés de responder imediatamente
       // ⚠️ SKIP GROUPS - Only respond to individual contacts (economia de tokens)
@@ -1103,10 +1129,16 @@ Deno.serve(async (req) => {
         console.log('📝 Group messages are saved but NOT auto-replied to (token economy)');
       } else if (isManager && carrierId) {
         // 👔 GESTOR: Resposta instantânea via ai-agent-manager-query
-        console.log('👔 Manager detected! Routing to manager query handler...');
+        console.log('👔 [DIAGNOSTIC] Manager detected! Routing to manager query handler...');
+        console.log('👔 [DIAGNOSTIC] Message:', messageText);
+        console.log('👔 [DIAGNOSTIC] Phone:', phoneNumber);
+        console.log('👔 [DIAGNOSTIC] CarrierId:', carrierId);
         
         try {
-          const response = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/ai-agent-manager-query`, {
+          const managerQueryUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/ai-agent-manager-query`;
+          console.log('👔 [DIAGNOSTIC] Calling:', managerQueryUrl);
+          
+          const response = await fetch(managerQueryUrl, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -1119,14 +1151,28 @@ Deno.serve(async (req) => {
             }),
           });
           
+          const responseText = await response.text();
+          console.log('👔 [DIAGNOSTIC] Manager query response status:', response.status);
+          console.log('👔 [DIAGNOSTIC] Manager query response:', responseText.substring(0, 500));
+          
           if (response.ok) {
-            const result = await response.json();
-            console.log('✅ Manager query processed:', result.intent);
+            try {
+              const result = JSON.parse(responseText);
+              console.log('✅ Manager query processed:', result.intent);
+              
+              // Verificar se houve erro de instância não conectada
+              if (result.error === 'NO_WHATSAPP_INSTANCE') {
+                console.error('❌ [DIAGNOSTIC] CRITICAL: WhatsApp instance not connected!');
+                console.error('❌ [DIAGNOSTIC] Diagnostic:', result.diagnostic);
+              }
+            } catch (parseErr) {
+              console.log('✅ Manager query processed (non-JSON response)');
+            }
           } else {
-            console.error('❌ Manager query failed:', await response.text());
+            console.error('❌ [DIAGNOSTIC] Manager query failed:', response.status, responseText);
           }
         } catch (err) {
-          console.error('❌ Manager query error:', err);
+          console.error('❌ [DIAGNOSTIC] Manager query error:', err);
         }
       } else if (carrierId) {
         try {
