@@ -364,6 +364,35 @@ async function calculateMetrics(supabase: any): Promise<OrderMetrics> {
   const activeOrders = orders || [];
   console.log(`📦 Found ${activeOrders.length} active orders`);
 
+  // Buscar histórico de status para calcular dias na fase corretamente
+  const orderIds = activeOrders.map((o: any) => o.id);
+  let lastStatusChangeMap: Record<string, Date> = {};
+  
+  if (orderIds.length > 0) {
+    const { data: historyData, error: historyError } = await supabase
+      .from('order_history')
+      .select('order_id, new_status, changed_at')
+      .in('order_id', orderIds)
+      .order('changed_at', { ascending: false });
+
+    if (historyError) {
+      console.error('❌ Error fetching order history:', historyError);
+    } else {
+      console.log(`📜 Found ${historyData?.length || 0} history records`);
+      
+      // Criar mapa de última entrada na fase por pedido
+      activeOrders.forEach((order: any) => {
+        const history = historyData?.filter((h: any) => h.order_id === order.id && h.new_status === order.status);
+        if (history && history.length > 0) {
+          lastStatusChangeMap[order.id] = new Date(history[0].changed_at);
+        } else {
+          // Fallback para created_at se não houver histórico
+          lastStatusChangeMap[order.id] = new Date(order.created_at);
+        }
+      });
+    }
+  }
+
   // Inicializar contadores por fase (TODAS as fases)
   const byPhase: OrderMetrics['byPhase'] = {
     almoxSsm: 0, 
@@ -431,9 +460,9 @@ async function calculateMetrics(supabase: any): Promise<OrderMetrics> {
     if (!phaseDays[phaseKey]) phaseDays[phaseKey] = [];
     if (!phaseValues[phaseKey]) phaseValues[phaseKey] = 0;
     
-    // Calcular dias na fase
-    const updatedAt = new Date(order.updated_at || order.created_at);
-    const daysInPhase = Math.ceil((today.getTime() - updatedAt.getTime()) / (1000 * 60 * 60 * 24));
+    // Calcular dias na fase usando histórico de mudança de status (mais preciso)
+    const phaseStartedAt = lastStatusChangeMap[order.id] || new Date(order.created_at);
+    const daysInPhase = Math.ceil((today.getTime() - phaseStartedAt.getTime()) / (1000 * 60 * 60 * 24));
     phaseDays[phaseKey].push(daysInPhase);
 
     // Calcular dias até entrega e dias de atraso
