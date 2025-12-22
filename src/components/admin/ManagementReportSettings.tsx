@@ -306,19 +306,31 @@ WHERE jobname = 'daily-management-report-08h';`;
   async function checkCronStatus() {
     setCronLoading(true);
     try {
-      // Tentar verificar se o cron job existe via RPC ou query
+      // Verificar status do cron job via RPC
       const { data, error } = await supabase.rpc('get_cron_job_status' as any, {
-        job_name: 'daily-management-report-08h'
+        job_name_pattern: 'daily-management-report%'
       });
       
       if (error) {
-        // Se a função não existe, o cron provavelmente não está configurado
+        // Se a função não existe ou pg_cron não está habilitado
         console.log('Cron status check:', error.message);
-        setCronStatus('unknown');
-      } else if (data && data.length > 0 && data[0].active) {
-        setCronStatus('active');
+        if (error.message.includes('pg_cron') || error.message.includes('does not exist')) {
+          setCronStatus('inactive');
+          toast.info('pg_cron não está habilitado. Configure manualmente no Supabase.');
+        } else {
+          setCronStatus('error');
+        }
+      } else if (data && data.length > 0) {
+        const job = data[0];
+        setCronStatus(job.is_active ? 'active' : 'inactive');
+        if (job.is_active) {
+          toast.success(`Cron job ativo: ${job.schedule}`);
+        } else {
+          toast.warning('Cron job existe mas está inativo');
+        }
       } else {
         setCronStatus('inactive');
+        toast.info('Nenhum cron job configurado. Execute o SQL para ativá-lo.');
       }
     } catch (err) {
       console.log('Cron check error:', err);
