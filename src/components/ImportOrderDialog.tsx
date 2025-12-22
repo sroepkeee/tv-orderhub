@@ -16,6 +16,7 @@ import { DuplicateOrderWarningDialog } from "@/components/DuplicateOrderWarningD
 import { OrderItemsReviewTable } from "@/components/OrderItemsReviewTable";
 import { enrichWithRateioProject, RateioProject } from "@/lib/rateioEnrichment";
 import { CustomerWhatsAppDialog } from "@/components/CustomerWhatsAppDialog";
+import { useOrganizationId } from "@/hooks/useOrganizationId";
 interface ImportOrderDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -26,6 +27,7 @@ export const ImportOrderDialog = ({
   onOpenChange,
   onImportSuccess
 }: ImportOrderDialogProps) => {
+  const { requireOrganization } = useOrganizationId();
   const [file, setFile] = useState<File | null>(null);
   const [parsedData, setParsedData] = useState<ParsedOrderData | null>(null);
   const [validation, setValidation] = useState<ValidationResult | null>(null);
@@ -163,19 +165,8 @@ export const ImportOrderDialog = ({
       } = await supabase.auth.getUser();
       if (!user) throw new Error("Usuário não autenticado");
 
-      // 🔐 Buscar organization_id do usuário para RLS
-      const { data: memberData } = await supabase
-        .from('organization_members')
-        .select('organization_id')
-        .eq('user_id', user.id)
-        .eq('is_active', true)
-        .maybeSingle();
-
-      if (!memberData?.organization_id) {
-        throw new Error("Usuário não possui organização ativa. Contate o administrador.");
-      }
-
-      const organizationId = memberData.organization_id;
+      // 🔐 Usar hook centralizado para obter organization_id
+      const organizationId = requireOrganization();
       console.log('✅ [executeImport] Organization ID:', organizationId);
 
       // Converter datas DD/MM/YYYY para YYYY-MM-DD

@@ -26,6 +26,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useAdminAuth } from "@/hooks/useAdminAuth";
 import { usePhaseAuthorization } from "@/hooks/usePhaseAuthorization";
 import { usePhaseManagerNotification } from "@/hooks/usePhaseManagerNotification";
+import { useOrganizationId } from "@/hooks/useOrganizationId";
 import { supabase } from "@/integrations/supabase/client";
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
 import AppSidebar from "@/components/sidebar/AppSidebar";
@@ -230,6 +231,7 @@ export const Dashboard = () => {
     phasePermissions,
     userRoles
   } = usePhaseAuthorization();
+  const { requireOrganization } = useOrganizationId();
   const navigate = useNavigate();
   const location = useLocation();
   const [activeTab, setActiveTab] = useState("all");
@@ -1375,19 +1377,8 @@ export const Dashboard = () => {
   const handleAddOrder = async (orderData: any) => {
     if (!user) return;
     try {
-      // Buscar organization_id do usuário
-      const { data: memberData } = await supabase
-        .from('organization_members')
-        .select('organization_id')
-        .eq('user_id', user.id)
-        .eq('is_active', true)
-        .maybeSingle();
-      
-      if (!memberData?.organization_id) {
-        throw new Error("Usuário não está vinculado a uma organização ativa");
-      }
-      
-      const organizationId = memberData.organization_id;
+      // Usar hook centralizado para obter organization_id
+      const organizationId = requireOrganization();
       const orderNumber = generateOrderNumber(orderData.type);
       
       const {
@@ -1641,24 +1632,15 @@ export const Dashboard = () => {
   const handleDuplicateOrder = async (originalOrder: Order) => {
     if (!user) return;
     try {
-      // Buscar organization_id do usuário
-      const { data: memberData } = await supabase
-        .from('organization_members')
-        .select('organization_id')
-        .eq('user_id', user.id)
-        .eq('is_active', true)
-        .maybeSingle();
-      
-      if (!memberData?.organization_id) {
-        throw new Error("Usuário não está vinculado a uma organização ativa");
-      }
+      // Usar hook centralizado para obter organization_id
+      const organizationId = requireOrganization();
       
       const {
         data,
         error
       } = await supabase.from('orders').insert({
         user_id: user.id,
-        organization_id: memberData.organization_id,
+        organization_id: organizationId,
         order_number: generateOrderNumber(originalOrder.type),
         customer_name: originalOrder.client,
         delivery_address: originalOrder.client,
