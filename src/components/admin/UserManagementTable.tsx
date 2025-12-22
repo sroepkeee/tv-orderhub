@@ -7,7 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { UserCheck, UserX, UserCog, Search, CheckCircle, XCircle, Clock, Crown } from "lucide-react";
+import { UserCheck, UserX, Shield, Search, CheckCircle, XCircle, Clock, Crown, Settings } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { UserApprovalDialog } from "./UserApprovalDialog";
 import { UserRolesDialog } from "./UserRolesDialog";
 import { DepartmentSelect } from "./DepartmentSelect";
@@ -31,6 +32,7 @@ interface UserData {
 }
 
 export const UserManagementTable = () => {
+  const navigate = useNavigate();
   const [users, setUsers] = useState<UserData[]>([]);
   const [filteredUsers, setFilteredUsers] = useState<UserData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -488,9 +490,19 @@ export const UserManagementTable = () => {
                               setSelectedUser(user);
                               setShowRolesDialog(true);
                             }}
+                            title="Administrador"
                           >
-                            <UserCog className="h-4 w-4 mr-1" />
-                            Roles
+                            <Shield className="h-4 w-4 mr-1" />
+                            Admin
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => navigate('/settings/phases')}
+                            title="Configurar permissões de fases"
+                          >
+                            <Settings className="h-4 w-4 mr-1" />
+                            Fases
                           </Button>
                           <Button
                             size="sm"
