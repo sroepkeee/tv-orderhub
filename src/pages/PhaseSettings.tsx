@@ -5,11 +5,12 @@ import { useOrganization } from "@/hooks/useOrganization";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Settings2, Plus, Shield } from "lucide-react";
+import { ArrowLeft, Settings2, Plus, Shield, Users } from "lucide-react";
 import { toast } from "sonner";
 import { PhaseList } from "@/components/phases/PhaseList";
 import { AddPhaseDialog } from "@/components/phases/AddPhaseDialog";
 import { PhasePermissionsMatrix } from "@/components/admin/PhasePermissionsMatrix";
+import { UserPhasePermissionsMatrix } from "@/components/admin/UserPhasePermissionsMatrix";
 
 export interface PhaseConfig {
   id: string;
@@ -18,6 +19,7 @@ export interface PhaseConfig {
   order_index: number;
   responsible_role: string | null;
   organization_id: string | null;
+  manager_user_id?: string | null;
 }
 
 export interface UserByRole {
@@ -56,14 +58,12 @@ const PhaseSettings = () => {
 
   const fetchUsersByRole = async () => {
     try {
-      // Buscar user_roles com profiles
       const { data: rolesData, error: rolesError } = await supabase
         .from('user_roles')
         .select('role, user_id');
 
       if (rolesError) throw rolesError;
 
-      // Buscar profiles
       const userIds = [...new Set(rolesData?.map(r => r.user_id) || [])];
       
       if (userIds.length === 0) {
@@ -78,7 +78,6 @@ const PhaseSettings = () => {
 
       if (profilesError) throw profilesError;
 
-      // Agrupar por role
       const grouped: Record<string, UserByRole[]> = {};
       
       rolesData?.forEach(roleEntry => {
@@ -87,7 +86,6 @@ const PhaseSettings = () => {
           if (!grouped[roleEntry.role]) {
             grouped[roleEntry.role] = [];
           }
-          // Evitar duplicatas
           if (!grouped[roleEntry.role].find(u => u.id === profile.id)) {
             grouped[roleEntry.role].push({
               id: profile.id,
@@ -114,7 +112,6 @@ const PhaseSettings = () => {
   const handlePhasesReorder = async (reorderedPhases: PhaseConfig[]) => {
     setPhases(reorderedPhases);
 
-    // Update order_index in database
     try {
       const updates = reorderedPhases.map((phase, index) => ({
         id: phase.id,
@@ -134,7 +131,7 @@ const PhaseSettings = () => {
     } catch (error) {
       console.error('Error reordering phases:', error);
       toast.error('Erro ao reordenar fases');
-      fetchPhases(); // Revert on error
+      fetchPhases();
     }
   };
 
@@ -145,6 +142,7 @@ const PhaseSettings = () => {
         .update({
           display_name: updatedPhase.display_name,
           responsible_role: updatedPhase.responsible_role as any,
+          manager_user_id: updatedPhase.manager_user_id,
         })
         .eq('id', updatedPhase.id);
 
@@ -247,7 +245,11 @@ const PhaseSettings = () => {
             </TabsTrigger>
             <TabsTrigger value="permissions" className="flex items-center gap-2">
               <Shield className="h-4 w-4" />
-              Matriz de Permissões
+              Permissões por Role
+            </TabsTrigger>
+            <TabsTrigger value="user-permissions" className="flex items-center gap-2">
+              <Users className="h-4 w-4" />
+              Permissões por Usuário
             </TabsTrigger>
           </TabsList>
 
@@ -289,6 +291,10 @@ const PhaseSettings = () => {
 
           <TabsContent value="permissions">
             <PhasePermissionsMatrix />
+          </TabsContent>
+
+          <TabsContent value="user-permissions">
+            <UserPhasePermissionsMatrix />
           </TabsContent>
         </Tabs>
 
