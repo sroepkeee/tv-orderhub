@@ -232,11 +232,16 @@ export async function parseTxtOrder(file: File): Promise<ParsedOrderData & { cus
         orderInfo.issueDate = parts[3];
         const representative = parts[4] || '';
         
+        // 🆕 Mapear Representante para executiveName
+        if (representative) {
+          orderInfo.executiveName = representative;
+        }
+        
         console.log('   ✅ Formato: Cabecalho;FILIAL;PEDIDO;DATA;REPRESENTANTE');
         console.log(`   ✅ Filial: ${filialCode}`);
         console.log(`   ✅ Pedido: ${orderInfo.orderNumber}`);
         console.log(`   ✅ Data Emissão: ${orderInfo.issueDate}`);
-        if (representative) console.log(`   ✅ Representante: ${representative}`);
+        if (representative) console.log(`   ✅ Representante → executiveName: ${representative}`);
         foundDate = true;
       }
       // Tentar formato: Cabecalho;PEDIDO;DATA
