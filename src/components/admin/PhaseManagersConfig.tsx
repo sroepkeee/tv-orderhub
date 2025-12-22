@@ -11,7 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { toast } from 'sonner';
-import { Plus, Trash2, Bell, BellOff, UserCog, MessageSquare, Crown } from 'lucide-react';
+import { Plus, Trash2, Bell, BellOff, UserCog, MessageSquare, Crown, CheckCircle, AlertCircle } from 'lucide-react';
 
 interface PhaseManager {
   id: string;
@@ -66,6 +66,7 @@ export function PhaseManagersConfig() {
   const [receiveNewOrders, setReceiveNewOrders] = useState(true);
   const [receiveUrgentAlerts, setReceiveUrgentAlerts] = useState(true);
   const [receiveDailySummary, setReceiveDailySummary] = useState(false);
+  const [whatsappWarning, setWhatsappWarning] = useState('');
 
   useEffect(() => {
     if (organizationId) {
@@ -151,6 +152,12 @@ export function PhaseManagersConfig() {
     }
 
     const normalizedWhatsapp = whatsapp.replace(/\D/g, '');
+    
+    // Validação de WhatsApp mínimo
+    if (normalizedWhatsapp.length < 10) {
+      toast.error('WhatsApp deve ter pelo menos 10 dígitos (DDD + número)');
+      return;
+    }
 
     const { error } = await supabase
       .from('phase_managers')
@@ -226,6 +233,7 @@ export function PhaseManagersConfig() {
     setSelectedUser('');
     setSelectedPhase('');
     setWhatsapp('');
+    setWhatsappWarning('');
     setReceiveNewOrders(true);
     setReceiveUrgentAlerts(true);
     setReceiveDailySummary(false);
@@ -236,7 +244,18 @@ export function PhaseManagersConfig() {
     const profile = profiles.find(p => p.id === userId);
     if (profile?.whatsapp) {
       setWhatsapp(profile.whatsapp);
+      setWhatsappWarning('');
+    } else {
+      setWhatsapp('');
+      setWhatsappWarning('Este usuário não tem WhatsApp cadastrado no perfil');
     }
+  };
+
+  // Helper para verificar se WhatsApp é válido
+  const isValidWhatsapp = (phone: string | undefined | null) => {
+    if (!phone) return false;
+    const normalized = phone.replace(/\D/g, '');
+    return normalized.length >= 10;
   };
 
   // Agrupar por fase dinâmica
@@ -302,11 +321,29 @@ export function PhaseManagersConfig() {
                     <SelectContent>
                       {profiles.map(profile => (
                         <SelectItem key={profile.id} value={profile.id}>
-                          {profile.full_name || profile.email}
+                          <span className="flex items-center gap-2">
+                            {isValidWhatsapp(profile.whatsapp) ? (
+                              <CheckCircle className="h-3 w-3 text-green-500 flex-shrink-0" />
+                            ) : (
+                              <AlertCircle className="h-3 w-3 text-amber-500 flex-shrink-0" />
+                            )}
+                            <span>{profile.full_name || profile.email}</span>
+                            {profile.whatsapp && (
+                              <span className="text-xs text-muted-foreground">
+                                ({profile.whatsapp})
+                              </span>
+                            )}
+                          </span>
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
+                  {whatsappWarning && (
+                    <p className="text-xs text-amber-600 flex items-center gap-1">
+                      <AlertCircle className="h-3 w-3" />
+                      {whatsappWarning}
+                    </p>
+                  )}
                 </div>
 
                 <div className="space-y-2">
@@ -426,7 +463,14 @@ export function PhaseManagersConfig() {
                               </div>
                             </TableCell>
                             <TableCell className="font-mono text-sm">
-                              {phase.manager_profile?.whatsapp || '-'}
+                              {isValidWhatsapp(phase.manager_profile?.whatsapp) ? (
+                                phase.manager_profile?.whatsapp
+                              ) : (
+                                <span className="flex items-center gap-1 text-destructive">
+                                  <AlertCircle className="h-4 w-4" />
+                                  {phase.manager_profile?.whatsapp || 'Não configurado'}
+                                </span>
+                              )}
                             </TableCell>
                             <TableCell colSpan={4} className="text-center text-sm text-muted-foreground">
                               Definido em "Fases do Workflow" - adicione abaixo para configurar notificações
@@ -453,7 +497,14 @@ export function PhaseManagersConfig() {
                               </div>
                             </TableCell>
                             <TableCell className="font-mono text-sm">
-                              {manager.whatsapp}
+                              {isValidWhatsapp(manager.whatsapp) ? (
+                                manager.whatsapp
+                              ) : (
+                                <span className="flex items-center gap-1 text-destructive">
+                                  <AlertCircle className="h-4 w-4" />
+                                  {manager.whatsapp || 'Não configurado'}
+                                </span>
+                              )}
                             </TableCell>
                             <TableCell className="text-center">
                               <Switch
