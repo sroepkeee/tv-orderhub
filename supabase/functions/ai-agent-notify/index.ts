@@ -585,6 +585,10 @@ async function sendWhatsAppMessage(
     .single();
 
   if (!instance) {
+    await supabase.from('ai_notification_log').update({ 
+      status: 'failed',
+      error_message: 'No connected WhatsApp instance'
+    }).eq('id', logId);
     throw new Error('No connected WhatsApp instance');
   }
 
@@ -592,6 +596,10 @@ async function sendWhatsAppMessage(
   const megaApiToken = Deno.env.get('MEGA_API_TOKEN');
 
   if (!megaApiUrl || !megaApiToken) {
+    await supabase.from('ai_notification_log').update({ 
+      status: 'failed',
+      error_message: 'Mega API not configured'
+    }).eq('id', logId);
     throw new Error('Mega API not configured');
   }
 
@@ -608,29 +616,78 @@ async function sendWhatsAppMessage(
     formattedPhone = '55' + formattedPhone;
   }
 
-  console.log(`📱 Sending WhatsApp to: ${formattedPhone}`);
+  // ✅ ENDPOINT CORRETO: /rest/sendMessage/{instance}/text
+  const endpoint = `/rest/sendMessage/${instance.instance_key}/text`;
+  const fullUrl = `${baseUrl}${endpoint}`;
 
-  const response = await fetch(`${baseUrl}/message/sendText/${instance.instance_key}`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'apikey': megaApiToken,
-    },
-    body: JSON.stringify({
-      number: formattedPhone,
-      textMessage: { text: message },
-    }),
-  });
+  // ✅ BODY CORRETO: messageData com to, text, linkPreview
+  const body = {
+    messageData: {
+      to: formattedPhone,
+      text: message,
+      linkPreview: false,
+    }
+  };
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Mega API error: ${errorText}`);
+  console.log(`📱 Sending WhatsApp to: ${formattedPhone} via ${fullUrl}`);
+
+  // Multi-header fallback para compatibilidade com diferentes versões da API
+  const authFormats: Array<Record<string, string>> = [
+    { 'apikey': megaApiToken },
+    { 'Authorization': `Bearer ${megaApiToken}` },
+    { 'Apikey': megaApiToken },
+  ];
+
+  let megaData: any = null;
+  let lastError = '';
+
+  for (const authHeader of authFormats) {
+    try {
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        ...authHeader,
+      };
+
+      const response = await fetch(fullUrl, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(body),
+      });
+
+      const responseText = await response.text();
+      console.log(`Response (${Object.keys(authHeader)[0]}):`, response.status, responseText.substring(0, 300));
+
+      if (response.ok) {
+        try {
+          megaData = JSON.parse(responseText);
+        } catch {
+          megaData = { raw: responseText };
+        }
+        break;
+      } else if (response.status === 401 || response.status === 403) {
+        lastError = `Auth failed (${response.status}): ${responseText.substring(0, 200)}`;
+        continue;
+      } else {
+        lastError = `Mega API error: ${response.status} - ${responseText.substring(0, 200)}`;
+        break;
+      }
+    } catch (fetchError) {
+      lastError = `Fetch error: ${fetchError}`;
+      console.error('Fetch error:', fetchError);
+    }
   }
 
-  const result = await response.json();
-  const externalMessageId = result.key?.id || result.messageId || null;
+  if (!megaData) {
+    await supabase.from('ai_notification_log').update({ 
+      status: 'failed',
+      error_message: lastError
+    }).eq('id', logId);
+    throw new Error(lastError);
+  }
+
+  const externalMessageId = megaData.id || megaData.key?.id || megaData.messageId || null;
   
-  // Atualizar log
+  // Atualizar log com sucesso
   await supabase
     .from('ai_notification_log')
     .update({ 
