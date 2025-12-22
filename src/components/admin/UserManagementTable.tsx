@@ -498,7 +498,7 @@ export const UserManagementTable = () => {
                           <Button
                             size="sm"
                             variant="ghost"
-                            onClick={() => navigate('/settings/phases')}
+                            onClick={() => navigate('/settings/phases?tab=user-permissions')}
                             title="Configurar permissões de fases"
                           >
                             <Settings className="h-4 w-4 mr-1" />

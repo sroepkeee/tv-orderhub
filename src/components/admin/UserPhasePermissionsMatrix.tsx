@@ -8,7 +8,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useOrganization } from "@/hooks/useOrganization";
-import { Save, Info, Eye, Pencil, ArrowRight, Trash2, Users, Search, Wand2, RotateCcw, CheckCircle2 } from "lucide-react";
+import { Save, Info, Eye, Pencil, ArrowRight, Trash2, Users, Search, Wand2, RotateCcw, CheckCircle2, ChevronLeft, ChevronRight } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Input } from "@/components/ui/input";
 import {
@@ -56,7 +56,6 @@ const PHASES = [
 
 const FULL_ACCESS_ROLES = ['admin', 'manager'];
 
-// Mapeamento de departamentos para fases
 const DEPARTMENT_PHASES_MAP: Record<string, string[]> = {
   'Almoxarifado SSM': ['almox_ssm'],
   'SSM': ['almox_ssm'],
@@ -73,7 +72,6 @@ const DEPARTMENT_PHASES_MAP: Record<string, string[]> = {
   'Embalagem': ['packaging'],
 };
 
-// Cores por tipo de permissão
 const PERMISSION_STYLES = {
   can_view: {
     color: 'text-emerald-600',
@@ -105,12 +103,15 @@ const PERMISSION_STYLES = {
   },
 };
 
+const USERS_PER_PAGE = 10;
+
 export const UserPhasePermissionsMatrix = () => {
   const [permissions, setPermissions] = useState<UserPermission[]>([]);
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
   const { toast } = useToast();
   const { organization } = useOrganization();
 
@@ -120,41 +121,52 @@ export const UserPhasePermissionsMatrix = () => {
     }
   }, [organization?.id]);
 
+  // Reset para página 1 quando o termo de busca muda
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
+
   const loadData = async () => {
     try {
       setLoading(true);
       
-      const { data: profilesData, error: profilesError } = await supabase
-        .from('profiles')
-        .select('id, full_name, email, department')
-        .eq('organization_id', organization?.id)
-        .eq('is_active', true);
+      // Executar queries em paralelo
+      const [profilesResult, permissionsResult] = await Promise.all([
+        supabase
+          .from('profiles')
+          .select('id, full_name, email, department')
+          .eq('organization_id', organization?.id)
+          .eq('is_active', true),
+        supabase
+          .from('user_phase_permissions')
+          .select('*')
+          .eq('organization_id', organization?.id)
+      ]);
 
-      if (profilesError) throw profilesError;
+      if (profilesResult.error) throw profilesResult.error;
+      if (permissionsResult.error) throw permissionsResult.error;
 
-      const userIds = profilesData?.map(p => p.id) || [];
-      const { data: rolesData, error: rolesError } = await supabase
-        .from('user_roles')
-        .select('user_id, role')
-        .in('user_id', userIds);
+      const userIds = profilesResult.data?.map(p => p.id) || [];
+      
+      // Buscar roles apenas se houver usuários
+      let rolesData: { user_id: string; role: string }[] = [];
+      if (userIds.length > 0) {
+        const { data, error } = await supabase
+          .from('user_roles')
+          .select('user_id, role')
+          .in('user_id', userIds);
+        
+        if (error) throw error;
+        rolesData = data || [];
+      }
 
-      if (rolesError) throw rolesError;
-
-      const usersWithRoles: UserProfile[] = (profilesData || []).map(profile => ({
+      const usersWithRoles: UserProfile[] = (profilesResult.data || []).map(profile => ({
         ...profile,
-        roles: rolesData?.filter(r => r.user_id === profile.id).map(r => r.role) || []
+        roles: rolesData.filter(r => r.user_id === profile.id).map(r => r.role)
       }));
 
       setUsers(usersWithRoles);
-
-      const { data: permData, error: permError } = await supabase
-        .from('user_phase_permissions')
-        .select('*')
-        .eq('organization_id', organization?.id);
-
-      if (permError) throw permError;
-      
-      setPermissions(permData?.map(p => ({
+      setPermissions(permissionsResult.data?.map(p => ({
         user_id: p.user_id,
         phase_key: p.phase_key,
         can_view: p.can_view ?? false,
@@ -195,9 +207,7 @@ export const UserPhasePermissionsMatrix = () => {
       const existing = prev.find(p => p.user_id === userId && p.phase_key === phase);
       
       if (existing) {
-        // Atualiza existente
         const updated = { ...existing, [field]: value };
-        // Se todas as permissões são false, remove o registro
         if (!updated.can_view && !updated.can_edit && !updated.can_advance && !updated.can_delete) {
           return prev.filter(p => !(p.user_id === userId && p.phase_key === phase));
         }
@@ -207,7 +217,6 @@ export const UserPhasePermissionsMatrix = () => {
             : p
         );
       } else if (value) {
-        // Só cria se value é true
         return [...prev, {
           user_id: userId,
           phase_key: phase,
@@ -217,21 +226,19 @@ export const UserPhasePermissionsMatrix = () => {
           can_delete: field === 'can_delete',
         }];
       }
-      return prev; // Não faz nada se value é false e não existe
+      return prev;
     });
   };
 
-  // Aplica permissões baseado no departamento do usuário
   const applyDepartmentPermissions = () => {
     const newPermissions: UserPermission[] = [];
     
     users.forEach(user => {
-      if (hasFullAccessRole(user)) return; // Ignora admin/manager
+      if (hasFullAccessRole(user)) return;
       
       const department = user.department?.trim();
       if (!department) return;
       
-      // Encontra as fases para este departamento
       const phases = DEPARTMENT_PHASES_MAP[department] || [];
       
       phases.forEach(phaseKey => {
@@ -241,7 +248,7 @@ export const UserPhasePermissionsMatrix = () => {
           can_view: true,
           can_edit: true,
           can_advance: true,
-          can_delete: false, // Delete requer permissão especial
+          can_delete: false,
         });
       });
     });
@@ -254,7 +261,6 @@ export const UserPhasePermissionsMatrix = () => {
     });
   };
 
-  // Limpa todas as permissões
   const clearAllPermissions = () => {
     setPermissions([]);
     toast({
@@ -263,16 +269,13 @@ export const UserPhasePermissionsMatrix = () => {
     });
   };
 
-  // Concede acesso total a um usuário específico
   const grantFullAccessToUser = (userId: string) => {
     const user = users.find(u => u.id === userId);
     if (!user || hasFullAccessRole(user)) return;
 
     setPermissions(prev => {
-      // Remove permissões existentes do usuário
       const withoutUser = prev.filter(p => p.user_id !== userId);
       
-      // Cria permissões completas para todas as fases
       const fullPermissions = PHASES.map(phase => ({
         user_id: userId,
         phase_key: phase.key,
@@ -358,6 +361,13 @@ export const UserPhasePermissionsMatrix = () => {
     );
   });
 
+  // Paginação
+  const totalPages = Math.ceil(filteredUsers.length / USERS_PER_PAGE);
+  const paginatedUsers = filteredUsers.slice(
+    (currentPage - 1) * USERS_PER_PAGE,
+    currentPage * USERS_PER_PAGE
+  );
+
   if (loading) {
     return (
       <Card>
@@ -369,54 +379,54 @@ export const UserPhasePermissionsMatrix = () => {
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center justify-between flex-wrap gap-4">
-          <div>
-            <CardTitle className="flex items-center gap-2">
-              <Users className="h-5 w-5" />
-              Permissões por Usuário
-            </CardTitle>
-            <CardDescription>Configure permissões individuais para cada usuário por fase</CardDescription>
+    <TooltipProvider>
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between flex-wrap gap-4">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Users className="h-5 w-5" />
+                Permissões por Usuário
+              </CardTitle>
+              <CardDescription>Configure permissões individuais para cada usuário por fase</CardDescription>
+            </div>
+            <div className="flex gap-2 flex-wrap">
+              <Button variant="outline" onClick={applyDepartmentPermissions}>
+                <Wand2 className="h-4 w-4 mr-2" />
+                Aplicar por Departamento
+              </Button>
+              <Button variant="outline" onClick={clearAllPermissions}>
+                <RotateCcw className="h-4 w-4 mr-2" />
+                Limpar Tudo
+              </Button>
+              <Button onClick={handleSave} disabled={saving}>
+                <Save className="h-4 w-4 mr-2" />
+                {saving ? "Salvando..." : "Salvar"}
+              </Button>
+            </div>
           </div>
-          <div className="flex gap-2 flex-wrap">
-            <Button variant="outline" onClick={applyDepartmentPermissions}>
-              <Wand2 className="h-4 w-4 mr-2" />
-              Aplicar por Departamento
-            </Button>
-            <Button variant="outline" onClick={clearAllPermissions}>
-              <RotateCcw className="h-4 w-4 mr-2" />
-              Limpar Tudo
-            </Button>
-            <Button onClick={handleSave} disabled={saving}>
-              <Save className="h-4 w-4 mr-2" />
-              {saving ? "Salvando..." : "Salvar"}
-            </Button>
+        </CardHeader>
+        <CardContent>
+          <Alert className="mb-4">
+            <Info className="h-4 w-4" />
+            <AlertDescription className="text-sm">
+              Usuários com role <strong>Admin</strong> ou <strong>Gestor</strong> têm acesso total automático (destacados em azul).
+            </AlertDescription>
+          </Alert>
+
+          {/* Search */}
+          <div className="mb-4 relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Buscar usuário por nome, email ou departamento..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10"
+            />
           </div>
-        </div>
-      </CardHeader>
-      <CardContent>
-        <Alert className="mb-4">
-          <Info className="h-4 w-4" />
-          <AlertDescription className="text-sm">
-            Usuários com role <strong>Admin</strong> ou <strong>Gestor</strong> têm acesso total automático (destacados em azul).
-          </AlertDescription>
-        </Alert>
 
-        {/* Search */}
-        <div className="mb-4 relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Buscar usuário por nome, email ou departamento..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
-          />
-        </div>
-
-        {/* Legenda com cores */}
-        <div className="mb-4 flex flex-wrap gap-6 text-sm p-3 bg-muted/50 rounded-lg">
-          <TooltipProvider>
+          {/* Legenda com cores */}
+          <div className="mb-4 flex flex-wrap gap-6 text-sm p-3 bg-muted/50 rounded-lg">
             {Object.entries(PERMISSION_STYLES).map(([key, style]) => {
               const Icon = style.icon;
               return (
@@ -438,60 +448,58 @@ export const UserPhasePermissionsMatrix = () => {
                 </Tooltip>
               );
             })}
-          </TooltipProvider>
-        </div>
-        
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-[200px] sticky left-0 bg-background">Usuário</TableHead>
-                {PHASES.map(phase => (
-                  <TableHead key={phase.key} className="text-center min-w-[90px]">
-                    <div className="text-xs leading-tight">{phase.label}</div>
-                  </TableHead>
-                ))}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredUsers.length === 0 ? (
+          </div>
+          
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
                 <TableRow>
-                  <TableCell colSpan={PHASES.length + 1} className="text-center py-8 text-muted-foreground">
-                    {searchTerm ? 'Nenhum usuário encontrado' : 'Nenhum usuário na organização'}
-                  </TableCell>
+                  <TableHead className="w-[200px] sticky left-0 bg-background">Usuário</TableHead>
+                  {PHASES.map(phase => (
+                    <TableHead key={phase.key} className="text-center min-w-[90px]">
+                      <div className="text-xs leading-tight">{phase.label}</div>
+                    </TableHead>
+                  ))}
                 </TableRow>
-              ) : (
-                filteredUsers.map(user => {
-                  const hasFullAccess = hasFullAccessRole(user);
-                  
-                  return (
-                    <TableRow 
-                      key={user.id}
-                      className={hasFullAccess ? "bg-primary/5" : ""}
-                    >
-                      <TableCell className="font-medium sticky left-0 bg-background">
-                        <div className="flex items-center gap-2">
-                          <Avatar className="h-8 w-8">
-                            <AvatarFallback className="text-xs">
-                              {getInitials(user.full_name, user.email)}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div className="flex flex-col">
-                            <span className="text-sm truncate max-w-[120px]">
-                              {user.full_name || user.email || 'Sem nome'}
-                            </span>
-                            {user.department && (
-                              <span className="text-xs text-muted-foreground truncate max-w-[120px]">
-                                {user.department}
+              </TableHeader>
+              <TableBody>
+                {paginatedUsers.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={PHASES.length + 1} className="text-center py-8 text-muted-foreground">
+                      {searchTerm ? 'Nenhum usuário encontrado' : 'Nenhum usuário na organização'}
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  paginatedUsers.map(user => {
+                    const hasFullAccess = hasFullAccessRole(user);
+                    
+                    return (
+                      <TableRow 
+                        key={user.id}
+                        className={hasFullAccess ? "bg-primary/5" : ""}
+                      >
+                        <TableCell className="font-medium sticky left-0 bg-background">
+                          <div className="flex items-center gap-2">
+                            <Avatar className="h-8 w-8">
+                              <AvatarFallback className="text-xs">
+                                {getInitials(user.full_name, user.email)}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div className="flex flex-col">
+                              <span className="text-sm truncate max-w-[120px]">
+                                {user.full_name || user.email || 'Sem nome'}
                               </span>
-                            )}
-                          </div>
-                          {hasFullAccess ? (
-                            <Badge variant="secondary" className="text-[10px] px-1.5 py-0 ml-1 bg-primary/20">
-                              Total
-                            </Badge>
-                          ) : (
-                            <TooltipProvider>
+                              {user.department && (
+                                <span className="text-xs text-muted-foreground truncate max-w-[120px]">
+                                  {user.department}
+                                </span>
+                              )}
+                            </div>
+                            {hasFullAccess ? (
+                              <Badge variant="secondary" className="text-[10px] px-1.5 py-0 ml-1 bg-primary/20">
+                                Total
+                              </Badge>
+                            ) : (
                               <Tooltip>
                                 <TooltipTrigger asChild>
                                   <Button 
@@ -505,82 +513,107 @@ export const UserPhasePermissionsMatrix = () => {
                                 </TooltipTrigger>
                                 <TooltipContent>Conceder acesso a todas as fases</TooltipContent>
                               </Tooltip>
-                            </TooltipProvider>
-                          )}
-                        </div>
-                      </TableCell>
-                      {PHASES.map(phase => {
-                        const perm = getPermission(user.id, phase.key);
-                        
-                        if (hasFullAccess) {
+                            )}
+                          </div>
+                        </TableCell>
+                        {PHASES.map(phase => {
+                          const perm = getPermission(user.id, phase.key);
+                          
+                          if (hasFullAccess) {
+                            return (
+                              <TableCell key={phase.key} className="text-center">
+                                <div className="flex gap-1 items-center justify-center">
+                                  {Object.entries(PERMISSION_STYLES).map(([key, style]) => {
+                                    const Icon = style.icon;
+                                    return (
+                                      <div 
+                                        key={key}
+                                        className={`w-5 h-5 rounded flex items-center justify-center ${
+                                          key === 'can_view' ? 'bg-emerald-500' :
+                                          key === 'can_edit' ? 'bg-blue-500' :
+                                          key === 'can_advance' ? 'bg-orange-500' :
+                                          'bg-red-500'
+                                        }`}
+                                      >
+                                        <Icon className="h-3 w-3 text-white" />
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </TableCell>
+                            );
+                          }
+                          
                           return (
                             <TableCell key={phase.key} className="text-center">
                               <div className="flex gap-1 items-center justify-center">
-                                {Object.entries(PERMISSION_STYLES).map(([key, style]) => {
-                                  const Icon = style.icon;
-                                  return (
-                                    <div 
-                                      key={key}
-                                      className={`w-5 h-5 rounded flex items-center justify-center ${
-                                        key === 'can_view' ? 'bg-emerald-500' :
-                                        key === 'can_edit' ? 'bg-blue-500' :
-                                        key === 'can_advance' ? 'bg-orange-500' :
-                                        'bg-red-500'
-                                      }`}
-                                    >
-                                      <Icon className="h-3 w-3 text-white" />
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            </TableCell>
-                          );
-                        }
-                        
-                        return (
-                          <TableCell key={phase.key} className="text-center">
-                            <div className="flex gap-1 items-center justify-center">
-                              <TooltipProvider>
                                 {Object.entries(PERMISSION_STYLES).map(([key, style]) => {
                                   const Icon = style.icon;
                                   const fieldKey = key as 'can_view' | 'can_edit' | 'can_advance' | 'can_delete';
                                   const isChecked = perm?.[fieldKey] || false;
                                   
                                   return (
-                                    <Tooltip key={key}>
-                                      <TooltipTrigger asChild>
-                                        <div className="flex flex-col items-center">
-                                          <Icon className={`h-3 w-3 mb-0.5 ${isChecked ? style.color : 'text-muted-foreground/40'}`} />
-                                          <Checkbox
-                                            checked={isChecked}
-                                            onCheckedChange={(checked) => 
-                                              updatePermission(user.id, phase.key, fieldKey, checked as boolean)
-                                            }
-                                            className={`h-4 w-4 ${style.bgChecked}`}
-                                          />
-                                        </div>
-                                      </TooltipTrigger>
-                                      <TooltipContent side="top">{style.label}</TooltipContent>
-                                    </Tooltip>
+                                    <div key={key} className="flex flex-col items-center">
+                                      <Icon className={`h-3 w-3 mb-0.5 ${isChecked ? style.color : 'text-muted-foreground/40'}`} />
+                                      <Checkbox
+                                        checked={isChecked}
+                                        onCheckedChange={(checked) => 
+                                          updatePermission(user.id, phase.key, fieldKey, checked as boolean)
+                                        }
+                                        className={`h-4 w-4 ${style.bgChecked}`}
+                                      />
+                                    </div>
                                   );
                                 })}
-                              </TooltipProvider>
-                            </div>
-                          </TableCell>
-                        );
-                      })}
-                    </TableRow>
-                  );
-                })
-              )}
-            </TableBody>
-          </Table>
-        </div>
+                              </div>
+                            </TableCell>
+                          );
+                        })}
+                      </TableRow>
+                    );
+                  })
+                )}
+              </TableBody>
+            </Table>
+          </div>
 
-        <div className="mt-4 text-xs text-muted-foreground">
-          <strong>Dica:</strong> Clique nos checkboxes para definir permissões específicas por usuário e fase.
-        </div>
-      </CardContent>
-    </Card>
+          {/* Paginação */}
+          {totalPages > 1 && (
+            <div className="mt-4 flex items-center justify-between">
+              <span className="text-sm text-muted-foreground">
+                Mostrando {((currentPage - 1) * USERS_PER_PAGE) + 1} a {Math.min(currentPage * USERS_PER_PAGE, filteredUsers.length)} de {filteredUsers.length} usuários
+              </span>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                  Anterior
+                </Button>
+                <span className="text-sm px-2">
+                  Página {currentPage} de {totalPages}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                >
+                  Próxima
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          )}
+
+          <div className="mt-4 text-xs text-muted-foreground">
+            <strong>Dica:</strong> Clique nos checkboxes para definir permissões específicas por usuário e fase.
+          </div>
+        </CardContent>
+      </Card>
+    </TooltipProvider>
   );
 };
