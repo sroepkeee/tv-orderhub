@@ -4219,6 +4219,17 @@ export type Database = {
           role: string
         }[]
       }
+      get_cron_job_status: {
+        Args: { job_name_pattern?: string }
+        Returns: {
+          is_active: boolean
+          job_id: number
+          job_name: string
+          last_run: string
+          next_run: string
+          schedule: string
+        }[]
+      }
       get_order_organization_id: {
         Args: { _order_id: string }
         Returns: string
