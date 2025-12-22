@@ -56,6 +56,38 @@ const PHASES = [
 
 const FULL_ACCESS_ROLES = ['admin', 'manager'];
 
+// Cores por tipo de permissão
+const PERMISSION_STYLES = {
+  can_view: {
+    color: 'text-emerald-600',
+    bgChecked: 'data-[state=checked]:bg-emerald-500 data-[state=checked]:border-emerald-500',
+    icon: Eye,
+    label: 'Ver',
+    tooltip: 'Pode visualizar pedidos nesta fase'
+  },
+  can_edit: {
+    color: 'text-blue-600',
+    bgChecked: 'data-[state=checked]:bg-blue-500 data-[state=checked]:border-blue-500',
+    icon: Pencil,
+    label: 'Editar',
+    tooltip: 'Pode editar pedidos nesta fase'
+  },
+  can_advance: {
+    color: 'text-orange-600',
+    bgChecked: 'data-[state=checked]:bg-orange-500 data-[state=checked]:border-orange-500',
+    icon: ArrowRight,
+    label: 'Avançar',
+    tooltip: 'Pode mover pedidos para a próxima fase'
+  },
+  can_delete: {
+    color: 'text-red-600',
+    bgChecked: 'data-[state=checked]:bg-red-500 data-[state=checked]:border-red-500',
+    icon: Trash2,
+    label: 'Deletar',
+    tooltip: 'Pode deletar pedidos nesta fase'
+  },
+};
+
 export const UserPhasePermissionsMatrix = () => {
   const [permissions, setPermissions] = useState<UserPermission[]>([]);
   const [users, setUsers] = useState<UserProfile[]>([]);
@@ -75,7 +107,6 @@ export const UserPhasePermissionsMatrix = () => {
     try {
       setLoading(true);
       
-      // Carregar usuários com roles
       const { data: profilesData, error: profilesError } = await supabase
         .from('profiles')
         .select('id, full_name, email, department')
@@ -84,7 +115,6 @@ export const UserPhasePermissionsMatrix = () => {
 
       if (profilesError) throw profilesError;
 
-      // Carregar roles de todos os usuários
       const userIds = profilesData?.map(p => p.id) || [];
       const { data: rolesData, error: rolesError } = await supabase
         .from('user_roles')
@@ -93,7 +123,6 @@ export const UserPhasePermissionsMatrix = () => {
 
       if (rolesError) throw rolesError;
 
-      // Mapear usuários com suas roles
       const usersWithRoles: UserProfile[] = (profilesData || []).map(profile => ({
         ...profile,
         roles: rolesData?.filter(r => r.user_id === profile.id).map(r => r.role) || []
@@ -101,7 +130,6 @@ export const UserPhasePermissionsMatrix = () => {
 
       setUsers(usersWithRoles);
 
-      // Carregar permissões individuais
       const { data: permData, error: permError } = await supabase
         .from('user_phase_permissions')
         .select('*')
@@ -174,13 +202,11 @@ export const UserPhasePermissionsMatrix = () => {
     try {
       setSaving(true);
 
-      // Filtrar permissões de usuários com acesso total
       const permissionsToSave = permissions.filter(p => {
         const user = users.find(u => u.id === p.user_id);
         return user && !hasFullAccessRole(user);
       });
 
-      // Deletar todas as permissões atuais da org
       const { error: deleteError } = await supabase
         .from('user_phase_permissions')
         .delete()
@@ -188,7 +214,6 @@ export const UserPhasePermissionsMatrix = () => {
 
       if (deleteError) throw deleteError;
 
-      // Inserir novas permissões
       if (permissionsToSave.length > 0) {
         const dataToInsert = permissionsToSave.map(p => ({
           user_id: p.user_id,
@@ -257,7 +282,7 @@ export const UserPhasePermissionsMatrix = () => {
               <Users className="h-5 w-5" />
               Permissões por Usuário
             </CardTitle>
-            <CardDescription>Configure permissões individuais além das permissões de role</CardDescription>
+            <CardDescription>Configure permissões individuais para cada usuário por fase</CardDescription>
           </div>
           <Button onClick={handleSave} disabled={saving}>
             <Save className="h-4 w-4 mr-2" />
@@ -269,8 +294,7 @@ export const UserPhasePermissionsMatrix = () => {
         <Alert className="mb-4">
           <Info className="h-4 w-4" />
           <AlertDescription className="text-sm">
-            Permissões individuais são <strong>adicionais</strong> às permissões de role. 
-            Usuários com role Admin ou Gestor têm acesso total (destacados em azul).
+            Usuários com role <strong>Admin</strong> ou <strong>Gestor</strong> têm acesso total automático (destacados em azul).
           </AlertDescription>
         </Alert>
 
@@ -285,48 +309,30 @@ export const UserPhasePermissionsMatrix = () => {
           />
         </div>
 
-        {/* Legenda */}
-        <div className="mb-4 flex flex-wrap gap-4 text-sm">
+        {/* Legenda com cores */}
+        <div className="mb-4 flex flex-wrap gap-6 text-sm p-3 bg-muted/50 rounded-lg">
           <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div className="flex items-center gap-1.5 cursor-help">
-                  <Eye className="h-4 w-4 text-muted-foreground" />
-                  <span>Ver</span>
-                </div>
-              </TooltipTrigger>
-              <TooltipContent>Pode visualizar pedidos nesta fase</TooltipContent>
-            </Tooltip>
-            
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div className="flex items-center gap-1.5 cursor-help">
-                  <Pencil className="h-4 w-4 text-muted-foreground" />
-                  <span>Editar</span>
-                </div>
-              </TooltipTrigger>
-              <TooltipContent>Pode editar pedidos nesta fase</TooltipContent>
-            </Tooltip>
-            
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div className="flex items-center gap-1.5 cursor-help">
-                  <ArrowRight className="h-4 w-4 text-muted-foreground" />
-                  <span>Avançar</span>
-                </div>
-              </TooltipTrigger>
-              <TooltipContent>Pode mover pedidos para a próxima fase</TooltipContent>
-            </Tooltip>
-            
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div className="flex items-center gap-1.5 cursor-help">
-                  <Trash2 className="h-4 w-4 text-muted-foreground" />
-                  <span>Deletar</span>
-                </div>
-              </TooltipTrigger>
-              <TooltipContent>Pode deletar pedidos nesta fase</TooltipContent>
-            </Tooltip>
+            {Object.entries(PERMISSION_STYLES).map(([key, style]) => {
+              const Icon = style.icon;
+              return (
+                <Tooltip key={key}>
+                  <TooltipTrigger asChild>
+                    <div className="flex items-center gap-2 cursor-help">
+                      <div className={`w-4 h-4 rounded flex items-center justify-center ${
+                        key === 'can_view' ? 'bg-emerald-500' :
+                        key === 'can_edit' ? 'bg-blue-500' :
+                        key === 'can_advance' ? 'bg-orange-500' :
+                        'bg-red-500'
+                      }`}>
+                        <Icon className="h-2.5 w-2.5 text-white" />
+                      </div>
+                      <span className={style.color}>{style.label}</span>
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent>{style.tooltip}</TooltipContent>
+                </Tooltip>
+              );
+            })}
           </TooltipProvider>
         </div>
         
@@ -336,7 +342,7 @@ export const UserPhasePermissionsMatrix = () => {
               <TableRow>
                 <TableHead className="w-[200px] sticky left-0 bg-background">Usuário</TableHead>
                 {PHASES.map(phase => (
-                  <TableHead key={phase.key} className="text-center min-w-[80px]">
+                  <TableHead key={phase.key} className="text-center min-w-[90px]">
                     <div className="text-xs leading-tight">{phase.label}</div>
                   </TableHead>
                 ))}
@@ -376,7 +382,7 @@ export const UserPhasePermissionsMatrix = () => {
                             )}
                           </div>
                           {hasFullAccess && (
-                            <Badge variant="secondary" className="text-[10px] px-1.5 py-0 ml-1">
+                            <Badge variant="secondary" className="text-[10px] px-1.5 py-0 ml-1 bg-primary/20">
                               Total
                             </Badge>
                           )}
@@ -388,11 +394,23 @@ export const UserPhasePermissionsMatrix = () => {
                         if (hasFullAccess) {
                           return (
                             <TableCell key={phase.key} className="text-center">
-                              <div className="flex flex-col gap-0.5 items-center">
-                                <Checkbox checked disabled className="data-[state=checked]:bg-primary" />
-                                <Checkbox checked disabled className="data-[state=checked]:bg-primary" />
-                                <Checkbox checked disabled className="data-[state=checked]:bg-primary" />
-                                <Checkbox checked disabled className="data-[state=checked]:bg-primary" />
+                              <div className="flex gap-1 items-center justify-center">
+                                {Object.entries(PERMISSION_STYLES).map(([key, style]) => {
+                                  const Icon = style.icon;
+                                  return (
+                                    <div 
+                                      key={key}
+                                      className={`w-5 h-5 rounded flex items-center justify-center ${
+                                        key === 'can_view' ? 'bg-emerald-500' :
+                                        key === 'can_edit' ? 'bg-blue-500' :
+                                        key === 'can_advance' ? 'bg-orange-500' :
+                                        'bg-red-500'
+                                      }`}
+                                    >
+                                      <Icon className="h-3 w-3 text-white" />
+                                    </div>
+                                  );
+                                })}
                               </div>
                             </TableCell>
                           );
@@ -400,63 +418,31 @@ export const UserPhasePermissionsMatrix = () => {
                         
                         return (
                           <TableCell key={phase.key} className="text-center">
-                            <div className="flex flex-col gap-0.5 items-center">
+                            <div className="flex gap-1 items-center justify-center">
                               <TooltipProvider>
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <span>
-                                      <Checkbox
-                                        checked={perm?.can_view || false}
-                                        onCheckedChange={(checked) => 
-                                          updatePermission(user.id, phase.key, 'can_view', checked as boolean)
-                                        }
-                                      />
-                                    </span>
-                                  </TooltipTrigger>
-                                  <TooltipContent side="top">Ver</TooltipContent>
-                                </Tooltip>
-                                
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <span>
-                                      <Checkbox
-                                        checked={perm?.can_edit || false}
-                                        onCheckedChange={(checked) => 
-                                          updatePermission(user.id, phase.key, 'can_edit', checked as boolean)
-                                        }
-                                      />
-                                    </span>
-                                  </TooltipTrigger>
-                                  <TooltipContent side="top">Editar</TooltipContent>
-                                </Tooltip>
-                                
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <span>
-                                      <Checkbox
-                                        checked={perm?.can_advance || false}
-                                        onCheckedChange={(checked) => 
-                                          updatePermission(user.id, phase.key, 'can_advance', checked as boolean)
-                                        }
-                                      />
-                                    </span>
-                                  </TooltipTrigger>
-                                  <TooltipContent side="top">Avançar</TooltipContent>
-                                </Tooltip>
-                                
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <span>
-                                      <Checkbox
-                                        checked={perm?.can_delete || false}
-                                        onCheckedChange={(checked) => 
-                                          updatePermission(user.id, phase.key, 'can_delete', checked as boolean)
-                                        }
-                                      />
-                                    </span>
-                                  </TooltipTrigger>
-                                  <TooltipContent side="top">Deletar</TooltipContent>
-                                </Tooltip>
+                                {Object.entries(PERMISSION_STYLES).map(([key, style]) => {
+                                  const Icon = style.icon;
+                                  const fieldKey = key as 'can_view' | 'can_edit' | 'can_advance' | 'can_delete';
+                                  const isChecked = perm?.[fieldKey] || false;
+                                  
+                                  return (
+                                    <Tooltip key={key}>
+                                      <TooltipTrigger asChild>
+                                        <div className="flex flex-col items-center">
+                                          <Icon className={`h-3 w-3 mb-0.5 ${isChecked ? style.color : 'text-muted-foreground/40'}`} />
+                                          <Checkbox
+                                            checked={isChecked}
+                                            onCheckedChange={(checked) => 
+                                              updatePermission(user.id, phase.key, fieldKey, checked as boolean)
+                                            }
+                                            className={`h-4 w-4 ${style.bgChecked}`}
+                                          />
+                                        </div>
+                                      </TooltipTrigger>
+                                      <TooltipContent side="top">{style.label}</TooltipContent>
+                                    </Tooltip>
+                                  );
+                                })}
                               </TooltipProvider>
                             </div>
                           </TableCell>
@@ -469,10 +455,9 @@ export const UserPhasePermissionsMatrix = () => {
             </TableBody>
           </Table>
         </div>
-        
-        <div className="mt-4 text-xs text-muted-foreground space-y-1 border-t pt-3">
-          <p><strong>Ordem dos checkboxes:</strong> 👁️ Ver → ✏️ Editar → ▶️ Avançar → 🗑️ Deletar</p>
-          <p><strong>Dica:</strong> Estas permissões são <em>adicionais</em> às permissões que o usuário já tem por sua role.</p>
+
+        <div className="mt-4 text-xs text-muted-foreground">
+          <strong>Dica:</strong> Clique nos checkboxes para definir permissões específicas por usuário e fase.
         </div>
       </CardContent>
     </Card>

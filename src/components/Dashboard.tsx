@@ -228,7 +228,6 @@ export const Dashboard = () => {
     isAdmin
   } = useAdminAuth();
   const {
-    phasePermissions,
     userRoles
   } = usePhaseAuthorization();
   const { requireOrganization } = useOrganizationId();

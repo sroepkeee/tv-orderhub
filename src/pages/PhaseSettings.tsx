@@ -5,11 +5,10 @@ import { useOrganization } from "@/hooks/useOrganization";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Settings2, Plus, Shield, Users } from "lucide-react";
+import { ArrowLeft, Settings2, Plus, Users } from "lucide-react";
 import { toast } from "sonner";
 import { PhaseList } from "@/components/phases/PhaseList";
 import { AddPhaseDialog } from "@/components/phases/AddPhaseDialog";
-import { PhasePermissionsMatrix } from "@/components/admin/PhasePermissionsMatrix";
 import { UserPhasePermissionsMatrix } from "@/components/admin/UserPhasePermissionsMatrix";
 
 export interface PhaseConfig {
@@ -243,10 +242,6 @@ const PhaseSettings = () => {
               <Settings2 className="h-4 w-4" />
               Fases do Workflow
             </TabsTrigger>
-            <TabsTrigger value="permissions" className="flex items-center gap-2">
-              <Shield className="h-4 w-4" />
-              Permissões por Role
-            </TabsTrigger>
             <TabsTrigger value="user-permissions" className="flex items-center gap-2">
               <Users className="h-4 w-4" />
               Permissões por Usuário
@@ -287,10 +282,6 @@ const PhaseSettings = () => {
                 )}
               </CardContent>
             </Card>
-          </TabsContent>
-
-          <TabsContent value="permissions">
-            <PhasePermissionsMatrix />
           </TabsContent>
 
           <TabsContent value="user-permissions">
