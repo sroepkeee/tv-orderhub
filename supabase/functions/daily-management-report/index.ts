@@ -46,13 +46,14 @@ interface OrderMetrics {
     endingToday: number;
   };
   
-  // Distribuição por Fase (14 fases do Kanban)
+  // Distribuição por Fase (TODAS as 15 fases do Kanban)
   byPhase: {
     almoxSsm: number;
     gerarOrdem: number;
     compras: number;
     almoxGeral: number;
-    producao: number;
+    producaoClientes: number;  // SEPARADO
+    producaoEstoque: number;   // SEPARADO
     gerarSaldo: number;
     laboratorio: number;
     embalagem: number;
@@ -101,10 +102,52 @@ interface OrderMetrics {
       daysUntil: number;
     }>;
   }>;
+
+  // NOVO: Análise detalhada de fases críticas
+  criticalPhaseAnalysis: {
+    compras: {
+      count: number;
+      avgDays: number;
+      maxDays: number;
+      totalValue: number;
+      awaitingMaterial: number;
+      oldestOrders: Array<{
+        orderNumber: string;
+        customer: string;
+        daysInPhase: number;
+        value: number;
+      }>;
+    };
+    producaoClientes: {
+      count: number;
+      avgDays: number;
+      maxDays: number;
+      totalValue: number;
+      oldestOrders: Array<{
+        orderNumber: string;
+        customer: string;
+        daysInPhase: number;
+        value: number;
+      }>;
+    };
+    producaoEstoque: {
+      count: number;
+      avgDays: number;
+      maxDays: number;
+      totalValue: number;
+      oldestOrders: Array<{
+        orderNumber: string;
+        customer: string;
+        daysInPhase: number;
+        value: number;
+      }>;
+    };
+  };
 }
 
 // ==================== MAPEAMENTOS ====================
-const statusToPhase: Record<string, string> = {
+// Status para fase base (produção será resolvida dinamicamente baseado em order_category)
+const statusToPhaseBase: Record<string, string> = {
   // Almox SSM
   'almox_ssm_pending': 'almoxSsm',
   'almox_ssm_received': 'almoxSsm',
@@ -123,7 +166,7 @@ const statusToPhase: Record<string, string> = {
   'almox_general_received': 'almoxGeral',
   'almox_general_separating': 'almoxGeral',
   'almox_general_ready': 'almoxGeral',
-  // Produção
+  // Produção (será mapeado dinamicamente)
   'separation_started': 'producao',
   'in_production': 'producao',
   'awaiting_material': 'producao',
@@ -167,12 +210,26 @@ const statusToPhase: Record<string, string> = {
   'cancelled': 'conclusao',
 };
 
+// Função para determinar fase real (separando produção por categoria)
+function getPhaseFromOrder(status: string, orderCategory: string): string {
+  const basePhase = statusToPhaseBase[status] || 'conclusao';
+  
+  // Se é produção, separar por categoria do pedido
+  if (basePhase === 'producao') {
+    // 'vendas' = clientes, outros = estoque
+    return orderCategory === 'vendas' ? 'producaoClientes' : 'producaoEstoque';
+  }
+  
+  return basePhase;
+}
+
 const phaseLabels: Record<string, string> = {
   'almoxSsm': '📥 Almox SSM',
   'gerarOrdem': '📋 Gerar Ordem',
   'compras': '🛒 Compras',
   'almoxGeral': '📦 Almox Geral',
-  'producao': '🔧 Produção',
+  'producaoClientes': '🔧 Produção Clientes',  // NOVO
+  'producaoEstoque': '📦 Produção Estoque',     // NOVO
   'gerarSaldo': '📊 Gerar Saldo',
   'laboratorio': '🔬 Laboratório',
   'embalagem': '📦 Embalagem',
@@ -183,6 +240,25 @@ const phaseLabels: Record<string, string> = {
   'emTransito': '🚚 Em Trânsito',
   'conclusao': '✅ Conclusão',
 };
+
+// Ordem de exibição das fases (como no Kanban)
+const phaseOrder: string[] = [
+  'almoxSsm',
+  'gerarOrdem', 
+  'compras',
+  'almoxGeral',
+  'producaoClientes',
+  'producaoEstoque',
+  'gerarSaldo',
+  'laboratorio',
+  'embalagem',
+  'cotacao',
+  'aFaturar',
+  'faturamento',
+  'expedicao',
+  'emTransito',
+  'conclusao',
+];
 
 const statusLabels: Record<string, string> = {
   'almox_ssm_pending': '📥 Almox SSM - Pendente',
@@ -229,9 +305,10 @@ const statusLabels: Record<string, string> = {
 const phaseThresholds: Record<string, number> = {
   'almoxSsm': 2,
   'gerarOrdem': 2,
-  'compras': 10,
+  'compras': 10,          // Compras tem threshold maior
   'almoxGeral': 2,
-  'producao': 7,
+  'producaoClientes': 7,  // NOVO
+  'producaoEstoque': 7,   // NOVO
   'gerarSaldo': 1,
   'laboratorio': 3,
   'embalagem': 2,
@@ -249,11 +326,11 @@ async function calculateMetrics(supabase: any): Promise<OrderMetrics> {
   const lastWeek = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
   const twoWeeksAgo = new Date(today.getTime() - 14 * 24 * 60 * 60 * 1000);
 
-  // Buscar pedidos ativos COM order_items para calcular valor
+  // Buscar pedidos ativos COM order_items e order_category para calcular valor e fase
   const { data: orders, error: ordersError } = await supabase
     .from('orders')
     .select(`
-      id, order_number, customer_name, status, 
+      id, order_number, customer_name, status, order_category, order_type,
       delivery_date, created_at, updated_at,
       order_items(id, item_code, item_status, unit_price, requested_quantity, total_value)
     `)
@@ -266,16 +343,35 @@ async function calculateMetrics(supabase: any): Promise<OrderMetrics> {
   const activeOrders = orders || [];
   console.log(`📦 Found ${activeOrders.length} active orders`);
 
-  // Inicializar contadores por fase
-  const byPhase = {
-    almoxSsm: 0, gerarOrdem: 0, compras: 0, almoxGeral: 0,
-    producao: 0, gerarSaldo: 0, laboratorio: 0, embalagem: 0,
-    cotacao: 0, aFaturar: 0, faturamento: 0, expedicao: 0,
-    emTransito: 0, conclusao: 0,
+  // Inicializar contadores por fase (TODAS as fases)
+  const byPhase: OrderMetrics['byPhase'] = {
+    almoxSsm: 0, 
+    gerarOrdem: 0, 
+    compras: 0, 
+    almoxGeral: 0,
+    producaoClientes: 0,  // NOVO
+    producaoEstoque: 0,   // NOVO
+    gerarSaldo: 0, 
+    laboratorio: 0, 
+    embalagem: 0,
+    cotacao: 0, 
+    aFaturar: 0, 
+    faturamento: 0, 
+    expedicao: 0,
+    emTransito: 0, 
+    conclusao: 0,
   };
 
   const phaseOrders: Record<string, any[]> = {};
   const phaseDays: Record<string, number[]> = {};
+  const phaseValues: Record<string, number> = {};
+  
+  // Para análise crítica de Compras e Produção
+  const criticalPhaseOrders: Record<string, any[]> = {
+    compras: [],
+    producaoClientes: [],
+    producaoEstoque: [],
+  };
   
   let totalValue = 0;
   let newToday = 0;
@@ -285,13 +381,17 @@ async function calculateMetrics(supabase: any): Promise<OrderMetrics> {
   let lateValue = 0;
   let pendingLab = 0;
   let pendingPurchase = 0;
+  let awaitingMaterial = 0;
   const productionDays: number[] = [];
   let startedToday = 0;
   let endingToday = 0;
 
   activeOrders.forEach((order: any) => {
     const status = order.status || 'unknown';
-    const phaseKey = statusToPhase[status] || 'conclusao';
+    const orderCategory = order.order_category || 'estoque';
+    
+    // Usar função para determinar fase real
+    const phaseKey = getPhaseFromOrder(status, orderCategory);
     
     // Contar por fase
     if (phaseKey in byPhase) {
@@ -301,6 +401,7 @@ async function calculateMetrics(supabase: any): Promise<OrderMetrics> {
     // Agrupar pedidos por fase
     if (!phaseOrders[phaseKey]) phaseOrders[phaseKey] = [];
     if (!phaseDays[phaseKey]) phaseDays[phaseKey] = [];
+    if (!phaseValues[phaseKey]) phaseValues[phaseKey] = 0;
     
     // Calcular dias na fase
     const updatedAt = new Date(order.updated_at || order.created_at);
@@ -314,21 +415,37 @@ async function calculateMetrics(supabase: any): Promise<OrderMetrics> {
       daysUntilDelivery = Math.ceil((deliveryDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
     }
 
-    phaseOrders[phaseKey].push({
-      orderNumber: order.order_number,
-      customer: order.customer_name,
-      daysUntil: daysUntilDelivery,
-    });
-
     // Calcular valor somando dos itens
     const orderValue = (order.order_items || []).reduce((sum: number, item: any) => {
       const itemValue = item.total_value || (item.unit_price * item.requested_quantity) || 0;
       return sum + Number(itemValue);
     }, 0);
     totalValue += orderValue;
+    phaseValues[phaseKey] = (phaseValues[phaseKey] || 0) + orderValue;
     
     // Guardar valor calculado no objeto order para uso posterior
     (order as any).calculated_value = orderValue;
+    (order as any).days_in_phase = daysInPhase;
+    (order as any).phase_key = phaseKey;
+
+    phaseOrders[phaseKey].push({
+      orderNumber: order.order_number,
+      customer: order.customer_name,
+      daysUntil: daysUntilDelivery,
+      daysInPhase: daysInPhase,
+      value: orderValue,
+    });
+
+    // Coletar dados para análise de fases críticas
+    if (phaseKey === 'compras' || phaseKey === 'producaoClientes' || phaseKey === 'producaoEstoque') {
+      criticalPhaseOrders[phaseKey].push({
+        orderNumber: order.order_number,
+        customer: order.customer_name,
+        daysInPhase: daysInPhase,
+        value: orderValue,
+        status: status,
+      });
+    }
 
     // Verificar se é novo hoje
     const createdAt = new Date(order.created_at);
@@ -361,12 +478,15 @@ async function calculateMetrics(supabase: any): Promise<OrderMetrics> {
     if (status === 'awaiting_lab' || status === 'in_lab_analysis') {
       pendingLab++;
     }
-    if (status.startsWith('purchase_') || status === 'awaiting_material') {
+    if (status.startsWith('purchase_')) {
       pendingPurchase++;
     }
+    if (status === 'awaiting_material') {
+      awaitingMaterial++;
+    }
 
-    // Calcular tempo de produção
-    if (phaseKey === 'producao') {
+    // Calcular tempo de produção (ambas as fases)
+    if (phaseKey === 'producaoClientes' || phaseKey === 'producaoEstoque') {
       productionDays.push(daysInPhase);
     }
   });
@@ -403,6 +523,36 @@ async function calculateMetrics(supabase: any): Promise<OrderMetrics> {
     }
   }
   bottlenecks.sort((a, b) => b.avgDays - a.avgDays);
+
+  // Calcular análise de fases críticas
+  const calculateCriticalPhaseStats = (phaseKey: string) => {
+    const orders = criticalPhaseOrders[phaseKey] || [];
+    const days = phaseDays[phaseKey] || [];
+    const value = phaseValues[phaseKey] || 0;
+    
+    // Ordenar por dias na fase (mais antigos primeiro)
+    const sortedOrders = [...orders].sort((a, b) => b.daysInPhase - a.daysInPhase);
+    
+    return {
+      count: orders.length,
+      avgDays: days.length > 0 ? Math.round((days.reduce((a, b) => a + b, 0) / days.length) * 10) / 10 : 0,
+      maxDays: days.length > 0 ? Math.max(...days) : 0,
+      totalValue: value,
+      awaitingMaterial: phaseKey === 'compras' ? awaitingMaterial : 0,
+      oldestOrders: sortedOrders.slice(0, 3).map(o => ({
+        orderNumber: o.orderNumber,
+        customer: o.customer,
+        daysInPhase: o.daysInPhase,
+        value: o.value,
+      })),
+    };
+  };
+
+  const criticalPhaseAnalysis = {
+    compras: calculateCriticalPhaseStats('compras'),
+    producaoClientes: calculateCriticalPhaseStats('producaoClientes'),
+    producaoEstoque: calculateCriticalPhaseStats('producaoEstoque'),
+  };
 
   // ==================== TENDÊNCIAS SEMANAIS ====================
   const { data: thisWeekCreated } = await supabase
@@ -485,16 +635,16 @@ async function calculateMetrics(supabase: any): Promise<OrderMetrics> {
       };
     });
 
-  // ==================== DETALHES POR FASE ====================
-  const phaseDetails = Object.entries(byPhase)
-    .filter(([, count]) => count > 0)
-    .sort(([, a], [, b]) => b - a)
-    .map(([phaseKey, count]) => ({
+  // ==================== DETALHES POR FASE (TODAS as fases, na ordem do Kanban) ====================
+  const phaseDetails = phaseOrder
+    .filter(phaseKey => phaseKey !== 'conclusao') // Excluir conclusão dos ativos
+    .map(phaseKey => ({
       phase: phaseLabels[phaseKey] || phaseKey,
       phaseKey,
-      count,
+      count: (byPhase as any)[phaseKey] || 0,
       orders: (phaseOrders[phaseKey] || []).slice(0, 3),
-    }));
+    }))
+    .filter(phase => phase.count > 0); // Só mostrar fases com pedidos
 
   return {
     totalActive: activeOrders.length,
@@ -506,8 +656,14 @@ async function calculateMetrics(supabase: any): Promise<OrderMetrics> {
     byPhase,
     bottlenecks,
     topOrders,
-    alerts: { delayed: lateCount, critical: criticalCount, pendingLab, pendingPurchase },
+    alerts: { 
+      delayed: lateCount, 
+      critical: criticalCount, 
+      pendingLab, 
+      pendingPurchase: pendingPurchase + awaitingMaterial 
+    },
     phaseDetails,
+    criticalPhaseAnalysis,
   };
 }
 
@@ -517,12 +673,6 @@ function formatCurrency(value: number): string {
     style: 'currency',
     currency: 'BRL',
   }).format(value);
-}
-
-function getTrendIcon(change: number): string {
-  if (change > 0) return '📈';
-  if (change < 0) return '📉';
-  return '➡️';
 }
 
 function getTrendArrow(change: number): string {
@@ -566,7 +716,76 @@ function formatReportMessage(metrics: OrderMetrics, date: Date): string {
       message += `🔬 *${metrics.alerts.pendingLab}* aguardando Laboratório\n`;
     }
     if (metrics.alerts.pendingPurchase > 0) {
-      message += `🛒 *${metrics.alerts.pendingPurchase}* aguardando Compras\n`;
+      message += `🛒 *${metrics.alerts.pendingPurchase}* aguardando Compras/Material\n`;
+    }
+    message += `\n`;
+  }
+
+  // ========== ANÁLISE DETALHADA - COMPRAS (NOVA SEÇÃO) ==========
+  const comprasAnalysis = metrics.criticalPhaseAnalysis.compras;
+  if (comprasAnalysis.count > 0) {
+    message += `🛒 *ANÁLISE DETALHADA - COMPRAS*\n`;
+    message += `━━━━━━━━━━━━━━━━━━━━━━\n`;
+    message += `• Total na fase: *${comprasAnalysis.count}* pedidos\n`;
+    message += `• Tempo médio: *${comprasAnalysis.avgDays}* dias\n`;
+    message += `• Maior tempo: *${comprasAnalysis.maxDays}* dias\n`;
+    message += `• Valor parado: *${formatCurrency(comprasAnalysis.totalValue)}*\n`;
+    
+    if (comprasAnalysis.oldestOrders.length > 0) {
+      message += `\n📌 *Pedidos mais antigos:*\n`;
+      comprasAnalysis.oldestOrders.forEach((order, idx) => {
+        message += `${idx + 1}. #${order.orderNumber} - ${order.daysInPhase}d (${formatCurrency(order.value)})\n`;
+      });
+    }
+    
+    // Alerta de gargalo em Compras
+    if (comprasAnalysis.avgDays > phaseThresholds['compras']) {
+      message += `\n⚠️ *GARGALO:* Tempo médio acima do limite (${phaseThresholds['compras']}d)\n`;
+    }
+    message += `\n`;
+  }
+
+  // ========== ANÁLISE DETALHADA - PRODUÇÃO (NOVA SEÇÃO) ==========
+  const prodClientesAnalysis = metrics.criticalPhaseAnalysis.producaoClientes;
+  const prodEstoqueAnalysis = metrics.criticalPhaseAnalysis.producaoEstoque;
+  const totalProducao = prodClientesAnalysis.count + prodEstoqueAnalysis.count;
+  
+  if (totalProducao > 0) {
+    message += `🔧 *ANÁLISE DETALHADA - PRODUÇÃO*\n`;
+    message += `━━━━━━━━━━━━━━━━━━━━━━\n`;
+    
+    if (prodClientesAnalysis.count > 0) {
+      message += `\n👥 *Produção Clientes:*\n`;
+      message += `• Pedidos: *${prodClientesAnalysis.count}*\n`;
+      message += `• Tempo médio: *${prodClientesAnalysis.avgDays}* dias\n`;
+      message += `• Valor: *${formatCurrency(prodClientesAnalysis.totalValue)}*\n`;
+      
+      if (prodClientesAnalysis.oldestOrders.length > 0) {
+        message += `📌 Mais antigos: `;
+        message += prodClientesAnalysis.oldestOrders.map(o => `#${o.orderNumber} (${o.daysInPhase}d)`).join(', ');
+        message += `\n`;
+      }
+    }
+    
+    if (prodEstoqueAnalysis.count > 0) {
+      message += `\n📦 *Produção Estoque:*\n`;
+      message += `• Pedidos: *${prodEstoqueAnalysis.count}*\n`;
+      message += `• Tempo médio: *${prodEstoqueAnalysis.avgDays}* dias\n`;
+      message += `• Valor: *${formatCurrency(prodEstoqueAnalysis.totalValue)}*\n`;
+      
+      if (prodEstoqueAnalysis.oldestOrders.length > 0) {
+        message += `📌 Mais antigos: `;
+        message += prodEstoqueAnalysis.oldestOrders.map(o => `#${o.orderNumber} (${o.daysInPhase}d)`).join(', ');
+        message += `\n`;
+      }
+    }
+    
+    // Alerta de gargalo em Produção
+    const avgProducao = totalProducao > 0 
+      ? ((prodClientesAnalysis.avgDays * prodClientesAnalysis.count) + (prodEstoqueAnalysis.avgDays * prodEstoqueAnalysis.count)) / totalProducao
+      : 0;
+    if (avgProducao > phaseThresholds['producaoClientes']) {
+      message += `\n⚠️ *GARGALO:* Tempo médio de produção acima do limite (${phaseThresholds['producaoClientes']}d)\n`;
     }
     message += `\n`;
   }
@@ -582,11 +801,13 @@ function formatReportMessage(metrics: OrderMetrics, date: Date): string {
   }
   message += `\n`;
 
-  // ========== DISTRIBUIÇÃO POR FASE ==========
+  // ========== DISTRIBUIÇÃO POR FASE (TODAS AS FASES COM PEDIDOS) ==========
   message += `📦 *DISTRIBUIÇÃO POR FASE*\n`;
   message += `━━━━━━━━━━━━━━━━━━━━━━\n`;
   
-  metrics.phaseDetails.slice(0, 10).forEach(phase => {
+  // Ordenar por quantidade e mostrar todas que têm pedidos
+  const sortedPhases = [...metrics.phaseDetails].sort((a, b) => b.count - a.count);
+  sortedPhases.forEach(phase => {
     message += `• ${phase.phase}: *${phase.count}*\n`;
   });
   message += `\n`;
@@ -595,8 +816,8 @@ function formatReportMessage(metrics: OrderMetrics, date: Date): string {
   if (metrics.bottlenecks.length > 0) {
     message += `🎯 *GARGALOS IDENTIFICADOS*\n`;
     message += `━━━━━━━━━━━━━━━━━━━━━━\n`;
-    metrics.bottlenecks.slice(0, 3).forEach(b => {
-      message += `⚠️ ${b.phase}: ${b.avgDays} dias (limite: ${b.threshold})\n`;
+    metrics.bottlenecks.slice(0, 5).forEach(b => {
+      message += `⚠️ ${b.phase}: ${b.avgDays}d média (limite: ${b.threshold}d) - ${b.count} pedidos\n`;
     });
     message += `\n`;
   }
@@ -648,7 +869,7 @@ async function generateDistributionChart(metrics: OrderMetrics): Promise<string 
 
     const phaseData = metrics.phaseDetails
       .slice(0, 8)
-      .map(p => `${p.phase.replace(/[📥📋🛒📦🔧📊🔬💰💳🧾🚛🚚✅]/g, '').trim()}: ${p.count}`)
+      .map(p => `${p.phase.replace(/[📥📋🛒📦🔧📊🔬💰💳🧾🚛🚚✅👥]/g, '').trim()}: ${p.count}`)
       .join(', ');
     
     const date = new Date().toLocaleDateString('pt-BR');
@@ -760,7 +981,6 @@ async function generateSLAGauge(metrics: OrderMetrics): Promise<string | null> {
     if (!LOVABLE_API_KEY) return null;
 
     const rate = metrics.sla.onTimeRate;
-    const color = rate >= 85 ? '#10B981' : rate >= 70 ? '#F59E0B' : '#EF4444';
     const colorName = rate >= 85 ? 'green' : rate >= 70 ? 'yellow/orange' : 'red';
 
     const prompt = `Create a professional gauge/speedometer chart showing SLA compliance:
@@ -1063,6 +1283,11 @@ serve(async (req) => {
       totalValue: metrics.totalValue,
       onTimeRate: metrics.sla.onTimeRate,
       alerts: metrics.alerts,
+      criticalPhases: {
+        compras: metrics.criticalPhaseAnalysis.compras.count,
+        producaoClientes: metrics.criticalPhaseAnalysis.producaoClientes.count,
+        producaoEstoque: metrics.criticalPhaseAnalysis.producaoEstoque.count,
+      },
     });
 
     // ========== GERAR GRÁFICOS ==========
@@ -1175,6 +1400,7 @@ serve(async (req) => {
           totalValue: metrics.totalValue,
           onTimeRate: metrics.sla.onTimeRate,
           alerts: metrics.alerts,
+          criticalPhases: metrics.criticalPhaseAnalysis,
         },
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
