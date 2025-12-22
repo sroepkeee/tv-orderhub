@@ -518,9 +518,11 @@ Deno.serve(async (req) => {
     const payload = await req.json();
     console.log('Webhook received:', JSON.stringify(payload, null, 2));
 
-    // ✅ SECURITY: Validar instância - OBRIGATÓRIO
+    // ✅ SECURITY: Validar instância
     const instanceKey = payload.instance_key || payload.instance;
+    const expectedInstance = Deno.env.get('MEGA_API_INSTANCE');
     console.log('🔑 Instance key received:', instanceKey);
+    console.log('🔑 Expected instance (from env):', expectedInstance);
     
     if (!instanceKey) {
       console.error('❌ SECURITY: No instance key provided');
@@ -529,51 +531,8 @@ Deno.serve(async (req) => {
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
-    
-    // Verificar se a instância está registrada no banco
-    const { data: validInstance, error: instanceError } = await supabase
-      .from('whatsapp_instances')
-      .select('instance_key, is_active')
-      .eq('instance_key', instanceKey)
-      .maybeSingle();
-    
-    if (instanceError) {
-      console.error('❌ Error checking instance:', instanceError);
-    }
-    
-    if (!validInstance) {
-      console.error('❌ SECURITY: Unknown instance attempted to connect:', instanceKey);
-      // Logar tentativa de acesso não autorizado (fire and forget)
-      supabase.from('ai_notification_log').insert({
-        channel: 'webhook',
-        recipient: 'system',
-        message_content: `Tentativa de webhook com instance_key desconhecida: ${instanceKey}`,
-        status: 'blocked',
-        metadata: { 
-          security_event: 'unknown_instance',
-          instance_key: instanceKey,
-          ip: req.headers.get('x-forwarded-for') || 'unknown'
-        }
-      });
-      
-      return new Response(
-        JSON.stringify({ success: false, error: 'Unauthorized - Invalid instance' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-    
-    // Verificar se a instância está ativa
-    if (validInstance.is_active === false) {
-      console.warn('⚠️ Instance is inactive:', instanceKey);
-      return new Response(
-        JSON.stringify({ success: false, error: 'Instance is inactive' }),
-        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-    
-    console.log('✅ Instance validated:', instanceKey);
 
-    // Processar QR Code Update
+    // Processar QR Code Update PRIMEIRO - permite registrar novas instâncias
     const qrcode = 
       payload.qrcode ||
       payload.data?.qrcode ||
@@ -587,11 +546,16 @@ Deno.serve(async (req) => {
       payload.event === 'qrcode.updated' ||
       payload.event === 'qrcode' ||
       payload.event === 'qr_code' ||
-      payload.event === 'connection.update' && qrcode ||
+      (payload.event === 'connection.update' && qrcode) ||
       !!qrcode;
 
+    const isConnectionEvent = 
+      payload.event === 'connection.update' || 
+      payload.messageType === 'connection_update';
+
+    // QR/Connection events podem registrar/atualizar instâncias sem validação prévia
     if (isQrCodeEvent && qrcode) {
-      console.log('QR Code update received');
+      console.log('📱 QR Code update received - auto-registering instance');
       
       const { error: upsertError } = await supabase
         .from('whatsapp_instances')
@@ -600,6 +564,7 @@ Deno.serve(async (req) => {
           qrcode: qrcode,
           qrcode_updated_at: new Date().toISOString(),
           status: 'waiting_scan',
+          is_active: true,
           updated_at: new Date().toISOString(),
         }, { onConflict: 'instance_key' });
 
@@ -608,19 +573,80 @@ Deno.serve(async (req) => {
         throw upsertError;
       }
 
-      console.log('QR code cached successfully');
+      console.log('✅ QR code cached and instance registered');
 
       return new Response(
         JSON.stringify({ 
           success: true, 
           event: 'qrcode_update',
-          cached: true 
+          cached: true,
+          instanceRegistered: true
         }),
         {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 200,
         }
       );
+    }
+    
+    // Para eventos de conexão, também permitir atualização
+    if (isConnectionEvent && !qrcode) {
+      console.log('📱 Connection update - processing without strict validation');
+      // Continua para processar o evento de conexão abaixo
+    } else {
+      // Para mensagens, validar instância de forma mais resiliente
+      // Primeiro verifica se corresponde ao env (whitelist primária)
+      const isWhitelisted = expectedInstance && instanceKey === expectedInstance;
+      
+      if (isWhitelisted) {
+        console.log('✅ Instance validated via env whitelist');
+      } else {
+        // Fallback: verificar no banco de dados
+        const { data: validInstance, error: instanceError } = await supabase
+          .from('whatsapp_instances')
+          .select('instance_key, is_active')
+          .eq('instance_key', instanceKey)
+          .maybeSingle();
+        
+        if (instanceError) {
+          console.error('❌ Error checking instance (non-blocking):', instanceError.message);
+          // Continuar mesmo com erro de schema - pode ser coluna faltando
+        }
+        
+        if (!validInstance) {
+          console.error('❌ SECURITY: Unknown instance:', instanceKey);
+          console.error('❌ Expected:', expectedInstance);
+          // Logar tentativa de acesso não autorizado (fire and forget)
+          Promise.resolve(supabase.from('ai_notification_log').insert({
+            channel: 'webhook',
+            recipient: 'system',
+            message_content: `Webhook com instance_key não registrada: ${instanceKey}`,
+            status: 'blocked',
+            metadata: { 
+              security_event: 'unknown_instance',
+              instance_key: instanceKey,
+              expected_instance: expectedInstance,
+              ip: req.headers.get('x-forwarded-for') || 'unknown'
+            }
+          })).catch(() => {}); // Ignorar erro de log
+          
+          return new Response(
+            JSON.stringify({ success: false, error: 'Unauthorized - Invalid instance' }),
+            { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+        
+        // Verificar se a instância está ativa
+        if (validInstance.is_active === false) {
+          console.warn('⚠️ Instance is inactive:', instanceKey);
+          return new Response(
+            JSON.stringify({ success: false, error: 'Instance is inactive' }),
+            { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+        
+        console.log('✅ Instance validated via database');
+      }
     }
 
     // Processar diferentes tipos de evento de mensagem
@@ -1127,12 +1153,13 @@ Deno.serve(async (req) => {
       if (isGroupMessage) {
         console.log('⏭️ Skipping AI Agent for group message:', groupName || groupId || 'unknown group');
         console.log('📝 Group messages are saved but NOT auto-replied to (token economy)');
-      } else if (isManager && carrierId) {
+      } else if (isManager) {
         // 👔 GESTOR: Resposta instantânea via ai-agent-manager-query
+        // Gestores são roteados mesmo sem carrierId
         console.log('👔 [DIAGNOSTIC] Manager detected! Routing to manager query handler...');
         console.log('👔 [DIAGNOSTIC] Message:', messageText);
         console.log('👔 [DIAGNOSTIC] Phone:', phoneNumber);
-        console.log('👔 [DIAGNOSTIC] CarrierId:', carrierId);
+        console.log('👔 [DIAGNOSTIC] CarrierId:', carrierId || 'NULL (manager without carrier)');
         
         try {
           const managerQueryUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/ai-agent-manager-query`;
@@ -1147,7 +1174,7 @@ Deno.serve(async (req) => {
             body: JSON.stringify({
               message: messageText,
               senderPhone: phoneNumber,
-              carrierId: carrierId,
+              carrierId: carrierId || null, // Permitir null para gestores
             }),
           });
           

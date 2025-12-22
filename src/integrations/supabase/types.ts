@@ -4174,6 +4174,7 @@ export type Database = {
           created_at: string | null
           id: string
           instance_key: string
+          is_active: boolean | null
           name: string | null
           organization_id: string | null
           phone_number: string | null
@@ -4187,6 +4188,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           instance_key: string
+          is_active?: boolean | null
           name?: string | null
           organization_id?: string | null
           phone_number?: string | null
@@ -4200,6 +4202,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           instance_key?: string
+          is_active?: boolean | null
           name?: string | null
           organization_id?: string | null
           phone_number?: string | null
