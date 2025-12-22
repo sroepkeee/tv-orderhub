@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useOrganization } from "@/hooks/useOrganization";
 import { Button } from "@/components/ui/button";
@@ -32,11 +32,14 @@ export interface UserByRole {
 
 const PhaseSettings = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { organization } = useOrganization();
   const [phases, setPhases] = useState<PhaseConfig[]>([]);
   const [usersByRole, setUsersByRole] = useState<Record<string, UserByRole[]>>({});
   const [loading, setLoading] = useState(true);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
+  
+  const defaultTab = searchParams.get('tab') || 'phases';
 
   const fetchPhases = async () => {
     if (!organization?.id) return;
@@ -281,7 +284,7 @@ const PhaseSettings = () => {
           </p>
         </div>
 
-        <Tabs defaultValue="phases" className="space-y-4">
+        <Tabs defaultValue={defaultTab} className="space-y-4">
           <TabsList>
             <TabsTrigger value="phases" className="flex items-center gap-2">
               <Settings2 className="h-4 w-4" />
