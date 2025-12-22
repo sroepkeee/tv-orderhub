@@ -152,7 +152,7 @@ export const ordersData = [
   }
 ];
 
-export async function importOrders(userId: string) {
+export async function importOrders(userId: string, organizationId: string) {
   try {
     let successCount = 0;
     let errorCount = 0;
@@ -164,6 +164,7 @@ export async function importOrders(userId: string) {
           .from('orders')
           .insert({
             user_id: userId,
+            organization_id: organizationId,
             order_number: orderData.orderNumber,
             customer_name: orderData.customerName,
             delivery_address: orderData.customerName,
@@ -187,6 +188,7 @@ export async function importOrders(userId: string) {
         // Inserir itens
         const itemsToInsert = orderData.items.map(item => ({
           user_id: userId,
+          organization_id: organizationId,
           order_id: order.id,
           item_code: item.itemCode,
           item_description: item.description,
