@@ -8,7 +8,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useOrganization } from "@/hooks/useOrganization";
-import { Save, Info, Eye, Pencil, ArrowRight, Trash2, Users, Search } from "lucide-react";
+import { Save, Info, Eye, Pencil, ArrowRight, Trash2, Users, Search, Wand2, RotateCcw } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Input } from "@/components/ui/input";
 import {
@@ -55,6 +55,23 @@ const PHASES = [
 ];
 
 const FULL_ACCESS_ROLES = ['admin', 'manager'];
+
+// Mapeamento de departamentos para fases
+const DEPARTMENT_PHASES_MAP: Record<string, string[]> = {
+  'Almoxarifado SSM': ['almox_ssm'],
+  'SSM': ['almox_ssm'],
+  'Compras': ['purchases'],
+  'Almoxarifado Geral': ['almox_general'],
+  'Produção': ['production_client', 'production_stock'],
+  'Projetos': ['order_generation', 'balance_generation'],
+  'Planejamento': ['order_generation', 'balance_generation'],
+  'Laboratório': ['laboratory'],
+  'Expedição': ['logistics', 'packaging', 'freight_quote', 'in_transit'],
+  'Logística': ['logistics', 'packaging', 'freight_quote', 'in_transit', 'carriers_chat'],
+  'Faturamento': ['invoicing', 'ready_to_invoice'],
+  'Financeiro': ['invoicing', 'ready_to_invoice'],
+  'Embalagem': ['packaging'],
+};
 
 // Cores por tipo de permissão
 const PERMISSION_STYLES = {
@@ -178,21 +195,71 @@ export const UserPhasePermissionsMatrix = () => {
       const existing = prev.find(p => p.user_id === userId && p.phase_key === phase);
       
       if (existing) {
+        // Atualiza existente
+        const updated = { ...existing, [field]: value };
+        // Se todas as permissões são false, remove o registro
+        if (!updated.can_view && !updated.can_edit && !updated.can_advance && !updated.can_delete) {
+          return prev.filter(p => !(p.user_id === userId && p.phase_key === phase));
+        }
         return prev.map(p => 
           p.user_id === userId && p.phase_key === phase
-            ? { ...p, [field]: value }
+            ? updated
             : p
         );
-      } else {
+      } else if (value) {
+        // Só cria se value é true
         return [...prev, {
           user_id: userId,
           phase_key: phase,
-          can_view: field === 'can_view' ? value : false,
-          can_edit: field === 'can_edit' ? value : false,
-          can_advance: field === 'can_advance' ? value : false,
-          can_delete: field === 'can_delete' ? value : false,
+          can_view: field === 'can_view',
+          can_edit: field === 'can_edit',
+          can_advance: field === 'can_advance',
+          can_delete: field === 'can_delete',
         }];
       }
+      return prev; // Não faz nada se value é false e não existe
+    });
+  };
+
+  // Aplica permissões baseado no departamento do usuário
+  const applyDepartmentPermissions = () => {
+    const newPermissions: UserPermission[] = [];
+    
+    users.forEach(user => {
+      if (hasFullAccessRole(user)) return; // Ignora admin/manager
+      
+      const department = user.department?.trim();
+      if (!department) return;
+      
+      // Encontra as fases para este departamento
+      const phases = DEPARTMENT_PHASES_MAP[department] || [];
+      
+      phases.forEach(phaseKey => {
+        newPermissions.push({
+          user_id: user.id,
+          phase_key: phaseKey,
+          can_view: true,
+          can_edit: true,
+          can_advance: true,
+          can_delete: false, // Delete requer permissão especial
+        });
+      });
+    });
+    
+    setPermissions(newPermissions);
+    
+    toast({
+      title: "Permissões aplicadas",
+      description: `Permissões configuradas para ${newPermissions.length} combinações usuário/fase baseado nos departamentos`,
+    });
+  };
+
+  // Limpa todas as permissões
+  const clearAllPermissions = () => {
+    setPermissions([]);
+    toast({
+      title: "Permissões limpas",
+      description: "Todas as permissões foram removidas. Clique em 'Salvar' para confirmar.",
     });
   };
 
@@ -276,7 +343,7 @@ export const UserPhasePermissionsMatrix = () => {
   return (
     <Card>
       <CardHeader>
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between flex-wrap gap-4">
           <div>
             <CardTitle className="flex items-center gap-2">
               <Users className="h-5 w-5" />
@@ -284,10 +351,20 @@ export const UserPhasePermissionsMatrix = () => {
             </CardTitle>
             <CardDescription>Configure permissões individuais para cada usuário por fase</CardDescription>
           </div>
-          <Button onClick={handleSave} disabled={saving}>
-            <Save className="h-4 w-4 mr-2" />
-            {saving ? "Salvando..." : "Salvar Alterações"}
-          </Button>
+          <div className="flex gap-2 flex-wrap">
+            <Button variant="outline" onClick={applyDepartmentPermissions}>
+              <Wand2 className="h-4 w-4 mr-2" />
+              Aplicar por Departamento
+            </Button>
+            <Button variant="outline" onClick={clearAllPermissions}>
+              <RotateCcw className="h-4 w-4 mr-2" />
+              Limpar Tudo
+            </Button>
+            <Button onClick={handleSave} disabled={saving}>
+              <Save className="h-4 w-4 mr-2" />
+              {saving ? "Salvando..." : "Salvar"}
+            </Button>
+          </div>
         </div>
       </CardHeader>
       <CardContent>
