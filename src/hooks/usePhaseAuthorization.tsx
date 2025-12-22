@@ -14,15 +14,22 @@ interface UserPhasePermission {
 const FULL_ACCESS_ROLES = ['admin', 'manager'];
 
 export const usePhaseAuthorization = () => {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [userRoles, setUserRoles] = useState<string[]>([]);
   const [userPhasePermissions, setUserPhasePermissions] = useState<UserPhasePermission[]>([]);
-  const [isApproved, setIsApproved] = useState(false);
+  // Tri-state: null = ainda carregando, true = aprovado, false = pendente
+  const [isApproved, setIsApproved] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Não fazer nada se ainda estiver carregando auth ou sem usuário
+    if (authLoading) {
+      return;
+    }
+    
     if (!user) {
       setLoading(false);
+      setIsApproved(null);
       return;
     }
 
@@ -44,9 +51,11 @@ export const usePhaseAuthorization = () => {
     return () => {
       supabase.removeChannel(subscription);
     };
-  }, [user]);
+  }, [user, authLoading]);
 
   const loadUserData = async () => {
+    if (!user) return;
+    
     try {
       // Carregar roles
       const { data: rolesData, error: rolesError } = await supabase

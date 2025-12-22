@@ -31,6 +31,7 @@ import { VisualModeProvider } from "./hooks/useVisualMode";
 import { PrivacyModeProvider } from "./hooks/usePrivacyMode";
 import { OrganizationProvider } from "./hooks/useOrganization";
 import { OrganizationGuard } from "./components/onboarding/OrganizationGuard";
+import { AuthProvider } from "./contexts/AuthContext";
 import { useEffect, useState } from "react";
 import { supabase } from "./integrations/supabase/client";
 
@@ -63,7 +64,9 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
     }
   }, [user, loading]);
   
-  if (loading || authLoading || checkingProfile) {
+  // Mostrar loading enquanto auth, authLoading ou checkingProfile estiverem ativos
+  // OU enquanto isApproved for null (ainda carregando status de aprovação)
+  if (loading || authLoading || checkingProfile || isApproved === null) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
@@ -82,7 +85,8 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
     return <CompleteProfileDialog open={true} userId={user.id} userEmail={user.email} />;
   }
 
-  if (!isApproved) {
+  // Somente mostrar PendingApprovalScreen quando isApproved === false (explicitamente pendente)
+  if (isApproved === false) {
     return <PendingApprovalScreen />;
   }
   
@@ -136,12 +140,13 @@ const queryClient = new QueryClient({
 const App = () => {
   return (
     <QueryClientProvider client={queryClient}>
-      <PrivacyModeProvider>
-        <VisualModeProvider>
-          <OrganizationProvider>
-            <TooltipProvider>
-              <Toaster />
-              <Sonner />
+      <AuthProvider>
+        <PrivacyModeProvider>
+          <VisualModeProvider>
+            <OrganizationProvider>
+              <TooltipProvider>
+                <Toaster />
+                <Sonner />
               <BrowserRouter>
                 <OrganizationGuard>
                   <Routes>
@@ -227,6 +232,7 @@ const App = () => {
           </OrganizationProvider>
         </VisualModeProvider>
       </PrivacyModeProvider>
+      </AuthProvider>
     </QueryClientProvider>
   );
 };
