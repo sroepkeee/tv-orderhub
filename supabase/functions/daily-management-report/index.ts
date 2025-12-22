@@ -81,6 +81,7 @@ interface OrderMetrics {
     status: string;
     statusLabel: string;
     daysUntilDelivery: number;
+    daysOverdue: number;
   }>;
   
   // Alertas
@@ -109,12 +110,14 @@ interface OrderMetrics {
       count: number;
       avgDays: number;
       maxDays: number;
+      maxDaysOverdue: number;
       totalValue: number;
       awaitingMaterial: number;
       oldestOrders: Array<{
         orderNumber: string;
         customer: string;
         daysInPhase: number;
+        daysOverdue: number;
         value: number;
       }>;
     };
@@ -142,6 +145,24 @@ interface OrderMetrics {
         value: number;
       }>;
     };
+  };
+
+  // NOVO: Pedidos extremamente atrasados (>30 dias)
+  extremelyOverdueOrders: Array<{
+    orderNumber: string;
+    customer: string;
+    daysOverdue: number;
+    value: number;
+    phase: string;
+    phaseLabel: string;
+  }>;
+
+  // NOVO: Saúde do Portfólio
+  portfolioHealth: {
+    onTime: { count: number; percentage: number };
+    late1to7: { count: number; percentage: number };
+    late8to30: { count: number; percentage: number };
+    lateOver30: { count: number; percentage: number };
   };
 }
 
@@ -373,6 +394,13 @@ async function calculateMetrics(supabase: any): Promise<OrderMetrics> {
     producaoEstoque: [],
   };
   
+  // NOVO: Para pedidos extremamente atrasados e saúde do portfólio
+  const allOrdersWithOverdue: any[] = [];
+  let healthOnTime = 0;
+  let healthLate1to7 = 0;
+  let healthLate8to30 = 0;
+  let healthLateOver30 = 0;
+  
   let totalValue = 0;
   let newToday = 0;
   let onTimeCount = 0;
@@ -408,11 +436,13 @@ async function calculateMetrics(supabase: any): Promise<OrderMetrics> {
     const daysInPhase = Math.ceil((today.getTime() - updatedAt.getTime()) / (1000 * 60 * 60 * 24));
     phaseDays[phaseKey].push(daysInPhase);
 
-    // Calcular dias até entrega
+    // Calcular dias até entrega e dias de atraso
     let daysUntilDelivery = 999;
+    let daysOverdue = 0;
     if (order.delivery_date) {
       const deliveryDate = new Date(order.delivery_date);
       daysUntilDelivery = Math.ceil((deliveryDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+      daysOverdue = daysUntilDelivery < 0 ? Math.abs(daysUntilDelivery) : 0;
     }
 
     // Calcular valor somando dos itens
@@ -426,6 +456,7 @@ async function calculateMetrics(supabase: any): Promise<OrderMetrics> {
     // Guardar valor calculado no objeto order para uso posterior
     (order as any).calculated_value = orderValue;
     (order as any).days_in_phase = daysInPhase;
+    (order as any).days_overdue = daysOverdue;
     (order as any).phase_key = phaseKey;
 
     phaseOrders[phaseKey].push({
@@ -433,18 +464,41 @@ async function calculateMetrics(supabase: any): Promise<OrderMetrics> {
       customer: order.customer_name,
       daysUntil: daysUntilDelivery,
       daysInPhase: daysInPhase,
+      daysOverdue: daysOverdue,
       value: orderValue,
     });
 
-    // Coletar dados para análise de fases críticas
+    // Coletar dados para análise de fases críticas (com daysOverdue)
     if (phaseKey === 'compras' || phaseKey === 'producaoClientes' || phaseKey === 'producaoEstoque') {
       criticalPhaseOrders[phaseKey].push({
         orderNumber: order.order_number,
         customer: order.customer_name,
         daysInPhase: daysInPhase,
+        daysOverdue: daysOverdue,
         value: orderValue,
         status: status,
       });
+    }
+
+    // NOVO: Coletar todos os pedidos para análise de extremamente atrasados
+    allOrdersWithOverdue.push({
+      orderNumber: order.order_number,
+      customer: order.customer_name,
+      daysOverdue: daysOverdue,
+      value: orderValue,
+      phase: phaseKey,
+      phaseLabel: phaseLabels[phaseKey] || phaseKey,
+    });
+
+    // NOVO: Calcular saúde do portfólio
+    if (daysOverdue === 0) {
+      healthOnTime++;
+    } else if (daysOverdue >= 1 && daysOverdue <= 7) {
+      healthLate1to7++;
+    } else if (daysOverdue >= 8 && daysOverdue <= 30) {
+      healthLate8to30++;
+    } else if (daysOverdue > 30) {
+      healthLateOver30++;
     }
 
     // Verificar se é novo hoje
@@ -491,6 +545,33 @@ async function calculateMetrics(supabase: any): Promise<OrderMetrics> {
     }
   });
 
+  // NOVO: Filtrar e ordenar pedidos extremamente atrasados (>30 dias)
+  const extremelyOverdueOrders = allOrdersWithOverdue
+    .filter(o => o.daysOverdue > 30)
+    .sort((a, b) => b.daysOverdue - a.daysOverdue)
+    .slice(0, 10);
+
+  // NOVO: Calcular percentuais de saúde do portfólio
+  const totalOrders = activeOrders.length;
+  const portfolioHealth = {
+    onTime: { 
+      count: healthOnTime, 
+      percentage: totalOrders > 0 ? Math.round((healthOnTime / totalOrders) * 100) : 0 
+    },
+    late1to7: { 
+      count: healthLate1to7, 
+      percentage: totalOrders > 0 ? Math.round((healthLate1to7 / totalOrders) * 100) : 0 
+    },
+    late8to30: { 
+      count: healthLate8to30, 
+      percentage: totalOrders > 0 ? Math.round((healthLate8to30 / totalOrders) * 100) : 0 
+    },
+    lateOver30: { 
+      count: healthLateOver30, 
+      percentage: totalOrders > 0 ? Math.round((healthLateOver30 / totalOrders) * 100) : 0 
+    },
+  };
+
   // Calcular SLA rate
   const onTimeRate = activeOrders.length > 0 
     ? Math.round((onTimeCount / activeOrders.length) * 100) 
@@ -524,34 +605,44 @@ async function calculateMetrics(supabase: any): Promise<OrderMetrics> {
   }
   bottlenecks.sort((a, b) => b.avgDays - a.avgDays);
 
-  // Calcular análise de fases críticas
-  const calculateCriticalPhaseStats = (phaseKey: string) => {
+  // Calcular análise de fases críticas (Compras ordenado por daysOverdue, outros por daysInPhase)
+  const calculateCriticalPhaseStats = (phaseKey: string, sortByOverdue: boolean = false) => {
     const orders = criticalPhaseOrders[phaseKey] || [];
     const days = phaseDays[phaseKey] || [];
     const value = phaseValues[phaseKey] || 0;
     
-    // Ordenar por dias na fase (mais antigos primeiro)
-    const sortedOrders = [...orders].sort((a, b) => b.daysInPhase - a.daysInPhase);
+    // Para Compras: ordenar por dias de atraso (mais atrasados primeiro)
+    // Para Produção: ordenar por dias na fase (mais antigos primeiro)
+    const sortedOrders = sortByOverdue 
+      ? [...orders].sort((a, b) => b.daysOverdue - a.daysOverdue)
+      : [...orders].sort((a, b) => b.daysInPhase - a.daysInPhase);
+    
+    // Calcular max daysOverdue
+    const maxDaysOverdue = orders.length > 0 
+      ? Math.max(...orders.map((o: any) => o.daysOverdue || 0)) 
+      : 0;
     
     return {
       count: orders.length,
       avgDays: days.length > 0 ? Math.round((days.reduce((a, b) => a + b, 0) / days.length) * 10) / 10 : 0,
       maxDays: days.length > 0 ? Math.max(...days) : 0,
+      maxDaysOverdue: maxDaysOverdue,
       totalValue: value,
       awaitingMaterial: phaseKey === 'compras' ? awaitingMaterial : 0,
       oldestOrders: sortedOrders.slice(0, 3).map(o => ({
         orderNumber: o.orderNumber,
         customer: o.customer,
         daysInPhase: o.daysInPhase,
+        daysOverdue: o.daysOverdue || 0,
         value: o.value,
       })),
     };
   };
 
   const criticalPhaseAnalysis = {
-    compras: calculateCriticalPhaseStats('compras'),
-    producaoClientes: calculateCriticalPhaseStats('producaoClientes'),
-    producaoEstoque: calculateCriticalPhaseStats('producaoEstoque'),
+    compras: calculateCriticalPhaseStats('compras', true), // Ordenar por atraso
+    producaoClientes: calculateCriticalPhaseStats('producaoClientes', false),
+    producaoEstoque: calculateCriticalPhaseStats('producaoEstoque', false),
   };
 
   // ==================== TENDÊNCIAS SEMANAIS ====================
@@ -614,7 +705,7 @@ async function calculateMetrics(supabase: any): Promise<OrderMetrics> {
     dateChanges7d: dateChanges || 0,
   };
 
-  // ==================== TOP PEDIDOS ====================
+  // ==================== TOP PEDIDOS (com daysOverdue) ====================
   const topOrders = activeOrders
     .filter((o: any) => (o as any).calculated_value > 0)
     .sort((a: any, b: any) => ((b as any).calculated_value || 0) - ((a as any).calculated_value || 0))
@@ -624,6 +715,7 @@ async function calculateMetrics(supabase: any): Promise<OrderMetrics> {
       const daysUntil = deliveryDate 
         ? Math.ceil((deliveryDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
         : 999;
+      const daysOverdue = (o as any).days_overdue || 0;
 
       return {
         orderNumber: o.order_number,
@@ -632,6 +724,7 @@ async function calculateMetrics(supabase: any): Promise<OrderMetrics> {
         status: o.status,
         statusLabel: statusLabels[o.status] || o.status,
         daysUntilDelivery: daysUntil,
+        daysOverdue: daysOverdue,
       };
     });
 
@@ -664,6 +757,8 @@ async function calculateMetrics(supabase: any): Promise<OrderMetrics> {
     },
     phaseDetails,
     criticalPhaseAnalysis,
+    extremelyOverdueOrders,
+    portfolioHealth,
   };
 }
 
@@ -721,20 +816,48 @@ function formatReportMessage(metrics: OrderMetrics, date: Date): string {
     message += `\n`;
   }
 
-  // ========== ANÁLISE DETALHADA - COMPRAS (NOVA SEÇÃO) ==========
+  // ========== NOVO: PEDIDOS EXTREMAMENTE ATRASADOS (>30 dias) ==========
+  if (metrics.extremelyOverdueOrders && metrics.extremelyOverdueOrders.length > 0) {
+    message += `🆘 *PEDIDOS EXTREMAMENTE ATRASADOS*\n`;
+    message += `━━━━━━━━━━━━━━━━━━━━━━\n`;
+    message += `⚠️ *${metrics.extremelyOverdueOrders.length}* pedidos com mais de 30 dias de atraso:\n\n`;
+    
+    metrics.extremelyOverdueOrders.slice(0, 5).forEach((order, idx) => {
+      message += `${idx + 1}. *#${order.orderNumber}* - ${order.daysOverdue}d atrasado\n`;
+      message += `   ${formatCurrency(order.value)} | ${order.phaseLabel}\n`;
+    });
+    
+    if (metrics.extremelyOverdueOrders.length > 5) {
+      message += `\n_... e mais ${metrics.extremelyOverdueOrders.length - 5} pedidos_\n`;
+    }
+    message += `\n`;
+  }
+
+  // ========== NOVO: SAÚDE DO PORTFÓLIO ==========
+  if (metrics.portfolioHealth) {
+    message += `🩺 *SAÚDE DO PORTFÓLIO*\n`;
+    message += `━━━━━━━━━━━━━━━━━━━━━━\n`;
+    message += `✅ Dentro do prazo: *${metrics.portfolioHealth.onTime.count}* (${metrics.portfolioHealth.onTime.percentage}%)\n`;
+    message += `⚠️ 1-7 dias atrasados: *${metrics.portfolioHealth.late1to7.count}* (${metrics.portfolioHealth.late1to7.percentage}%)\n`;
+    message += `🔴 8-30 dias atrasados: *${metrics.portfolioHealth.late8to30.count}* (${metrics.portfolioHealth.late8to30.percentage}%)\n`;
+    message += `🆘 > 30 dias atrasados: *${metrics.portfolioHealth.lateOver30.count}* (${metrics.portfolioHealth.lateOver30.percentage}%)\n\n`;
+  }
+
+  // ========== ANÁLISE DETALHADA - COMPRAS (ORDENADO POR ATRASO) ==========
   const comprasAnalysis = metrics.criticalPhaseAnalysis.compras;
   if (comprasAnalysis.count > 0) {
     message += `🛒 *ANÁLISE DETALHADA - COMPRAS*\n`;
     message += `━━━━━━━━━━━━━━━━━━━━━━\n`;
     message += `• Total na fase: *${comprasAnalysis.count}* pedidos\n`;
-    message += `• Tempo médio: *${comprasAnalysis.avgDays}* dias\n`;
-    message += `• Maior tempo: *${comprasAnalysis.maxDays}* dias\n`;
+    message += `• Tempo médio na fase: *${comprasAnalysis.avgDays}* dias\n`;
+    message += `• Maior atraso: *${comprasAnalysis.maxDaysOverdue}* dias\n`;
     message += `• Valor parado: *${formatCurrency(comprasAnalysis.totalValue)}*\n`;
     
     if (comprasAnalysis.oldestOrders.length > 0) {
-      message += `\n📌 *Pedidos mais antigos:*\n`;
+      message += `\n📌 *Pedidos mais atrasados:*\n`;
       comprasAnalysis.oldestOrders.forEach((order, idx) => {
-        message += `${idx + 1}. #${order.orderNumber} - ${order.daysInPhase}d (${formatCurrency(order.value)})\n`;
+        const criticalBadge = order.daysOverdue > 30 ? '🆘 ' : order.daysOverdue > 7 ? '⚠️ ' : '';
+        message += `${idx + 1}. ${criticalBadge}#${order.orderNumber} - *${order.daysOverdue}d* atrasado (${formatCurrency(order.value)})\n`;
       });
     }
     
@@ -822,17 +945,27 @@ function formatReportMessage(metrics: OrderMetrics, date: Date): string {
     message += `\n`;
   }
 
-  // ========== TOP 5 PEDIDOS ==========
+  // ========== TOP 5 PEDIDOS (COM INDICADORES DE ATRASO EXTREMO) ==========
   if (metrics.topOrders.length > 0) {
     message += `💰 *TOP 5 PEDIDOS (MAIOR VALOR)*\n`;
     message += `━━━━━━━━━━━━━━━━━━━━━━\n`;
     metrics.topOrders.forEach((order, idx) => {
-      const daysIcon = order.daysUntilDelivery < 0 ? '⚠️' : order.daysUntilDelivery <= 2 ? '🔴' : '🕐';
-      const daysText = order.daysUntilDelivery < 0 
-        ? `${Math.abs(order.daysUntilDelivery)}d atrasado`
-        : order.daysUntilDelivery === 0 
-          ? 'Hoje'
-          : `${order.daysUntilDelivery}d`;
+      // Indicadores visuais baseados no atraso
+      let daysIcon = '🕐';
+      let daysText = '';
+      
+      if (order.daysOverdue > 30) {
+        daysIcon = '🆘';
+        daysText = `${order.daysOverdue}d atrasado`;
+      } else if (order.daysOverdue > 0) {
+        daysIcon = '⚠️';
+        daysText = `${order.daysOverdue}d atrasado`;
+      } else if (order.daysUntilDelivery <= 2) {
+        daysIcon = '🔴';
+        daysText = order.daysUntilDelivery === 0 ? 'Hoje' : `${order.daysUntilDelivery}d`;
+      } else {
+        daysText = `${order.daysUntilDelivery}d`;
+      }
       
       message += `${idx + 1}. *${order.orderNumber}* - ${order.customer}\n`;
       message += `   ${formatCurrency(order.totalValue)} | ${order.statusLabel} | ${daysIcon} ${daysText}\n\n`;
