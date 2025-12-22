@@ -29,12 +29,101 @@ export function OrdersTrackingTable({
 }: OrdersTrackingTableProps) {
   const [filter, setFilter] = useState<'all' | 'critical' | 'warning' | 'good'>('all');
   const [orderTypeFilter, setOrderTypeFilter] = useState<string>('all');
+  const [phaseFilter, setPhaseFilter] = useState<string>('all');
   const [ordersWithDetails, setOrdersWithDetails] = useState<OrderWithDetails[]>([]);
   const [orderTypes, setOrderTypes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [sortField, setSortField] = useState<SortField | null>(null);
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const [isDeadlineFilterOpen, setIsDeadlineFilterOpen] = useState(false);
+  const [isPhaseFilterOpen, setIsPhaseFilterOpen] = useState(false);
+
+  // Constante de fases
+  const ORDER_PHASES = [
+    { value: 'almox_ssm', label: 'Almox SSM' },
+    { value: 'order_generation', label: 'Gerar Ordem' },
+    { value: 'purchases', label: 'Compras' },
+    { value: 'almox_general', label: 'Almox Geral' },
+    { value: 'production_client', label: 'Produção Clientes' },
+    { value: 'production_stock', label: 'Produção Estoque' },
+    { value: 'balance_generation', label: 'Gerar Saldo' },
+    { value: 'laboratory', label: 'Laboratório' },
+    { value: 'packaging', label: 'Embalagem' },
+    { value: 'freight_quote', label: 'Cotação de Frete' },
+    { value: 'ready_to_invoice', label: 'À Faturar' },
+    { value: 'invoicing', label: 'Faturamento' },
+    { value: 'logistics', label: 'Expedição' },
+    { value: 'in_transit', label: 'Em Trânsito' },
+    { value: 'completion', label: 'Conclusão' },
+  ];
+
+  // Função para mapear status para fase
+  const getPhaseFromStatus = (status: string): string => {
+    const statusPhaseMap: Record<string, string> = {
+      // Almox SSM
+      'almox_ssm_pending': 'almox_ssm',
+      'almox_ssm_received': 'almox_ssm',
+      // Gerar Ordem
+      'order_generation_pending': 'order_generation',
+      'order_in_creation': 'order_generation',
+      'order_generated': 'order_generation',
+      // Compras
+      'purchase_pending': 'purchases',
+      'purchase_in_progress': 'purchases',
+      'purchase_completed': 'purchases',
+      // Almox Geral
+      'almox_general_received': 'almox_general',
+      'almox_general_separating': 'almox_general',
+      'almox_general_ready': 'almox_general',
+      // Produção
+      'separation_started': 'production_client',
+      'in_production': 'production_client',
+      'awaiting_material': 'production_client',
+      'separation_completed': 'production_client',
+      'production_completed': 'production_client',
+      // Gerar Saldo
+      'balance_calculation': 'balance_generation',
+      'balance_review': 'balance_generation',
+      'balance_approved': 'balance_generation',
+      // Laboratório
+      'awaiting_lab': 'laboratory',
+      'in_lab_analysis': 'laboratory',
+      'lab_completed': 'laboratory',
+      // Embalagem
+      'in_quality_check': 'packaging',
+      'in_packaging': 'packaging',
+      'ready_for_shipping': 'packaging',
+      // Cotação de Frete
+      'freight_quote_requested': 'freight_quote',
+      'freight_quote_received': 'freight_quote',
+      'freight_approved': 'freight_quote',
+      // À Faturar
+      'ready_to_invoice': 'ready_to_invoice',
+      'pending_invoice_request': 'ready_to_invoice',
+      // Faturamento
+      'invoice_requested': 'invoicing',
+      'awaiting_invoice': 'invoicing',
+      'invoice_issued': 'invoicing',
+      'invoice_sent': 'invoicing',
+      // Expedição
+      'released_for_shipping': 'logistics',
+      'in_expedition': 'logistics',
+      'pickup_scheduled': 'logistics',
+      'awaiting_pickup': 'logistics',
+      // Em Trânsito
+      'in_transit': 'in_transit',
+      'collected': 'in_transit',
+      // Conclusão
+      'delivered': 'completion',
+      'completed': 'completion',
+      'cancelled': 'completion',
+      'delayed': 'completion',
+      'returned': 'completion',
+      'pending': 'completion',
+      'on_hold': 'completion',
+    };
+    return statusPhaseMap[status] || 'completion';
+  };
   useEffect(() => {
     loadOrderDetails();
     loadOrderTypes();
@@ -120,6 +209,14 @@ export function OrdersTrackingTable({
     // Filtrar por tipo de pedido
     if (orderTypeFilter !== 'all') {
       filtered = filtered.filter(order => order.type === orderTypeFilter);
+    }
+
+    // Filtrar por fase
+    if (phaseFilter !== 'all') {
+      filtered = filtered.filter(order => {
+        const phase = getPhaseFromStatus(order.status);
+        return phase === phaseFilter;
+      });
     }
 
     // Aplicar ordenação
@@ -371,6 +468,42 @@ export function OrdersTrackingTable({
               })}
             </div>
           </div>
+
+          {/* Filtros por Fase */}
+          <Collapsible open={isPhaseFilterOpen} onOpenChange={setIsPhaseFilterOpen}>
+            <div>
+              <CollapsibleTrigger className="flex items-center gap-2 w-full hover:opacity-70 transition-opacity">
+                <h3 className="text-sm font-semibold mb-2 text-muted-foreground">Filtrar por Fase</h3>
+                <ChevronDown className={cn("h-4 w-4 text-muted-foreground transition-transform mb-2", isPhaseFilterOpen && "rotate-180")} />
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <div className="flex gap-2 flex-wrap">
+                  <Button 
+                    variant={phaseFilter === 'all' ? 'default' : 'outline'} 
+                    size="sm" 
+                    onClick={() => setPhaseFilter('all')}
+                  >
+                    Todas as Fases ({ordersWithDetails.length})
+                  </Button>
+                  {ORDER_PHASES.map(phase => {
+                    const count = ordersWithDetails.filter(o => getPhaseFromStatus(o.status) === phase.value).length;
+                    if (count === 0) return null;
+                    
+                    return (
+                      <Button 
+                        key={phase.value}
+                        variant={phaseFilter === phase.value ? 'default' : 'outline'} 
+                        size="sm" 
+                        onClick={() => setPhaseFilter(phase.value)}
+                      >
+                        {phase.label} ({count})
+                      </Button>
+                    );
+                  })}
+                </div>
+              </CollapsibleContent>
+            </div>
+          </Collapsible>
         </div>
       </div>
 
