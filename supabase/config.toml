@@ -98,3 +98,6 @@ verify_jwt = false
 
 [functions.notify-phase-manager]
 verify_jwt = true
+
+[functions.check-stalled-orders]
+verify_jwt = false

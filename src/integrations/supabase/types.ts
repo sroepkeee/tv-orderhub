@@ -3082,10 +3082,13 @@ export type Database = {
           icon: string | null
           id: string
           manager_user_id: string | null
+          max_days_allowed: number | null
           order_index: number | null
           organization_id: string | null
           phase_key: string
           responsible_role: Database["public"]["Enums"]["app_role"]
+          stall_alerts_enabled: boolean | null
+          warning_days: number | null
         }
         Insert: {
           color?: string | null
@@ -3095,10 +3098,13 @@ export type Database = {
           icon?: string | null
           id?: string
           manager_user_id?: string | null
+          max_days_allowed?: number | null
           order_index?: number | null
           organization_id?: string | null
           phase_key: string
           responsible_role: Database["public"]["Enums"]["app_role"]
+          stall_alerts_enabled?: boolean | null
+          warning_days?: number | null
         }
         Update: {
           color?: string | null
@@ -3108,10 +3114,13 @@ export type Database = {
           icon?: string | null
           id?: string
           manager_user_id?: string | null
+          max_days_allowed?: number | null
           order_index?: number | null
           organization_id?: string | null
           phase_key?: string
           responsible_role?: Database["public"]["Enums"]["app_role"]
+          stall_alerts_enabled?: boolean | null
+          warning_days?: number | null
         }
         Relationships: [
           {
@@ -3290,6 +3299,86 @@ export type Database = {
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      phase_stall_alerts: {
+        Row: {
+          alert_type: string
+          alerted_at: string | null
+          created_at: string | null
+          days_stalled: number
+          id: string
+          manager_user_id: string | null
+          notification_sent: boolean | null
+          order_id: string
+          organization_id: string | null
+          phase_key: string
+          resolved_at: string | null
+          resolved_by: string | null
+          status: string | null
+          whatsapp_message_id: string | null
+        }
+        Insert: {
+          alert_type?: string
+          alerted_at?: string | null
+          created_at?: string | null
+          days_stalled: number
+          id?: string
+          manager_user_id?: string | null
+          notification_sent?: boolean | null
+          order_id: string
+          organization_id?: string | null
+          phase_key: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: string | null
+          whatsapp_message_id?: string | null
+        }
+        Update: {
+          alert_type?: string
+          alerted_at?: string | null
+          created_at?: string | null
+          days_stalled?: number
+          id?: string
+          manager_user_id?: string | null
+          notification_sent?: boolean | null
+          order_id?: string
+          organization_id?: string | null
+          phase_key?: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: string | null
+          whatsapp_message_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "phase_stall_alerts_manager_user_id_fkey"
+            columns: ["manager_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "phase_stall_alerts_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "phase_stall_alerts_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "phase_stall_alerts_resolved_by_fkey"
+            columns: ["resolved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]

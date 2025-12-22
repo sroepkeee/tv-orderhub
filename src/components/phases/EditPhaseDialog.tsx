@@ -18,7 +18,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Users, UserCheck, Building } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Users, UserCheck, Building, Clock, Bell } from "lucide-react";
 import { ROLE_LABELS } from "@/lib/roleLabels";
 import { supabase } from "@/integrations/supabase/client";
 import { useOrganization } from "@/hooks/useOrganization";
@@ -31,6 +32,9 @@ export interface PhaseConfig {
   responsible_role: string | null;
   organization_id: string | null;
   manager_user_id?: string | null;
+  max_days_allowed?: number;
+  warning_days?: number;
+  stall_alerts_enabled?: boolean;
 }
 
 export interface UserByRole {
@@ -58,6 +62,9 @@ export function EditPhaseDialog({ phase, open, onOpenChange, onSave, usersByRole
   const [displayName, setDisplayName] = useState("");
   const [responsibleRole, setResponsibleRole] = useState<string>("");
   const [managerUserId, setManagerUserId] = useState<string>("");
+  const [maxDaysAllowed, setMaxDaysAllowed] = useState<number>(5);
+  const [warningDays, setWarningDays] = useState<number>(3);
+  const [stallAlertsEnabled, setStallAlertsEnabled] = useState<boolean>(true);
   const [orgUsers, setOrgUsers] = useState<OrgUser[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
   const { organization } = useOrganization();
@@ -67,6 +74,9 @@ export function EditPhaseDialog({ phase, open, onOpenChange, onSave, usersByRole
       setDisplayName(phase.display_name);
       setResponsibleRole(phase.responsible_role || "__none__");
       setManagerUserId(phase.manager_user_id || "__none__");
+      setMaxDaysAllowed(phase.max_days_allowed ?? 5);
+      setWarningDays(phase.warning_days ?? 3);
+      setStallAlertsEnabled(phase.stall_alerts_enabled ?? true);
     }
   }, [phase]);
 
@@ -107,6 +117,9 @@ export function EditPhaseDialog({ phase, open, onOpenChange, onSave, usersByRole
       display_name: displayName.trim(),
       responsible_role: responsibleRole === "__none__" ? null : responsibleRole || null,
       manager_user_id: managerUserId === "__none__" ? null : managerUserId || null,
+      max_days_allowed: maxDaysAllowed,
+      warning_days: warningDays,
+      stall_alerts_enabled: stallAlertsEnabled,
     });
   };
 
@@ -128,7 +141,7 @@ export function EditPhaseDialog({ phase, open, onOpenChange, onSave, usersByRole
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Editar Fase</DialogTitle>
           <DialogDescription>
@@ -184,7 +197,7 @@ export function EditPhaseDialog({ phase, open, onOpenChange, onSave, usersByRole
               </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground">
-              O gestor é o responsável principal por esta fase.
+              O gestor é o responsável principal por esta fase e receberá alertas.
             </p>
           </div>
 
@@ -209,6 +222,64 @@ export function EditPhaseDialog({ phase, open, onOpenChange, onSave, usersByRole
               </div>
             </div>
           )}
+
+          {/* Configuração de Tempo Máximo */}
+          <div className="p-4 bg-muted/30 rounded-lg border space-y-4">
+            <div className="flex items-center gap-2 text-sm font-medium">
+              <Clock className="h-4 w-4" />
+              <span>Controle de Tempo na Fase</span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="maxDays" className="text-xs">
+                  Tempo máximo (dias)
+                </Label>
+                <Input
+                  id="maxDays"
+                  type="number"
+                  min={1}
+                  max={90}
+                  value={maxDaysAllowed}
+                  onChange={(e) => setMaxDaysAllowed(parseInt(e.target.value) || 5)}
+                  className="h-9"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Alerta crítico após esse tempo
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="warningDays" className="text-xs">
+                  Dias para aviso
+                </Label>
+                <Input
+                  id="warningDays"
+                  type="number"
+                  min={1}
+                  max={maxDaysAllowed - 1}
+                  value={warningDays}
+                  onChange={(e) => setWarningDays(parseInt(e.target.value) || 3)}
+                  className="h-9"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Aviso antes do limite
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <Label htmlFor="stallAlerts" className="flex items-center gap-2 text-sm cursor-pointer">
+                <Bell className="h-4 w-4" />
+                Alertas de estagnação habilitados
+              </Label>
+              <Switch
+                id="stallAlerts"
+                checked={stallAlertsEnabled}
+                onCheckedChange={setStallAlertsEnabled}
+              />
+            </div>
+          </div>
 
           {/* Role Responsável (para referência/fallback) */}
           <div className="space-y-2">
