@@ -153,9 +153,9 @@ const AppSidebar = ({
         icon: Bot,
         label: "Agente IA"
       }] : []), {
-        path: "/settings/phases",
+      path: "/settings/phases",
         icon: Settings,
-        label: "Fases"
+        label: "Configurações"
       }]
     });
   }
