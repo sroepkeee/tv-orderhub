@@ -1375,12 +1375,27 @@ export const Dashboard = () => {
   const handleAddOrder = async (orderData: any) => {
     if (!user) return;
     try {
+      // Buscar organization_id do usuário
+      const { data: memberData } = await supabase
+        .from('organization_members')
+        .select('organization_id')
+        .eq('user_id', user.id)
+        .eq('is_active', true)
+        .maybeSingle();
+      
+      if (!memberData?.organization_id) {
+        throw new Error("Usuário não está vinculado a uma organização ativa");
+      }
+      
+      const organizationId = memberData.organization_id;
       const orderNumber = generateOrderNumber(orderData.type);
+      
       const {
         data: orderRow,
         error: orderError
       } = await supabase.from('orders').insert({
         user_id: user.id,
+        organization_id: organizationId,
         order_number: orderNumber,
         customer_name: orderData.client,
         customer_whatsapp: orderData.customerWhatsapp || null,
@@ -1397,6 +1412,7 @@ export const Dashboard = () => {
       // Register manual creation in history
       await supabase.from('order_changes').insert({
         order_id: orderRow.id,
+        organization_id: organizationId,
         field_name: 'created',
         old_value: '',
         new_value: 'manual_creation',
@@ -1410,6 +1426,7 @@ export const Dashboard = () => {
         const itemsToInsert = orderData.items.map((item: any) => ({
           order_id: orderRow.id,
           user_id: user.id,
+          organization_id: organizationId,
           item_code: item.itemCode,
           item_description: item.itemDescription,
           unit: item.unit,
@@ -1449,6 +1466,7 @@ export const Dashboard = () => {
           error: attachmentError
         } = await supabase.from('order_attachments').insert({
           order_id: orderRow.id,
+          organization_id: organizationId,
           file_name: orderData.pdfFile.name,
           file_path: uploadData.path,
           file_size: orderData.pdfFile.size,
@@ -1623,11 +1641,24 @@ export const Dashboard = () => {
   const handleDuplicateOrder = async (originalOrder: Order) => {
     if (!user) return;
     try {
+      // Buscar organization_id do usuário
+      const { data: memberData } = await supabase
+        .from('organization_members')
+        .select('organization_id')
+        .eq('user_id', user.id)
+        .eq('is_active', true)
+        .maybeSingle();
+      
+      if (!memberData?.organization_id) {
+        throw new Error("Usuário não está vinculado a uma organização ativa");
+      }
+      
       const {
         data,
         error
       } = await supabase.from('orders').insert({
         user_id: user.id,
+        organization_id: memberData.organization_id,
         order_number: generateOrderNumber(originalOrder.type),
         customer_name: originalOrder.client,
         delivery_address: originalOrder.client,
