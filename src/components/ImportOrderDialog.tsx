@@ -163,6 +163,21 @@ export const ImportOrderDialog = ({
       } = await supabase.auth.getUser();
       if (!user) throw new Error("Usuário não autenticado");
 
+      // 🔐 Buscar organization_id do usuário para RLS
+      const { data: memberData } = await supabase
+        .from('organization_members')
+        .select('organization_id')
+        .eq('user_id', user.id)
+        .eq('is_active', true)
+        .maybeSingle();
+
+      if (!memberData?.organization_id) {
+        throw new Error("Usuário não possui organização ativa. Contate o administrador.");
+      }
+
+      const organizationId = memberData.organization_id;
+      console.log('✅ [executeImport] Organization ID:', organizationId);
+
       // Converter datas DD/MM/YYYY para YYYY-MM-DD
       const convertDate = (dateStr: string) => {
         if (!dateStr) return null;
@@ -171,12 +186,13 @@ export const ImportOrderDialog = ({
         return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
       };
 
-      // Inserir pedido
+      // Inserir pedido COM organization_id
       const {
         data: order,
         error: orderError
       } = await supabase.from('orders').insert({
         user_id: user.id,
+        organization_id: organizationId,
         order_number: data.orderInfo.orderNumber,
         totvs_order_number: data.orderInfo.orderNumber,
         customer_name: data.orderInfo.customerName,
@@ -209,6 +225,7 @@ export const ImportOrderDialog = ({
       // Registrar criação por importação no histórico
       await supabase.from('order_changes').insert({
         order_id: order.id,
+        organization_id: organizationId,
         field_name: 'created',
         old_value: '',
         new_value: 'imported',
@@ -221,6 +238,7 @@ export const ImportOrderDialog = ({
       if (duplicateInfo?.isDuplicateApproved) {
         await supabase.from('order_changes').insert({
           order_id: order.id,
+          organization_id: organizationId,
           field_name: 'duplicate_approval',
           old_value: duplicateInfo.originalOrderId,
           new_value: duplicateInfo.approvalNote || 'Duplicação aprovada pelo usuário',
@@ -258,6 +276,7 @@ export const ImportOrderDialog = ({
               error: attachmentError
             } = await supabase.from('order_attachments').insert({
               order_id: order.id,
+              organization_id: organizationId,
               file_name: file.name,
               file_path: filePath,
               file_size: file.size,
@@ -280,9 +299,10 @@ export const ImportOrderDialog = ({
         }
       }
 
-      // Inserir itens
+      // Inserir itens COM organization_id
       const itemsToInsert = data.items.map(item => ({
         user_id: user.id,
+        organization_id: organizationId,
         order_id: order.id,
         item_code: item.itemCode,
         item_description: cleanItemDescription(item.description),
@@ -309,7 +329,7 @@ export const ImportOrderDialog = ({
       console.log('✅ [executeImport] Items inseridos:', itemsToInsert.length);
       
       // 🆕 Auto-cadastrar cliente na tabela customer_contacts
-      const customerData = await saveCustomerFromOrder(data, order.id, user.id);
+      const customerData = await saveCustomerFromOrder(data, order.id, user.id, organizationId);
       
       // Mensagem de sucesso diferenciada para importações com PDF
       if (file?.name.endsWith('.pdf')) {
@@ -354,7 +374,7 @@ export const ImportOrderDialog = ({
   };
 
   // 🆕 Função para salvar/atualizar cliente automaticamente
-  const saveCustomerFromOrder = async (data: ParsedOrderData, orderId: string, userId: string): Promise<{ id: string; hasWhatsApp: boolean } | null> => {
+  const saveCustomerFromOrder = async (data: ParsedOrderData, orderId: string, userId: string, organizationId?: string): Promise<{ id: string; hasWhatsApp: boolean } | null> => {
     try {
       const customerDocument = data.orderInfo.customerDocument;
       const customerName = data.orderInfo.customerName;
@@ -416,7 +436,7 @@ export const ImportOrderDialog = ({
         return { id: existingByName.id, hasWhatsApp: !!existingByName.whatsapp };
       }
       
-      // Criar novo cliente
+      // Criar novo cliente COM organization_id
       const { data: newCustomer, error } = await supabase
         .from('customer_contacts')
         .insert({
@@ -424,6 +444,7 @@ export const ImportOrderDialog = ({
           customer_document: customerDocument || null,
           address: address || null,
           city: municipality || null,
+          organization_id: organizationId || null,
           source: 'import',
           last_order_id: orderId,
           orders_count: 1,
