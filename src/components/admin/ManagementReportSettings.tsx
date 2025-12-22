@@ -28,10 +28,15 @@ import {
   FileText,
   Image,
   MessageSquare,
-  HelpCircle
+  HelpCircle,
+  Timer,
+  AlertTriangle,
+  Copy
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 interface Recipient {
   id: string;
@@ -82,6 +87,11 @@ export function ManagementReportSettings() {
   // Test send state
   const [testPhone, setTestPhone] = useState('');
   const [testSending, setTestSending] = useState(false);
+  
+  // Cron job state
+  const [cronStatus, setCronStatus] = useState<'unknown' | 'active' | 'inactive' | 'error'>('unknown');
+  const [cronLoading, setCronLoading] = useState(false);
+  const [showCronSQL, setShowCronSQL] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -265,8 +275,140 @@ export function ManagementReportSettings() {
 
   const activeRecipients = recipients.filter(r => r.is_active).length;
 
+  // SQL para configurar o cron job
+  const cronJobSQL = `-- IMPORTANTE: Primeiro habilite as extensões no Dashboard do Supabase
+-- Database → Extensions → Habilitar "pg_cron" e "pg_net"
+
+-- Depois execute este SQL no SQL Editor do Supabase:
+
+-- Remover job existente (se houver)
+SELECT cron.unschedule('daily-management-report-08h');
+
+-- Agendar o relatório diário às 08:00 (horário de Brasília)
+-- 11:00 UTC = 08:00 BRT
+SELECT cron.schedule(
+  'daily-management-report-08h',
+  '0 11 * * 1-6', -- Segunda a Sábado às 11:00 UTC (08:00 BRT)
+  $$
+  SELECT net.http_post(
+    url := 'https://wejkyyjhckdlttieuyku.supabase.co/functions/v1/daily-management-report',
+    headers := '{"Content-Type": "application/json", "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Indlamt5eWpoY2tkbHR0aWV1eWt1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkxNzMxNzYsImV4cCI6MjA3NDc0OTE3Nn0.iS9y0xOEbv1N7THwbmeQ2DLB5ablnUU6rDs7XDVGG3c"}'::jsonb,
+    body := '{"includeChart": true}'::jsonb
+  ) AS request_id;
+  $$
+);
+
+-- Verificar se o job foi criado
+SELECT jobid, jobname, schedule, active 
+FROM cron.job 
+WHERE jobname = 'daily-management-report-08h';`;
+
+  async function checkCronStatus() {
+    setCronLoading(true);
+    try {
+      // Tentar verificar se o cron job existe via RPC ou query
+      const { data, error } = await supabase.rpc('get_cron_job_status' as any, {
+        job_name: 'daily-management-report-08h'
+      });
+      
+      if (error) {
+        // Se a função não existe, o cron provavelmente não está configurado
+        console.log('Cron status check:', error.message);
+        setCronStatus('unknown');
+      } else if (data && data.length > 0 && data[0].active) {
+        setCronStatus('active');
+      } else {
+        setCronStatus('inactive');
+      }
+    } catch (err) {
+      console.log('Cron check error:', err);
+      setCronStatus('unknown');
+    } finally {
+      setCronLoading(false);
+    }
+  }
+
+  function copyCronSQL() {
+    navigator.clipboard.writeText(cronJobSQL);
+    toast.success('SQL copiado para a área de transferência');
+  }
+
   return (
     <div className="space-y-6">
+      {/* Cron Job Status Card */}
+      <Card className="border-dashed">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2">
+            <Timer className="h-5 w-5" />
+            Agendamento Automático
+          </CardTitle>
+          <CardDescription>
+            Configure o disparo automático do relatório diário às 08:00 (segunda a sábado)
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <div className={`h-3 w-3 rounded-full ${
+                cronStatus === 'active' ? 'bg-green-500' : 
+                cronStatus === 'inactive' ? 'bg-yellow-500' : 
+                'bg-muted-foreground/50'
+              }`} />
+              <span className="text-sm font-medium">
+                {cronStatus === 'active' && 'Cron job ativo'}
+                {cronStatus === 'inactive' && 'Cron job inativo'}
+                {cronStatus === 'unknown' && 'Status desconhecido'}
+                {cronStatus === 'error' && 'Erro ao verificar'}
+              </span>
+            </div>
+            
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="outline" size="sm" onClick={checkCronStatus} disabled={cronLoading}>
+                    {cronLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Verificar status do cron</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
+          
+          <Alert>
+            <AlertTriangle className="h-4 w-4" />
+            <AlertTitle>Configuração Manual Necessária</AlertTitle>
+            <AlertDescription className="mt-2 space-y-2">
+              <p>Para ativar o disparo automático às 08:00, você precisa:</p>
+              <ol className="list-decimal list-inside text-sm space-y-1 ml-2">
+                <li>Acessar o <a href="https://supabase.com/dashboard/project/wejkyyjhckdlttieuyku/database/extensions" target="_blank" rel="noopener noreferrer" className="text-primary underline">Dashboard do Supabase</a></li>
+                <li>Habilitar as extensões <strong>pg_cron</strong> e <strong>pg_net</strong></li>
+                <li>Executar o SQL abaixo no <a href="https://supabase.com/dashboard/project/wejkyyjhckdlttieuyku/sql/new" target="_blank" rel="noopener noreferrer" className="text-primary underline">SQL Editor</a></li>
+              </ol>
+            </AlertDescription>
+          </Alert>
+          
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => setShowCronSQL(!showCronSQL)}>
+              {showCronSQL ? 'Ocultar SQL' : 'Ver SQL de Configuração'}
+            </Button>
+            {showCronSQL && (
+              <Button variant="secondary" onClick={copyCronSQL}>
+                <Copy className="mr-2 h-4 w-4" />
+                Copiar SQL
+              </Button>
+            )}
+          </div>
+          
+          {showCronSQL && (
+            <div className="relative">
+              <pre className="p-4 rounded-lg bg-muted text-xs overflow-x-auto max-h-[400px] overflow-y-auto">
+                <code>{cronJobSQL}</code>
+              </pre>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Header Stats */}
       <div className="grid gap-4 md:grid-cols-4">
         <Card>
