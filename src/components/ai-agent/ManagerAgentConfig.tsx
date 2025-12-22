@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -7,10 +8,12 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { 
   Terminal, Bell, BarChart3, AlertTriangle, Clock, 
   Package, TrendingUp, FileText, Truck, History,
-  ExternalLink, Send, CheckCircle
+  ExternalLink, Send, CheckCircle, Activity, RefreshCw,
+  Wifi, WifiOff, MessageSquare, Bug
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
@@ -19,6 +22,19 @@ import { ManagerRecipientsManager } from './ManagerRecipientsManager';
 
 interface ManagerAgentConfigProps {
   agentId?: string;
+}
+
+interface DiagnosticResult {
+  whatsappConnected: boolean;
+  instanceKey?: string;
+  instanceStatus?: string;
+  connectedAt?: string;
+  managerFound: boolean;
+  managerName?: string;
+  managerWhatsapp?: string;
+  megaApiConfigured: boolean;
+  testMessageSent: boolean;
+  error?: string;
 }
 
 const MANAGER_COMMANDS = [
@@ -46,9 +62,13 @@ const DEFAULT_ALERT_CONFIG = {
 };
 
 export function ManagerAgentConfig({ agentId }: ManagerAgentConfigProps) {
+  const navigate = useNavigate();
   const [showDashboard, setShowDashboard] = useState(false);
   const [testingAlert, setTestingAlert] = useState(false);
   const [alertConfig, setAlertConfig] = useState(DEFAULT_ALERT_CONFIG);
+  const [runningDiagnostic, setRunningDiagnostic] = useState(false);
+  const [diagnosticResult, setDiagnosticResult] = useState<DiagnosticResult | null>(null);
+  const [sendingTestMessage, setSendingTestMessage] = useState(false);
 
   const handleTestAlert = async () => {
     setTestingAlert(true);
@@ -67,8 +87,276 @@ export function ManagerAgentConfig({ agentId }: ManagerAgentConfigProps) {
     }
   };
 
+  const runDiagnostic = async () => {
+    setRunningDiagnostic(true);
+    setDiagnosticResult(null);
+    
+    try {
+      const result: DiagnosticResult = {
+        whatsappConnected: false,
+        managerFound: false,
+        megaApiConfigured: false,
+        testMessageSent: false,
+      };
+
+      // 1. Verificar instância WhatsApp conectada
+      const { data: instance, error: instanceError } = await supabase
+        .from('whatsapp_instances')
+        .select('instance_key, status, phone_number, connected_at')
+        .eq('status', 'connected')
+        .order('connected_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (instanceError) {
+        console.error('Diagnostic: Instance error', instanceError);
+      }
+
+      if (instance) {
+        result.whatsappConnected = true;
+        result.instanceKey = instance.instance_key;
+        result.instanceStatus = instance.status;
+        result.connectedAt = instance.connected_at;
+      } else {
+        // Buscar todas as instâncias para mostrar status
+        const { data: allInstances } = await supabase
+          .from('whatsapp_instances')
+          .select('instance_key, status, updated_at')
+          .order('updated_at', { ascending: false })
+          .limit(1);
+        
+        if (allInstances?.[0]) {
+          result.instanceKey = allInstances[0].instance_key;
+          result.instanceStatus = allInstances[0].status;
+        }
+      }
+
+      // 2. Verificar gestor atual (usuário logado)
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('full_name, is_manager, whatsapp')
+          .eq('id', user.id)
+          .maybeSingle();
+
+        if (profile?.is_manager) {
+          result.managerFound = true;
+          result.managerName = profile.full_name;
+          result.managerWhatsapp = profile.whatsapp;
+        }
+      }
+
+      // 3. Verificar se há gestores cadastrados
+      if (!result.managerFound) {
+        const { data: managers } = await supabase
+          .from('profiles')
+          .select('full_name, whatsapp')
+          .eq('is_manager', true)
+          .limit(1);
+
+        if (managers?.[0]) {
+          result.managerFound = true;
+          result.managerName = managers[0].full_name;
+          result.managerWhatsapp = managers[0].whatsapp;
+        }
+      }
+
+      // 4. Verificar configuração Mega API (através de status check)
+      try {
+        const { data: statusData, error: statusError } = await supabase.functions.invoke('mega-api-status');
+        if (!statusError && statusData) {
+          result.megaApiConfigured = true;
+        }
+      } catch {
+        result.megaApiConfigured = false;
+      }
+
+      setDiagnosticResult(result);
+      
+      if (result.whatsappConnected && result.managerFound) {
+        toast.success('Diagnóstico: Sistema funcionando corretamente!');
+      } else if (!result.whatsappConnected) {
+        toast.error('Diagnóstico: WhatsApp desconectado!');
+      } else if (!result.managerFound) {
+        toast.warning('Diagnóstico: Nenhum gestor configurado');
+      }
+    } catch (error) {
+      console.error('Diagnostic error:', error);
+      toast.error('Erro ao executar diagnóstico');
+      setDiagnosticResult({
+        whatsappConnected: false,
+        managerFound: false,
+        megaApiConfigured: false,
+        testMessageSent: false,
+        error: error instanceof Error ? error.message : 'Erro desconhecido',
+      });
+    } finally {
+      setRunningDiagnostic(false);
+    }
+  };
+
+  const sendTestMessage = async () => {
+    if (!diagnosticResult?.managerWhatsapp) {
+      toast.error('Nenhum WhatsApp de gestor encontrado');
+      return;
+    }
+
+    setSendingTestMessage(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('ai-agent-manager-query', {
+        body: {
+          message: 'resumo',
+          senderPhone: diagnosticResult.managerWhatsapp.replace(/\D/g, ''),
+          carrierId: null,
+          isTest: true,
+        }
+      });
+
+      if (error) throw error;
+
+      if (data?.error === 'NO_WHATSAPP_INSTANCE') {
+        toast.error('WhatsApp não está conectado. Reconecte primeiro.');
+        return;
+      }
+
+      toast.success('Mensagem de teste enviada! Verifique seu WhatsApp.');
+      setDiagnosticResult(prev => prev ? { ...prev, testMessageSent: true } : null);
+    } catch (error) {
+      console.error('Error sending test message:', error);
+      toast.error('Erro ao enviar mensagem de teste');
+    } finally {
+      setSendingTestMessage(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
+      {/* Diagnóstico do Sistema */}
+      <Card className="border-blue-500/20 bg-blue-500/5">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Bug className="h-5 w-5 text-blue-500" />
+            Diagnóstico do Agente IA Gerencial
+          </CardTitle>
+          <CardDescription>
+            Verifique se o sistema está configurado corretamente
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex gap-2">
+            <Button 
+              onClick={runDiagnostic} 
+              disabled={runningDiagnostic}
+              variant="outline"
+            >
+              <Activity className={`h-4 w-4 mr-2 ${runningDiagnostic ? 'animate-pulse' : ''}`} />
+              {runningDiagnostic ? 'Executando...' : 'Executar Diagnóstico'}
+            </Button>
+            
+            {diagnosticResult?.whatsappConnected && diagnosticResult?.managerWhatsapp && (
+              <Button 
+                onClick={sendTestMessage}
+                disabled={sendingTestMessage}
+                variant="default"
+              >
+                <MessageSquare className="h-4 w-4 mr-2" />
+                {sendingTestMessage ? 'Enviando...' : 'Enviar Teste'}
+              </Button>
+            )}
+          </div>
+
+          {diagnosticResult && (
+            <div className="space-y-3 mt-4">
+              {/* Status WhatsApp */}
+              <div className={`flex items-center justify-between p-3 rounded-lg ${
+                diagnosticResult.whatsappConnected 
+                  ? 'bg-green-500/10 border border-green-500/20' 
+                  : 'bg-destructive/10 border border-destructive/20'
+              }`}>
+                <div className="flex items-center gap-2">
+                  {diagnosticResult.whatsappConnected ? (
+                    <Wifi className="h-5 w-5 text-green-500" />
+                  ) : (
+                    <WifiOff className="h-5 w-5 text-destructive" />
+                  )}
+                  <div>
+                    <p className="font-medium text-sm">WhatsApp</p>
+                    <p className="text-xs text-muted-foreground">
+                      {diagnosticResult.instanceKey || 'Nenhuma instância'}
+                      {diagnosticResult.instanceStatus && ` (${diagnosticResult.instanceStatus})`}
+                    </p>
+                  </div>
+                </div>
+                <Badge variant={diagnosticResult.whatsappConnected ? 'default' : 'destructive'}>
+                  {diagnosticResult.whatsappConnected ? 'Conectado' : 'Desconectado'}
+                </Badge>
+              </div>
+
+              {/* Status Gestor */}
+              <div className={`flex items-center justify-between p-3 rounded-lg ${
+                diagnosticResult.managerFound 
+                  ? 'bg-green-500/10 border border-green-500/20' 
+                  : 'bg-amber-500/10 border border-amber-500/20'
+              }`}>
+                <div className="flex items-center gap-2">
+                  <CheckCircle className={`h-5 w-5 ${diagnosticResult.managerFound ? 'text-green-500' : 'text-amber-500'}`} />
+                  <div>
+                    <p className="font-medium text-sm">Gestor Configurado</p>
+                    <p className="text-xs text-muted-foreground">
+                      {diagnosticResult.managerName || 'Nenhum gestor encontrado'}
+                      {diagnosticResult.managerWhatsapp && ` - ${diagnosticResult.managerWhatsapp}`}
+                    </p>
+                  </div>
+                </div>
+                <Badge variant={diagnosticResult.managerFound ? 'default' : 'secondary'}>
+                  {diagnosticResult.managerFound ? 'OK' : 'Não configurado'}
+                </Badge>
+              </div>
+
+              {/* Ações de correção */}
+              {!diagnosticResult.whatsappConnected && (
+                <Alert variant="destructive">
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertTitle>WhatsApp Desconectado</AlertTitle>
+                  <AlertDescription className="space-y-2">
+                    <p>O WhatsApp não está conectado. Mensagens de gestores não serão respondidas.</p>
+                    <Button 
+                      size="sm" 
+                      variant="outline"
+                      onClick={() => navigate('/settings/whatsapp')}
+                    >
+                      <RefreshCw className="h-4 w-4 mr-2" />
+                      Reconectar WhatsApp
+                    </Button>
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              {!diagnosticResult.managerFound && (
+                <Alert>
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertTitle>Nenhum Gestor Configurado</AlertTitle>
+                  <AlertDescription>
+                    Configure um gestor no card abaixo para receber respostas via WhatsApp.
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              {diagnosticResult.testMessageSent && (
+                <Alert className="bg-green-500/10 border-green-500/20">
+                  <CheckCircle className="h-4 w-4 text-green-500" />
+                  <AlertTitle>Teste Enviado</AlertTitle>
+                  <AlertDescription>
+                    Verifique seu WhatsApp. Você deve receber o resumo do dia.
+                  </AlertDescription>
+                </Alert>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Gestores Cadastrados */}
       <ManagerRecipientsManager />
 
