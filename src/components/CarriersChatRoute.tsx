@@ -9,7 +9,7 @@ interface CarriersChatRouteProps {
 }
 
 export const CarriersChatRoute = ({ children }: CarriersChatRouteProps) => {
-  const { phasePermissions, loading } = usePhaseAuthorization();
+  const { canViewPhase, loading } = usePhaseAuthorization();
 
   // Aguardar carregamento das permissões
   if (loading) {
@@ -21,9 +21,7 @@ export const CarriersChatRoute = ({ children }: CarriersChatRouteProps) => {
   }
 
   // Verificar se tem permissão para acessar carriers_chat
-  const hasAccess = phasePermissions.some(
-    p => p.phase_key === 'carriers_chat' && p.can_view
-  );
+  const hasAccess = canViewPhase('carriers_chat');
 
   if (!hasAccess) {
     return (

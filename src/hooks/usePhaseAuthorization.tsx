@@ -2,14 +2,6 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 
-interface PhasePermission {
-  phase_key: string;
-  can_view: boolean;
-  can_edit: boolean;
-  can_advance: boolean;
-  can_delete: boolean;
-}
-
 interface UserPhasePermission {
   phase_key: string;
   can_view: boolean;
@@ -24,7 +16,6 @@ const FULL_ACCESS_ROLES = ['admin', 'manager'];
 export const usePhaseAuthorization = () => {
   const { user } = useAuth();
   const [userRoles, setUserRoles] = useState<string[]>([]);
-  const [phasePermissions, setPhasePermissions] = useState<PhasePermission[]>([]);
   const [userPhasePermissions, setUserPhasePermissions] = useState<UserPhasePermission[]>([]);
   const [isApproved, setIsApproved] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -39,15 +30,7 @@ export const usePhaseAuthorization = () => {
 
     // Real-time subscription para mudanças de permissões
     const subscription = supabase
-      .channel('phase-permissions-changes')
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'phase_permissions'
-      }, () => {
-        console.log('🔄 [Phase Authorization] Role permissions changed, reloading...');
-        loadUserData();
-      })
+      .channel('user-phase-permissions-changes')
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
@@ -78,7 +61,7 @@ export const usePhaseAuthorization = () => {
       setUserRoles(roles);
 
       // Verificar se tem role com acesso total
-      const hasFullAccess = roles.some(role => FULL_ACCESS_ROLES.includes(role));
+      const hasFullAccessRole = roles.some(role => FULL_ACCESS_ROLES.includes(role));
 
       // Carregar status de aprovação
       const { data: approvalData, error: approvalError } = await supabase
@@ -91,52 +74,14 @@ export const usePhaseAuthorization = () => {
       setIsApproved(approvalData?.status === 'approved');
 
       // Se tem acesso total, não precisa buscar permissões granulares
-      if (hasFullAccess) {
+      if (hasFullAccessRole) {
         console.log('✅ [Phase Authorization] User has full access role');
-        setPhasePermissions([]);
         setUserPhasePermissions([]);
         setLoading(false);
         return;
       }
 
-      // Buscar permissões de role da tabela phase_permissions
-      const { data: permissionsData, error: permissionsError } = await supabase
-        .from('phase_permissions')
-        .select('*')
-        .in('role', roles);
-
-      if (permissionsError) throw permissionsError;
-      
-      console.log('📊 [Phase Authorization] Loading role permissions for:', roles);
-      
-      // Merge de permissões de múltiplas roles
-      const mergedPermissions = new Map<string, PhasePermission>();
-      
-      permissionsData?.forEach(perm => {
-        const existing = mergedPermissions.get(perm.phase_key);
-        if (existing) {
-          mergedPermissions.set(perm.phase_key, {
-            phase_key: perm.phase_key,
-            can_view: existing.can_view || perm.can_view,
-            can_edit: existing.can_edit || perm.can_edit,
-            can_advance: existing.can_advance || (perm.can_advance ?? false),
-            can_delete: existing.can_delete || perm.can_delete,
-          });
-        } else {
-          mergedPermissions.set(perm.phase_key, {
-            phase_key: perm.phase_key,
-            can_view: perm.can_view,
-            can_edit: perm.can_edit,
-            can_advance: perm.can_advance ?? false,
-            can_delete: perm.can_delete,
-          });
-        }
-      });
-
-      const rolePermissions = Array.from(mergedPermissions.values());
-      setPhasePermissions(rolePermissions);
-
-      // Buscar permissões individuais do usuário
+      // Buscar APENAS permissões individuais do usuário
       const { data: userPermData, error: userPermError } = await supabase
         .from('user_phase_permissions')
         .select('*')
@@ -152,13 +97,12 @@ export const usePhaseAuthorization = () => {
         can_delete: p.can_delete ?? false,
       }));
 
-      console.log('👤 [Phase Authorization] User individual permissions:', userPerms.length);
+      console.log('👤 [Phase Authorization] User permissions loaded:', userPerms.length);
       setUserPhasePermissions(userPerms);
 
     } catch (error) {
       console.error('❌ [Phase Authorization] Error loading user data:', error);
       setUserRoles([]);
-      setPhasePermissions([]);
       setUserPhasePermissions([]);
       setIsApproved(false);
     } finally {
@@ -171,20 +115,9 @@ export const usePhaseAuthorization = () => {
     return userRoles.some(role => FULL_ACCESS_ROLES.includes(role));
   };
 
-  // Combinar permissões de role + individuais (OR lógico)
-  const getEffectivePermission = (phase: string): PhasePermission | null => {
-    const rolePermission = phasePermissions.find(p => p.phase_key === phase);
-    const userPermission = userPhasePermissions.find(p => p.phase_key === phase);
-
-    if (!rolePermission && !userPermission) return null;
-
-    return {
-      phase_key: phase,
-      can_view: (rolePermission?.can_view ?? false) || (userPermission?.can_view ?? false),
-      can_edit: (rolePermission?.can_edit ?? false) || (userPermission?.can_edit ?? false),
-      can_advance: (rolePermission?.can_advance ?? false) || (userPermission?.can_advance ?? false),
-      can_delete: (rolePermission?.can_delete ?? false) || (userPermission?.can_delete ?? false),
-    };
+  // Obter permissão efetiva (APENAS user_phase_permissions)
+  const getEffectivePermission = (phase: string): UserPhasePermission | null => {
+    return userPhasePermissions.find(p => p.phase_key === phase) || null;
   };
 
   const canViewPhase = (phase: string): boolean => {
@@ -217,7 +150,6 @@ export const usePhaseAuthorization = () => {
 
   return { 
     userRoles, 
-    phasePermissions,
     userPhasePermissions,
     isApproved,
     canViewPhase, 
