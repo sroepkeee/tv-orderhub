@@ -18,9 +18,33 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Users } from "lucide-react";
+import { Users, UserCheck, Building } from "lucide-react";
 import { ROLE_LABELS } from "@/lib/roleLabels";
-import type { PhaseConfig, UserByRole } from "@/pages/PhaseSettings";
+import { supabase } from "@/integrations/supabase/client";
+import { useOrganization } from "@/hooks/useOrganization";
+
+export interface PhaseConfig {
+  id: string;
+  phase_key: string;
+  display_name: string;
+  order_index: number;
+  responsible_role: string | null;
+  organization_id: string | null;
+  manager_user_id?: string | null;
+}
+
+export interface UserByRole {
+  id: string;
+  full_name: string | null;
+  email: string | null;
+}
+
+interface OrgUser {
+  id: string;
+  full_name: string | null;
+  email: string | null;
+  department: string | null;
+}
 
 interface EditPhaseDialogProps {
   phase: PhaseConfig | null;
@@ -33,13 +57,45 @@ interface EditPhaseDialogProps {
 export function EditPhaseDialog({ phase, open, onOpenChange, onSave, usersByRole = {} }: EditPhaseDialogProps) {
   const [displayName, setDisplayName] = useState("");
   const [responsibleRole, setResponsibleRole] = useState<string>("");
+  const [managerUserId, setManagerUserId] = useState<string>("");
+  const [orgUsers, setOrgUsers] = useState<OrgUser[]>([]);
+  const [loadingUsers, setLoadingUsers] = useState(false);
+  const { organization } = useOrganization();
 
   useEffect(() => {
     if (phase) {
       setDisplayName(phase.display_name);
       setResponsibleRole(phase.responsible_role || "__none__");
+      setManagerUserId(phase.manager_user_id || "__none__");
     }
   }, [phase]);
+
+  useEffect(() => {
+    if (open && organization?.id) {
+      loadOrgUsers();
+    }
+  }, [open, organization?.id]);
+
+  const loadOrgUsers = async () => {
+    if (!organization?.id) return;
+
+    try {
+      setLoadingUsers(true);
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, full_name, email, department')
+        .eq('organization_id', organization.id)
+        .eq('is_active', true)
+        .order('full_name');
+
+      if (error) throw error;
+      setOrgUsers(data || []);
+    } catch (error) {
+      console.error('Error loading org users:', error);
+    } finally {
+      setLoadingUsers(false);
+    }
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -50,6 +106,7 @@ export function EditPhaseDialog({ phase, open, onOpenChange, onSave, usersByRole
       ...phase,
       display_name: displayName.trim(),
       responsible_role: responsibleRole === "__none__" ? null : responsibleRole || null,
+      manager_user_id: managerUserId === "__none__" ? null : managerUserId || null,
     });
   };
 
@@ -67,9 +124,11 @@ export function EditPhaseDialog({ phase, open, onOpenChange, onSave, usersByRole
     ? usersByRole[responsibleRole] || [] 
     : [];
 
+  const selectedManager = orgUsers.find(u => u.id === managerUserId);
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle>Editar Fase</DialogTitle>
           <DialogDescription>
@@ -100,8 +159,63 @@ export function EditPhaseDialog({ phase, open, onOpenChange, onSave, usersByRole
             </p>
           </div>
 
+          {/* Gestor Principal (Usuário) */}
           <div className="space-y-2">
-            <Label htmlFor="editResponsibleRole">Responsável</Label>
+            <Label htmlFor="managerUser" className="flex items-center gap-2">
+              <UserCheck className="h-4 w-4" />
+              Gestor Principal
+            </Label>
+            <Select value={managerUserId} onValueChange={setManagerUserId}>
+              <SelectTrigger>
+                <SelectValue placeholder={loadingUsers ? "Carregando..." : "Selecione um gestor"} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">Nenhum</SelectItem>
+                {orgUsers.map((user) => (
+                  <SelectItem key={user.id} value={user.id}>
+                    <div className="flex items-center gap-2">
+                      <span>{user.full_name || user.email || 'Sem nome'}</span>
+                      {user.department && (
+                        <span className="text-xs text-muted-foreground">({user.department})</span>
+                      )}
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              O gestor é o responsável principal por esta fase.
+            </p>
+          </div>
+
+          {/* Mostrar gestor selecionado */}
+          {selectedManager && managerUserId !== "__none__" && (
+            <div className="p-3 bg-primary/5 rounded-lg border">
+              <div className="flex items-center gap-3">
+                <Avatar className="h-10 w-10">
+                  <AvatarFallback>
+                    {getInitials(selectedManager.full_name, selectedManager.email)}
+                  </AvatarFallback>
+                </Avatar>
+                <div>
+                  <p className="font-medium text-sm">{selectedManager.full_name || selectedManager.email}</p>
+                  {selectedManager.department && (
+                    <p className="text-xs text-muted-foreground flex items-center gap-1">
+                      <Building className="h-3 w-3" />
+                      {selectedManager.department}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Role Responsável (para referência/fallback) */}
+          <div className="space-y-2">
+            <Label htmlFor="editResponsibleRole" className="flex items-center gap-2">
+              <Users className="h-4 w-4" />
+              Role Responsável (Fallback)
+            </Label>
             <Select value={responsibleRole} onValueChange={setResponsibleRole}>
               <SelectTrigger>
                 <SelectValue placeholder="Selecione um papel" />
@@ -115,6 +229,9 @@ export function EditPhaseDialog({ phase, open, onOpenChange, onSave, usersByRole
                 ))}
               </SelectContent>
             </Select>
+            <p className="text-xs text-muted-foreground">
+              Role usada como fallback quando não há gestor definido.
+            </p>
           </div>
 
           {currentRoleUsers.length > 0 && (

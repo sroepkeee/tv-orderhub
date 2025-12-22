@@ -3081,6 +3081,7 @@ export type Database = {
           display_name: string
           icon: string | null
           id: string
+          manager_user_id: string | null
           order_index: number | null
           organization_id: string | null
           phase_key: string
@@ -3093,6 +3094,7 @@ export type Database = {
           display_name: string
           icon?: string | null
           id?: string
+          manager_user_id?: string | null
           order_index?: number | null
           organization_id?: string | null
           phase_key: string
@@ -3105,12 +3107,20 @@ export type Database = {
           display_name?: string
           icon?: string | null
           id?: string
+          manager_user_id?: string | null
           order_index?: number | null
           organization_id?: string | null
           phase_key?: string
           responsible_role?: Database["public"]["Enums"]["app_role"]
         }
         Relationships: [
+          {
+            foreignKeyName: "phase_config_manager_user_id_fkey"
+            columns: ["manager_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "phase_config_organization_id_fkey"
             columns: ["organization_id"]
@@ -3931,6 +3941,70 @@ export type Database = {
         }
         Relationships: []
       }
+      user_phase_permissions: {
+        Row: {
+          can_advance: boolean | null
+          can_delete: boolean | null
+          can_edit: boolean | null
+          can_view: boolean | null
+          created_at: string | null
+          granted_by: string | null
+          id: string
+          organization_id: string | null
+          phase_key: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          can_advance?: boolean | null
+          can_delete?: boolean | null
+          can_edit?: boolean | null
+          can_view?: boolean | null
+          created_at?: string | null
+          granted_by?: string | null
+          id?: string
+          organization_id?: string | null
+          phase_key: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          can_advance?: boolean | null
+          can_delete?: boolean | null
+          can_edit?: boolean | null
+          can_view?: boolean | null
+          created_at?: string | null
+          granted_by?: string | null
+          id?: string
+          organization_id?: string | null
+          phase_key?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_phase_permissions_granted_by_fkey"
+            columns: ["granted_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_phase_permissions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_phase_permissions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           created_at: string | null
@@ -4286,6 +4360,10 @@ export type Database = {
         Returns: boolean
       }
       user_can_modify_order: { Args: { order_uuid: string }; Returns: boolean }
+      user_has_phase_permission: {
+        Args: { _permission?: string; _phase_key: string; _user_id: string }
+        Returns: boolean
+      }
     }
     Enums: {
       app_role:
