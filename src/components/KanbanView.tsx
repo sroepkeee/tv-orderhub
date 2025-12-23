@@ -265,8 +265,8 @@ export const KanbanView = ({
     },
   ];
 
-  // Função para obter colunas visíveis (apenas com permissão explícita)
-  const getVisibleColumns = () => {
+  // Memoizar colunas visíveis para evitar re-renders desnecessários
+  const visibleColumns = React.useMemo(() => {
     // Admin vê tudo
     if (userRoles.includes('admin')) {
       return columns;
@@ -283,9 +283,7 @@ export const KanbanView = ({
 
     // Filtrar colunas visíveis mantendo ordem original
     return columns.filter(col => visiblePhases.has(col.id));
-  };
-
-  const visibleColumns = getVisibleColumns();
+  }, [userRoles, canViewPhase]);
 
   const getOrdersByPhase = (phase: Phase) => {
     return optimisticOrders.filter((order) => getPhaseFromStatus(order.status, order.order_category) === phase);

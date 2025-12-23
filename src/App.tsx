@@ -40,6 +40,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isApproved, loading: authLoading } = usePhaseAuthorization();
   const [profileIncomplete, setProfileIncomplete] = useState(false);
   const [checkingProfile, setCheckingProfile] = useState(true);
+  const [loadingTimeout, setLoadingTimeout] = useState(false);
   
   useEffect(() => {
     const checkProfile = async () => {
@@ -63,10 +64,30 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
       setCheckingProfile(false);
     }
   }, [user, loading]);
+
+  // Timeout de segurança para evitar loading infinito
+  useEffect(() => {
+    const isStillLoading = loading || authLoading || checkingProfile || isApproved === null;
+    
+    if (!isStillLoading) {
+      setLoadingTimeout(false);
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      console.warn('⚠️ [ProtectedRoute] Loading timeout reached after 8s - forcing render');
+      setLoadingTimeout(true);
+    }, 8000); // 8 segundos de timeout
+
+    return () => clearTimeout(timer);
+  }, [loading, authLoading, checkingProfile, isApproved]);
   
   // Mostrar loading enquanto auth, authLoading ou checkingProfile estiverem ativos
   // OU enquanto isApproved for null (ainda carregando status de aprovação)
-  if (loading || authLoading || checkingProfile || isApproved === null) {
+  // MAS respeitar timeout de segurança
+  const isStillLoading = loading || authLoading || checkingProfile || isApproved === null;
+  
+  if (isStillLoading && !loadingTimeout) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
@@ -86,6 +107,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   }
 
   // Somente mostrar PendingApprovalScreen quando isApproved === false (explicitamente pendente)
+  // Se loadingTimeout ativo e isApproved ainda null, considerar como aprovado (legado)
   if (isApproved === false) {
     return <PendingApprovalScreen />;
   }
