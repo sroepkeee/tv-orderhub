@@ -36,6 +36,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             }
           }, 0);
         }
+
+        // Track restored sessions (refresh token logins) if last login was > 8 hours ago
+        if (event === 'INITIAL_SESSION' && session?.user) {
+          setTimeout(async () => {
+            try {
+              const { data: lastActivity } = await supabase
+                .from('user_activity_log')
+                .select('created_at')
+                .eq('user_id', session.user.id)
+                .eq('action_type', 'login')
+                .order('created_at', { ascending: false })
+                .limit(1)
+                .maybeSingle();
+              
+              const lastLoginTime = lastActivity?.created_at ? new Date(lastActivity.created_at) : null;
+              const hoursSinceLastLogin = lastLoginTime 
+                ? (Date.now() - lastLoginTime.getTime()) / (1000 * 60 * 60) 
+                : 999;
+              
+              // If last login was more than 8 hours ago, register as new session
+              if (hoursSinceLastLogin > 8) {
+                const provider = session.user.app_metadata?.provider;
+                trackLogin(session.user.id, provider === 'azure' ? 'azure' : 'email');
+              }
+            } catch (error) {
+              console.error('Error checking last login:', error);
+            }
+          }, 0);
+        }
       }
     );
 

@@ -23,38 +23,44 @@ export function useUserPresence() {
     // Track presence
     const trackPresence = async () => {
       try {
-        const { data: profile } = await supabase
+        const { data: profile, error: profileError } = await supabase
           .from('profiles')
           .select('full_name, email, department')
           .eq('id', user.id)
-          .single();
+          .maybeSingle();
 
-        if (profile) {
-          await channel
-            .on('presence', { event: 'sync' }, () => {
-              const state = channel.presenceState<OnlineUser>();
-              const users = Object.values(state).flat();
-              setOnlineUsers(users);
-            })
-            .on('presence', { event: 'join' }, ({ newPresences }) => {
-              console.log('👋 Usuário entrou:', newPresences);
-            })
-            .on('presence', { event: 'leave' }, ({ leftPresences }) => {
-              console.log('👋 Usuário saiu:', leftPresences);
-            })
-            .subscribe(async (status) => {
-              if (status === 'SUBSCRIBED') {
-                await channel.track({
-                  user_id: user.id,
-                  full_name: profile.full_name || 'Usuário',
-                  email: profile.email || user.email || '',
-                  department: profile.department || 'N/A',
-                  online_at: new Date().toISOString(),
-                });
-                setIsTracking(true);
-              }
-            });
+        if (profileError) {
+          console.warn('⚠️ Erro ao buscar perfil para presença:', profileError);
         }
+
+        // Prepare presence data - use profile if available, fallback to auth user data
+        const presenceData = {
+          user_id: user.id,
+          full_name: profile?.full_name || user.email?.split('@')[0] || 'Usuário',
+          email: profile?.email || user.email || '',
+          department: profile?.department || 'N/A',
+          online_at: new Date().toISOString(),
+        };
+
+        await channel
+          .on('presence', { event: 'sync' }, () => {
+            const state = channel.presenceState<OnlineUser>();
+            const users = Object.values(state).flat();
+            setOnlineUsers(users);
+          })
+          .on('presence', { event: 'join' }, ({ newPresences }) => {
+            console.log('👋 Usuário entrou:', newPresences);
+          })
+          .on('presence', { event: 'leave' }, ({ leftPresences }) => {
+            console.log('👋 Usuário saiu:', leftPresences);
+          })
+          .subscribe(async (status) => {
+            if (status === 'SUBSCRIBED') {
+              await channel.track(presenceData);
+              setIsTracking(true);
+              console.log('✅ Presença rastreada:', presenceData.full_name);
+            }
+          });
       } catch (error) {
         console.error('Erro ao rastrear presença:', error);
       }

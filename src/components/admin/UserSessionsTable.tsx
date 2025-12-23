@@ -60,7 +60,7 @@ export function UserSessionsTable() {
             .select('id', { count: 'exact', head: true })
             .eq('user_id', profile.id);
 
-          // Get last login details
+          // Get last login details - use maybeSingle to avoid 406 error
           const { data: lastLogin } = await supabase
             .from('user_activity_log')
             .select('ip_address, metadata')
@@ -68,7 +68,7 @@ export function UserSessionsTable() {
             .eq('action_type', 'login')
             .order('created_at', { ascending: false })
             .limit(1)
-            .single();
+            .maybeSingle();
 
           // Get preferred login method
           const { data: loginMethods } = await supabase
@@ -79,13 +79,14 @@ export function UserSessionsTable() {
             .order('created_at', { ascending: false })
             .limit(10);
 
-          const methodCounts = loginMethods?.reduce((acc: any, log: any) => {
+          const methodCounts = loginMethods?.reduce((acc: Record<string, number>, log: any) => {
             const method = log.metadata?.login_method || 'unknown';
             acc[method] = (acc[method] || 0) + 1;
             return acc;
-          }, {});
+          }, {} as Record<string, number>);
 
-          const preferredMethod = methodCounts 
+          // Fix: check if methodCounts has any keys before reducing to avoid empty array error
+          const preferredMethod = methodCounts && Object.keys(methodCounts).length > 0
             ? Object.keys(methodCounts).reduce((a, b) => methodCounts[a] > methodCounts[b] ? a : b)
             : null;
 
