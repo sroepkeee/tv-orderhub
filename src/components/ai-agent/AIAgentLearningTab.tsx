@@ -16,6 +16,7 @@ import {
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area, PieChart, Pie, Cell } from 'recharts';
+import AgentErrorsPanel from './AgentErrorsPanel';
 
 interface KnowledgeSuggestion {
   id: string;
@@ -319,6 +320,10 @@ export default function AIAgentLearningTab() {
             <BarChart3 className="h-4 w-4 mr-2" />
             Visão Geral
           </TabsTrigger>
+          <TabsTrigger value="errors">
+            <XCircle className="h-4 w-4 mr-2 text-red-500" />
+            Erros ({feedback.filter(f => (f.knowledge_gaps_detected?.length || 0) > 0 || f.customer_sentiment === 'negative' || f.resolution_status === 'escalated').length})
+          </TabsTrigger>
           <TabsTrigger value="suggestions">
             <Lightbulb className="h-4 w-4 mr-2" />
             Sugestões ({pendingSuggestions})
@@ -426,6 +431,14 @@ export default function AIAgentLearningTab() {
               </CardContent>
             </Card>
           )}
+        </TabsContent>
+
+        <TabsContent value="errors" className="space-y-4">
+          <AgentErrorsPanel 
+            feedback={feedback} 
+            instances={instances}
+            onRefresh={loadData}
+          />
         </TabsContent>
 
         <TabsContent value="suggestions" className="space-y-4">
