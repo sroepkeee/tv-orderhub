@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -30,7 +30,9 @@ import {
   RefreshCw,
   Loader2,
   AlertTriangle,
-  CheckCheck
+  CheckCheck,
+  Bell,
+  Volume2
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
@@ -80,6 +82,17 @@ const statusLabels: Record<string, { label: string; variant: 'default' | 'second
   'applied': { label: 'Aplicado', variant: 'outline' },
 };
 
+// Notification sound
+const playNotificationSound = () => {
+  try {
+    const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2teleQAKDJXU7YhlAAoNl+j/q3oABQiQ3/+sdgAFCJHg/6x2AAUIkeD/rHYABQiR4P+sdgA=');
+    audio.volume = 0.5;
+    audio.play().catch(() => {});
+  } catch (e) {
+    // Ignore audio errors
+  }
+};
+
 export function ChangeRequestsQueue() {
   const queryClient = useQueryClient();
   const [selectedRequest, setSelectedRequest] = useState<ChangeRequest | null>(null);
@@ -89,6 +102,8 @@ export function ChangeRequestsQueue() {
     decision: null,
   });
   const [activeTab, setActiveTab] = useState('pending');
+  const [soundEnabled, setSoundEnabled] = useState(true);
+  const previousPendingCount = useRef<number>(0);
 
   // Buscar solicitações
   const { data: requests, isLoading, refetch } = useQuery({
@@ -116,6 +131,66 @@ export function ChangeRequestsQueue() {
     },
   });
 
+  // Real-time subscription for new requests
+  useEffect(() => {
+    const channel = supabase
+      .channel('change-requests-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'customer_change_requests'
+        },
+        (payload) => {
+          console.log('🔔 New change request:', payload);
+          queryClient.invalidateQueries({ queryKey: ['change-requests'] });
+          
+          if (soundEnabled) {
+            playNotificationSound();
+          }
+          
+          toast.info('Nova solicitação de alteração recebida!', {
+            description: 'Um cliente enviou uma nova solicitação via WhatsApp.',
+            action: {
+              label: 'Ver',
+              onClick: () => setActiveTab('pending'),
+            },
+          });
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'customer_change_requests'
+        },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ['change-requests'] });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient, soundEnabled]);
+
+  // Track pending count changes
+  useEffect(() => {
+    const currentCount = requests?.filter(r => r.status === 'pending').length || 0;
+    
+    if (currentCount > previousPendingCount.current && previousPendingCount.current > 0) {
+      // New pending request arrived
+      if (soundEnabled) {
+        playNotificationSound();
+      }
+    }
+    
+    previousPendingCount.current = currentCount;
+  }, [requests, soundEnabled]);
+
   // Mutation para processar solicitação
   const processRequest = useMutation({
     mutationFn: async ({ requestId, decision, notes }: { requestId: string; decision: 'approved' | 'rejected'; notes: string }) => {
@@ -134,12 +209,12 @@ export function ChangeRequestsQueue() {
       if (error) throw error;
       return data;
     },
-    onSuccess: (_, variables) => {
-      toast.success(
-        variables.decision === 'approved' 
-          ? 'Solicitação aprovada! Cliente será notificado.'
-          : 'Solicitação rejeitada. Cliente será notificado.'
-      );
+    onSuccess: (data, variables) => {
+      const message = variables.decision === 'approved' 
+        ? `Solicitação aprovada!${data?.autoApplied ? ' Alteração aplicada automaticamente.' : ''}`
+        : 'Solicitação rejeitada. Cliente será notificado.';
+      
+      toast.success(message);
       queryClient.invalidateQueries({ queryKey: ['change-requests'] });
       setSelectedRequest(null);
       setReviewNotes('');
@@ -175,7 +250,7 @@ export function ChangeRequestsQueue() {
             <MessageSquare className="h-5 w-5" />
             Solicitações de Alteração
             {pendingCount > 0 && (
-              <Badge variant="destructive" className="ml-2">
+              <Badge variant="destructive" className="ml-2 animate-pulse">
                 {pendingCount} pendente{pendingCount > 1 ? 's' : ''}
               </Badge>
             )}
@@ -184,10 +259,20 @@ export function ChangeRequestsQueue() {
             Gerencie solicitações de alteração feitas por clientes via WhatsApp
           </p>
         </div>
-        <Button variant="outline" size="sm" onClick={() => refetch()}>
-          <RefreshCw className="h-4 w-4 mr-2" />
-          Atualizar
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setSoundEnabled(!soundEnabled)}
+            title={soundEnabled ? 'Desativar som' : 'Ativar som'}
+          >
+            {soundEnabled ? <Volume2 className="h-4 w-4" /> : <Bell className="h-4 w-4 opacity-50" />}
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => refetch()}>
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Atualizar
+          </Button>
+        </div>
       </div>
 
       <div className="grid lg:grid-cols-3 gap-4">
@@ -200,6 +285,11 @@ export function ChangeRequestsQueue() {
                   <TabsTrigger value="pending" className="gap-2">
                     <Clock className="h-3 w-3" />
                     Pendentes
+                    {pendingCount > 0 && (
+                      <span className="ml-1 bg-destructive text-destructive-foreground text-xs px-1.5 py-0.5 rounded-full">
+                        {pendingCount}
+                      </span>
+                    )}
                   </TabsTrigger>
                   <TabsTrigger value="processed" className="gap-2">
                     <CheckCheck className="h-3 w-3" />
@@ -230,7 +320,7 @@ export function ChangeRequestsQueue() {
                           key={request.id}
                           className={`p-3 cursor-pointer hover:bg-muted/50 transition-colors ${
                             selectedRequest?.id === request.id ? 'bg-muted' : ''
-                          }`}
+                          } ${request.status === 'pending' ? 'border-l-2 border-l-amber-500' : ''}`}
                           onClick={() => setSelectedRequest(request)}
                         >
                           <div className="flex items-start justify-between gap-2">
@@ -327,6 +417,16 @@ export function ChangeRequestsQueue() {
                   </div>
                 )}
 
+                {/* Info sobre aplicação automática */}
+                {selectedRequest.status === 'pending' && (
+                  <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg text-sm">
+                    <p className="text-blue-700 dark:text-blue-300">
+                      💡 <strong>Dica:</strong> Ao aprovar solicitações de alteração de data ou endereço, 
+                      a mudança será aplicada automaticamente no pedido.
+                    </p>
+                  </div>
+                )}
+
                 {/* Ações de Aprovação */}
                 {selectedRequest.status === 'pending' && (
                   <>
@@ -403,7 +503,7 @@ export function ChangeRequestsQueue() {
             </AlertDialogTitle>
             <AlertDialogDescription>
               {confirmDialog.decision === 'approved' 
-                ? 'A solicitação será aprovada e o cliente será notificado via WhatsApp.'
+                ? 'A solicitação será aprovada, a alteração será aplicada (se possível) e o cliente será notificado via WhatsApp.'
                 : 'A solicitação será rejeitada e o cliente será notificado via WhatsApp.'
               }
             </AlertDialogDescription>
