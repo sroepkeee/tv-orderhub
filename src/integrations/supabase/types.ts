@@ -1124,6 +1124,98 @@ export type Database = {
           },
         ]
       }
+      customer_change_requests: {
+        Row: {
+          change_type: Database["public"]["Enums"]["change_request_type"]
+          conversation_id: string | null
+          created_at: string | null
+          customer_contact_id: string | null
+          description: string
+          id: string
+          message_id: string | null
+          order_id: string
+          organization_id: string | null
+          original_value: string | null
+          requested_by_name: string | null
+          requested_by_phone: string
+          requested_value: string | null
+          review_notes: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: Database["public"]["Enums"]["change_request_status"] | null
+          updated_at: string | null
+        }
+        Insert: {
+          change_type: Database["public"]["Enums"]["change_request_type"]
+          conversation_id?: string | null
+          created_at?: string | null
+          customer_contact_id?: string | null
+          description: string
+          id?: string
+          message_id?: string | null
+          order_id: string
+          organization_id?: string | null
+          original_value?: string | null
+          requested_by_name?: string | null
+          requested_by_phone: string
+          requested_value?: string | null
+          review_notes?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: Database["public"]["Enums"]["change_request_status"] | null
+          updated_at?: string | null
+        }
+        Update: {
+          change_type?: Database["public"]["Enums"]["change_request_type"]
+          conversation_id?: string | null
+          created_at?: string | null
+          customer_contact_id?: string | null
+          description?: string
+          id?: string
+          message_id?: string | null
+          order_id?: string
+          organization_id?: string | null
+          original_value?: string | null
+          requested_by_name?: string | null
+          requested_by_phone?: string
+          requested_value?: string | null
+          review_notes?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: Database["public"]["Enums"]["change_request_status"] | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_change_requests_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "carrier_conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_change_requests_customer_contact_id_fkey"
+            columns: ["customer_contact_id"]
+            isOneToOne: false
+            referencedRelation: "customer_contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_change_requests_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_change_requests_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       customer_contacts: {
         Row: {
           address: string | null
@@ -4521,6 +4613,16 @@ export type Database = {
         | "in_transit"
         | "purchases"
         | "carriers_chat"
+      change_request_status: "pending" | "approved" | "rejected" | "applied"
+      change_request_type:
+        | "delivery_address"
+        | "delivery_date"
+        | "add_item"
+        | "remove_item"
+        | "change_quantity"
+        | "cancel_order"
+        | "change_contact"
+        | "other"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -4667,6 +4769,17 @@ export const Constants = {
         "in_transit",
         "purchases",
         "carriers_chat",
+      ],
+      change_request_status: ["pending", "approved", "rejected", "applied"],
+      change_request_type: [
+        "delivery_address",
+        "delivery_date",
+        "add_item",
+        "remove_item",
+        "change_quantity",
+        "cancel_order",
+        "change_contact",
+        "other",
       ],
     },
   },
