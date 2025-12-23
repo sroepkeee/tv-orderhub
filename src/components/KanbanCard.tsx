@@ -207,11 +207,12 @@ const KanbanCardComponent = ({
         <Tooltip>
           <TooltipTrigger asChild>
             <div ref={setNodeRef} style={style} className={isDragging ? "dragging" : ""}>
-              <Card 
+            <Card 
                 className={cn(
                   "kanban-card kanban-card-micro p-1 flex items-center gap-1.5 cursor-pointer transition-all h-7",
                   isDragging ? 'opacity-50' : 'hover:bg-accent',
-                  isAnimating && 'animate-card-pop-in'
+                  isAnimating && 'animate-card-pop-in',
+                  isVendasEcommerce && !isMinimal && 'animate-ecommerce-pulse border border-purple-500/40'
                 )}
                 onClick={handleCardClick}
                 onMouseDown={() => setClickStart(Date.now())}
@@ -219,9 +220,14 @@ const KanbanCardComponent = ({
                 {/* Priority indicator */}
                 <div className={cn("w-2 h-2 rounded-full flex-shrink-0", getPriorityColor())} />
                 
-                {/* Order number */}
+                {/* E-commerce indicator */}
+                {isVendasEcommerce && (
+                  <ShoppingCart className="w-2.5 h-2.5 text-purple-500 flex-shrink-0" />
+                )}
+                
+                {/* Order number - 6 digits */}
                 <span className="font-bold text-[10px] flex-shrink-0">
-                  #{order.orderNumber.slice(-4)}
+                  #{order.orderNumber.slice(-6)}
                 </span>
                 
                 {/* Days indicator */}
