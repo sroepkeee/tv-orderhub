@@ -49,6 +49,9 @@ interface KanbanViewProps {
   density?: KanbanDensity;
 }
 
+// 🔍 Debug flag - ativar via: localStorage.setItem('DEBUG_KANBAN', 'true')
+const DEBUG_KANBAN = typeof window !== 'undefined' && localStorage.getItem('DEBUG_KANBAN') === 'true';
+
 export const KanbanView = ({ 
   orders, 
   onEdit, 
@@ -63,9 +66,32 @@ export const KanbanView = ({
   const { getPhaseInfo, loading: phaseInfoLoading } = usePhaseInfo();
   const { canViewPhase, canEditPhase, userRoles, loading: authLoading } = usePhaseAuthorization();
   const { user } = useAuth();
+  
+  // 📊 Debug: Contador de renders
+  const renderCount = React.useRef(0);
+  const visibleColumnsCalcCount = React.useRef(0);
+  
+  React.useEffect(() => {
+    if (DEBUG_KANBAN) {
+      renderCount.current++;
+      console.log(`🔄 [KanbanView] Render #${renderCount.current}`, {
+        ordersCount: orders.length,
+        density,
+        cardViewMode,
+        userRolesCount: userRoles.length,
+        timestamp: new Date().toISOString()
+      });
+    }
+  });
 
   // Sincronizar com orders recebidos (atualização real do servidor)
   React.useEffect(() => {
+    if (DEBUG_KANBAN) {
+      console.log(`📦 [KanbanView] Orders atualizados:`, {
+        count: orders.length,
+        ids: orders.slice(0, 5).map(o => o.orderNumber)
+      });
+    }
     setOptimisticOrders(orders);
   }, [orders]);
 
@@ -267,6 +293,14 @@ export const KanbanView = ({
 
   // Memoizar colunas visíveis para evitar re-renders desnecessários
   const visibleColumns = React.useMemo(() => {
+    if (DEBUG_KANBAN) {
+      visibleColumnsCalcCount.current++;
+      console.log(`🧮 [KanbanView] Recalculando visibleColumns #${visibleColumnsCalcCount.current}`, {
+        userRoles,
+        isAdmin: userRoles.includes('admin')
+      });
+    }
+    
     // Admin vê tudo
     if (userRoles.includes('admin')) {
       return columns;
@@ -281,8 +315,13 @@ export const KanbanView = ({
       }
     });
 
-    // Filtrar colunas visíveis mantendo ordem original
-    return columns.filter(col => visiblePhases.has(col.id));
+    const result = columns.filter(col => visiblePhases.has(col.id));
+    
+    if (DEBUG_KANBAN) {
+      console.log(`✅ [KanbanView] visibleColumns:`, result.map(c => c.id));
+    }
+    
+    return result;
   }, [userRoles, canViewPhase]);
 
   const getOrdersByPhase = (phase: Phase) => {
@@ -355,10 +394,19 @@ export const KanbanView = ({
   };
 
   const handleDragStart = (event: DragEndEvent) => {
+    const startTime = performance.now();
     setActiveId(event.active.id as string);
+    
+    if (DEBUG_KANBAN) {
+      console.log(`🎯 [KanbanView] Drag started`, {
+        orderId: event.active.id,
+        processingTime: `${(performance.now() - startTime).toFixed(2)}ms`
+      });
+    }
   };
 
   const handleDragEnd = async (event: DragEndEvent) => {
+    const dragEndStartTime = performance.now();
     const { active, over } = event;
     setActiveId(null);
 
@@ -372,17 +420,24 @@ export const KanbanView = ({
 
     const currentPhase = getPhaseFromStatus(order.status, order.order_category);
 
-    console.log('🎯 [Kanban] Drag & Drop:', {
-      pedido: order.orderNumber,
-      de: currentPhase,
-      para: targetPhase,
-      statusAtual: order.status,
-      usuario: user?.email,
-      timestamp: new Date().toISOString()
-    });
+    if (DEBUG_KANBAN) {
+      console.log('🎯 [KanbanView] Drag & Drop:', {
+        pedido: order.orderNumber,
+        de: currentPhase,
+        para: targetPhase,
+        statusAtual: order.status,
+        usuario: user?.email,
+        timestamp: new Date().toISOString()
+      });
+    }
     
     // Se soltar na mesma coluna, não faz nada
-    if (currentPhase === targetPhase) return;
+    if (currentPhase === targetPhase) {
+      if (DEBUG_KANBAN) {
+        console.log(`⏭️ [KanbanView] Mesma fase, ignorando. Time: ${(performance.now() - dragEndStartTime).toFixed(2)}ms`);
+      }
+      return;
+    }
 
     // 🚨 VALIDAR: Regra de categoria para fases de produção
     if (targetPhase === 'production_stock' && order.order_category === 'vendas') {
