@@ -46,7 +46,7 @@ interface KanbanCardProps {
   isAnimating?: boolean;
   viewMode?: CardViewMode;
 }
-export const KanbanCard = ({
+const KanbanCardComponent = ({
   order,
   onEdit,
   onStatusChange,
@@ -443,3 +443,35 @@ export const KanbanCard = ({
     </div>
   );
 };
+
+// Comparador customizado para evitar re-renders desnecessários do card
+const areCardsEqual = (prev: KanbanCardProps, next: KanbanCardProps): boolean => {
+  // Comparar props de controle
+  if (
+    prev.canDrag !== next.canDrag ||
+    prev.isAnimating !== next.isAnimating ||
+    prev.viewMode !== next.viewMode
+  ) {
+    return false;
+  }
+  
+  // Comparar propriedades relevantes da order
+  const prevOrder = prev.order;
+  const nextOrder = next.order;
+  
+  return (
+    prevOrder.id === nextOrder.id &&
+    prevOrder.orderNumber === nextOrder.orderNumber &&
+    prevOrder.status === nextOrder.status &&
+    prevOrder.priority === nextOrder.priority &&
+    prevOrder.client === nextOrder.client &&
+    prevOrder.deliveryDeadline === nextOrder.deliveryDeadline &&
+    prevOrder.type === nextOrder.type &&
+    prevOrder.business_area === nextOrder.business_area &&
+    prevOrder.items?.length === nextOrder.items?.length &&
+    prevOrder.customer_whatsapp === nextOrder.customer_whatsapp
+  );
+};
+
+export const KanbanCard = React.memo(KanbanCardComponent, areCardsEqual);
+KanbanCard.displayName = 'KanbanCard';

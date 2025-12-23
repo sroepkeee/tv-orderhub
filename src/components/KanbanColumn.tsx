@@ -32,7 +32,7 @@ interface KanbanColumnProps {
   cardViewMode?: CardViewMode;
   density?: KanbanDensity;
 }
-export const KanbanColumn = ({
+const KanbanColumnComponent = ({
   id,
   title,
   icon: Icon,
@@ -220,3 +220,46 @@ export const KanbanColumn = ({
     </div>
   );
 };
+
+// Comparador customizado para evitar re-renders desnecessários
+const areColumnsEqual = (prev: KanbanColumnProps, next: KanbanColumnProps): boolean => {
+  // Comparar props primitivas
+  if (
+    prev.id !== next.id ||
+    prev.title !== next.title ||
+    prev.canDrag !== next.canDrag ||
+    prev.cardViewMode !== next.cardViewMode ||
+    prev.density !== next.density ||
+    prev.linkTo !== next.linkTo ||
+    prev.area !== next.area ||
+    prev.responsibleRole !== next.responsibleRole
+  ) {
+    return false;
+  }
+  
+  // Comparar array de orders (shallow)
+  if (prev.orders.length !== next.orders.length) {
+    return false;
+  }
+  
+  // Verificar se as orders mudaram (comparação por id e status)
+  for (let i = 0; i < prev.orders.length; i++) {
+    if (
+      prev.orders[i].id !== next.orders[i].id ||
+      prev.orders[i].status !== next.orders[i].status ||
+      prev.orders[i].priority !== next.orders[i].priority
+    ) {
+      return false;
+    }
+  }
+  
+  // Comparar animatedCardIds (Set)
+  if (prev.animatedCardIds?.size !== next.animatedCardIds?.size) {
+    return false;
+  }
+  
+  return true;
+};
+
+export const KanbanColumn = React.memo(KanbanColumnComponent, areColumnsEqual);
+KanbanColumn.displayName = 'KanbanColumn';

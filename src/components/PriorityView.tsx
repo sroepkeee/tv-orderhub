@@ -6,6 +6,7 @@ import { ActionButtons } from "./ActionButtons";
 import { PhaseButtons } from "./PhaseButtons";
 import { ViewControls, SortOption, GroupOption, PhaseFilter, ViewMode, StatusFilter, CardViewMode } from "./ViewControls";
 import { KanbanView } from "./KanbanView";
+import { KanbanErrorBoundary } from "./KanbanErrorBoundary";
 import { MatrixView } from "./MatrixView";
 import { ClipboardList, PackageCheck, Microscope, Boxes, Truck, CheckCircle2 } from "lucide-react";
 import { useKanbanDensity, KanbanDensity } from "@/hooks/useKanbanDensity";
@@ -502,13 +503,15 @@ export const PriorityView = ({
       
       {/* Orders Display */}
       {viewMode === "kanban" ? (
-        <KanbanView
-          orders={sortedOrders}
-          onEdit={(order) => onRowClick ? onRowClick(order) : onEdit(order)}
-          onStatusChange={onStatusChange}
-          cardViewMode={cardViewMode}
-          density={density}
-        />
+        <KanbanErrorBoundary>
+          <KanbanView
+            orders={sortedOrders}
+            onEdit={(order) => onRowClick ? onRowClick(order) : onEdit(order)}
+            onStatusChange={onStatusChange}
+            cardViewMode={cardViewMode}
+            density={density}
+          />
+        </KanbanErrorBoundary>
       ) : viewMode === "matrix" ? (
         <MatrixView
           orders={sortedOrders}
