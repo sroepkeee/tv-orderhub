@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/hooks/useAuth';
-import { useAdminAuth } from '@/hooks/useAdminAuth';
 import { supabase } from '@/integrations/supabase/client';
 
 // Chaves de menu disponíveis no sistema
@@ -27,9 +26,9 @@ interface MenuPermission {
 
 export const useMenuPermissions = () => {
   const { user } = useAuth();
-  const { isAdmin } = useAdminAuth();
   const [menuPermissions, setMenuPermissions] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   const loadPermissions = useCallback(async () => {
     if (!user) {
@@ -37,16 +36,27 @@ export const useMenuPermissions = () => {
       return;
     }
 
-    // Admin vê tudo por padrão
-    if (isAdmin) {
-      const allVisible: Record<string, boolean> = {};
-      ALL_MENU_KEYS.forEach(key => { allVisible[key] = true; });
-      setMenuPermissions(allVisible);
-      setLoading(false);
-      return;
-    }
-
     try {
+      // Verificar admin diretamente aqui (evita dependência circular)
+      const { data: adminCheck } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id)
+        .eq('role', 'admin')
+        .maybeSingle();
+      
+      const userIsAdmin = !!adminCheck;
+      setIsAdmin(userIsAdmin);
+
+      // Admin vê tudo por padrão
+      if (userIsAdmin) {
+        const allVisible: Record<string, boolean> = {};
+        ALL_MENU_KEYS.forEach(key => { allVisible[key] = true; });
+        setMenuPermissions(allVisible);
+        setLoading(false);
+        return;
+      }
+
       const { data, error } = await supabase
         .from('menu_permissions')
         .select('menu_key, can_view')
@@ -80,7 +90,7 @@ export const useMenuPermissions = () => {
     } finally {
       setLoading(false);
     }
-  }, [user?.id, isAdmin]);
+  }, [user?.id]); // Apenas user?.id - sem isAdmin para evitar loop
 
   useEffect(() => {
     loadPermissions();
@@ -89,7 +99,7 @@ export const useMenuPermissions = () => {
 
     // Real-time subscription para atualizações
     const channel = supabase
-      .channel('menu-permissions-changes')
+      .channel(`menu-permissions-${user.id}`)
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
@@ -104,7 +114,7 @@ export const useMenuPermissions = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user, loadPermissions]);
+  }, [user?.id, loadPermissions]);
 
   const canViewMenu = useCallback((key: string): boolean => {
     // Admin sempre pode ver tudo
