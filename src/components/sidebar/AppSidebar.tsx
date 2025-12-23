@@ -1,4 +1,5 @@
 import { Link, useNavigate } from "react-router-dom";
+import { useMemo, useEffect, useState } from "react";
 import { LayoutDashboard, BarChart3, Factory, Truck, MessageSquare, ShoppingCart, Users, UserCog, Bot, Settings, LogOut, Moon, Sun, KeyRound, FolderOpen, Eye, EyeOff } from "lucide-react";
 import logo from "@/assets/logo.png";
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarRail, SidebarSeparator, SidebarMenu, SidebarMenuItem, SidebarMenuButton, useSidebar } from "@/components/ui/sidebar";
@@ -11,11 +12,12 @@ import { Order } from "@/components/Dashboard";
 import { useAuth } from "@/hooks/useAuth";
 import { useAdminAuth } from "@/hooks/useAdminAuth";
 import { usePrivacyMode } from "@/hooks/usePrivacyMode";
-import { useEffect, useState } from "react";
+import { useMenuPermissions } from "@/hooks/useMenuPermissions";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { KanbanDensity } from "@/hooks/useKanbanDensity";
 import { ViewMode } from "@/components/ViewControls";
+
 interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
   orders?: Order[];
   unreadConversationsCount?: number;
@@ -28,6 +30,7 @@ interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
   onKanbanDensityChange?: (density: KanbanDensity) => void;
   onKanbanAutoDetectChange?: (enabled: boolean) => void;
 }
+
 const AppSidebar = ({
   orders = [],
   unreadConversationsCount = 0,
@@ -40,17 +43,11 @@ const AppSidebar = ({
   onKanbanAutoDetectChange,
   ...props
 }: AppSidebarProps) => {
-  const {
-    user,
-    signOut
-  } = useAuth();
-  const {
-    isAdmin
-  } = useAdminAuth();
-  const {
-    state
-  } = useSidebar();
+  const { user, signOut } = useAuth();
+  const { isAdmin } = useAdminAuth();
+  const { state } = useSidebar();
   const { isPrivacyMode, togglePrivacyMode } = usePrivacyMode();
+  const { canViewMenu } = useMenuPermissions();
   const navigate = useNavigate();
   const [isDark, setIsDark] = useState(false);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
@@ -63,15 +60,18 @@ const AppSidebar = ({
       data
     }) => setIsSuperAdmin(!!data));
   }, [user?.email]);
+
   useEffect(() => {
     const root = window.document.documentElement;
     setIsDark(root.classList.contains("dark"));
   }, []);
+
   const toggleTheme = () => {
     const root = window.document.documentElement;
     root.classList.toggle("dark");
     setIsDark(!isDark);
   };
+
   const handleLogout = async () => {
     try {
       await signOut();
@@ -85,80 +85,78 @@ const AppSidebar = ({
     }
   };
 
-  // Grupos de menu
-  const menuGroups: MenuGroup[] = [{
-    id: "main",
-    label: "PRINCIPAL",
-    icon: LayoutDashboard,
-    items: [{
-      path: "/",
-      icon: LayoutDashboard,
-      label: "Kanban"
-    }, {
-      path: "/metrics",
-      icon: BarChart3,
-      label: "Indicadores"
-    }, {
-      path: "/producao",
-      icon: Factory,
-      label: "Produção"
-    }, {
-      path: "/files",
-      icon: FolderOpen,
-      label: "Arquivos"
-    }]
-  }, {
-    id: "logistics",
-    label: "LOGÍSTICA",
-    icon: Truck,
-    items: [{
-      path: "/transportadoras",
-      icon: Truck,
-      label: "Transportadoras"
-    }, {
-      path: "/carriers-chat",
-      icon: MessageSquare,
-      label: "Conversas",
-      badge: unreadConversationsCount
-    }, {
-      path: "/compras",
-      icon: ShoppingCart,
-      label: "Compras"
-    }]
-  }, {
-    id: "customers",
-    label: "CLIENTES",
-    icon: Users,
-    items: [{
-      path: "/customers",
-      icon: Users,
-      label: "Clientes"
-    }]
-  }];
+  // Grupos de menu com filtro de permissões
+  const menuGroups = useMemo((): MenuGroup[] => {
+    const groups: MenuGroup[] = [];
 
-  // Adicionar grupo de admin se for admin
-  if (isAdmin) {
-    menuGroups.push({
-      id: "admin",
-      label: "ADMINISTRAÇÃO",
-      icon: Settings,
-      adminOnly: true,
-      items: [{
-        path: "/admin/users",
-        icon: UserCog,
-        label: "Usuários",
-        badge: pendingApprovalsCount
-      }, ...(isSuperAdmin ? [{
-        path: "/ai-agent",
-        icon: Bot,
-        label: "Agente IA"
-      }] : []), {
-      path: "/settings/phases",
-        icon: Settings,
-        label: "Configurações"
-      }]
-    });
-  }
+    // Grupo Principal
+    const mainItems = [
+      { path: "/", icon: LayoutDashboard, label: "Kanban", key: "kanban" },
+      { path: "/metrics", icon: BarChart3, label: "Indicadores", key: "metrics" },
+      { path: "/producao", icon: Factory, label: "Produção", key: "producao" },
+      { path: "/files", icon: FolderOpen, label: "Arquivos", key: "files" },
+    ].filter(item => canViewMenu(item.key));
+
+    if (mainItems.length > 0) {
+      groups.push({
+        id: "main",
+        label: "PRINCIPAL",
+        icon: LayoutDashboard,
+        items: mainItems.map(({ key, ...rest }) => rest)
+      });
+    }
+
+    // Grupo Logística
+    const logisticsItems = [
+      { path: "/transportadoras", icon: Truck, label: "Transportadoras", key: "transportadoras" },
+      { path: "/carriers-chat", icon: MessageSquare, label: "Conversas", badge: unreadConversationsCount, key: "carriers-chat" },
+      { path: "/compras", icon: ShoppingCart, label: "Compras", key: "compras" },
+    ].filter(item => canViewMenu(item.key));
+
+    if (logisticsItems.length > 0) {
+      groups.push({
+        id: "logistics",
+        label: "LOGÍSTICA",
+        icon: Truck,
+        items: logisticsItems.map(({ key, ...rest }) => rest)
+      });
+    }
+
+    // Grupo Clientes
+    const customersItems = [
+      { path: "/customers", icon: Users, label: "Clientes", key: "customers" },
+    ].filter(item => canViewMenu(item.key));
+
+    if (customersItems.length > 0) {
+      groups.push({
+        id: "customers",
+        label: "CLIENTES",
+        icon: Users,
+        items: customersItems.map(({ key, ...rest }) => rest)
+      });
+    }
+
+    // Grupo Admin (apenas para admins)
+    if (isAdmin && canViewMenu('admin')) {
+      const adminItems = [
+        { path: "/admin/users", icon: UserCog, label: "Usuários", badge: pendingApprovalsCount, key: "admin" },
+        ...(isSuperAdmin && canViewMenu('ai-agent') ? [{ path: "/ai-agent", icon: Bot, label: "Agente IA", key: "ai-agent" }] : []),
+        { path: "/settings/phases", icon: Settings, label: "Configurações", key: "settings" },
+      ].filter(item => canViewMenu(item.key));
+
+      if (adminItems.length > 0) {
+        groups.push({
+          id: "admin",
+          label: "ADMINISTRAÇÃO",
+          icon: Settings,
+          adminOnly: true,
+          items: adminItems.map(({ key, ...rest }) => rest)
+        });
+      }
+    }
+
+    return groups;
+  }, [isAdmin, isSuperAdmin, pendingApprovalsCount, unreadConversationsCount, canViewMenu]);
   const userInitials = user?.email?.slice(0, 2).toUpperCase() || "??";
   return <Sidebar collapsible="icon" {...props}>
       {/* Header com Logo */}

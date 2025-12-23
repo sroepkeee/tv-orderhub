@@ -1846,6 +1846,47 @@ export type Database = {
           },
         ]
       }
+      menu_permissions: {
+        Row: {
+          can_view: boolean | null
+          created_at: string | null
+          granted_by: string | null
+          id: string
+          menu_key: string
+          organization_id: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          can_view?: boolean | null
+          created_at?: string | null
+          granted_by?: string | null
+          id?: string
+          menu_key: string
+          organization_id?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          can_view?: boolean | null
+          created_at?: string | null
+          granted_by?: string | null
+          id?: string
+          menu_key?: string
+          organization_id?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "menu_permissions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       message_queue: {
         Row: {
           attempts: number
