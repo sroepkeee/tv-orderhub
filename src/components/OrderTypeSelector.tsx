@@ -94,7 +94,5 @@ export function OrderTypeSelector({
         </SelectContent>
       </Select>
 
-      {/* Informações do tipo selecionado */}
-      {selectedType}
     </div>;
 }
