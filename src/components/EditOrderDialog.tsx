@@ -2251,16 +2251,20 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                   </div>
                 </div>
 
-                {/* Card de Orientação para Contato */}
-                <Card className="p-2 border-amber-200 bg-amber-50/50 dark:bg-amber-950/20 dark:border-amber-800">
-                  <div className="flex items-start gap-2 text-xs text-amber-800 dark:text-amber-200">
-                    <Info className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                    <span>
-                      <strong>Contato para Notificações:</strong> Informe o nome e WhatsApp de quem receberá 
-                      atualizações sobre o pedido. Para pedidos internos, insira o responsável da área.
-                    </span>
-                  </div>
-                </Card>
+                {/* Card de Orientação para Contato - só exibe quando campos não preenchidos */}
+                {(!watch('customer_contact_name' as any) || 
+                  !watch('customer_whatsapp' as any) || 
+                  (watch('customer_whatsapp' as any)?.replace(/\D/g, '').length < 10)) && (
+                  <Card className="p-2 border-amber-200 bg-amber-50/50 dark:bg-amber-950/20 dark:border-amber-800">
+                    <div className="flex items-start gap-2 text-xs text-amber-800 dark:text-amber-200">
+                      <Info className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                      <span>
+                        <strong>Contato para Notificações:</strong> Informe o nome e WhatsApp de quem receberá 
+                        atualizações sobre o pedido. Para pedidos internos, insira o responsável da área.
+                      </span>
+                    </div>
+                  </Card>
+                )}
 
                 {/* Linha 2: Contato, WhatsApp, Desk, TOTVS */}
                 <div className="grid grid-cols-4 gap-2">
