@@ -36,13 +36,14 @@ export const usePhaseAuthorization = () => {
 
     loadUserData();
 
-    // Real-time subscription para mudanças de permissões
+    // Real-time subscription para mudanças de permissões - APENAS do próprio usuário
     const subscription = supabase
-      .channel('user-phase-permissions-changes')
+      .channel(`user-phase-permissions-${user.id}`)
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
-        table: 'user_phase_permissions'
+        table: 'user_phase_permissions',
+        filter: `user_id=eq.${user.id}`
       }, () => {
         console.log('🔄 [Phase Authorization] User permissions changed, reloading...');
         loadUserData();
@@ -81,7 +82,8 @@ export const usePhaseAuthorization = () => {
         .single();
 
       if (approvalError && approvalError.code !== 'PGRST116') throw approvalError;
-      setIsApproved(approvalData?.status === 'approved');
+      // Usuários sem registro na tabela são considerados aprovados (legados)
+      setIsApproved(approvalData ? approvalData.status === 'approved' : true);
 
       // Se tem acesso total, não precisa buscar permissões granulares
       if (hasFullAccessRole) {
