@@ -11,7 +11,8 @@ interface UserPhasePermission {
 }
 
 // Roles que têm acesso total automaticamente
-const FULL_ACCESS_ROLES = ['admin', 'manager'];
+// Nota: 'manager' não existe no enum app_role do banco, apenas 'admin' tem acesso total
+const FULL_ACCESS_ROLES = ['admin'];
 
 export const usePhaseAuthorization = () => {
   const { user, loading: authLoading } = useAuth();
