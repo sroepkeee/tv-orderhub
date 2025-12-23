@@ -179,7 +179,8 @@ serve(async (req) => {
     if (!customerContact && order.customer_whatsapp) {
       customerContact = {
         id: null,
-        customer_name: order.customer_name,
+        // ✨ Priorizar customer_contact_name se disponível
+        customer_name: order.customer_contact_name || order.customer_name,
         email: null,
         whatsapp: order.customer_whatsapp,
         preferred_channel: 'whatsapp',
@@ -187,7 +188,7 @@ serve(async (req) => {
         opt_in_email: true,
       };
       contactSource = 'order_whatsapp';
-      console.log('✅ Using customer_whatsapp from order:', order.customer_whatsapp);
+      console.log('✅ Using customer_whatsapp from order:', order.customer_whatsapp, '- Contact name:', order.customer_contact_name || order.customer_name);
     }
 
     // Se não encontrou nenhum contato

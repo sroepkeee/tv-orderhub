@@ -115,7 +115,8 @@ export interface Order {
   rateio_project_code?: string;
   // ✨ Campo de empresa emissora
   sender_company?: string;
-  // ✨ Campo WhatsApp do cliente para notificações
+  // ✨ Campos de contato do cliente para notificações
+  customer_contact_name?: string;
   customer_whatsapp?: string;
 }
 

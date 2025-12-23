@@ -2781,6 +2781,7 @@ export type Database = {
           contracted_sla_days: number | null
           cost_center: string | null
           created_at: string
+          customer_contact_name: string | null
           customer_document: string | null
           customer_name: string
           customer_whatsapp: string | null
@@ -2838,6 +2839,7 @@ export type Database = {
           contracted_sla_days?: number | null
           cost_center?: string | null
           created_at?: string
+          customer_contact_name?: string | null
           customer_document?: string | null
           customer_name: string
           customer_whatsapp?: string | null
@@ -2895,6 +2897,7 @@ export type Database = {
           contracted_sla_days?: number | null
           cost_center?: string | null
           created_at?: string
+          customer_contact_name?: string | null
           customer_document?: string | null
           customer_name?: string
           customer_whatsapp?: string | null
