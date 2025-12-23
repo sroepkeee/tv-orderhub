@@ -80,7 +80,7 @@ export const useMenuPermissions = () => {
     } finally {
       setLoading(false);
     }
-  }, [user, isAdmin]);
+  }, [user?.id, isAdmin]);
 
   useEffect(() => {
     loadPermissions();
