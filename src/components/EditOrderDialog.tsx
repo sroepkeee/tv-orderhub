@@ -1822,6 +1822,36 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
   
   const onSubmit = async (data: Order) => {
     console.log('💾 [INICIO] Salvando pedido com dados:', data);
+    
+    // ✨ Validação de campos obrigatórios
+    const contactName = ((data as any).customer_contact_name || '').trim();
+    const whatsapp = ((data as any).customer_whatsapp || '').replace(/\D/g, '');
+    const costCenter = watch('cost_center' as any);
+    const accountItem = watch('account_item' as any);
+    
+    const errors: string[] = [];
+    
+    if (!contactName) {
+      errors.push('Nome do Contato/Negociador');
+    }
+    
+    if (!whatsapp || whatsapp.length < 10) {
+      errors.push('WhatsApp (mínimo 10 dígitos)');
+    }
+    
+    if (!costCenter && !accountItem) {
+      errors.push('Centro de Custo ou Projeto (RATEIO)');
+    }
+    
+    if (errors.length > 0) {
+      toast({
+        title: "⚠️ Campos obrigatórios",
+        description: `Preencha: ${errors.join(', ')}`,
+        variant: "destructive"
+      });
+      return;
+    }
+    
     try {
       // ✨ Sincronizar dimensões e volumes da tabela order_volumes
       const { data: volumes } = await supabase
@@ -1854,7 +1884,8 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
         business_area: watch('business_area' as any) || (order as any).business_area,
         cost_center: watch('cost_center' as any) || (order as any).cost_center,
         account_item: watch('account_item' as any) || (order as any).account_item,
-        sender_company: watch('sender_company' as any) || (order as any).sender_company
+        sender_company: watch('sender_company' as any) || (order as any).sender_company,
+        customer_contact_name: contactName
       };
 
       // ✨ Track ALL field changes for complete history
@@ -2220,18 +2251,46 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                   </div>
                 </div>
 
-                {/* Linha 2: WhatsApp, Desk, TOTVS, Data Emissão */}
+                {/* Card de Orientação para Contato */}
+                <Card className="p-2 border-amber-200 bg-amber-50/50 dark:bg-amber-950/20 dark:border-amber-800">
+                  <div className="flex items-start gap-2 text-xs text-amber-800 dark:text-amber-200">
+                    <Info className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                    <span>
+                      <strong>Contato para Notificações:</strong> Informe o nome e WhatsApp de quem receberá 
+                      atualizações sobre o pedido. Para pedidos internos, insira o responsável da área.
+                    </span>
+                  </div>
+                </Card>
+
+                {/* Linha 2: Contato, WhatsApp, Desk, TOTVS */}
                 <div className="grid grid-cols-4 gap-2">
                   <div>
+                    <Label htmlFor="customer_contact_name" className="text-xs flex items-center gap-1">
+                      <User className="h-3 w-3" />
+                      Contato/Negociador <span className="text-destructive">*</span>
+                    </Label>
+                    <Input 
+                      {...register("customer_contact_name" as any)} 
+                      placeholder="Nome de quem negociou"
+                      maxLength={100}
+                      className={cn("h-8 text-xs", !watch('customer_contact_name' as any) && "border-amber-400")}
+                    />
+                  </div>
+                  <div>
                     <Label htmlFor="customer_whatsapp" className="text-xs flex items-center gap-1">
-                      📱 WhatsApp
+                      📱 WhatsApp <span className="text-destructive">*</span>
                     </Label>
                     <Input 
                       {...register("customer_whatsapp" as any)} 
                       placeholder="51999999999"
                       maxLength={20}
                       type="tel"
-                      className="h-8 text-xs"
+                      className={cn(
+                        "h-8 text-xs", 
+                        (!watch('customer_whatsapp' as any) || 
+                         (watch('customer_whatsapp' as any)?.replace(/\D/g, '').length < 10)) && 
+                         "border-amber-400"
+                      )}
                     />
                   </div>
                   <div>
@@ -2242,16 +2301,24 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                     <Label htmlFor="totvsOrderNumber" className="text-xs">Pedido TOTVS</Label>
                     <Input {...register("totvsOrderNumber" as any)} placeholder="123456" maxLength={50} className="h-8 text-xs" />
                   </div>
-                  {order.issueDate && (
-                    <div>
-                      <Label htmlFor="issueDate" className="text-xs">Emissão TOTVS</Label>
-                      <Input type="date" value={order.issueDate ? order.issueDate.split('T')[0] : ''} disabled className="h-8 text-xs bg-muted cursor-not-allowed" />
-                    </div>
-                  )}
                 </div>
 
                 {/* Seção Empresa Emissora + RATEIO - Compacta */}
-                <Card className="p-2.5 border-dashed border-blue-200 dark:border-blue-800 bg-blue-50/30 dark:bg-blue-950/20">
+                <Card className={cn(
+                  "p-2.5 border-dashed bg-blue-50/30 dark:bg-blue-950/20",
+                  (!watch('cost_center' as any) && !watch('account_item' as any)) 
+                    ? "border-amber-400 dark:border-amber-600" 
+                    : "border-blue-200 dark:border-blue-800"
+                )}>
+                  <div className="flex items-center gap-2 mb-2">
+                    <Label className="text-xs font-semibold">📊 RATEIO</Label>
+                    <span className="text-destructive text-xs">*</span>
+                    {(!watch('cost_center' as any) && !watch('account_item' as any)) && (
+                      <Badge variant="outline" className="text-amber-600 border-amber-400 text-[10px] h-5 dark:text-amber-400 dark:border-amber-600">
+                        Preencha Centro de Custo ou Projeto
+                      </Badge>
+                    )}
+                  </div>
                   <div className="grid grid-cols-4 gap-2">
                     {/* Empresa Emissora */}
                     <div>
