@@ -23,8 +23,7 @@ import PhaseSettings from "./pages/PhaseSettings";
 import Files from "./pages/Files";
 import { CarriersChatRoute } from "./components/CarriersChatRoute";
 import { useAuth } from "./hooks/useAuth";
-import { useAdminAuth } from "./hooks/useAdminAuth";
-import { usePhaseAuthorization } from "./hooks/usePhaseAuthorization";
+import { usePermissions } from "./contexts/PermissionsContext";
 import { PendingApprovalScreen } from "./components/PendingApprovalScreen";
 import { CompleteProfileDialog } from "./components/CompleteProfileDialog";
 import { VisualModeProvider } from "./hooks/useVisualMode";
@@ -32,12 +31,13 @@ import { PrivacyModeProvider } from "./hooks/usePrivacyMode";
 import { OrganizationProvider } from "./hooks/useOrganization";
 import { OrganizationGuard } from "./components/onboarding/OrganizationGuard";
 import { AuthProvider } from "./contexts/AuthContext";
+import { PermissionsProvider } from "./contexts/PermissionsContext";
 import { useEffect, useState } from "react";
 import { supabase } from "./integrations/supabase/client";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
-  const { isApproved, loading: authLoading } = usePhaseAuthorization();
+  const { isApproved, loading: permissionsLoading } = usePermissions();
   const [profileIncomplete, setProfileIncomplete] = useState(false);
   const [checkingProfile, setCheckingProfile] = useState(true);
   const [loadingTimeout, setLoadingTimeout] = useState(false);
@@ -67,7 +67,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
   // Timeout de segurança para evitar loading infinito
   useEffect(() => {
-    const isStillLoading = loading || authLoading || checkingProfile || isApproved === null;
+    const isStillLoading = loading || permissionsLoading || checkingProfile || isApproved === null;
     
     if (!isStillLoading) {
       setLoadingTimeout(false);
@@ -80,12 +80,12 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
     }, 8000); // 8 segundos de timeout
 
     return () => clearTimeout(timer);
-  }, [loading, authLoading, checkingProfile, isApproved]);
+  }, [loading, permissionsLoading, checkingProfile, isApproved]);
   
-  // Mostrar loading enquanto auth, authLoading ou checkingProfile estiverem ativos
+  // Mostrar loading enquanto auth, permissionsLoading ou checkingProfile estiverem ativos
   // OU enquanto isApproved for null (ainda carregando status de aprovação)
   // MAS respeitar timeout de segurança
-  const isStillLoading = loading || authLoading || checkingProfile || isApproved === null;
+  const isStillLoading = loading || permissionsLoading || checkingProfile || isApproved === null;
   
   if (isStillLoading && !loadingTimeout) {
     return (
@@ -116,7 +116,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 }
 
 function AdminRoute({ children }: { children: React.ReactNode }) {
-  const { isAdmin, loading } = useAdminAuth();
+  const { isAdmin, loading } = usePermissions();
   
   if (loading) {
     return (
@@ -163,97 +163,99 @@ const App = () => {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <PrivacyModeProvider>
-          <VisualModeProvider>
-            <OrganizationProvider>
-              <TooltipProvider>
-                <Toaster />
-                <Sonner />
-              <BrowserRouter>
-                <OrganizationGuard>
-                  <Routes>
-                    <Route path="/landing" element={<Landing />} />
-                    <Route path="/auth" element={<Auth />} />
-                    <Route path="/onboarding" element={
-                      <ProtectedRoute>
-                        <Onboarding />
-                      </ProtectedRoute>
-                    } />
-                    <Route path="/" element={
-                      <ProtectedRoute>
-                        <Index />
-                      </ProtectedRoute>
-                    } />
-                    <Route path="/metrics" element={
-                      <ProtectedRoute>
-                        <Metrics />
-                      </ProtectedRoute>
-                    } />
-                    <Route path="/producao" element={
-                      <ProtectedRoute>
-                        <Production />
-                      </ProtectedRoute>
-                    } />
-                    <Route path="/carriers-chat" element={
-                      <ProtectedRoute>
-                        <CarriersChatRoute>
-                          <CarriersChat />
-                        </CarriersChatRoute>
-                      </ProtectedRoute>
-                    } />
-                    <Route path="/transportadoras" element={
-                      <ProtectedRoute>
-                        <Carriers />
-                      </ProtectedRoute>
-                    } />
-                    <Route path="/admin/users" element={
-                      <ProtectedRoute>
-                        <AdminRoute>
-                          <Admin />
-                        </AdminRoute>
-                      </ProtectedRoute>
-                    } />
-                    <Route path="/compras" element={
-                      <ProtectedRoute>
-                        <Purchases />
-                      </ProtectedRoute>
-                    } />
-                    <Route path="/whatsapp-settings" element={
-                      <ProtectedRoute>
-                        <WhatsAppSettings />
-                      </ProtectedRoute>
-                    } />
-                    <Route path="/ai-agent" element={
-                      <ProtectedRoute>
-                        <AIAgent />
-                      </ProtectedRoute>
-                    } />
-                    <Route path="/customers" element={
-                      <ProtectedRoute>
-                        <Customers />
-                      </ProtectedRoute>
-                    } />
-                    <Route path="/files" element={
-                      <ProtectedRoute>
-                        <Files />
-                      </ProtectedRoute>
-                    } />
-                    <Route path="/settings/phases" element={
-                      <ProtectedRoute>
-                        <AdminRoute>
-                          <PhaseSettings />
-                        </AdminRoute>
-                      </ProtectedRoute>
-                    } />
-                    {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-                    <Route path="*" element={<NotFound />} />
-                  </Routes>
-                </OrganizationGuard>
-              </BrowserRouter>
-            </TooltipProvider>
-          </OrganizationProvider>
-        </VisualModeProvider>
-      </PrivacyModeProvider>
+        <PermissionsProvider>
+          <PrivacyModeProvider>
+            <VisualModeProvider>
+              <OrganizationProvider>
+                <TooltipProvider>
+                  <Toaster />
+                  <Sonner />
+                  <BrowserRouter>
+                    <OrganizationGuard>
+                      <Routes>
+                        <Route path="/landing" element={<Landing />} />
+                        <Route path="/auth" element={<Auth />} />
+                        <Route path="/onboarding" element={
+                          <ProtectedRoute>
+                            <Onboarding />
+                          </ProtectedRoute>
+                        } />
+                        <Route path="/" element={
+                          <ProtectedRoute>
+                            <Index />
+                          </ProtectedRoute>
+                        } />
+                        <Route path="/metrics" element={
+                          <ProtectedRoute>
+                            <Metrics />
+                          </ProtectedRoute>
+                        } />
+                        <Route path="/producao" element={
+                          <ProtectedRoute>
+                            <Production />
+                          </ProtectedRoute>
+                        } />
+                        <Route path="/carriers-chat" element={
+                          <ProtectedRoute>
+                            <CarriersChatRoute>
+                              <CarriersChat />
+                            </CarriersChatRoute>
+                          </ProtectedRoute>
+                        } />
+                        <Route path="/transportadoras" element={
+                          <ProtectedRoute>
+                            <Carriers />
+                          </ProtectedRoute>
+                        } />
+                        <Route path="/admin/users" element={
+                          <ProtectedRoute>
+                            <AdminRoute>
+                              <Admin />
+                            </AdminRoute>
+                          </ProtectedRoute>
+                        } />
+                        <Route path="/compras" element={
+                          <ProtectedRoute>
+                            <Purchases />
+                          </ProtectedRoute>
+                        } />
+                        <Route path="/whatsapp-settings" element={
+                          <ProtectedRoute>
+                            <WhatsAppSettings />
+                          </ProtectedRoute>
+                        } />
+                        <Route path="/ai-agent" element={
+                          <ProtectedRoute>
+                            <AIAgent />
+                          </ProtectedRoute>
+                        } />
+                        <Route path="/customers" element={
+                          <ProtectedRoute>
+                            <Customers />
+                          </ProtectedRoute>
+                        } />
+                        <Route path="/files" element={
+                          <ProtectedRoute>
+                            <Files />
+                          </ProtectedRoute>
+                        } />
+                        <Route path="/settings/phases" element={
+                          <ProtectedRoute>
+                            <AdminRoute>
+                              <PhaseSettings />
+                            </AdminRoute>
+                          </ProtectedRoute>
+                        } />
+                        {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+                        <Route path="*" element={<NotFound />} />
+                      </Routes>
+                    </OrganizationGuard>
+                  </BrowserRouter>
+                </TooltipProvider>
+              </OrganizationProvider>
+            </VisualModeProvider>
+          </PrivacyModeProvider>
+        </PermissionsProvider>
       </AuthProvider>
     </QueryClientProvider>
   );
