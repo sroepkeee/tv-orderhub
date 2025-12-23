@@ -1139,6 +1139,28 @@ Deno.serve(async (req) => {
 
       console.log('✅ Message saved successfully:', conversation.id);
 
+      // 🛑 CRITICAL FIX: Skip ALL AI agent processing for outbound messages
+      // Mensagens enviadas pelo sistema (notificações) NÃO devem acionar agentes
+      // Isso previne o loop onde o sistema responde a suas próprias mensagens
+      if (isFromMe) {
+        console.log('⏭️ [OUTBOUND] Skipping AI agent processing for outbound message');
+        console.log('📝 Outbound messages are saved but NOT processed by AI agents');
+        
+        return new Response(
+          JSON.stringify({ 
+            success: true, 
+            conversationId: conversation.id,
+            carrierId: carrierId,
+            skipped: 'outbound_message',
+            reason: 'Outbound messages do not trigger AI agent responses',
+          }),
+          {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 200,
+          }
+        );
+      }
+
       // 🤖 VERIFICAR SE É GESTOR - Resposta instantânea sem debounce
       // Gestores cadastrados em management_report_recipients recebem respostas imediatas
       console.log('🔍 [DIAGNOSTIC] Checking if sender is manager:', phoneNumber);
