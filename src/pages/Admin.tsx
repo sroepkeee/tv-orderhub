@@ -9,7 +9,8 @@ import { LoginAuditTable } from "@/components/admin/LoginAuditTable";
 import { ManagementReportSettings } from "@/components/admin/ManagementReportSettings";
 import { MessageQueueDashboard } from "@/components/admin/MessageQueueDashboard";
 import { PhaseManagersConfig } from "@/components/admin/PhaseManagersConfig";
-import { Shield, ArrowLeft, BarChart3, MessageSquare, Settings2, UserCog } from "lucide-react";
+import { UserMenuPermissionsMatrix } from "@/components/admin/UserMenuPermissionsMatrix";
+import { Shield, ArrowLeft, BarChart3, MessageSquare, Settings2, UserCog, Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 
@@ -38,11 +39,15 @@ const Admin = () => {
         </div>
 
         <Tabs defaultValue="users" className="w-full">
-          <TabsList className="grid w-full grid-cols-7 mb-4">
+          <TabsList className="grid w-full grid-cols-8 mb-4">
             <TabsTrigger value="users">Usuários</TabsTrigger>
             <TabsTrigger value="managers" className="flex items-center gap-1">
               <UserCog className="h-3 w-3" />
               Gestores
+            </TabsTrigger>
+            <TabsTrigger value="menus" className="flex items-center gap-1">
+              <Menu className="h-3 w-3" />
+              Menus
             </TabsTrigger>
             <TabsTrigger value="monitoring">Monitoramento</TabsTrigger>
             <TabsTrigger value="audit">Auditoria</TabsTrigger>
@@ -66,6 +71,10 @@ const Admin = () => {
 
           <TabsContent value="managers" className="space-y-4">
             <PhaseManagersConfig />
+          </TabsContent>
+
+          <TabsContent value="menus" className="space-y-4">
+            <UserMenuPermissionsMatrix />
           </TabsContent>
 
           <TabsContent value="monitoring" className="space-y-4">
