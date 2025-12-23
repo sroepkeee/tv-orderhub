@@ -468,9 +468,10 @@ export default function AIAgentLearningTab() {
                         <Button
                           size="sm"
                           onClick={() => approveSuggestion(suggestion)}
+                          className="bg-green-600 hover:bg-green-700"
                         >
-                          <ThumbsUp className="h-4 w-4 mr-1" />
-                          Aprovar
+                          <Plus className="h-4 w-4 mr-1" />
+                          Implementar
                         </Button>
                         <Button
                           size="sm"
@@ -478,7 +479,7 @@ export default function AIAgentLearningTab() {
                           onClick={() => rejectSuggestion(suggestion.id)}
                         >
                           <ThumbsDown className="h-4 w-4 mr-1" />
-                          Rejeitar
+                          Ignorar
                         </Button>
                       </div>
                     </div>

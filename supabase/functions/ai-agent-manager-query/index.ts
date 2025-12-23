@@ -60,6 +60,257 @@ function fuzzyMatch(input: string): string {
   return result;
 }
 
+// ==================== ROBUST ORDER SEARCH ====================
+
+// Normalizar número do pedido - remove caracteres não numéricos e espaços
+function normalizeOrderNumber(orderNumber: string): string {
+  // Remove espaços, caracteres invisíveis e mantém apenas dígitos
+  return orderNumber.replace(/[\s\u00A0\u200B\u200C\u200D\uFEFF]/g, '').replace(/\D/g, '');
+}
+
+// Busca robusta de pedido por número - tenta múltiplas estratégias
+async function findOrderByNumber(supabase: any, orderNumber: string, selectFields: string = '*'): Promise<any | null> {
+  const normalized = normalizeOrderNumber(orderNumber);
+  
+  if (!normalized) {
+    console.log('⚠️ findOrderByNumber: Empty order number after normalization');
+    return null;
+  }
+  
+  console.log(`🔍 findOrderByNumber: Searching for "${orderNumber}" (normalized: "${normalized}")`);
+  
+  // Estratégia 1: Match exato em order_number
+  let { data: order } = await supabase
+    .from('orders')
+    .select(selectFields)
+    .eq('order_number', normalized)
+    .limit(1)
+    .maybeSingle();
+  
+  if (order) {
+    console.log(`✅ Found via exact order_number: ${order.order_number}`);
+    return order;
+  }
+  
+  // Estratégia 2: Match exato em totvs_order_number
+  ({ data: order } = await supabase
+    .from('orders')
+    .select(selectFields)
+    .eq('totvs_order_number', normalized)
+    .limit(1)
+    .maybeSingle());
+  
+  if (order) {
+    console.log(`✅ Found via exact totvs_order_number: ${order.order_number}`);
+    return order;
+  }
+  
+  // Estratégia 3: ILIKE em order_number (contém)
+  ({ data: order } = await supabase
+    .from('orders')
+    .select(selectFields)
+    .ilike('order_number', `%${normalized}%`)
+    .limit(1)
+    .maybeSingle());
+  
+  if (order) {
+    console.log(`✅ Found via ilike order_number: ${order.order_number}`);
+    return order;
+  }
+  
+  // Estratégia 4: ILIKE em totvs_order_number
+  ({ data: order } = await supabase
+    .from('orders')
+    .select(selectFields)
+    .ilike('totvs_order_number', `%${normalized}%`)
+    .limit(1)
+    .maybeSingle());
+  
+  if (order) {
+    console.log(`✅ Found via ilike totvs_order_number: ${order.order_number}`);
+    return order;
+  }
+  
+  // Estratégia 5: Remover zeros à esquerda
+  const withoutLeadingZeros = normalized.replace(/^0+/, '');
+  if (withoutLeadingZeros && withoutLeadingZeros !== normalized) {
+    ({ data: order } = await supabase
+      .from('orders')
+      .select(selectFields)
+      .or(`order_number.ilike.%${withoutLeadingZeros}%,totvs_order_number.ilike.%${withoutLeadingZeros}%`)
+      .limit(1)
+      .maybeSingle());
+    
+    if (order) {
+      console.log(`✅ Found via without leading zeros: ${order.order_number}`);
+      return order;
+    }
+  }
+  
+  // Estratégia 6: Adicionar zeros à esquerda (para números TOTVS que usam padding)
+  const with6Digits = normalized.padStart(6, '0');
+  const with8Digits = normalized.padStart(8, '0');
+  
+  if (with6Digits !== normalized || with8Digits !== normalized) {
+    ({ data: order } = await supabase
+      .from('orders')
+      .select(selectFields)
+      .or(`order_number.eq.${with6Digits},order_number.eq.${with8Digits},totvs_order_number.eq.${with6Digits},totvs_order_number.eq.${with8Digits}`)
+      .limit(1)
+      .maybeSingle());
+    
+    if (order) {
+      console.log(`✅ Found via padded number: ${order.order_number}`);
+      return order;
+    }
+  }
+  
+  console.log(`❌ Order not found after all strategies: "${orderNumber}"`);
+  return null;
+}
+
+// ==================== LEARNING FEEDBACK INSTRUMENTATION ====================
+
+// Detectar gaps de conhecimento baseado na resposta
+function detectKnowledgeGaps(intentType: string, response: string, originalMessage: string): string[] {
+  const gaps: string[] = [];
+  
+  // Se a resposta indica que não encontrou algo
+  if (response.includes('❌') && response.includes('não encontr')) {
+    if (intentType === 'order_status') {
+      gaps.push('order_lookup_failed');
+    } else if (intentType === 'item_details') {
+      gaps.push('item_lookup_failed');
+    } else if (intentType === 'search_customer') {
+      gaps.push('customer_search_failed');
+    } else if (intentType === 'transportadora') {
+      gaps.push('carrier_search_failed');
+    } else {
+      gaps.push('general_lookup_failed');
+    }
+  }
+  
+  // Se caiu no tipo 'general', pode indicar falta de comando
+  if (intentType === 'general') {
+    gaps.push('unknown_command');
+    
+    // Detectar possíveis intenções não mapeadas
+    const msgLower = originalMessage.toLowerCase();
+    if (msgLower.includes('cancel') || msgLower.includes('cancelar')) {
+      gaps.push('missing_cancellation_command');
+    }
+    if (msgLower.includes('priorid') || msgLower.includes('urgent')) {
+      gaps.push('missing_priority_command');
+    }
+    if (msgLower.includes('retrabalho') || msgLower.includes('refaz')) {
+      gaps.push('missing_rework_command');
+    }
+  }
+  
+  return gaps;
+}
+
+// Inferir sentimento básico da mensagem
+function inferSentiment(message: string): 'positive' | 'neutral' | 'negative' {
+  const msgLower = message.toLowerCase();
+  
+  const negativeWords = ['problema', 'erro', 'urgente', 'atrasado', 'falta', 'errado', 'ruim', 'péssimo', 'absurdo'];
+  const positiveWords = ['ok', 'obrigado', 'ótimo', 'perfeito', 'bom', 'excelente', 'parabéns'];
+  
+  const hasNegative = negativeWords.some(w => msgLower.includes(w));
+  const hasPositive = positiveWords.some(w => msgLower.includes(w));
+  
+  if (hasNegative && !hasPositive) return 'negative';
+  if (hasPositive && !hasNegative) return 'positive';
+  return 'neutral';
+}
+
+// Registrar feedback de aprendizado
+async function recordLearningFeedback(
+  supabase: any,
+  params: {
+    message: string;
+    response: string;
+    intentType: string;
+    responseTimeMs: number;
+    carrierId?: string;
+    agentInstanceId?: string;
+  }
+): Promise<void> {
+  try {
+    const gaps = detectKnowledgeGaps(params.intentType, params.response, params.message);
+    const sentiment = inferSentiment(params.message);
+    
+    // Determinar status de resolução
+    const hasError = params.response.includes('❌') || params.response.includes('não encontr');
+    const resolutionStatus = hasError ? 'failed' : 'resolved';
+    
+    // Calcular confiança (maior se foi um comando bem definido)
+    const isWellDefinedCommand = !['general', 'help'].includes(params.intentType);
+    const confidenceScore = isWellDefinedCommand ? 0.9 : 0.5;
+    
+    // Inserir feedback
+    const { error } = await supabase
+      .from('ai_learning_feedback')
+      .insert({
+        agent_instance_id: params.agentInstanceId || null,
+        message_content: params.message.substring(0, 1000),
+        response_content: params.response.substring(0, 2000),
+        confidence_score: confidenceScore,
+        resolution_status: resolutionStatus,
+        response_time_ms: params.responseTimeMs,
+        knowledge_gaps_detected: gaps.length > 0 ? gaps : null,
+        customer_sentiment: sentiment,
+        feedback_source: 'manager_query',
+        feedback_notes: `Intent: ${params.intentType}`,
+      });
+    
+    if (error) {
+      console.error('⚠️ Failed to record learning feedback:', error.message);
+    } else {
+      console.log(`📊 Learning feedback recorded: ${resolutionStatus}, gaps: ${gaps.join(',') || 'none'}`);
+    }
+    
+    // Se há gaps, criar sugestão de conhecimento
+    if (gaps.length > 0 && hasError) {
+      await supabase
+        .from('ai_knowledge_suggestions')
+        .insert({
+          agent_instance_id: params.agentInstanceId || null,
+          suggestion_type: 'gap_detected',
+          suggested_title: `Melhoria: ${gaps[0].replace(/_/g, ' ')}`,
+          suggested_content: `Comando original: "${params.message}"\nResposta: "${params.response.substring(0, 200)}..."\nSugestão: Adicionar tratamento para este tipo de consulta.`,
+          suggested_category: 'Erros',
+          suggested_keywords: gaps,
+          source_question: params.message.substring(0, 500),
+          detection_reason: `Gap detectado: ${gaps.join(', ')}`,
+          confidence_score: 0.7,
+          status: 'pending',
+        });
+      
+      console.log(`💡 Knowledge suggestion created for gap: ${gaps[0]}`);
+    }
+  } catch (err) {
+    // Não propagar erro - feedback é secundário
+    console.error('⚠️ Exception in recordLearningFeedback:', err);
+  }
+}
+
+// Mensagem amigável quando pedido não é encontrado
+function getOrderNotFoundMessage(orderNumber: string): string {
+  const normalized = normalizeOrderNumber(orderNumber);
+  return `❌ Não encontrei o pedido *#${normalized || orderNumber}*.
+
+💡 *Dicas:*
+• Verifique se o número está correto
+• Tente apenas os dígitos (ex: \`status 140037\`)
+• O pedido pode ser IMPLY ou TOTVS - ambos são buscados automaticamente
+
+📋 Comandos úteis:
+• \`resumo\` - ver todos os pedidos ativos
+• \`cliente <nome>\` - buscar pedidos de um cliente`;
+}
+
 // Detectar intenção da mensagem do gestor
 function detectManagerIntent(message: string): QueryIntent {
   const correctedMessage = fuzzyMatch(message);
@@ -344,15 +595,11 @@ async function getRateioProject(supabase: any, projectCode: string): Promise<str
 
 // Buscar volumes de um pedido
 async function getOrderVolumes(supabase: any, orderNumber: string): Promise<string> {
-  const { data: order } = await supabase
-    .from('orders')
-    .select('id, order_number, customer_name')
-    .ilike('order_number', `%${orderNumber}%`)
-    .limit(1)
-    .maybeSingle();
+  // Usar busca robusta
+  const order = await findOrderByNumber(supabase, orderNumber, 'id, order_number, customer_name');
 
   if (!order) {
-    return `❌ Pedido #${orderNumber} não encontrado.`;
+    return getOrderNotFoundMessage(orderNumber);
   }
 
   const { data: volumes } = await supabase
@@ -397,15 +644,11 @@ async function getOrderVolumes(supabase: any, orderNumber: string): Promise<stri
 
 // Buscar cotações de frete
 async function getFreightQuotes(supabase: any, orderNumber: string): Promise<string> {
-  const { data: order } = await supabase
-    .from('orders')
-    .select('id, order_number, customer_name, destination_city, destination_state')
-    .ilike('order_number', `%${orderNumber}%`)
-    .limit(1)
-    .maybeSingle();
+  // Usar busca robusta
+  const order = await findOrderByNumber(supabase, orderNumber, 'id, order_number, customer_name, destination_city, destination_state');
 
   if (!order) {
-    return `❌ Pedido #${orderNumber} não encontrado.`;
+    return getOrderNotFoundMessage(orderNumber);
   }
 
   const { data: quotes } = await supabase
@@ -455,15 +698,11 @@ async function getFreightQuotes(supabase: any, orderNumber: string): Promise<str
 
 // Buscar histórico de alterações
 async function getOrderHistory(supabase: any, orderNumber: string): Promise<string> {
-  const { data: order } = await supabase
-    .from('orders')
-    .select('id, order_number, customer_name, created_at')
-    .ilike('order_number', `%${orderNumber}%`)
-    .limit(1)
-    .maybeSingle();
+  // Usar busca robusta
+  const order = await findOrderByNumber(supabase, orderNumber, 'id, order_number, customer_name, created_at');
 
   if (!order) {
-    return `❌ Pedido #${orderNumber} não encontrado.`;
+    return getOrderNotFoundMessage(orderNumber);
   }
 
   // Buscar alterações de data
@@ -517,15 +756,11 @@ async function getOrderHistory(supabase: any, orderNumber: string): Promise<stri
 
 // Listar anexos
 async function getOrderAttachments(supabase: any, orderNumber: string): Promise<string> {
-  const { data: order } = await supabase
-    .from('orders')
-    .select('id, order_number, customer_name')
-    .ilike('order_number', `%${orderNumber}%`)
-    .limit(1)
-    .maybeSingle();
+  // Usar busca robusta
+  const order = await findOrderByNumber(supabase, orderNumber, 'id, order_number, customer_name');
 
   if (!order) {
-    return `❌ Pedido #${orderNumber} não encontrado.`;
+    return getOrderNotFoundMessage(orderNumber);
   }
 
   const { data: attachments } = await supabase
@@ -1089,19 +1324,17 @@ ${alerts.join('\n')}
 
 // Buscar detalhes de um pedido específico
 async function getOrderDetails(supabase: any, orderNumber: string): Promise<string> {
-  const { data: order, error } = await supabase
-    .from('orders')
-    .select(`
-      id, order_number, customer_name, status, delivery_date, 
-      notes, created_at, freight_type, destination_city, destination_state,
-      order_items(id, item_code, item_description, requested_quantity, delivered_quantity, item_status, delivery_date, unit_price, total_value)
-    `)
-    .or(`order_number.ilike.%${orderNumber}%,order_number.eq.${orderNumber}`)
-    .limit(1)
-    .maybeSingle();
+  // Usar busca robusta que tenta múltiplas estratégias
+  const order = await findOrderByNumber(
+    supabase, 
+    orderNumber,
+    `id, order_number, customer_name, status, delivery_date, 
+     notes, created_at, updated_at, freight_type, destination_city, destination_state,
+     order_items(id, item_code, item_description, requested_quantity, delivered_quantity, item_status, delivery_date, unit_price, total_value)`
+  );
 
-  if (error || !order) {
-    return `❌ Pedido #${orderNumber} não encontrado.`;
+  if (!order) {
+    return getOrderNotFoundMessage(orderNumber);
   }
 
   const items = order.order_items || [];
@@ -2794,6 +3027,9 @@ Deno.serve(async (req) => {
     );
 
     const { message, senderPhone, carrierId } = await req.json();
+    
+    // Marcar tempo de início para calcular response time
+    const startTime = Date.now();
 
     console.log('🔍 Manager query received:', { message, senderPhone });
 
@@ -3073,11 +3309,22 @@ Deno.serve(async (req) => {
       }
     }
 
+    // 📊 Registrar feedback de aprendizado (fire and forget)
+    const responseTimeMs = Date.now() - startTime;
+    recordLearningFeedback(supabase, {
+      message,
+      response: responseMessage,
+      intentType: intent.type,
+      responseTimeMs,
+      carrierId,
+    }).catch(err => console.error('Learning feedback error:', err));
+
     return new Response(
       JSON.stringify({ 
         success: true, 
         intent: intent.type,
         response: responseMessage,
+        responseTimeMs,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
