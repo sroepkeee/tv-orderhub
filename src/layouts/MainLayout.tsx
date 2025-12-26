@@ -3,6 +3,7 @@ import AppSidebar from "@/components/sidebar/AppSidebar";
 import { Order } from "@/components/Dashboard";
 import { KanbanDensity } from "@/hooks/useKanbanDensity";
 import { ViewMode } from "@/components/ViewControls";
+import EnvironmentBadge from "@/components/EnvironmentBadge";
 
 interface MainLayoutProps {
   children: React.ReactNode;
@@ -32,8 +33,9 @@ const MainLayout = ({
 }: MainLayoutProps) => {
   return (
     <SidebarProvider>
+      <EnvironmentBadge />
       <div className="flex min-h-screen w-full">
-        <AppSidebar 
+        <AppSidebar
           orders={orders}
           unreadConversationsCount={unreadConversationsCount}
           pendingApprovalsCount={pendingApprovalsCount}
