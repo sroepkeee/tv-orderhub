@@ -275,17 +275,21 @@ export function ManagementReportSettings() {
 
   const activeRecipients = recipients.filter(r => r.is_active).length;
 
-  // SQL para configurar o cron job
+  // SQL para configurar os cron jobs (08:00 e 13:30)
   const cronJobSQL = `-- IMPORTANTE: Primeiro habilite as extensões no Dashboard do Supabase
 -- Database → Extensions → Habilitar "pg_cron" e "pg_net"
 
 -- Depois execute este SQL no SQL Editor do Supabase:
 
--- Remover job existente (se houver)
+-- ========================================
+-- REMOVER JOBS EXISTENTES (se houver)
+-- ========================================
 SELECT cron.unschedule('daily-management-report-08h');
+SELECT cron.unschedule('daily-management-report-1330');
 
--- Agendar o relatório diário às 08:00 (horário de Brasília)
--- 11:00 UTC = 08:00 BRT
+-- ========================================
+-- AGENDAR RELATÓRIO DAS 08:00 (11:00 UTC = 08:00 BRT)
+-- ========================================
 SELECT cron.schedule(
   'daily-management-report-08h',
   '0 11 * * 1-6', -- Segunda a Sábado às 11:00 UTC (08:00 BRT)
@@ -293,15 +297,32 @@ SELECT cron.schedule(
   SELECT net.http_post(
     url := 'https://wejkyyjhckdlttieuyku.supabase.co/functions/v1/daily-management-report',
     headers := '{"Content-Type": "application/json", "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Indlamt5eWpoY2tkbHR0aWV1eWt1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkxNzMxNzYsImV4cCI6MjA3NDc0OTE3Nn0.iS9y0xOEbv1N7THwbmeQ2DLB5ablnUU6rDs7XDVGG3c"}'::jsonb,
-    body := '{"includeChart": true}'::jsonb
+    body := '{"includeChart": true, "includeKanbanVisual": true, "sendEmail": true, "sendPhaseReports": true, "scheduleTime": "08:00"}'::jsonb
   ) AS request_id;
   $$
 );
 
--- Verificar se o job foi criado
+-- ========================================
+-- AGENDAR RELATÓRIO DAS 13:30 (16:30 UTC = 13:30 BRT)
+-- ========================================
+SELECT cron.schedule(
+  'daily-management-report-1330',
+  '30 16 * * 1-6', -- Segunda a Sábado às 16:30 UTC (13:30 BRT)
+  $$
+  SELECT net.http_post(
+    url := 'https://wejkyyjhckdlttieuyku.supabase.co/functions/v1/daily-management-report',
+    headers := '{"Content-Type": "application/json", "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Indlamt5eWpoY2tkbHR0aWV1eWt1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkxNzMxNzYsImV4cCI6MjA3NDc0OTE3Nn0.iS9y0xOEbv1N7THwbmeQ2DLB5ablnUU6rDs7XDVGG3c"}'::jsonb,
+    body := '{"includeChart": true, "includeKanbanVisual": true, "sendEmail": true, "sendPhaseReports": true, "scheduleTime": "13:30"}'::jsonb
+  ) AS request_id;
+  $$
+);
+
+-- ========================================
+-- VERIFICAR SE OS JOBS FORAM CRIADOS
+-- ========================================
 SELECT jobid, jobname, schedule, active 
 FROM cron.job 
-WHERE jobname = 'daily-management-report-08h';`;
+WHERE jobname LIKE 'daily-management-report%';`;
 
   async function checkCronStatus() {
     setCronLoading(true);

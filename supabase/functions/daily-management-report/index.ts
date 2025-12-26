@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { Resend } from "https://esm.sh/resend@2.0.0";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -52,8 +53,8 @@ interface OrderMetrics {
     gerarOrdem: number;
     compras: number;
     almoxGeral: number;
-    producaoClientes: number;  // SEPARADO
-    producaoEstoque: number;   // SEPARADO
+    producaoClientes: number;
+    producaoEstoque: number;
     gerarSaldo: number;
     laboratorio: number;
     embalagem: number;
@@ -104,7 +105,7 @@ interface OrderMetrics {
     }>;
   }>;
 
-  // NOVO: Análise detalhada de fases críticas
+  // Análise detalhada de fases críticas
   criticalPhaseAnalysis: {
     compras: {
       count: number;
@@ -147,7 +148,7 @@ interface OrderMetrics {
     };
   };
 
-  // NOVO: Pedidos extremamente atrasados (>30 dias)
+  // Pedidos extremamente atrasados (>30 dias)
   extremelyOverdueOrders: Array<{
     orderNumber: string;
     customer: string;
@@ -157,7 +158,7 @@ interface OrderMetrics {
     phaseLabel: string;
   }>;
 
-  // NOVO: Saúde do Portfólio
+  // Saúde do Portfólio
   portfolioHealth: {
     onTime: { count: number; percentage: number };
     late1to7: { count: number; percentage: number };
@@ -166,8 +167,17 @@ interface OrderMetrics {
   };
 }
 
+// Interface para gestor de fase
+interface PhaseManager {
+  user_id: string;
+  phase_key: string;
+  whatsapp: string;
+  email?: string;
+  full_name: string;
+  receive_daily_summary: boolean;
+}
+
 // ==================== MAPEAMENTOS ====================
-// Status para fase base (produção será resolvida dinamicamente baseado em order_category)
 const statusToPhaseBase: Record<string, string> = {
   // Almox SSM
   'almox_ssm_pending': 'almoxSsm',
@@ -187,7 +197,7 @@ const statusToPhaseBase: Record<string, string> = {
   'almox_general_received': 'almoxGeral',
   'almox_general_separating': 'almoxGeral',
   'almox_general_ready': 'almoxGeral',
-  // Produção (será mapeado dinamicamente)
+  // Produção
   'separation_started': 'producao',
   'in_production': 'producao',
   'awaiting_material': 'producao',
@@ -231,13 +241,29 @@ const statusToPhaseBase: Record<string, string> = {
   'cancelled': 'conclusao',
 };
 
-// Função para determinar fase real (separando produção por categoria)
+// Mapeamento de phase_key do banco para chave interna
+const phaseKeyDbToInternal: Record<string, string> = {
+  'almox_ssm': 'almoxSsm',
+  'order_generation': 'gerarOrdem',
+  'purchases': 'compras',
+  'almox_general': 'almoxGeral',
+  'production_client': 'producaoClientes',
+  'production_stock': 'producaoEstoque',
+  'balance_generation': 'gerarSaldo',
+  'laboratory': 'laboratorio',
+  'packaging': 'embalagem',
+  'freight_quote': 'cotacao',
+  'ready_to_invoice': 'aFaturar',
+  'invoicing': 'faturamento',
+  'logistics': 'expedicao',
+  'in_transit': 'emTransito',
+  'completion': 'conclusao',
+};
+
 function getPhaseFromOrder(status: string, orderCategory: string): string {
   const basePhase = statusToPhaseBase[status] || 'conclusao';
   
-  // Se é produção, separar por categoria do pedido
   if (basePhase === 'producao') {
-    // 'vendas' = clientes, outros = estoque
     return orderCategory === 'vendas' ? 'producaoClientes' : 'producaoEstoque';
   }
   
@@ -249,8 +275,8 @@ const phaseLabels: Record<string, string> = {
   'gerarOrdem': '📋 Gerar Ordem',
   'compras': '🛒 Compras',
   'almoxGeral': '📦 Almox Geral',
-  'producaoClientes': '🔧 Produção Clientes',  // NOVO
-  'producaoEstoque': '📦 Produção Estoque',     // NOVO
+  'producaoClientes': '🔧 Produção Clientes',
+  'producaoEstoque': '📦 Produção Estoque',
   'gerarSaldo': '📊 Gerar Saldo',
   'laboratorio': '🔬 Laboratório',
   'embalagem': '📦 Embalagem',
@@ -262,7 +288,6 @@ const phaseLabels: Record<string, string> = {
   'conclusao': '✅ Conclusão',
 };
 
-// Ordem de exibição das fases (como no Kanban)
 const phaseOrder: string[] = [
   'almoxSsm',
   'gerarOrdem', 
@@ -326,10 +351,10 @@ const statusLabels: Record<string, string> = {
 const phaseThresholds: Record<string, number> = {
   'almoxSsm': 2,
   'gerarOrdem': 2,
-  'compras': 10,          // Compras tem threshold maior
+  'compras': 10,
   'almoxGeral': 2,
-  'producaoClientes': 7,  // NOVO
-  'producaoEstoque': 7,   // NOVO
+  'producaoClientes': 7,
+  'producaoEstoque': 7,
   'gerarSaldo': 1,
   'laboratorio': 3,
   'embalagem': 2,
@@ -347,7 +372,6 @@ async function calculateMetrics(supabase: any): Promise<OrderMetrics> {
   const lastWeek = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
   const twoWeeksAgo = new Date(today.getTime() - 14 * 24 * 60 * 60 * 1000);
 
-  // Buscar pedidos ativos COM order_items e order_category para calcular valor e fase
   const { data: orders, error: ordersError } = await supabase
     .from('orders')
     .select(`
@@ -364,7 +388,6 @@ async function calculateMetrics(supabase: any): Promise<OrderMetrics> {
   const activeOrders = orders || [];
   console.log(`📦 Found ${activeOrders.length} active orders`);
 
-  // Buscar histórico de status para calcular dias na fase corretamente
   const orderIds = activeOrders.map((o: any) => o.id);
   let lastStatusChangeMap: Record<string, Date> = {};
   
@@ -380,27 +403,24 @@ async function calculateMetrics(supabase: any): Promise<OrderMetrics> {
     } else {
       console.log(`📜 Found ${historyData?.length || 0} history records`);
       
-      // Criar mapa de última entrada na fase por pedido
       activeOrders.forEach((order: any) => {
         const history = historyData?.filter((h: any) => h.order_id === order.id && h.new_status === order.status);
         if (history && history.length > 0) {
           lastStatusChangeMap[order.id] = new Date(history[0].changed_at);
         } else {
-          // Fallback para created_at se não houver histórico
           lastStatusChangeMap[order.id] = new Date(order.created_at);
         }
       });
     }
   }
 
-  // Inicializar contadores por fase (TODAS as fases)
   const byPhase: OrderMetrics['byPhase'] = {
     almoxSsm: 0, 
     gerarOrdem: 0, 
     compras: 0, 
     almoxGeral: 0,
-    producaoClientes: 0,  // NOVO
-    producaoEstoque: 0,   // NOVO
+    producaoClientes: 0,
+    producaoEstoque: 0,
     gerarSaldo: 0, 
     laboratorio: 0, 
     embalagem: 0,
@@ -416,14 +436,12 @@ async function calculateMetrics(supabase: any): Promise<OrderMetrics> {
   const phaseDays: Record<string, number[]> = {};
   const phaseValues: Record<string, number> = {};
   
-  // Para análise crítica de Compras e Produção
   const criticalPhaseOrders: Record<string, any[]> = {
     compras: [],
     producaoClientes: [],
     producaoEstoque: [],
   };
   
-  // NOVO: Para pedidos extremamente atrasados e saúde do portfólio
   const allOrdersWithOverdue: any[] = [];
   let healthOnTime = 0;
   let healthLate1to7 = 0;
@@ -447,25 +465,20 @@ async function calculateMetrics(supabase: any): Promise<OrderMetrics> {
     const status = order.status || 'unknown';
     const orderCategory = order.order_category || 'estoque';
     
-    // Usar função para determinar fase real
     const phaseKey = getPhaseFromOrder(status, orderCategory);
     
-    // Contar por fase
     if (phaseKey in byPhase) {
       (byPhase as any)[phaseKey]++;
     }
     
-    // Agrupar pedidos por fase
     if (!phaseOrders[phaseKey]) phaseOrders[phaseKey] = [];
     if (!phaseDays[phaseKey]) phaseDays[phaseKey] = [];
     if (!phaseValues[phaseKey]) phaseValues[phaseKey] = 0;
     
-    // Calcular dias na fase usando histórico de mudança de status (mais preciso)
     const phaseStartedAt = lastStatusChangeMap[order.id] || new Date(order.created_at);
     const daysInPhase = Math.ceil((today.getTime() - phaseStartedAt.getTime()) / (1000 * 60 * 60 * 24));
     phaseDays[phaseKey].push(daysInPhase);
 
-    // Calcular dias até entrega e dias de atraso
     let daysUntilDelivery = 999;
     let daysOverdue = 0;
     if (order.delivery_date) {
@@ -474,7 +487,6 @@ async function calculateMetrics(supabase: any): Promise<OrderMetrics> {
       daysOverdue = daysUntilDelivery < 0 ? Math.abs(daysUntilDelivery) : 0;
     }
 
-    // Calcular valor somando dos itens
     const orderValue = (order.order_items || []).reduce((sum: number, item: any) => {
       const itemValue = item.total_value || (item.unit_price * item.requested_quantity) || 0;
       return sum + Number(itemValue);
@@ -482,7 +494,6 @@ async function calculateMetrics(supabase: any): Promise<OrderMetrics> {
     totalValue += orderValue;
     phaseValues[phaseKey] = (phaseValues[phaseKey] || 0) + orderValue;
     
-    // Guardar valor calculado no objeto order para uso posterior
     (order as any).calculated_value = orderValue;
     (order as any).days_in_phase = daysInPhase;
     (order as any).days_overdue = daysOverdue;
@@ -497,7 +508,6 @@ async function calculateMetrics(supabase: any): Promise<OrderMetrics> {
       value: orderValue,
     });
 
-    // Coletar dados para análise de fases críticas (com daysOverdue)
     if (phaseKey === 'compras' || phaseKey === 'producaoClientes' || phaseKey === 'producaoEstoque') {
       criticalPhaseOrders[phaseKey].push({
         orderNumber: order.order_number,
@@ -509,7 +519,6 @@ async function calculateMetrics(supabase: any): Promise<OrderMetrics> {
       });
     }
 
-    // NOVO: Coletar todos os pedidos para análise de extremamente atrasados
     allOrdersWithOverdue.push({
       orderNumber: order.order_number,
       customer: order.customer_name,
@@ -519,7 +528,6 @@ async function calculateMetrics(supabase: any): Promise<OrderMetrics> {
       phaseLabel: phaseLabels[phaseKey] || phaseKey,
     });
 
-    // NOVO: Calcular saúde do portfólio
     if (daysOverdue === 0) {
       healthOnTime++;
     } else if (daysOverdue >= 1 && daysOverdue <= 7) {
@@ -530,7 +538,6 @@ async function calculateMetrics(supabase: any): Promise<OrderMetrics> {
       healthLateOver30++;
     }
 
-    // Verificar se é novo hoje
     const createdAt = new Date(order.created_at);
     createdAt.setHours(0, 0, 0, 0);
     if (createdAt.getTime() === today.getTime()) {
@@ -538,7 +545,6 @@ async function calculateMetrics(supabase: any): Promise<OrderMetrics> {
       startedToday++;
     }
 
-    // Verificar prazo de entrega
     if (order.delivery_date) {
       const deliveryDate = new Date(order.delivery_date);
       deliveryDate.setHours(0, 0, 0, 0);
@@ -557,7 +563,6 @@ async function calculateMetrics(supabase: any): Promise<OrderMetrics> {
       }
     }
 
-    // Verificar alertas específicos
     if (status === 'awaiting_lab' || status === 'in_lab_analysis') {
       pendingLab++;
     }
@@ -568,19 +573,16 @@ async function calculateMetrics(supabase: any): Promise<OrderMetrics> {
       awaitingMaterial++;
     }
 
-    // Calcular tempo de produção (ambas as fases)
     if (phaseKey === 'producaoClientes' || phaseKey === 'producaoEstoque') {
       productionDays.push(daysInPhase);
     }
   });
 
-  // NOVO: Filtrar e ordenar pedidos extremamente atrasados (>30 dias)
   const extremelyOverdueOrders = allOrdersWithOverdue
     .filter(o => o.daysOverdue > 30)
     .sort((a, b) => b.daysOverdue - a.daysOverdue)
     .slice(0, 10);
 
-  // NOVO: Calcular percentuais de saúde do portfólio
   const totalOrders = activeOrders.length;
   const portfolioHealth = {
     onTime: { 
@@ -601,12 +603,10 @@ async function calculateMetrics(supabase: any): Promise<OrderMetrics> {
     },
   };
 
-  // Calcular SLA rate
   const onTimeRate = activeOrders.length > 0 
     ? Math.round((onTimeCount / activeOrders.length) * 100) 
     : 100;
 
-  // Calcular estatísticas de produção
   const production = {
     avgDays: productionDays.length > 0 ? Math.round(productionDays.reduce((a, b) => a + b, 0) / productionDays.length) : 0,
     minDays: productionDays.length > 0 ? Math.min(...productionDays) : 0,
@@ -616,7 +616,6 @@ async function calculateMetrics(supabase: any): Promise<OrderMetrics> {
     endingToday,
   };
 
-  // Identificar gargalos
   const bottlenecks: OrderMetrics['bottlenecks'] = [];
   for (const [phaseKey, days] of Object.entries(phaseDays)) {
     if (days.length === 0) continue;
@@ -634,19 +633,15 @@ async function calculateMetrics(supabase: any): Promise<OrderMetrics> {
   }
   bottlenecks.sort((a, b) => b.avgDays - a.avgDays);
 
-  // Calcular análise de fases críticas (Compras ordenado por daysOverdue, outros por daysInPhase)
   const calculateCriticalPhaseStats = (phaseKey: string, sortByOverdue: boolean = false) => {
     const orders = criticalPhaseOrders[phaseKey] || [];
     const days = phaseDays[phaseKey] || [];
     const value = phaseValues[phaseKey] || 0;
     
-    // Para Compras: ordenar por dias de atraso (mais atrasados primeiro)
-    // Para Produção: ordenar por dias na fase (mais antigos primeiro)
     const sortedOrders = sortByOverdue 
       ? [...orders].sort((a, b) => b.daysOverdue - a.daysOverdue)
       : [...orders].sort((a, b) => b.daysInPhase - a.daysInPhase);
     
-    // Calcular max daysOverdue
     const maxDaysOverdue = orders.length > 0 
       ? Math.max(...orders.map((o: any) => o.daysOverdue || 0)) 
       : 0;
@@ -669,12 +664,12 @@ async function calculateMetrics(supabase: any): Promise<OrderMetrics> {
   };
 
   const criticalPhaseAnalysis = {
-    compras: calculateCriticalPhaseStats('compras', true), // Ordenar por atraso
+    compras: calculateCriticalPhaseStats('compras', true),
     producaoClientes: calculateCriticalPhaseStats('producaoClientes', false),
     producaoEstoque: calculateCriticalPhaseStats('producaoEstoque', false),
   };
 
-  // ==================== TENDÊNCIAS SEMANAIS ====================
+  // Tendências semanais
   const { data: thisWeekCreated } = await supabase
     .from('orders')
     .select('id, order_items(total_value, unit_price, requested_quantity)')
@@ -699,7 +694,6 @@ async function calculateMetrics(supabase: any): Promise<OrderMetrics> {
     .gte('updated_at', twoWeeksAgo.toISOString())
     .lt('updated_at', lastWeek.toISOString());
 
-  // Contar mudanças de data nos últimos 7 dias
   const { count: dateChanges } = await supabase
     .from('delivery_date_changes')
     .select('id', { count: 'exact', head: true })
@@ -710,7 +704,6 @@ async function calculateMetrics(supabase: any): Promise<OrderMetrics> {
   const deliveredThisWeek = thisWeekDelivered?.length || 0;
   const deliveredLastWeek = lastWeekDelivered?.length || 0;
   
-  // Calcular valor somando order_items
   const calcOrderValue = (order: any) => {
     return (order.order_items || []).reduce((sum: number, item: any) => {
       const itemValue = item.total_value || (item.unit_price * item.requested_quantity) || 0;
@@ -734,7 +727,7 @@ async function calculateMetrics(supabase: any): Promise<OrderMetrics> {
     dateChanges7d: dateChanges || 0,
   };
 
-  // ==================== TOP PEDIDOS (com daysOverdue) ====================
+  // Top pedidos
   const topOrders = activeOrders
     .filter((o: any) => (o as any).calculated_value > 0)
     .sort((a: any, b: any) => ((b as any).calculated_value || 0) - ((a as any).calculated_value || 0))
@@ -757,16 +750,16 @@ async function calculateMetrics(supabase: any): Promise<OrderMetrics> {
       };
     });
 
-  // ==================== DETALHES POR FASE (TODAS as fases, na ordem do Kanban) ====================
+  // Detalhes por fase
   const phaseDetails = phaseOrder
-    .filter(phaseKey => phaseKey !== 'conclusao') // Excluir conclusão dos ativos
+    .filter(phaseKey => phaseKey !== 'conclusao')
     .map(phaseKey => ({
       phase: phaseLabels[phaseKey] || phaseKey,
       phaseKey,
       count: (byPhase as any)[phaseKey] || 0,
       orders: (phaseOrders[phaseKey] || []).slice(0, 3),
     }))
-    .filter(phase => phase.count > 0); // Só mostrar fases com pedidos
+    .filter(phase => phase.count > 0);
 
   return {
     totalActive: activeOrders.length,
@@ -805,7 +798,7 @@ function getTrendArrow(change: number): string {
   return '0%';
 }
 
-function formatReportMessage(metrics: OrderMetrics, date: Date): string {
+function formatReportMessage(metrics: OrderMetrics, date: Date, scheduleTime?: string): string {
   const dateStr = date.toLocaleDateString('pt-BR', {
     weekday: 'long',
     year: 'numeric',
@@ -813,10 +806,12 @@ function formatReportMessage(metrics: OrderMetrics, date: Date): string {
     day: 'numeric',
   });
 
-  let message = `📊 *RELATÓRIO GERENCIAL DIÁRIO*\n`;
-  message += `📅 ${dateStr}\n\n`;
+  const timeLabel = scheduleTime || date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 
-  // ========== RESUMO EXECUTIVO ==========
+  let message = `📊 *RELATÓRIO GERENCIAL DIÁRIO*\n`;
+  message += `📅 ${dateStr} • ${timeLabel}\n\n`;
+
+  // RESUMO EXECUTIVO
   message += `━━━━━━━━━━━━━━━━━━━━━━\n`;
   message += `📈 *RESUMO EXECUTIVO*\n`;
   message += `━━━━━━━━━━━━━━━━━━━━━━\n`;
@@ -825,7 +820,7 @@ function formatReportMessage(metrics: OrderMetrics, date: Date): string {
   message += `• Taxa de Cumprimento: *${metrics.sla.onTimeRate}%* ${metrics.sla.onTimeRate >= 85 ? '✅' : metrics.sla.onTimeRate >= 70 ? '⚠️' : '🔴'}\n`;
   message += `• Novos Hoje: *${metrics.newToday}*\n\n`;
 
-  // ========== ALERTAS CRÍTICOS ==========
+  // ALERTAS CRÍTICOS
   if (metrics.alerts.delayed > 0 || metrics.alerts.critical > 0 || metrics.alerts.pendingPurchase > 0) {
     message += `🚨 *ALERTAS CRÍTICOS*\n`;
     message += `━━━━━━━━━━━━━━━━━━━━━━\n`;
@@ -845,7 +840,7 @@ function formatReportMessage(metrics: OrderMetrics, date: Date): string {
     message += `\n`;
   }
 
-  // ========== NOVO: PEDIDOS EXTREMAMENTE ATRASADOS (>30 dias) ==========
+  // PEDIDOS EXTREMAMENTE ATRASADOS
   if (metrics.extremelyOverdueOrders && metrics.extremelyOverdueOrders.length > 0) {
     message += `🆘 *PEDIDOS EXTREMAMENTE ATRASADOS*\n`;
     message += `━━━━━━━━━━━━━━━━━━━━━━\n`;
@@ -862,7 +857,7 @@ function formatReportMessage(metrics: OrderMetrics, date: Date): string {
     message += `\n`;
   }
 
-  // ========== NOVO: SAÚDE DO PORTFÓLIO ==========
+  // SAÚDE DO PORTFÓLIO
   if (metrics.portfolioHealth) {
     message += `🩺 *SAÚDE DO PORTFÓLIO*\n`;
     message += `━━━━━━━━━━━━━━━━━━━━━━\n`;
@@ -872,7 +867,7 @@ function formatReportMessage(metrics: OrderMetrics, date: Date): string {
     message += `🆘 > 30 dias atrasados: *${metrics.portfolioHealth.lateOver30.count}* (${metrics.portfolioHealth.lateOver30.percentage}%)\n\n`;
   }
 
-  // ========== ANÁLISE DETALHADA - COMPRAS (ORDENADO POR ATRASO) ==========
+  // ANÁLISE DETALHADA - COMPRAS
   const comprasAnalysis = metrics.criticalPhaseAnalysis.compras;
   if (comprasAnalysis.count > 0) {
     message += `🛒 *ANÁLISE DETALHADA - COMPRAS*\n`;
@@ -890,14 +885,13 @@ function formatReportMessage(metrics: OrderMetrics, date: Date): string {
       });
     }
     
-    // Alerta de gargalo em Compras
     if (comprasAnalysis.avgDays > phaseThresholds['compras']) {
       message += `\n⚠️ *GARGALO:* Tempo médio acima do limite (${phaseThresholds['compras']}d)\n`;
     }
     message += `\n`;
   }
 
-  // ========== ANÁLISE DETALHADA - PRODUÇÃO (NOVA SEÇÃO) ==========
+  // ANÁLISE DETALHADA - PRODUÇÃO
   const prodClientesAnalysis = metrics.criticalPhaseAnalysis.producaoClientes;
   const prodEstoqueAnalysis = metrics.criticalPhaseAnalysis.producaoEstoque;
   const totalProducao = prodClientesAnalysis.count + prodEstoqueAnalysis.count;
@@ -932,7 +926,6 @@ function formatReportMessage(metrics: OrderMetrics, date: Date): string {
       }
     }
     
-    // Alerta de gargalo em Produção
     const avgProducao = totalProducao > 0 
       ? ((prodClientesAnalysis.avgDays * prodClientesAnalysis.count) + (prodEstoqueAnalysis.avgDays * prodEstoqueAnalysis.count)) / totalProducao
       : 0;
@@ -942,66 +935,39 @@ function formatReportMessage(metrics: OrderMetrics, date: Date): string {
     message += `\n`;
   }
 
-  // ========== TENDÊNCIAS ==========
+  // TENDÊNCIAS SEMANAIS
   message += `📊 *TENDÊNCIAS (vs semana anterior)*\n`;
   message += `━━━━━━━━━━━━━━━━━━━━━━\n`;
   message += `• Novos: ${metrics.trends.newOrdersThisWeek} (${getTrendArrow(metrics.trends.newOrdersChange)})\n`;
   message += `• Entregues: ${metrics.trends.deliveredThisWeek} (${getTrendArrow(metrics.trends.deliveredChange)})\n`;
   message += `• Valor: ${formatCurrency(metrics.trends.valueThisWeek)} (${getTrendArrow(metrics.trends.valueChange)})\n`;
-  if (metrics.trends.dateChanges7d > 0) {
-    message += `• Mudanças de prazo: ${metrics.trends.dateChanges7d}\n`;
-  }
-  message += `\n`;
+  message += `• Mudanças de prazo: ${metrics.trends.dateChanges7d}\n\n`;
 
-  // ========== DISTRIBUIÇÃO POR FASE (TODAS AS FASES COM PEDIDOS) ==========
+  // DISTRIBUIÇÃO POR FASE
   message += `📦 *DISTRIBUIÇÃO POR FASE*\n`;
   message += `━━━━━━━━━━━━━━━━━━━━━━\n`;
-  
-  // Ordenar por quantidade e mostrar todas que têm pedidos
-  const sortedPhases = [...metrics.phaseDetails].sort((a, b) => b.count - a.count);
-  sortedPhases.forEach(phase => {
+  metrics.phaseDetails.forEach((phase) => {
     message += `• ${phase.phase}: *${phase.count}*\n`;
   });
   message += `\n`;
 
-  // ========== GARGALOS ==========
-  if (metrics.bottlenecks.length > 0) {
-    message += `🎯 *GARGALOS IDENTIFICADOS*\n`;
-    message += `━━━━━━━━━━━━━━━━━━━━━━\n`;
-    metrics.bottlenecks.slice(0, 5).forEach(b => {
-      message += `⚠️ ${b.phase}: ${b.avgDays}d média (limite: ${b.threshold}d) - ${b.count} pedidos\n`;
-    });
-    message += `\n`;
-  }
-
-  // ========== TOP 5 PEDIDOS (COM INDICADORES DE ATRASO EXTREMO) ==========
+  // TOP 5 PEDIDOS
   if (metrics.topOrders.length > 0) {
     message += `💰 *TOP 5 PEDIDOS (MAIOR VALOR)*\n`;
     message += `━━━━━━━━━━━━━━━━━━━━━━\n`;
+    
     metrics.topOrders.forEach((order, idx) => {
-      // Indicadores visuais baseados no atraso
-      let daysIcon = '🕐';
-      let daysText = '';
-      
-      if (order.daysOverdue > 30) {
-        daysIcon = '🆘';
-        daysText = `${order.daysOverdue}d atrasado`;
-      } else if (order.daysOverdue > 0) {
-        daysIcon = '⚠️';
-        daysText = `${order.daysOverdue}d atrasado`;
-      } else if (order.daysUntilDelivery <= 2) {
-        daysIcon = '🔴';
-        daysText = order.daysUntilDelivery === 0 ? 'Hoje' : `${order.daysUntilDelivery}d`;
-      } else {
-        daysText = `${order.daysUntilDelivery}d`;
-      }
-      
-      message += `${idx + 1}. *${order.orderNumber}* - ${order.customer}\n`;
+      const daysIcon = order.daysOverdue > 0 ? '⚠️' : order.daysUntilDelivery <= 2 ? '🔴' : '✅';
+      const daysText = order.daysOverdue > 0 
+        ? `${order.daysOverdue}d atrasado` 
+        : `${order.daysUntilDelivery}d`;
+
+      message += `${idx + 1}. *${order.orderNumber}* - ${order.customer.substring(0, 30)}\n`;
       message += `   ${formatCurrency(order.totalValue)} | ${order.statusLabel} | ${daysIcon} ${daysText}\n\n`;
     });
   }
 
-  // ========== ESTATÍSTICAS DE PRODUÇÃO ==========
+  // ESTATÍSTICAS DE PRODUÇÃO
   if (metrics.production.avgDays > 0) {
     message += `🔧 *TEMPO EM PRODUÇÃO*\n`;
     message += `━━━━━━━━━━━━━━━━━━━━━━\n`;
@@ -1016,6 +982,90 @@ function formatReportMessage(metrics: OrderMetrics, date: Date): string {
   message += `━━━━━━━━━━━━━━━━━━━━━━\n`;
   message += `🤖 _Relatório gerado às ${date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}_\n`;
   message += `_Sistema de Gestão Imply_`;
+
+  return message;
+}
+
+// ==================== FORMATAÇÃO - RELATÓRIO POR FASE ====================
+function formatPhaseSpecificReport(
+  metrics: OrderMetrics, 
+  phaseKey: string, 
+  phaseName: string,
+  date: Date
+): string {
+  const dateStr = date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  const timeStr = date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+
+  // Encontrar dados da fase
+  const phaseData = metrics.phaseDetails.find(p => p.phaseKey === phaseKey);
+  const phaseCount = (metrics.byPhase as any)[phaseKey] || 0;
+
+  let message = `📊 *RESUMO DA FASE: ${phaseName.toUpperCase()}*\n`;
+  message += `─────────────────────\n`;
+  message += `📅 ${dateStr} às ${timeStr}\n\n`;
+
+  message += `📦 Pedidos na fase: *${phaseCount}*\n`;
+
+  // Calcular atrasados na fase
+  const phaseOrders = phaseData?.orders || [];
+  const overdueInPhase = phaseOrders.filter((o: any) => o.daysOverdue > 0).length;
+
+  if (overdueInPhase > 0) {
+    message += `⚠️ Críticos (atraso): *${overdueInPhase}*\n`;
+  }
+
+  // Se é uma fase crítica, mostrar análise detalhada
+  if (phaseKey === 'compras') {
+    const analysis = metrics.criticalPhaseAnalysis.compras;
+    message += `⏱️ Tempo médio: *${analysis.avgDays}* dias\n`;
+    message += `💰 Valor parado: *${formatCurrency(analysis.totalValue)}*\n`;
+    
+    if (analysis.oldestOrders.length > 0) {
+      message += `\n🔝 *Top 3 mais atrasados:*\n`;
+      analysis.oldestOrders.forEach((order, idx) => {
+        message += `${idx + 1}. #${order.orderNumber} - ${order.customer.substring(0, 20)} (${order.daysOverdue}d)\n`;
+      });
+    }
+  } else if (phaseKey === 'producaoClientes') {
+    const analysis = metrics.criticalPhaseAnalysis.producaoClientes;
+    message += `⏱️ Tempo médio: *${analysis.avgDays}* dias\n`;
+    message += `💰 Valor: *${formatCurrency(analysis.totalValue)}*\n`;
+    
+    if (analysis.oldestOrders.length > 0) {
+      message += `\n🔝 *Top 3 mais antigos:*\n`;
+      analysis.oldestOrders.forEach((order, idx) => {
+        message += `${idx + 1}. #${order.orderNumber} - ${order.customer.substring(0, 20)} (${order.daysInPhase}d)\n`;
+      });
+    }
+  } else if (phaseKey === 'producaoEstoque') {
+    const analysis = metrics.criticalPhaseAnalysis.producaoEstoque;
+    message += `⏱️ Tempo médio: *${analysis.avgDays}* dias\n`;
+    message += `💰 Valor: *${formatCurrency(analysis.totalValue)}*\n`;
+    
+    if (analysis.oldestOrders.length > 0) {
+      message += `\n🔝 *Top 3 mais antigos:*\n`;
+      analysis.oldestOrders.forEach((order, idx) => {
+        message += `${idx + 1}. #${order.orderNumber} - ${order.customer.substring(0, 20)} (${order.daysInPhase}d)\n`;
+      });
+    }
+  } else if (phaseData && phaseData.orders.length > 0) {
+    // Mostrar top 3 para outras fases
+    message += `\n🔝 *Top 3 pedidos:*\n`;
+    phaseData.orders.slice(0, 3).forEach((order: any, idx: number) => {
+      const daysText = order.daysOverdue > 0 ? `${order.daysOverdue}d atrasado` : `${order.daysUntil}d`;
+      message += `${idx + 1}. #${order.orderNumber} - ${order.customer.substring(0, 20)} (${daysText})\n`;
+    });
+  }
+
+  // Resumo geral (breve)
+  message += `\n─────────────────────\n`;
+  message += `📈 *Visão Geral:*\n`;
+  message += `• Total ativos: ${metrics.totalActive}\n`;
+  message += `• SLA geral: ${metrics.sla.onTimeRate}%\n`;
+  message += `• Atrasados: ${metrics.alerts.delayed}\n`;
+
+  message += `\n_Acesse o sistema para detalhes._\n`;
+  message += `🤖 _Sistema de Gestão Imply_`;
 
   return message;
 }
@@ -1080,6 +1130,76 @@ Requirements:
     return null;
   } catch (error) {
     console.error('Error generating distribution chart:', error);
+    return null;
+  }
+}
+
+// Gerar imagem visual do Kanban (barras horizontais)
+async function generateKanbanVisual(metrics: OrderMetrics): Promise<string | null> {
+  try {
+    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+    if (!LOVABLE_API_KEY) {
+      console.log('LOVABLE_API_KEY not configured, skipping Kanban visual generation');
+      return null;
+    }
+
+    // Preparar dados para o Kanban visual
+    const kanbanData = metrics.phaseDetails
+      .map(p => {
+        const hasOverdue = (metrics.byPhase as any)[p.phaseKey] > 0;
+        return `${p.phase.replace(/[📥📋🛒📦🔧📊🔬💰💳🧾🚛🚚✅👥]/g, '').trim()}: ${p.count} orders`;
+      })
+      .join('\n');
+    
+    const date = new Date().toLocaleDateString('pt-BR');
+    const time = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+
+    const prompt = `Create a professional horizontal bar chart representing a Kanban board status:
+
+Data:
+${kanbanData}
+
+Requirements:
+- Horizontal bars representing each phase/column
+- Bar length proportional to number of orders
+- Use a color gradient: green for start phases, yellow for middle, red for end phases that need attention
+- Title: "📊 Status do Kanban - ${date} ${time}"
+- Show the count value at the end of each bar
+- Dark theme with #1F2937 background
+- White/light text labels
+- Professional dashboard style
+- Dimensions: 1000x600 pixels
+- Add visual indicators: green checkmark for phases with low count, orange warning for medium, red alert for high count phases
+- Clean, modern design suitable for WhatsApp sharing`;
+
+    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'google/gemini-2.5-flash-image-preview',
+        messages: [{ role: 'user', content: prompt }],
+        modalities: ['image', 'text'],
+      }),
+    });
+
+    if (!response.ok) {
+      console.error('Kanban visual generation failed:', response.status);
+      return null;
+    }
+
+    const data = await response.json();
+    const imageUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+    
+    if (imageUrl && imageUrl.startsWith('data:image')) {
+      return imageUrl.split(',')[1];
+    }
+
+    return null;
+  } catch (error) {
+    console.error('Error generating Kanban visual:', error);
     return null;
   }
 }
@@ -1191,10 +1311,9 @@ Requirements:
   }
 }
 
-// ==================== WHATSAPP (ENVIO DIRETO VIA MEGA API) ====================
+// ==================== WHATSAPP ====================
 async function sendWhatsAppMessage(supabaseClient: any, phone: string, message: string): Promise<boolean> {
   try {
-    // Buscar instância conectada do banco
     const { data: activeInstance, error: instanceError } = await supabaseClient
       .from('whatsapp_instances')
       .select('instance_key')
@@ -1206,13 +1325,11 @@ async function sendWhatsAppMessage(supabaseClient: any, phone: string, message: 
       return false;
     }
 
-    // Formatar número
     let phoneNumber = phone.replace(/\D/g, '');
     if (!phoneNumber.startsWith('55')) {
       phoneNumber = `55${phoneNumber}`;
     }
 
-    // Configurar Mega API
     let megaApiUrl = (Deno.env.get('MEGA_API_URL') ?? '').trim();
     if (!megaApiUrl.startsWith('http://') && !megaApiUrl.startsWith('https://')) {
       megaApiUrl = `https://${megaApiUrl}`;
@@ -1222,7 +1339,6 @@ async function sendWhatsAppMessage(supabaseClient: any, phone: string, message: 
 
     console.log(`📤 Sending WhatsApp to ${phoneNumber} via instance ${activeInstance.instance_key}`);
 
-    // Enviar diretamente via Mega API
     const endpoint = `/rest/sendMessage/${activeInstance.instance_key}/text`;
     const fullUrl = `${megaApiUrl}${endpoint}`;
 
@@ -1234,7 +1350,6 @@ async function sendWhatsAppMessage(supabaseClient: any, phone: string, message: 
       }
     };
 
-    // Tentar diferentes formatos de autenticação
     const authFormats: Record<string, string>[] = [
       { 'apikey': megaApiToken },
       { 'Authorization': `Bearer ${megaApiToken}` },
@@ -1275,7 +1390,6 @@ async function sendWhatsAppMessage(supabaseClient: any, phone: string, message: 
 
 async function sendWhatsAppImage(supabaseClient: any, phone: string, base64Data: string, caption: string): Promise<boolean> {
   try {
-    // Buscar instância conectada
     const { data: activeInstance } = await supabaseClient
       .from('whatsapp_instances')
       .select('instance_key')
@@ -1287,13 +1401,11 @@ async function sendWhatsAppImage(supabaseClient: any, phone: string, base64Data:
       return false;
     }
 
-    // Formatar número
     let phoneNumber = phone.replace(/\D/g, '');
     if (!phoneNumber.startsWith('55')) {
       phoneNumber = `55${phoneNumber}`;
     }
 
-    // Configurar Mega API
     let megaApiUrl = (Deno.env.get('MEGA_API_URL') ?? '').trim();
     if (!megaApiUrl.startsWith('http://') && !megaApiUrl.startsWith('https://')) {
       megaApiUrl = `https://${megaApiUrl}`;
@@ -1301,7 +1413,6 @@ async function sendWhatsAppImage(supabaseClient: any, phone: string, base64Data:
     megaApiUrl = megaApiUrl.replace(/\/+$/, '');
     const megaApiToken = Deno.env.get('MEGA_API_TOKEN') ?? '';
 
-    // Endpoint para mídia
     const endpoint = `/rest/sendMessage/${activeInstance.instance_key}/image`;
     const fullUrl = `${megaApiUrl}${endpoint}`;
 
@@ -1350,6 +1461,175 @@ async function sendWhatsAppImage(supabaseClient: any, phone: string, base64Data:
   }
 }
 
+// ==================== EMAIL ====================
+async function sendEmailReport(
+  email: string, 
+  recipientName: string, 
+  subject: string, 
+  textContent: string, 
+  kanbanImage?: string | null
+): Promise<boolean> {
+  try {
+    const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
+    if (!RESEND_API_KEY) {
+      console.log('RESEND_API_KEY not configured, skipping email');
+      return false;
+    }
+
+    const resend = new Resend(RESEND_API_KEY);
+
+    // Converter texto WhatsApp para HTML
+    const htmlContent = textContent
+      .replace(/\n/g, '<br>')
+      .replace(/\*([^*]+)\*/g, '<strong>$1</strong>')
+      .replace(/_([^_]+)_/g, '<em>$1</em>')
+      .replace(/━/g, '─')
+      .replace(/📊/g, '📊')
+      .replace(/📅/g, '📅')
+      .replace(/📈/g, '📈')
+      .replace(/🚨/g, '🚨')
+      .replace(/⚠️/g, '⚠️')
+      .replace(/🔴/g, '🔴')
+      .replace(/✅/g, '✅')
+      .replace(/🆘/g, '🆘')
+      .replace(/🩺/g, '🩺')
+      .replace(/🛒/g, '🛒')
+      .replace(/🔧/g, '🔧')
+      .replace(/📦/g, '📦')
+      .replace(/💰/g, '💰')
+      .replace(/🤖/g, '🤖');
+
+    const htmlEmail = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <style>
+          body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: #1F2937;
+            color: #F3F4F6;
+            padding: 20px;
+            line-height: 1.6;
+          }
+          .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #374151;
+            border-radius: 12px;
+            padding: 24px;
+          }
+          .header {
+            text-align: center;
+            border-bottom: 2px solid #4B5563;
+            padding-bottom: 16px;
+            margin-bottom: 20px;
+          }
+          .content {
+            white-space: pre-wrap;
+            font-size: 14px;
+          }
+          .footer {
+            text-align: center;
+            margin-top: 20px;
+            padding-top: 16px;
+            border-top: 1px solid #4B5563;
+            font-size: 12px;
+            color: #9CA3AF;
+          }
+          img {
+            max-width: 100%;
+            border-radius: 8px;
+            margin: 16px 0;
+          }
+          strong { color: #60A5FA; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1 style="margin: 0; color: #60A5FA;">📊 Relatório Gerencial</h1>
+          </div>
+          <div class="content">
+            ${htmlContent}
+          </div>
+          ${kanbanImage ? `<img src="cid:kanban-visual" alt="Status do Kanban">` : ''}
+          <div class="footer">
+            <p>Sistema de Gestão Imply</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+
+    const emailOptions: any = {
+      from: 'Relatórios IMPLY <onboarding@resend.dev>',
+      to: [email],
+      subject: subject,
+      html: htmlEmail,
+    };
+
+    // Adicionar imagem como anexo inline se existir
+    if (kanbanImage) {
+      emailOptions.attachments = [{
+        filename: 'kanban-status.png',
+        content: kanbanImage,
+        content_id: 'kanban-visual',
+      }];
+    }
+
+    const { data, error } = await resend.emails.send(emailOptions);
+
+    if (error) {
+      console.error('❌ Email send error:', error);
+      return false;
+    }
+
+    console.log('✅ Email sent to:', email, data?.id);
+    return true;
+  } catch (error) {
+    console.error('❌ Error sending email:', error);
+    return false;
+  }
+}
+
+// ==================== BUSCAR GESTORES DE FASE ====================
+async function getPhaseManagers(supabaseClient: any): Promise<PhaseManager[]> {
+  try {
+    const { data: managers, error } = await supabaseClient
+      .from('phase_managers')
+      .select(`
+        user_id,
+        phase_key,
+        whatsapp,
+        receive_daily_summary,
+        profiles:user_id (
+          full_name,
+          email
+        )
+      `)
+      .eq('is_active', true)
+      .eq('receive_daily_summary', true);
+
+    if (error) {
+      console.error('Error fetching phase managers:', error);
+      return [];
+    }
+
+    return (managers || []).map((m: any) => ({
+      user_id: m.user_id,
+      phase_key: m.phase_key,
+      whatsapp: m.whatsapp,
+      email: m.profiles?.email,
+      full_name: m.profiles?.full_name || 'Gestor',
+      receive_daily_summary: m.receive_daily_summary,
+    }));
+  } catch (error) {
+    console.error('Error in getPhaseManagers:', error);
+    return [];
+  }
+}
+
 // ==================== MAIN HANDLER ====================
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -1366,15 +1646,25 @@ serve(async (req) => {
     // Parse request body
     let includeChart = true;
     let includeAllCharts = false;
+    let includeKanbanVisual = true;
     let testMode = false;
     let testPhone = null;
+    let testEmail = null;
+    let sendEmail = true;
+    let sendPhaseReports = true;
+    let scheduleTime: string | undefined;
 
     try {
       const body = await req.json();
       includeChart = body.includeChart !== false;
       includeAllCharts = body.includeAllCharts === true;
+      includeKanbanVisual = body.includeKanbanVisual !== false;
       testMode = body.testMode === true;
       testPhone = body.testPhone;
+      testEmail = body.testEmail;
+      sendEmail = body.sendEmail !== false;
+      sendPhaseReports = body.sendPhaseReports !== false;
+      scheduleTime = body.scheduleTime;
     } catch {
       // No body provided
     }
@@ -1382,14 +1672,19 @@ serve(async (req) => {
     // ========== BUSCAR DESTINATÁRIOS ==========
     let recipients: any[] = [];
     
-    if (testMode && testPhone) {
-      recipients = [{ whatsapp: testPhone, id: null, full_name: 'Teste' }];
-      console.log('🧪 Test mode - sending to:', testPhone);
+    if (testMode && (testPhone || testEmail)) {
+      recipients = [{ 
+        whatsapp: testPhone, 
+        email: testEmail,
+        id: null, 
+        full_name: 'Teste' 
+      }];
+      console.log('🧪 Test mode - sending to:', testPhone || testEmail);
     } else {
-      // Buscar da tabela management_report_recipients (com fallback para admins)
+      // Buscar da tabela management_report_recipients
       const { data: recipientsData, error: recipientsError } = await supabaseClient
         .from('management_report_recipients')
-        .select('id, whatsapp, user_id, profiles:user_id(full_name)')
+        .select('id, whatsapp, user_id, profiles:user_id(full_name, email)')
         .eq('is_active', true)
         .contains('report_types', ['daily']);
 
@@ -1397,10 +1692,11 @@ serve(async (req) => {
         recipients = recipientsData.map((r: any) => ({
           id: r.id,
           whatsapp: r.whatsapp,
+          email: r.profiles?.email,
           full_name: r.profiles?.full_name || 'Gestor',
         }));
       } else {
-        // Fallback: buscar admins com whatsapp
+        // Fallback: buscar admins
         const { data: admins } = await supabaseClient
           .from('user_roles')
           .select('user_id')
@@ -1410,14 +1706,14 @@ serve(async (req) => {
           const adminIds = admins.map((a: any) => a.user_id);
           const { data: profiles } = await supabaseClient
             .from('profiles')
-            .select('id, full_name, whatsapp')
-            .in('id', adminIds)
-            .not('whatsapp', 'is', null);
+            .select('id, full_name, whatsapp, email')
+            .in('id', adminIds);
 
           if (profiles) {
             recipients = profiles.map((p: any) => ({
               id: null,
               whatsapp: p.whatsapp,
+              email: p.email,
               full_name: p.full_name,
             }));
           }
@@ -1433,36 +1729,45 @@ serve(async (req) => {
       );
     }
 
-    console.log(`📬 Found ${recipients.length} recipients`);
+    console.log(`📬 Found ${recipients.length} general recipients`);
+
+    // ========== BUSCAR GESTORES DE FASE ==========
+    let phaseManagers: PhaseManager[] = [];
+    if (sendPhaseReports && !testMode) {
+      phaseManagers = await getPhaseManagers(supabaseClient);
+      console.log(`👥 Found ${phaseManagers.length} phase managers for specific reports`);
+    }
 
     // ========== CALCULAR MÉTRICAS ==========
     const metrics = await calculateMetrics(supabaseClient);
     const reportDate = new Date();
-    const message = formatReportMessage(metrics, reportDate);
+    const message = formatReportMessage(metrics, reportDate, scheduleTime);
 
     console.log('📊 Metrics calculated:', {
       totalActive: metrics.totalActive,
       totalValue: metrics.totalValue,
       onTimeRate: metrics.sla.onTimeRate,
       alerts: metrics.alerts,
-      criticalPhases: {
-        compras: metrics.criticalPhaseAnalysis.compras.count,
-        producaoClientes: metrics.criticalPhaseAnalysis.producaoClientes.count,
-        producaoEstoque: metrics.criticalPhaseAnalysis.producaoEstoque.count,
-      },
     });
 
     // ========== GERAR GRÁFICOS ==========
     let distributionChart: string | null = null;
+    let kanbanVisual: string | null = null;
     let trendChart: string | null = null;
     let slaGauge: string | null = null;
 
     if (includeChart) {
       console.log('🎨 Generating charts...');
       
-      // Gerar gráfico de distribuição (sempre)
+      // Gerar gráfico de distribuição
       distributionChart = await generateDistributionChart(metrics);
       if (distributionChart) console.log('✅ Distribution chart generated');
+      
+      // Gerar visual do Kanban
+      if (includeKanbanVisual) {
+        kanbanVisual = await generateKanbanVisual(metrics);
+        if (kanbanVisual) console.log('✅ Kanban visual generated');
+      }
       
       // Gerar gráficos adicionais se solicitado
       if (includeAllCharts) {
@@ -1474,105 +1779,179 @@ serve(async (req) => {
       }
     }
 
-    // ========== ENVIAR PARA DESTINATÁRIOS ==========
+    // ========== ENVIAR PARA DESTINATÁRIOS GERAIS ==========
     let sentCount = 0;
     let errorCount = 0;
+    let emailSentCount = 0;
 
     for (const recipient of recipients) {
       try {
-        // Enviar mensagem de texto
-        const messageSent = await sendWhatsAppMessage(supabaseClient, recipient.whatsapp, message);
-        
-        // Enviar gráficos
-        let chartsSent = 0;
-        if (messageSent) {
-          if (distributionChart) {
-            const sent = await sendWhatsAppImage(
-              supabaseClient,
-              recipient.whatsapp,
-              distributionChart,
-              '📊 Distribuição por Fase'
-            );
-            if (sent) chartsSent++;
-          }
+        // Enviar via WhatsApp
+        if (recipient.whatsapp) {
+          const messageSent = await sendWhatsAppMessage(supabaseClient, recipient.whatsapp, message);
           
-          if (trendChart) {
-            const sent = await sendWhatsAppImage(
-              supabaseClient,
-              recipient.whatsapp,
-              trendChart,
-              '📈 Tendência Semanal'
-            );
-            if (sent) chartsSent++;
-          }
-          
-          if (slaGauge) {
-            const sent = await sendWhatsAppImage(
-              supabaseClient,
-              recipient.whatsapp,
-              slaGauge,
-              '🎯 Taxa de Cumprimento SLA'
-            );
-            if (sent) chartsSent++;
-          }
-        }
+          let chartsSent = 0;
+          if (messageSent) {
+            // Enviar visual do Kanban primeiro
+            if (kanbanVisual) {
+              const sent = await sendWhatsAppImage(
+                supabaseClient,
+                recipient.whatsapp,
+                kanbanVisual,
+                '📊 Status do Kanban'
+              );
+              if (sent) chartsSent++;
+            }
 
-        // Log do relatório
-        if (!testMode) {
+            if (distributionChart) {
+              const sent = await sendWhatsAppImage(
+                supabaseClient,
+                recipient.whatsapp,
+                distributionChart,
+                '📊 Distribuição por Fase'
+              );
+              if (sent) chartsSent++;
+            }
+            
+            if (trendChart) {
+              const sent = await sendWhatsAppImage(
+                supabaseClient,
+                recipient.whatsapp,
+                trendChart,
+                '📈 Tendência Semanal'
+              );
+              if (sent) chartsSent++;
+            }
+            
+            if (slaGauge) {
+              const sent = await sendWhatsAppImage(
+                supabaseClient,
+                recipient.whatsapp,
+                slaGauge,
+                '🎯 Taxa de Cumprimento SLA'
+              );
+              if (sent) chartsSent++;
+            }
+          }
+
+          // Log no banco
           await supabaseClient.from('management_report_log').insert({
-            report_type: 'daily',
             recipient_id: recipient.id,
             recipient_whatsapp: recipient.whatsapp,
-            message_content: message,
-            chart_sent: chartsSent > 0,
-            metrics_snapshot: metrics,
+            report_type: 'daily',
             status: messageSent ? 'sent' : 'failed',
+            chart_sent: chartsSent > 0,
+            message_content: message.substring(0, 500),
+            metrics_snapshot: {
+              totalActive: metrics.totalActive,
+              totalValue: metrics.totalValue,
+              onTimeRate: metrics.sla.onTimeRate,
+              alerts: metrics.alerts,
+              scheduleTime,
+            },
           });
 
-          // Atualizar last_report_sent_at
-          if (recipient.id) {
-            await supabaseClient
-              .from('management_report_recipients')
-              .update({ last_report_sent_at: new Date().toISOString() })
-              .eq('id', recipient.id);
+          if (messageSent) {
+            sentCount++;
+            console.log(`✅ WhatsApp sent to ${recipient.full_name} (${recipient.whatsapp})`);
+          } else {
+            errorCount++;
           }
         }
 
-        if (messageSent) {
-          sentCount++;
-          console.log(`✅ Report sent to ${recipient.full_name} (${recipient.whatsapp}) with ${chartsSent} charts`);
-        } else {
-          errorCount++;
+        // Enviar via Email
+        if (sendEmail && recipient.email) {
+          const dateStr = reportDate.toLocaleDateString('pt-BR');
+          const subject = `📊 Relatório Gerencial Diário - ${dateStr}${scheduleTime ? ` (${scheduleTime})` : ''}`;
+          
+          const emailSent = await sendEmailReport(
+            recipient.email,
+            recipient.full_name,
+            subject,
+            message,
+            kanbanVisual
+          );
+
+          if (emailSent) {
+            emailSentCount++;
+            console.log(`✅ Email sent to ${recipient.full_name} (${recipient.email})`);
+          }
         }
       } catch (error) {
-        console.error(`Error sending to ${recipient.whatsapp}:`, error);
+        console.error(`Error sending to ${recipient.full_name}:`, error);
         errorCount++;
       }
     }
 
-    console.log(`📊 Report complete: ${sentCount} sent, ${errorCount} errors`);
+    // ========== ENVIAR RELATÓRIOS ESPECÍFICOS POR FASE ==========
+    let phaseReportsSent = 0;
+    
+    if (sendPhaseReports && phaseManagers.length > 0) {
+      console.log('📤 Sending phase-specific reports...');
+      
+      for (const manager of phaseManagers) {
+        try {
+          // Converter phase_key do banco para chave interna
+          const internalPhaseKey = phaseKeyDbToInternal[manager.phase_key] || manager.phase_key;
+          const phaseName = phaseLabels[internalPhaseKey] || manager.phase_key;
+          
+          // Gerar relatório específico da fase
+          const phaseReport = formatPhaseSpecificReport(
+            metrics,
+            internalPhaseKey,
+            phaseName,
+            reportDate
+          );
+
+          // Enviar via WhatsApp
+          if (manager.whatsapp) {
+            const sent = await sendWhatsAppMessage(supabaseClient, manager.whatsapp, phaseReport);
+            if (sent) {
+              phaseReportsSent++;
+              console.log(`✅ Phase report sent to ${manager.full_name} (${phaseName})`);
+            }
+          }
+
+          // Enviar via Email
+          if (sendEmail && manager.email) {
+            const dateStr = reportDate.toLocaleDateString('pt-BR');
+            const subject = `📊 Resumo ${phaseName} - ${dateStr}`;
+            
+            await sendEmailReport(
+              manager.email,
+              manager.full_name,
+              subject,
+              phaseReport,
+              null
+            );
+          }
+        } catch (error) {
+          console.error(`Error sending phase report to ${manager.full_name}:`, error);
+        }
+      }
+    }
+
+    console.log(`📊 Report summary: ${sentCount} WhatsApp, ${emailSentCount} emails, ${phaseReportsSent} phase reports, ${errorCount} errors`);
 
     return new Response(
-      JSON.stringify({
-        success: true,
+      JSON.stringify({ 
+        success: true, 
         sentCount,
+        emailSentCount,
+        phaseReportsSent,
         errorCount,
         metrics: {
           totalActive: metrics.totalActive,
-          totalValue: metrics.totalValue,
           onTimeRate: metrics.sla.onTimeRate,
-          alerts: metrics.alerts,
-          criticalPhases: metrics.criticalPhaseAnalysis,
-        },
+        }
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
-  } catch (error: any) {
-    console.error('❌ Error in daily report:', error);
-    
+  } catch (error) {
+    console.error('❌ Error in daily management report:', error);
     return new Response(
-      JSON.stringify({ success: false, error: error.message }),
+      JSON.stringify({ success: false, error: String(error) }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
