@@ -9,6 +9,16 @@ import { ReturnRequestsQueue } from '@/components/technicians/ReturnRequestsQueu
 import { DispatchMetricsCards } from '@/components/technicians/DispatchMetricsCards';
 import { useTechnicianDispatches } from '@/hooks/useTechnicianDispatches';
 import { useReturnRequests } from '@/hooks/useReturnRequests';
+import { DispatchMetrics } from '@/types/technicians';
+
+const defaultMetrics: DispatchMetrics = {
+  total_dispatches: 0,
+  total_items_sent: 0,
+  total_items_pending: 0,
+  total_items_returned: 0,
+  overdue_dispatches: 0,
+  pending_return_requests: 0,
+};
 
 export default function TechnicianDispatches() {
   const [activeTab, setActiveTab] = useState('dispatches');
@@ -30,7 +40,7 @@ export default function TechnicianDispatches() {
 
         {/* Métricas */}
         <DispatchMetricsCards 
-          metrics={metrics} 
+          metrics={metrics || defaultMetrics} 
           pendingReturns={pendingRequests.length} 
           loading={dispatchesLoading} 
         />
