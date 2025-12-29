@@ -3532,6 +3532,7 @@ export type Database = {
           last_login: string | null
           location: string | null
           organization_id: string | null
+          test_as_customer_document: string | null
           updated_at: string
           user_type: string | null
           whatsapp: string | null
@@ -3548,6 +3549,7 @@ export type Database = {
           last_login?: string | null
           location?: string | null
           organization_id?: string | null
+          test_as_customer_document?: string | null
           updated_at?: string
           user_type?: string | null
           whatsapp?: string | null
@@ -3564,6 +3566,7 @@ export type Database = {
           last_login?: string | null
           location?: string | null
           organization_id?: string | null
+          test_as_customer_document?: string | null
           updated_at?: string
           user_type?: string | null
           whatsapp?: string | null
@@ -4415,6 +4418,59 @@ export type Database = {
             columns: ["technician_id"]
             isOneToOne: false
             referencedRelation: "technicians"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      technician_invites: {
+        Row: {
+          created_at: string | null
+          customer_document: string | null
+          customer_name: string
+          email: string
+          id: string
+          invite_token: string | null
+          organization_id: string | null
+          registered_at: string | null
+          registered_user_id: string | null
+          sent_at: string | null
+          sent_by: string | null
+          status: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          customer_document?: string | null
+          customer_name: string
+          email: string
+          id?: string
+          invite_token?: string | null
+          organization_id?: string | null
+          registered_at?: string | null
+          registered_user_id?: string | null
+          sent_at?: string | null
+          sent_by?: string | null
+          status?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          customer_document?: string | null
+          customer_name?: string
+          email?: string
+          id?: string
+          invite_token?: string | null
+          organization_id?: string | null
+          registered_at?: string | null
+          registered_user_id?: string | null
+          sent_at?: string | null
+          sent_by?: string | null
+          status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "technician_invites_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
         ]
