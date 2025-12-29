@@ -694,7 +694,8 @@ export const EditOrderDialog = ({
         freight_type: (order as any).freight_type,
         freight_value: (order as any).freight_value,
         tracking_code: (order as any).tracking_code,
-        customer_whatsapp: (order as any).customer_whatsapp || ''
+        customer_whatsapp: (order as any).customer_whatsapp || '',
+        customer_contact_name: (order as any).customer_contact_name || ''
       };
       reset(orderData);
 
