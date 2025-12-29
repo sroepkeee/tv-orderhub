@@ -30,12 +30,13 @@ export function CreateDispatchDialog({ open, onClose, onSuccess }: CreateDispatc
     
     setLoading(true);
     try {
-      await createDispatch({
-        order_id: formData.orderId,
-        technician_id: formData.technicianId,
-        origin_warehouse: formData.originWarehouse,
-        expected_return_date: formData.expectedReturnDate || undefined,
-      }, []);
+      await createDispatch(
+        formData.orderId,
+        formData.technicianId,
+        formData.originWarehouse,
+        formData.expectedReturnDate || null,
+        [] // items - empty for now, can be populated from order
+      );
       onSuccess();
     } finally {
       setLoading(false);
