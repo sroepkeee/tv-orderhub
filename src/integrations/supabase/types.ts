@@ -3992,27 +3992,30 @@ export type Database = {
         Row: {
           condition: string
           created_at: string
-          dispatch_item_id: string
+          dispatch_item_id: string | null
           id: string
           notes: string | null
+          order_item_id: string | null
           quantity_returning: number
           return_request_id: string
         }
         Insert: {
           condition?: string
           created_at?: string
-          dispatch_item_id: string
+          dispatch_item_id?: string | null
           id?: string
           notes?: string | null
+          order_item_id?: string | null
           quantity_returning?: number
           return_request_id: string
         }
         Update: {
           condition?: string
           created_at?: string
-          dispatch_item_id?: string
+          dispatch_item_id?: string | null
           id?: string
           notes?: string | null
+          order_item_id?: string | null
           quantity_returning?: number
           return_request_id?: string
         }
@@ -4022,6 +4025,13 @@ export type Database = {
             columns: ["dispatch_item_id"]
             isOneToOne: false
             referencedRelation: "technician_dispatch_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "return_request_items_order_item_id_fkey"
+            columns: ["order_item_id"]
+            isOneToOne: false
+            referencedRelation: "order_items"
             referencedColumns: ["id"]
           },
           {
@@ -4039,13 +4049,16 @@ export type Database = {
           approved_by: string | null
           carrier_id: string | null
           created_at: string
+          customer_document: string | null
+          customer_name: string | null
           destination_technician_id: string | null
           destination_type: string | null
           destination_warehouse: string
-          dispatch_id: string
+          dispatch_id: string | null
           freight_value: number | null
           id: string
           notes: string | null
+          order_id: string | null
           organization_id: string | null
           photo_urls: string[] | null
           pickup_address: string | null
@@ -4059,9 +4072,10 @@ export type Database = {
           rejection_reason: string | null
           requested_at: string
           requested_by: string | null
+          requester_profile_id: string | null
           scheduled_pickup_date: string | null
           status: string
-          technician_id: string
+          technician_id: string | null
           total_volumes: number | null
           total_weight_kg: number | null
           tracking_code: string | null
@@ -4073,13 +4087,16 @@ export type Database = {
           approved_by?: string | null
           carrier_id?: string | null
           created_at?: string
+          customer_document?: string | null
+          customer_name?: string | null
           destination_technician_id?: string | null
           destination_type?: string | null
           destination_warehouse: string
-          dispatch_id: string
+          dispatch_id?: string | null
           freight_value?: number | null
           id?: string
           notes?: string | null
+          order_id?: string | null
           organization_id?: string | null
           photo_urls?: string[] | null
           pickup_address?: string | null
@@ -4093,9 +4110,10 @@ export type Database = {
           rejection_reason?: string | null
           requested_at?: string
           requested_by?: string | null
+          requester_profile_id?: string | null
           scheduled_pickup_date?: string | null
           status?: string
-          technician_id: string
+          technician_id?: string | null
           total_volumes?: number | null
           total_weight_kg?: number | null
           tracking_code?: string | null
@@ -4107,13 +4125,16 @@ export type Database = {
           approved_by?: string | null
           carrier_id?: string | null
           created_at?: string
+          customer_document?: string | null
+          customer_name?: string | null
           destination_technician_id?: string | null
           destination_type?: string | null
           destination_warehouse?: string
-          dispatch_id?: string
+          dispatch_id?: string | null
           freight_value?: number | null
           id?: string
           notes?: string | null
+          order_id?: string | null
           organization_id?: string | null
           photo_urls?: string[] | null
           pickup_address?: string | null
@@ -4127,9 +4148,10 @@ export type Database = {
           rejection_reason?: string | null
           requested_at?: string
           requested_by?: string | null
+          requester_profile_id?: string | null
           scheduled_pickup_date?: string | null
           status?: string
-          technician_id?: string
+          technician_id?: string | null
           total_volumes?: number | null
           total_weight_kg?: number | null
           tracking_code?: string | null
@@ -4159,10 +4181,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "return_requests_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "return_requests_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "return_requests_requester_profile_id_fkey"
+            columns: ["requester_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
           {

@@ -6,11 +6,13 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Package, RotateCcw, AlertCircle, LogOut, FileText, ChevronDown, ChevronUp, FlaskConical, X } from 'lucide-react';
-import { useTechnicianPortal } from '@/hooks/useTechnicianPortal';
+import { useTechnicianPortal, TechnicianOrder } from '@/hooks/useTechnicianPortal';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { OrderReturnForm } from '@/components/technicians/OrderReturnForm';
+import { useOrganizationId } from '@/hooks/useOrganizationId';
 import {
   Collapsible,
   CollapsibleContent,
@@ -28,7 +30,10 @@ import {
 export default function TechnicianPortal() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { organizationId } = useOrganizationId();
   const [expandedOrders, setExpandedOrders] = useState<Set<string>>(new Set());
+  const [returnDialogOpen, setReturnDialogOpen] = useState(false);
+  const [selectedOrder, setSelectedOrder] = useState<TechnicianOrder | null>(null);
 
   const { 
     userProfile, 
@@ -56,8 +61,15 @@ export default function TechnicianPortal() {
     setExpandedOrders(newExpanded);
   };
 
-  const handleRequestReturn = async (orderId: string) => {
-    toast.info('Funcionalidade de retorno em desenvolvimento');
+  const handleRequestReturn = (order: TechnicianOrder) => {
+    setSelectedOrder(order);
+    setReturnDialogOpen(true);
+  };
+
+  const handleReturnSuccess = () => {
+    setReturnDialogOpen(false);
+    setSelectedOrder(null);
+    fetchOrders();
   };
 
   // Loading state
@@ -281,7 +293,7 @@ export default function TechnicianPortal() {
                           <Button 
                             variant="outline" 
                             size="sm"
-                            onClick={() => handleRequestReturn(order.id)}
+                            onClick={() => handleRequestReturn(order)}
                           >
                             <RotateCcw className="h-4 w-4 mr-2" />
                             Solicitar Retorno
@@ -296,6 +308,21 @@ export default function TechnicianPortal() {
           )}
         </div>
       </main>
+
+      {/* Return Dialog */}
+      {selectedOrder && userProfile && (
+        <OrderReturnForm
+          order={selectedOrder}
+          userProfileId={userProfile.id}
+          organizationId={organizationId}
+          open={returnDialogOpen}
+          onClose={() => {
+            setReturnDialogOpen(false);
+            setSelectedOrder(null);
+          }}
+          onSuccess={handleReturnSuccess}
+        />
+      )}
     </div>
   );
 }
