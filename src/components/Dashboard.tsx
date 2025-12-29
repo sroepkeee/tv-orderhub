@@ -846,6 +846,7 @@ export const Dashboard = () => {
           rateio_project_code,
           sender_company,
           customer_whatsapp,
+          customer_contact_name,
           order_items (
             id,
             item_code,
@@ -1113,7 +1114,9 @@ export const Dashboard = () => {
           // Campo empresa emissora
           sender_company: dbOrder.sender_company || null,
           // Campo WhatsApp cliente
-          customer_whatsapp: dbOrder.customer_whatsapp || null
+          customer_whatsapp: dbOrder.customer_whatsapp || null,
+          // Campo Contato/Negociador
+          customer_contact_name: dbOrder.customer_contact_name || null
         };
       });
       console.log('✅ [loadOrders] Processamento concluído', {
@@ -1532,7 +1535,9 @@ export const Dashboard = () => {
         // Campo empresa emissora
         sender_company: (updatedOrder as any).sender_company || null,
         // Campo WhatsApp do cliente
-        customer_whatsapp: (updatedOrder as any).customer_whatsapp || null
+        customer_whatsapp: (updatedOrder as any).customer_whatsapp || null,
+        // Campo Contato/Negociador
+        customer_contact_name: (updatedOrder as any).customer_contact_name || null
       }).eq('id', updatedOrder.id).select('id').single();
       if (orderError) throw orderError;
       if (!updatedRow) throw new Error("Sem permissão para atualizar este pedido.");
