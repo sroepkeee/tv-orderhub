@@ -30,6 +30,7 @@ interface UserProfile {
   full_name: string;
   user_type: string;
   document?: string;
+  test_as_customer_document?: string;
 }
 
 export function useTechnicianPortal() {
@@ -45,7 +46,7 @@ export function useTechnicianPortal() {
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, full_name, user_type, document')
+        .select('id, full_name, user_type, document, test_as_customer_document')
         .eq('id', user.id)
         .single();
 
@@ -83,19 +84,25 @@ export function useTechnicianPortal() {
         .in('order_type', ['remessa_conserto', 'remessa_garantia'])
         .not('status', 'in', '("completed","cancelled")');
 
+      // Verificar se é modo teste (admin testando como técnico)
+      const isTestMode = !!userProfile.test_as_customer_document && userProfile.user_type !== 'technician';
+      
       // Construir filtro de match
       const filters = [];
       
-      // Match por nome completo (case insensitive)
-      if (userProfile.full_name) {
-        filters.push(`customer_name.ilike.%${userProfile.full_name}%`);
-      }
-      
-      // Match por documento
-      if (userProfile.document) {
-        // Remover formatação do documento para comparação
-        const cleanDoc = userProfile.document.replace(/[^\d]/g, '');
+      if (isTestMode) {
+        // Modo teste: buscar pelo documento de teste
+        const cleanDoc = userProfile.test_as_customer_document!.replace(/[^\d]/g, '');
         filters.push(`customer_document.ilike.%${cleanDoc}%`);
+      } else {
+        // Modo normal: buscar por nome ou documento do técnico
+        if (userProfile.full_name) {
+          filters.push(`customer_name.ilike.%${userProfile.full_name}%`);
+        }
+        if (userProfile.document) {
+          const cleanDoc = userProfile.document.replace(/[^\d]/g, '');
+          filters.push(`customer_document.ilike.%${cleanDoc}%`);
+        }
       }
 
       if (filters.length > 0) {
@@ -157,12 +164,29 @@ export function useTechnicianPortal() {
     acc + order.items.reduce((sum, item) => sum + item.quantity, 0), 0
   );
 
+  // Verificar modo teste
+  const isTestMode = !!userProfile?.test_as_customer_document && userProfile?.user_type !== 'technician';
+
+  // Função para sair do modo teste
+  const exitTestMode = useCallback(async () => {
+    if (!user?.id) return;
+    await supabase
+      .from('profiles')
+      .update({ test_as_customer_document: null })
+      .eq('id', user.id);
+    window.location.href = '/technician-dispatches';
+  }, [user?.id]);
+
   return {
     userProfile,
     orders,
     loading,
     totalItems,
     fetchOrders,
+    // Modo teste
+    isTestMode,
+    testingAsDocument: userProfile?.test_as_customer_document,
+    exitTestMode,
     // Compatibilidade com interface antiga (para TechnicianReturnForm e TechnicianTransferDialog)
     technicianInfo: userProfile ? {
       id: userProfile.id,
