@@ -4,7 +4,8 @@ import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Package, RotateCcw, AlertCircle, LogOut, FileText, ChevronDown, ChevronUp } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Package, RotateCcw, AlertCircle, LogOut, FileText, ChevronDown, ChevronUp, FlaskConical, X } from 'lucide-react';
 import { useTechnicianPortal } from '@/hooks/useTechnicianPortal';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -34,7 +35,10 @@ export default function TechnicianPortal() {
     orders, 
     loading, 
     totalItems,
-    fetchOrders 
+    fetchOrders,
+    isTestMode,
+    testingAsDocument,
+    exitTestMode
   } = useTechnicianPortal();
 
   const handleSignOut = async () => {
@@ -117,6 +121,27 @@ export default function TechnicianPortal() {
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Banner de modo teste */}
+      {isTestMode && (
+        <Alert className="rounded-none border-x-0 border-t-0 bg-yellow-500/10 border-yellow-500/30">
+          <FlaskConical className="h-4 w-4 text-yellow-600" />
+          <AlertDescription className="flex items-center justify-between w-full">
+            <span className="text-yellow-700 dark:text-yellow-400">
+              <strong>Modo Teste</strong> — Visualizando remessas do documento: <code className="bg-yellow-500/20 px-1.5 py-0.5 rounded">{testingAsDocument}</code>
+            </span>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={exitTestMode}
+              className="border-yellow-500/50 text-yellow-700 hover:bg-yellow-500/20"
+            >
+              <X className="h-4 w-4 mr-1" />
+              Sair do Modo Teste
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
+
       {/* Header simplificado */}
       <header className="border-b bg-card sticky top-0 z-10">
         <div className="container mx-auto px-4 py-4">
@@ -124,7 +149,7 @@ export default function TechnicianPortal() {
             <div>
               <h1 className="text-xl font-bold">Portal do Técnico</h1>
               <p className="text-sm text-muted-foreground">
-                {userProfile.full_name}
+                {isTestMode ? `Testando como: ${testingAsDocument}` : userProfile.full_name}
               </p>
             </div>
             <div className="flex items-center gap-4">
