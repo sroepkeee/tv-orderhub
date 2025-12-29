@@ -3,24 +3,21 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
 import { toast } from 'sonner';
 
-interface OrderItem {
+export interface OrderItem {
   id: string;
   item_code: string;
   item_description: string;
   quantity: number;
-  serial_number?: string;
-  status?: string;
 }
 
-interface TechnicianOrder {
+export interface TechnicianOrder {
   id: string;
   order_number: string;
+  order_type: string;
   customer_name: string;
   customer_document?: string;
-  order_type: string;
   status: string;
   created_at: string;
-  notes?: string;
   items: OrderItem[];
   items_count: number;
 }
