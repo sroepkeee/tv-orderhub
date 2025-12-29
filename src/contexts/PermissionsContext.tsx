@@ -27,6 +27,7 @@ export const ALL_MENU_KEYS = [
   'transportadoras',
   'carriers-chat',
   'compras',
+  'technician-dispatches',
   'customers',
   'admin',
   'ai-agent',

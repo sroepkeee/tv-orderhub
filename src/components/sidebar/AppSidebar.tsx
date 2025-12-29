@@ -1,6 +1,6 @@
 import { Link, useNavigate } from "react-router-dom";
 import { useMemo, useEffect, useState } from "react";
-import { LayoutDashboard, BarChart3, Factory, Truck, MessageSquare, ShoppingCart, Users, UserCog, Bot, Settings, LogOut, Moon, Sun, KeyRound, FolderOpen, Eye, EyeOff } from "lucide-react";
+import { LayoutDashboard, BarChart3, Factory, Truck, MessageSquare, ShoppingCart, Users, UserCog, Bot, Settings, LogOut, Moon, Sun, KeyRound, FolderOpen, Eye, EyeOff, Wrench } from "lucide-react";
 import logo from "@/assets/logo.png";
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarRail, SidebarSeparator, SidebarMenu, SidebarMenuItem, SidebarMenuButton, useSidebar } from "@/components/ui/sidebar";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -111,6 +111,7 @@ const AppSidebar = ({
       { path: "/transportadoras", icon: Truck, label: "Transportadoras", key: "transportadoras" },
       { path: "/carriers-chat", icon: MessageSquare, label: "Conversas", badge: unreadConversationsCount, key: "carriers-chat" },
       { path: "/compras", icon: ShoppingCart, label: "Compras", key: "compras" },
+      { path: "/technician-dispatches", icon: Wrench, label: "Técnicos", key: "technician-dispatches" },
     ].filter(item => canViewMenu(item.key));
 
     if (logisticsItems.length > 0) {

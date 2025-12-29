@@ -218,3 +218,11 @@ export const PACKAGING_TYPES = [
   { value: 'saco_plastico', label: 'Saco Plástico' },
   { value: 'outro', label: 'Outro' },
 ] as const;
+
+// Item conditions for return
+export const ITEM_CONDITIONS = [
+  { value: 'good', label: 'Bom Estado' },
+  { value: 'damaged', label: 'Danificado' },
+  { value: 'for_repair', label: 'Para Reparo' },
+  { value: 'for_disposal', label: 'Para Descarte' },
+] as const;

@@ -11,6 +11,43 @@ interface ReturnRequestFilters {
   destination_type?: DestinationType | 'all';
 }
 
+export function usePendingReturnsCount() {
+  const [count, setCount] = useState(0);
+  const { organizationId } = useOrganizationId();
+
+  useEffect(() => {
+    if (!organizationId) return;
+
+    const fetchCount = async () => {
+      const { count: pendingCount } = await supabase
+        .from('return_requests')
+        .select('*', { count: 'exact', head: true })
+        .eq('organization_id', organizationId)
+        .in('status', ['pending', 'approved']);
+      
+      setCount(pendingCount || 0);
+    };
+
+    fetchCount();
+
+    // Subscribe to changes
+    const channel = supabase
+      .channel('pending-returns-count')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'return_requests',
+      }, fetchCount)
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [organizationId]);
+
+  return count;
+}
+
 export function useReturnRequests(filters?: ReturnRequestFilters) {
   const [requests, setRequests] = useState<ReturnRequest[]>([]);
   const [loading, setLoading] = useState(true);
