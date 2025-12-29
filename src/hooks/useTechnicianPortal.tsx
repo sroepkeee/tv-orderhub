@@ -35,12 +35,14 @@ export function useTechnicianPortal() {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [orders, setOrders] = useState<TechnicianOrder[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
 
-  // Buscar perfil do usuário
+  // Buscar perfil do usuário e verificar se é admin
   const fetchUserProfile = useCallback(async () => {
     if (!user?.id) return null;
 
     try {
+      // Buscar perfil
       const { data, error } = await supabase
         .from('profiles')
         .select('id, full_name, user_type, document, test_as_customer_document')
@@ -48,6 +50,15 @@ export function useTechnicianPortal() {
         .single();
 
       if (error) throw error;
+      
+      // Verificar se é admin
+      const { data: roles } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id);
+      
+      const hasAdminRole = roles?.some(r => r.role === 'admin') || false;
+      setIsAdmin(hasAdminRole);
       
       setUserProfile(data as UserProfile);
       return data as UserProfile;
@@ -64,7 +75,6 @@ export function useTechnicianPortal() {
     setLoading(true);
     try {
       // Buscar ordens de remessa_conserto e remessa_garantia
-      // Matching por customer_name ou customer_document
       let query = supabase
         .from('orders')
         .select(`
@@ -84,15 +94,16 @@ export function useTechnicianPortal() {
       // Verificar se é modo teste (admin testando como técnico)
       const isTestMode = !!userProfile.test_as_customer_document && userProfile.user_type !== 'technician';
       
-      // Construir filtro de match
-      const filters = [];
-      
-      if (isTestMode) {
+      // Admin/Manager vê tudo (exceto em modo teste)
+      if (isAdmin && !isTestMode) {
+        // Não aplica filtro - gestor vê todas as remessas
+      } else if (isTestMode) {
         // Modo teste: buscar pelo documento de teste
         const cleanDoc = userProfile.test_as_customer_document!.replace(/[^\d]/g, '');
-        filters.push(`customer_document.ilike.%${cleanDoc}%`);
+        query = query.or(`customer_document.ilike.%${cleanDoc}%`);
       } else {
-        // Modo normal: buscar por nome ou documento do técnico
+        // Técnico normal: buscar por nome ou documento
+        const filters = [];
         if (userProfile.full_name) {
           filters.push(`customer_name.ilike.%${userProfile.full_name}%`);
         }
@@ -100,10 +111,9 @@ export function useTechnicianPortal() {
           const cleanDoc = userProfile.document.replace(/[^\d]/g, '');
           filters.push(`customer_document.ilike.%${cleanDoc}%`);
         }
-      }
-
-      if (filters.length > 0) {
-        query = query.or(filters.join(','));
+        if (filters.length > 0) {
+          query = query.or(filters.join(','));
+        }
       }
 
       const { data, error } = await query.order('created_at', { ascending: false });
@@ -136,7 +146,7 @@ export function useTechnicianPortal() {
     } finally {
       setLoading(false);
     }
-  }, [userProfile]);
+  }, [userProfile, isAdmin]);
 
   // Carregar dados iniciais
   useEffect(() => {
@@ -180,6 +190,7 @@ export function useTechnicianPortal() {
     loading,
     totalItems,
     fetchOrders,
+    isAdmin,
     // Modo teste
     isTestMode,
     testingAsDocument: userProfile?.test_as_customer_document,
