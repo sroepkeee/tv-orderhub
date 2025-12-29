@@ -4030,12 +4030,15 @@ export type Database = {
           approved_by: string | null
           carrier_id: string | null
           created_at: string
+          destination_technician_id: string | null
+          destination_type: string | null
           destination_warehouse: string
           dispatch_id: string
           freight_value: number | null
           id: string
           notes: string | null
           organization_id: string | null
+          photo_urls: string[] | null
           pickup_address: string | null
           pickup_city: string | null
           pickup_contact: string | null
@@ -4050,20 +4053,26 @@ export type Database = {
           scheduled_pickup_date: string | null
           status: string
           technician_id: string
+          total_volumes: number | null
+          total_weight_kg: number | null
           tracking_code: string | null
           updated_at: string
+          volume_details: Json | null
         }
         Insert: {
           approved_at?: string | null
           approved_by?: string | null
           carrier_id?: string | null
           created_at?: string
+          destination_technician_id?: string | null
+          destination_type?: string | null
           destination_warehouse: string
           dispatch_id: string
           freight_value?: number | null
           id?: string
           notes?: string | null
           organization_id?: string | null
+          photo_urls?: string[] | null
           pickup_address?: string | null
           pickup_city?: string | null
           pickup_contact?: string | null
@@ -4078,20 +4087,26 @@ export type Database = {
           scheduled_pickup_date?: string | null
           status?: string
           technician_id: string
+          total_volumes?: number | null
+          total_weight_kg?: number | null
           tracking_code?: string | null
           updated_at?: string
+          volume_details?: Json | null
         }
         Update: {
           approved_at?: string | null
           approved_by?: string | null
           carrier_id?: string | null
           created_at?: string
+          destination_technician_id?: string | null
+          destination_type?: string | null
           destination_warehouse?: string
           dispatch_id?: string
           freight_value?: number | null
           id?: string
           notes?: string | null
           organization_id?: string | null
+          photo_urls?: string[] | null
           pickup_address?: string | null
           pickup_city?: string | null
           pickup_contact?: string | null
@@ -4106,8 +4121,11 @@ export type Database = {
           scheduled_pickup_date?: string | null
           status?: string
           technician_id?: string
+          total_volumes?: number | null
+          total_weight_kg?: number | null
           tracking_code?: string | null
           updated_at?: string
+          volume_details?: Json | null
         }
         Relationships: [
           {
@@ -4115,6 +4133,13 @@ export type Database = {
             columns: ["carrier_id"]
             isOneToOne: false
             referencedRelation: "carriers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "return_requests_destination_technician_id_fkey"
+            columns: ["destination_technician_id"]
+            isOneToOne: false
+            referencedRelation: "technicians"
             referencedColumns: ["id"]
           },
           {

@@ -68,6 +68,16 @@ export interface TechnicianDispatchItem {
 }
 
 export type ReturnRequestStatus = 'pending' | 'approved' | 'scheduled' | 'in_transit' | 'received' | 'rejected' | 'cancelled';
+export type DestinationType = 'warehouse' | 'technician';
+
+export interface VolumeDetail {
+  quantity: number;
+  weight_kg: number;
+  length_cm: number;
+  width_cm: number;
+  height_cm: number;
+  packaging_type: string;
+}
 
 export interface ReturnRequest {
   id: string;
@@ -75,6 +85,8 @@ export interface ReturnRequest {
   dispatch_id: string;
   technician_id: string;
   destination_warehouse: string;
+  destination_type: DestinationType;
+  destination_technician_id?: string;
   pickup_address?: string;
   pickup_city?: string;
   pickup_state?: string;
@@ -85,6 +97,10 @@ export interface ReturnRequest {
   carrier_id?: string;
   tracking_code?: string;
   freight_value?: number;
+  total_weight_kg?: number;
+  total_volumes?: number;
+  volume_details?: VolumeDetail[];
+  photo_urls?: string[];
   requested_by?: string;
   requested_at: string;
   approved_by?: string;
@@ -100,6 +116,7 @@ export interface ReturnRequest {
   technician?: Technician;
   dispatch?: TechnicianDispatch;
   carrier?: { id: string; name: string };
+  destination_technician?: Technician;
   items?: ReturnRequestItem[];
 }
 
@@ -185,3 +202,19 @@ export const itemConditionColors: Record<ItemCondition, string> = {
   for_repair: 'bg-blue-500/10 text-blue-500 border-blue-500/20',
   for_disposal: 'bg-red-500/10 text-red-500 border-red-500/20',
 };
+
+// Destinos de armazém disponíveis
+export const WAREHOUSE_DESTINATIONS = [
+  { id: 'imply_rs', name: 'IMPLY TEC (RS)', city: 'Santa Cruz do Sul', state: 'RS' },
+  { id: 'imply_sp', name: 'IMPLY SP', city: 'São Paulo', state: 'SP' },
+] as const;
+
+// Tipos de embalagem
+export const PACKAGING_TYPES = [
+  { value: 'caixa_papelao', label: 'Caixa de Papelão' },
+  { value: 'caixa_madeira', label: 'Caixa de Madeira' },
+  { value: 'pallet', label: 'Pallet' },
+  { value: 'envelope', label: 'Envelope' },
+  { value: 'saco_plastico', label: 'Saco Plástico' },
+  { value: 'outro', label: 'Outro' },
+] as const;
