@@ -6,13 +6,11 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Package, RotateCcw, AlertCircle, LogOut, FileText, ChevronDown, ChevronUp, FlaskConical, X } from 'lucide-react';
-import { useTechnicianPortal, TechnicianOrder } from '@/hooks/useTechnicianPortal';
+import { useTechnicianPortal } from '@/hooks/useTechnicianPortal';
 import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { OrderReturnForm } from '@/components/technicians/OrderReturnForm';
-import { useOrganizationId } from '@/hooks/useOrganizationId';
+import { GroupedReturnForm } from '@/components/technicians/GroupedReturnForm';
 import {
   Collapsible,
   CollapsibleContent,
@@ -30,10 +28,8 @@ import {
 export default function TechnicianPortal() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { organizationId } = useOrganizationId();
   const [expandedOrders, setExpandedOrders] = useState<Set<string>>(new Set());
   const [returnDialogOpen, setReturnDialogOpen] = useState(false);
-  const [selectedOrder, setSelectedOrder] = useState<TechnicianOrder | null>(null);
 
   const { 
     userProfile, 
@@ -61,14 +57,12 @@ export default function TechnicianPortal() {
     setExpandedOrders(newExpanded);
   };
 
-  const handleRequestReturn = (order: TechnicianOrder) => {
-    setSelectedOrder(order);
+  const handleOpenReturnDialog = () => {
     setReturnDialogOpen(true);
   };
 
   const handleReturnSuccess = () => {
     setReturnDialogOpen(false);
-    setSelectedOrder(null);
     fetchOrders();
   };
 
@@ -194,7 +188,10 @@ export default function TechnicianPortal() {
             </CardContent>
           </Card>
 
-          <Card className="cursor-pointer hover:bg-accent/50 transition-colors">
+          <Card 
+            className="cursor-pointer hover:bg-accent/50 transition-colors"
+            onClick={handleOpenReturnDialog}
+          >
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Solicitar Retorno</CardTitle>
               <RotateCcw className="h-4 w-4 text-blue-500" />
@@ -293,7 +290,7 @@ export default function TechnicianPortal() {
                           <Button 
                             variant="outline" 
                             size="sm"
-                            onClick={() => handleRequestReturn(order)}
+                            onClick={handleOpenReturnDialog}
                           >
                             <RotateCcw className="h-4 w-4 mr-2" />
                             Solicitar Retorno
@@ -310,16 +307,12 @@ export default function TechnicianPortal() {
       </main>
 
       {/* Return Dialog */}
-      {selectedOrder && userProfile && (
-        <OrderReturnForm
-          order={selectedOrder}
-          userProfileId={userProfile.id}
-          organizationId={organizationId}
+      {userProfile && (
+        <GroupedReturnForm
+          orders={orders}
+          requesterProfileId={userProfile.id}
           open={returnDialogOpen}
-          onClose={() => {
-            setReturnDialogOpen(false);
-            setSelectedOrder(null);
-          }}
+          onClose={() => setReturnDialogOpen(false)}
           onSuccess={handleReturnSuccess}
         />
       )}

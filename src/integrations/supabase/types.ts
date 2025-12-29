@@ -4059,6 +4059,7 @@ export type Database = {
           id: string
           notes: string | null
           order_id: string | null
+          order_ids: string[] | null
           organization_id: string | null
           photo_urls: string[] | null
           pickup_address: string | null
@@ -4097,6 +4098,7 @@ export type Database = {
           id?: string
           notes?: string | null
           order_id?: string | null
+          order_ids?: string[] | null
           organization_id?: string | null
           photo_urls?: string[] | null
           pickup_address?: string | null
@@ -4135,6 +4137,7 @@ export type Database = {
           id?: string
           notes?: string | null
           order_id?: string | null
+          order_ids?: string[] | null
           organization_id?: string | null
           photo_urls?: string[] | null
           pickup_address?: string | null
