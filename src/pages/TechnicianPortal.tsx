@@ -5,8 +5,9 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Package, RotateCcw, AlertCircle, LogOut, FileText, ChevronDown, ChevronUp, FlaskConical, X } from 'lucide-react';
-import { useTechnicianPortal } from '@/hooks/useTechnicianPortal';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Package, RotateCcw, AlertCircle, LogOut, FileText, ChevronDown, ChevronUp, FlaskConical, X, ShieldCheck } from 'lucide-react';
+import { useTechnicianPortal, OrderItem } from '@/hooks/useTechnicianPortal';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -25,11 +26,21 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
+interface SelectedItemInfo {
+  order_item_id: string;
+  order_id: string;
+  order_number: string;
+  item_code: string;
+  item_description: string;
+  quantity: number;
+}
+
 export default function TechnicianPortal() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [expandedOrders, setExpandedOrders] = useState<Set<string>>(new Set());
   const [returnDialogOpen, setReturnDialogOpen] = useState(false);
+  const [selectedItems, setSelectedItems] = useState<Map<string, SelectedItemInfo>>(new Map());
 
   const { 
     userProfile, 
@@ -37,10 +48,30 @@ export default function TechnicianPortal() {
     loading, 
     totalItems,
     fetchOrders,
+    isAdmin,
     isTestMode,
     testingAsDocument,
     exitTestMode
   } = useTechnicianPortal();
+
+  const toggleItemSelection = (item: OrderItem, order: { id: string; order_number: string }) => {
+    setSelectedItems(prev => {
+      const newSelected = new Map(prev);
+      if (newSelected.has(item.id)) {
+        newSelected.delete(item.id);
+      } else {
+        newSelected.set(item.id, {
+          order_item_id: item.id,
+          order_id: order.id,
+          order_number: order.order_number,
+          item_code: item.item_code,
+          item_description: item.item_description,
+          quantity: item.quantity,
+        });
+      }
+      return newSelected;
+    });
+  };
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
@@ -61,8 +92,13 @@ export default function TechnicianPortal() {
     setReturnDialogOpen(true);
   };
 
+  const handleOpenReturnDialogWithSelection = () => {
+    setReturnDialogOpen(true);
+  };
+
   const handleReturnSuccess = () => {
     setReturnDialogOpen(false);
+    setSelectedItems(new Map());
     fetchOrders();
   };
 
@@ -127,6 +163,16 @@ export default function TechnicianPortal() {
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Banner de admin visualizando tudo */}
+      {isAdmin && !isTestMode && (
+        <Alert className="rounded-none border-x-0 border-t-0 bg-blue-500/10 border-blue-500/30">
+          <ShieldCheck className="h-4 w-4 text-blue-600" />
+          <AlertDescription className="text-blue-700 dark:text-blue-400">
+            <strong>Modo Gestor</strong> — Visualizando todas as remessas de técnicos
+          </AlertDescription>
+        </Alert>
+      )}
+
       {/* Banner de modo teste */}
       {isTestMode && (
         <Alert className="rounded-none border-x-0 border-t-0 bg-yellow-500/10 border-yellow-500/30">
@@ -153,7 +199,10 @@ export default function TechnicianPortal() {
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-xl font-bold">Portal do Técnico</h1>
+              <div className="flex items-center gap-2">
+                <h1 className="text-xl font-bold">Portal do Técnico</h1>
+                {isAdmin && <Badge variant="secondary" className="text-xs">Admin</Badge>}
+              </div>
               <p className="text-sm text-muted-foreground">
                 {isTestMode ? `Testando como: ${testingAsDocument}` : userProfile.full_name}
               </p>
@@ -267,6 +316,7 @@ export default function TechnicianPortal() {
                           <Table>
                             <TableHeader>
                               <TableRow>
+                                <TableHead className="w-10"></TableHead>
                                 <TableHead>Código</TableHead>
                                 <TableHead>Descrição</TableHead>
                                 <TableHead className="text-center">Qtd</TableHead>
@@ -274,7 +324,22 @@ export default function TechnicianPortal() {
                             </TableHeader>
                             <TableBody>
                               {order.items.map((item) => (
-                                <TableRow key={item.id}>
+                                <TableRow 
+                                  key={item.id}
+                                  className={`cursor-pointer transition-colors ${
+                                    selectedItems.has(item.id) 
+                                      ? 'bg-primary/10 hover:bg-primary/15' 
+                                      : 'hover:bg-accent/50'
+                                  }`}
+                                  onClick={() => toggleItemSelection(item, order)}
+                                >
+                                  <TableCell className="w-10">
+                                    <Checkbox 
+                                      checked={selectedItems.has(item.id)}
+                                      onCheckedChange={() => toggleItemSelection(item, order)}
+                                      onClick={(e) => e.stopPropagation()}
+                                    />
+                                  </TableCell>
                                   <TableCell className="font-mono text-sm">
                                     {item.item_code}
                                   </TableCell>
@@ -312,9 +377,27 @@ export default function TechnicianPortal() {
           orders={orders}
           requesterProfileId={userProfile.id}
           open={returnDialogOpen}
-          onClose={() => setReturnDialogOpen(false)}
+          onClose={() => {
+            setReturnDialogOpen(false);
+            setSelectedItems(new Map());
+          }}
           onSuccess={handleReturnSuccess}
+          preSelectedItems={selectedItems}
         />
+      )}
+
+      {/* Floating Action Button when items selected */}
+      {selectedItems.size > 0 && (
+        <div className="fixed bottom-6 right-6 z-50">
+          <Button 
+            size="lg" 
+            className="shadow-lg"
+            onClick={handleOpenReturnDialogWithSelection}
+          >
+            <RotateCcw className="h-4 w-4 mr-2" />
+            Devolver {selectedItems.size} item(s)
+          </Button>
+        </div>
       )}
     </div>
   );

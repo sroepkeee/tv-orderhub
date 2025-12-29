@@ -27,12 +27,22 @@ import { TechnicianOrder, OrderItem } from '@/hooks/useTechnicianPortal';
 import { WAREHOUSE_DESTINATIONS, ITEM_CONDITIONS, PACKAGING_TYPES } from '@/types/technicians';
 import { Package, FileText, Upload, Loader2 } from 'lucide-react';
 
+interface PreSelectedItem {
+  order_item_id: string;
+  order_id: string;
+  order_number: string;
+  item_code: string;
+  item_description: string;
+  quantity: number;
+}
+
 interface GroupedReturnFormProps {
   orders: TechnicianOrder[];
   requesterProfileId: string;
   open: boolean;
   onClose: () => void;
   onSuccess: () => void;
+  preSelectedItems?: Map<string, PreSelectedItem>;
 }
 
 interface OrderItemSource {
@@ -60,6 +70,7 @@ export function GroupedReturnForm({
   open,
   onClose,
   onSuccess,
+  preSelectedItems,
 }: GroupedReturnFormProps) {
   const { organizationId } = useOrganizationId();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -72,6 +83,12 @@ export function GroupedReturnForm({
   const [packagingType, setPackagingType] = useState('');
   const [generalNotes, setGeneralNotes] = useState('');
   const [photos, setPhotos] = useState<File[]>([]);
+
+  // Build set of pre-selected order_item_ids
+  const preSelectedIds = useMemo(() => {
+    if (!preSelectedItems || preSelectedItems.size === 0) return new Set<string>();
+    return new Set(Array.from(preSelectedItems.keys()));
+  }, [preSelectedItems]);
 
   // Group items by item_code across all orders
   const initialGroupedItems = useMemo(() => {
@@ -87,16 +104,23 @@ export function GroupedReturnForm({
           quantity: item.quantity,
         };
 
+        // Check if this item is pre-selected
+        const isPreSelected = preSelectedIds.has(item.id);
+
         if (existing) {
           existing.total_quantity += item.quantity;
           existing.sources.push(source);
+          // If any source is pre-selected, mark the whole group as selected
+          if (isPreSelected) {
+            existing.selected = true;
+          }
         } else {
           itemMap.set(item.item_code, {
             item_code: item.item_code,
             item_description: item.item_description || item.item_code,
             total_quantity: item.quantity,
             sources: [source],
-            selected: false,
+            selected: isPreSelected,
             quantity_returning: item.quantity,
             condition: 'bom',
             notes: '',
@@ -108,9 +132,16 @@ export function GroupedReturnForm({
     return Array.from(itemMap.values()).sort((a, b) => 
       a.item_code.localeCompare(b.item_code)
     );
-  }, [orders]);
+  }, [orders, preSelectedIds]);
 
   const [groupedItems, setGroupedItems] = useState<GroupedItem[]>(initialGroupedItems);
+
+  // Reset form when dialog opens with new pre-selected items
+  useMemo(() => {
+    if (open) {
+      setGroupedItems(initialGroupedItems);
+    }
+  }, [open, initialGroupedItems]);
 
   const selectedItems = groupedItems.filter((item) => item.selected);
   const totalItemsToReturn = selectedItems.reduce((sum, item) => sum + item.quantity_returning, 0);
