@@ -9,7 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { trackLogin } from "@/hooks/useLoginTracking";
-import { Activity, Shield } from "lucide-react";
+import { Activity, Shield, Wrench, Building } from "lucide-react";
 import { ForgotPasswordDialog } from "@/components/ForgotPasswordDialog";
 
 export default function Auth() {
@@ -20,13 +20,26 @@ export default function Auth() {
   const [fullName, setFullName] = useState("");
   const [department, setDepartment] = useState("");
   const [location, setLocation] = useState("");
+  const [userType, setUserType] = useState<"internal" | "technician">("internal");
+  const [document, setDocument] = useState("");
 
   // Redirecionar se já estiver autenticado
   useEffect(() => {
     const checkAuth = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
-        navigate("/");
+        // Verificar tipo de usuário para redirecionar corretamente
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('user_type')
+          .eq('id', session.user.id)
+          .single();
+        
+        if (profile?.user_type === 'technician') {
+          navigate("/technician-portal");
+        } else {
+          navigate("/");
+        }
       }
     };
     checkAuth();
@@ -44,19 +57,29 @@ export default function Auth() {
 
       if (error) throw error;
 
-      // Atualizar last_login e registrar no activity log
       if (data.user) {
-      await supabase.from('profiles').update({
-        last_login: new Date().toISOString()
-      }).eq('id', data.user.id);
+        // Atualizar last_login
+        await supabase.from('profiles').update({
+          last_login: new Date().toISOString()
+        }).eq('id', data.user.id);
 
-      // Log login activity with full tracking
-      await trackLogin(data.user.id, 'email');
-      }
+        // Log login activity
+        await trackLogin(data.user.id, 'email');
 
-      if (data.user) {
+        // Verificar tipo de usuário para redirecionar
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('user_type')
+          .eq('id', data.user.id)
+          .single();
+
         toast.success("Login realizado com sucesso!");
-        navigate("/");
+        
+        if (profile?.user_type === 'technician') {
+          navigate("/technician-portal");
+        } else {
+          navigate("/");
+        }
       }
     } catch (error: any) {
       toast.error(error.message || "Erro ao fazer login");
@@ -68,14 +91,25 @@ export default function Auth() {
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!department) {
-      toast.error("Por favor, selecione sua área de trabalho");
-      return;
+    // Validações para colaborador interno
+    if (userType === "internal") {
+      if (!department) {
+        toast.error("Por favor, selecione sua área de trabalho");
+        return;
+      }
+      
+      if (!location) {
+        toast.error("Por favor, selecione sua localização");
+        return;
+      }
     }
     
-    if (!location) {
-      toast.error("Por favor, selecione sua localização");
-      return;
+    // Validações para técnico externo
+    if (userType === "technician") {
+      if (!document) {
+        toast.error("Por favor, informe seu CPF ou CNPJ");
+        return;
+      }
     }
     
     setLoading(true);
@@ -88,8 +122,10 @@ export default function Auth() {
           emailRedirectTo: `${window.location.origin}/`,
           data: {
             full_name: fullName,
-            department: department,
-            location: location,
+            department: userType === "internal" ? department : "Técnico Externo",
+            location: userType === "internal" ? location : "Externo",
+            user_type: userType,
+            document: userType === "technician" ? document : null,
           },
         },
       });
@@ -97,9 +133,17 @@ export default function Auth() {
       if (error) throw error;
 
       if (data.user) {
-        // O trigger handle_new_user já cria o perfil com department
-        toast.success("Cadastro realizado! Aguarde a aprovação do administrador.");
-        // Não redirecionar - usuário permanece na página até confirmar email
+        // Atualizar perfil com user_type e document
+        await supabase.from('profiles').update({
+          user_type: userType,
+          document: userType === "technician" ? document : null,
+        }).eq('id', data.user.id);
+
+        if (userType === "technician") {
+          toast.success("Cadastro realizado! Você será redirecionado ao portal.");
+        } else {
+          toast.success("Cadastro realizado! Aguarde a aprovação do administrador.");
+        }
       }
     } catch (error: any) {
       toast.error(error.message || "Erro ao criar conta");
@@ -188,20 +232,51 @@ export default function Auth() {
                 </div>
               </div>
 
-          <Button
-            type="button"
-            variant="outline"
-            className="w-full gap-2"
-            onClick={handleSignInWithMicrosoft}
-            disabled={loading}
-          >
-            <Shield className="h-4 w-4" />
-            Entrar com Microsoft
-          </Button>
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full gap-2"
+                onClick={handleSignInWithMicrosoft}
+                disabled={loading}
+              >
+                <Shield className="h-4 w-4" />
+                Entrar com Microsoft
+              </Button>
             </TabsContent>
             
             <TabsContent value="signup">
               <form onSubmit={handleSignUp} className="space-y-4">
+                {/* Seleção de tipo de usuário */}
+                <div className="space-y-2">
+                  <Label>Tipo de Acesso</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button
+                      type="button"
+                      variant={userType === "internal" ? "default" : "outline"}
+                      className="flex items-center gap-2 h-auto py-3"
+                      onClick={() => setUserType("internal")}
+                    >
+                      <Building className="h-4 w-4" />
+                      <div className="text-left">
+                        <div className="font-medium text-sm">Colaborador</div>
+                        <div className="text-xs opacity-70">Interno</div>
+                      </div>
+                    </Button>
+                    <Button
+                      type="button"
+                      variant={userType === "technician" ? "default" : "outline"}
+                      className="flex items-center gap-2 h-auto py-3"
+                      onClick={() => setUserType("technician")}
+                    >
+                      <Wrench className="h-4 w-4" />
+                      <div className="text-left">
+                        <div className="font-medium text-sm">Técnico</div>
+                        <div className="text-xs opacity-70">Externo</div>
+                      </div>
+                    </Button>
+                  </div>
+                </div>
+
                 <div className="space-y-2">
                   <Label htmlFor="signup-name">Nome Completo</Label>
                   <Input
@@ -213,6 +288,25 @@ export default function Auth() {
                     required
                   />
                 </div>
+
+                {/* Campo de documento para técnicos */}
+                {userType === "technician" && (
+                  <div className="space-y-2">
+                    <Label htmlFor="signup-document">CPF ou CNPJ</Label>
+                    <Input
+                      id="signup-document"
+                      type="text"
+                      placeholder="000.000.000-00"
+                      value={document}
+                      onChange={(e) => setDocument(e.target.value)}
+                      required
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Usado para vincular suas remessas de conserto
+                    </p>
+                  </div>
+                )}
+
                 <div className="space-y-2">
                   <Label htmlFor="signup-email">E-mail</Label>
                   <Input
@@ -236,50 +330,62 @@ export default function Auth() {
                     minLength={6}
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="signup-department">Área de Trabalho</Label>
-                  <Select value={department} onValueChange={setDepartment} required>
-                    <SelectTrigger id="signup-department">
-                      <SelectValue placeholder="Selecione sua área" />
-                    </SelectTrigger>
-                    <SelectContent className="max-h-60 z-50 bg-popover">
-                      <SelectItem value="Administração">Administração</SelectItem>
-                      <SelectItem value="Almoxarifado Geral">Almoxarifado Geral</SelectItem>
-                      <SelectItem value="Almoxarifado SSM">Almoxarifado SSM</SelectItem>
-                      <SelectItem value="Comercial">Comercial</SelectItem>
-                      <SelectItem value="Compras">Compras</SelectItem>
-                      <SelectItem value="Expedição">Expedição</SelectItem>
-                      <SelectItem value="Faturamento">Faturamento</SelectItem>
-                      <SelectItem value="Financeiro">Financeiro</SelectItem>
-                      <SelectItem value="Laboratório">Laboratório</SelectItem>
-                      <SelectItem value="Logística">Logística</SelectItem>
-                      <SelectItem value="Planejamento">Planejamento</SelectItem>
-                      <SelectItem value="Produção">Produção</SelectItem>
-                      <SelectItem value="Projetos">Projetos</SelectItem>
-                      <SelectItem value="SSM">SSM</SelectItem>
-                      <SelectItem value="Suporte">Suporte</SelectItem>
-                      <SelectItem value="TI">TI</SelectItem>
-                      <SelectItem value="Outros">Outros</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="signup-location">Localização</Label>
-                  <Select value={location} onValueChange={setLocation} required>
-                    <SelectTrigger id="signup-location">
-                      <SelectValue placeholder="Selecione a localização" />
-                    </SelectTrigger>
-                    <SelectContent className="max-h-60 z-50 bg-popover">
-                      <SelectItem value="Matriz">Matriz</SelectItem>
-                      <SelectItem value="Filial">Filial</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+
+                {/* Campos para colaborador interno */}
+                {userType === "internal" && (
+                  <>
+                    <div className="space-y-2">
+                      <Label htmlFor="signup-department">Área de Trabalho</Label>
+                      <Select value={department} onValueChange={setDepartment} required>
+                        <SelectTrigger id="signup-department">
+                          <SelectValue placeholder="Selecione sua área" />
+                        </SelectTrigger>
+                        <SelectContent className="max-h-60 z-50 bg-popover">
+                          <SelectItem value="Administração">Administração</SelectItem>
+                          <SelectItem value="Almoxarifado Geral">Almoxarifado Geral</SelectItem>
+                          <SelectItem value="Almoxarifado SSM">Almoxarifado SSM</SelectItem>
+                          <SelectItem value="Comercial">Comercial</SelectItem>
+                          <SelectItem value="Compras">Compras</SelectItem>
+                          <SelectItem value="Expedição">Expedição</SelectItem>
+                          <SelectItem value="Faturamento">Faturamento</SelectItem>
+                          <SelectItem value="Financeiro">Financeiro</SelectItem>
+                          <SelectItem value="Laboratório">Laboratório</SelectItem>
+                          <SelectItem value="Logística">Logística</SelectItem>
+                          <SelectItem value="Planejamento">Planejamento</SelectItem>
+                          <SelectItem value="Produção">Produção</SelectItem>
+                          <SelectItem value="Projetos">Projetos</SelectItem>
+                          <SelectItem value="SSM">SSM</SelectItem>
+                          <SelectItem value="Suporte">Suporte</SelectItem>
+                          <SelectItem value="TI">TI</SelectItem>
+                          <SelectItem value="Outros">Outros</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="signup-location">Localização</Label>
+                      <Select value={location} onValueChange={setLocation} required>
+                        <SelectTrigger id="signup-location">
+                          <SelectValue placeholder="Selecione a localização" />
+                        </SelectTrigger>
+                        <SelectContent className="max-h-60 z-50 bg-popover">
+                          <SelectItem value="Matriz">Matriz</SelectItem>
+                          <SelectItem value="Filial">Filial</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </>
+                )}
                 
                 <Button type="submit" className="w-full" disabled={loading}>
                   {loading ? "Criando conta..." : "Criar conta"}
                 </Button>
+
+                {userType === "technician" && (
+                  <p className="text-xs text-center text-muted-foreground">
+                    Como técnico externo, você terá acesso apenas às suas remessas de conserto.
+                  </p>
+                )}
               </form>
             </TabsContent>
           </Tabs>

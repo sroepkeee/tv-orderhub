@@ -3523,6 +3523,7 @@ export type Database = {
         Row: {
           created_at: string
           department: string | null
+          document: string | null
           email: string | null
           full_name: string | null
           id: string
@@ -3532,11 +3533,13 @@ export type Database = {
           location: string | null
           organization_id: string | null
           updated_at: string
+          user_type: string | null
           whatsapp: string | null
         }
         Insert: {
           created_at?: string
           department?: string | null
+          document?: string | null
           email?: string | null
           full_name?: string | null
           id: string
@@ -3546,11 +3549,13 @@ export type Database = {
           location?: string | null
           organization_id?: string | null
           updated_at?: string
+          user_type?: string | null
           whatsapp?: string | null
         }
         Update: {
           created_at?: string
           department?: string | null
+          document?: string | null
           email?: string | null
           full_name?: string | null
           id?: string
@@ -3560,6 +3565,7 @@ export type Database = {
           location?: string | null
           organization_id?: string | null
           updated_at?: string
+          user_type?: string | null
           whatsapp?: string | null
         }
         Relationships: [
