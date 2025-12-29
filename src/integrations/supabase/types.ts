@@ -3979,6 +3979,167 @@ export type Database = {
           },
         ]
       }
+      return_request_items: {
+        Row: {
+          condition: string
+          created_at: string
+          dispatch_item_id: string
+          id: string
+          notes: string | null
+          quantity_returning: number
+          return_request_id: string
+        }
+        Insert: {
+          condition?: string
+          created_at?: string
+          dispatch_item_id: string
+          id?: string
+          notes?: string | null
+          quantity_returning?: number
+          return_request_id: string
+        }
+        Update: {
+          condition?: string
+          created_at?: string
+          dispatch_item_id?: string
+          id?: string
+          notes?: string | null
+          quantity_returning?: number
+          return_request_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "return_request_items_dispatch_item_id_fkey"
+            columns: ["dispatch_item_id"]
+            isOneToOne: false
+            referencedRelation: "technician_dispatch_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "return_request_items_return_request_id_fkey"
+            columns: ["return_request_id"]
+            isOneToOne: false
+            referencedRelation: "return_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      return_requests: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          carrier_id: string | null
+          created_at: string
+          destination_warehouse: string
+          dispatch_id: string
+          freight_value: number | null
+          id: string
+          notes: string | null
+          organization_id: string | null
+          pickup_address: string | null
+          pickup_city: string | null
+          pickup_contact: string | null
+          pickup_phone: string | null
+          pickup_state: string | null
+          pickup_zip_code: string | null
+          received_at: string | null
+          received_by: string | null
+          rejection_reason: string | null
+          requested_at: string
+          requested_by: string | null
+          scheduled_pickup_date: string | null
+          status: string
+          technician_id: string
+          tracking_code: string | null
+          updated_at: string
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          carrier_id?: string | null
+          created_at?: string
+          destination_warehouse: string
+          dispatch_id: string
+          freight_value?: number | null
+          id?: string
+          notes?: string | null
+          organization_id?: string | null
+          pickup_address?: string | null
+          pickup_city?: string | null
+          pickup_contact?: string | null
+          pickup_phone?: string | null
+          pickup_state?: string | null
+          pickup_zip_code?: string | null
+          received_at?: string | null
+          received_by?: string | null
+          rejection_reason?: string | null
+          requested_at?: string
+          requested_by?: string | null
+          scheduled_pickup_date?: string | null
+          status?: string
+          technician_id: string
+          tracking_code?: string | null
+          updated_at?: string
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          carrier_id?: string | null
+          created_at?: string
+          destination_warehouse?: string
+          dispatch_id?: string
+          freight_value?: number | null
+          id?: string
+          notes?: string | null
+          organization_id?: string | null
+          pickup_address?: string | null
+          pickup_city?: string | null
+          pickup_contact?: string | null
+          pickup_phone?: string | null
+          pickup_state?: string | null
+          pickup_zip_code?: string | null
+          received_at?: string | null
+          received_by?: string | null
+          rejection_reason?: string | null
+          requested_at?: string
+          requested_by?: string | null
+          scheduled_pickup_date?: string | null
+          status?: string
+          technician_id?: string
+          tracking_code?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "return_requests_carrier_id_fkey"
+            columns: ["carrier_id"]
+            isOneToOne: false
+            referencedRelation: "carriers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "return_requests_dispatch_id_fkey"
+            columns: ["dispatch_id"]
+            isOneToOne: false
+            referencedRelation: "technician_dispatches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "return_requests_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "return_requests_technician_id_fkey"
+            columns: ["technician_id"]
+            isOneToOne: false
+            referencedRelation: "technicians"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       saas_leads: {
         Row: {
           company_name: string
@@ -4087,6 +4248,207 @@ export type Database = {
           },
           {
             foreignKeyName: "stock_movements_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      technician_dispatch_items: {
+        Row: {
+          created_at: string
+          dispatch_id: string
+          id: string
+          item_code: string
+          item_description: string
+          notes: string | null
+          order_item_id: string | null
+          quantity_returned: number
+          quantity_sent: number
+          return_status: string
+          returned_at: string | null
+          returned_by: string | null
+          unit: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          dispatch_id: string
+          id?: string
+          item_code: string
+          item_description: string
+          notes?: string | null
+          order_item_id?: string | null
+          quantity_returned?: number
+          quantity_sent?: number
+          return_status?: string
+          returned_at?: string | null
+          returned_by?: string | null
+          unit?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          dispatch_id?: string
+          id?: string
+          item_code?: string
+          item_description?: string
+          notes?: string | null
+          order_item_id?: string | null
+          quantity_returned?: number
+          quantity_sent?: number
+          return_status?: string
+          returned_at?: string | null
+          returned_by?: string | null
+          unit?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "technician_dispatch_items_dispatch_id_fkey"
+            columns: ["dispatch_id"]
+            isOneToOne: false
+            referencedRelation: "technician_dispatches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "technician_dispatch_items_order_item_id_fkey"
+            columns: ["order_item_id"]
+            isOneToOne: false
+            referencedRelation: "order_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      technician_dispatches: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          dispatch_date: string
+          expected_return_date: string | null
+          id: string
+          notes: string | null
+          order_id: string
+          organization_id: string | null
+          origin_warehouse: string
+          status: string
+          technician_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          dispatch_date?: string
+          expected_return_date?: string | null
+          id?: string
+          notes?: string | null
+          order_id: string
+          organization_id?: string | null
+          origin_warehouse: string
+          status?: string
+          technician_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          dispatch_date?: string
+          expected_return_date?: string | null
+          id?: string
+          notes?: string | null
+          order_id?: string
+          organization_id?: string | null
+          origin_warehouse?: string
+          status?: string
+          technician_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "technician_dispatches_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "technician_dispatches_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "technician_dispatches_technician_id_fkey"
+            columns: ["technician_id"]
+            isOneToOne: false
+            referencedRelation: "technicians"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      technicians: {
+        Row: {
+          address: string | null
+          city: string | null
+          created_at: string
+          document: string | null
+          email: string | null
+          id: string
+          is_active: boolean
+          name: string
+          notes: string | null
+          organization_id: string | null
+          phone: string | null
+          specialty: string | null
+          state: string | null
+          updated_at: string
+          user_id: string | null
+          whatsapp: string | null
+          zip_code: string | null
+        }
+        Insert: {
+          address?: string | null
+          city?: string | null
+          created_at?: string
+          document?: string | null
+          email?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          notes?: string | null
+          organization_id?: string | null
+          phone?: string | null
+          specialty?: string | null
+          state?: string | null
+          updated_at?: string
+          user_id?: string | null
+          whatsapp?: string | null
+          zip_code?: string | null
+        }
+        Update: {
+          address?: string | null
+          city?: string | null
+          created_at?: string
+          document?: string | null
+          email?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          notes?: string | null
+          organization_id?: string | null
+          phone?: string | null
+          specialty?: string | null
+          state?: string | null
+          updated_at?: string
+          user_id?: string | null
+          whatsapp?: string | null
+          zip_code?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "technicians_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
