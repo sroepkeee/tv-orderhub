@@ -104,3 +104,6 @@ verify_jwt = false
 
 [functions.process-change-request]
 verify_jwt = true
+
+[functions.send-technician-invite]
+verify_jwt = true

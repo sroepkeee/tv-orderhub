@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,11 +9,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { trackLogin } from "@/hooks/useLoginTracking";
-import { Activity, Shield, Wrench, Building } from "lucide-react";
+import { Activity, Shield, Wrench, Building, Mail } from "lucide-react";
 import { ForgotPasswordDialog } from "@/components/ForgotPasswordDialog";
 
 export default function Auth() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -22,6 +23,24 @@ export default function Auth() {
   const [location, setLocation] = useState("");
   const [userType, setUserType] = useState<"internal" | "technician">("internal");
   const [document, setDocument] = useState("");
+  const [activeTab, setActiveTab] = useState("signin");
+  const [inviteToken, setInviteToken] = useState<string | null>(null);
+
+  // Ler parâmetros de convite da URL
+  useEffect(() => {
+    const type = searchParams.get('type');
+    const name = searchParams.get('name');
+    const doc = searchParams.get('doc');
+    const token = searchParams.get('token');
+
+    if (type === 'technician') {
+      setUserType('technician');
+      setActiveTab('signup');
+      if (name) setFullName(decodeURIComponent(name));
+      if (doc) setDocument(decodeURIComponent(doc));
+      if (token) setInviteToken(token);
+    }
+  }, [searchParams]);
 
   // Redirecionar se já estiver autenticado
   useEffect(() => {
@@ -183,11 +202,18 @@ export default function Auth() {
           <CardDescription>Controle Operacional Inteligente</CardDescription>
         </CardHeader>
         <CardContent>
-          <Tabs defaultValue="signin" className="w-full">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="signin">Entrar</TabsTrigger>
               <TabsTrigger value="signup">Cadastrar</TabsTrigger>
             </TabsList>
+            
+            {inviteToken && activeTab === 'signup' && (
+              <div className="mt-4 p-3 rounded-lg bg-primary/10 border border-primary/20 flex items-center gap-2">
+                <Mail className="h-4 w-4 text-primary" />
+                <span className="text-sm">Complete seu cadastro para acessar suas NFs</span>
+              </div>
+            )}
             
             <TabsContent value="signin">
               <form onSubmit={handleSignIn} className="space-y-4">

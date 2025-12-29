@@ -6,8 +6,10 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
-import { Plus, Search, Pencil, Trash2, Phone } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Plus, Search, Pencil, Trash2, Phone, Users, Package } from 'lucide-react';
 import { useTechnicians } from '@/hooks/useTechnicians';
+import { DispatchRecipientsTable } from './DispatchRecipientsTable';
 import type { Technician } from '@/types/technicians';
 
 export function TechnicianManagementTab() {
@@ -84,108 +86,127 @@ export function TechnicianManagementTab() {
   };
 
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0">
-        <CardTitle>Cadastro de Técnicos</CardTitle>
-        <Button size="sm" onClick={openCreateDialog}>
-          <Plus className="h-4 w-4 mr-2" />
-          Novo Técnico
-        </Button>
-      </CardHeader>
-      <CardContent>
-        {/* Busca */}
-        <div className="relative mb-4">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Buscar por nome, cidade ou email..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-9"
-          />
-        </div>
+    <Tabs defaultValue="recipients" className="space-y-4">
+      <TabsList>
+        <TabsTrigger value="recipients" className="gap-2">
+          <Package className="h-4 w-4" />
+          Destinatários de Remessas
+        </TabsTrigger>
+        <TabsTrigger value="technicians" className="gap-2">
+          <Users className="h-4 w-4" />
+          Cadastro de Técnicos
+        </TabsTrigger>
+      </TabsList>
 
-        {/* Tabela */}
-        <div className="rounded-md border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Nome</TableHead>
-                <TableHead>Cidade/UF</TableHead>
-                <TableHead>Contato</TableHead>
-                <TableHead>Especialidade</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Ações</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loading ? (
-                <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8">
-                    Carregando...
-                  </TableCell>
-                </TableRow>
-              ) : filteredTechnicians.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                    Nenhum técnico cadastrado
-                  </TableCell>
-                </TableRow>
-              ) : (
-                filteredTechnicians.map((tech) => (
-                  <TableRow key={tech.id}>
-                    <TableCell className="font-medium">{tech.name}</TableCell>
-                    <TableCell>
-                      {tech.city && tech.state ? `${tech.city}/${tech.state}` : '-'}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        {tech.whatsapp && (
-                          <a
-                            href={`https://wa.me/${tech.whatsapp.replace(/\D/g, '')}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-emerald-500 hover:text-emerald-600"
-                          >
-                            <Phone className="h-4 w-4" />
-                          </a>
-                        )}
-                        <span className="text-sm text-muted-foreground">
-                          {tech.email || tech.phone || '-'}
-                        </span>
-                      </div>
-                    </TableCell>
-                    <TableCell>{tech.specialty || '-'}</TableCell>
-                    <TableCell>
-                      <Badge variant={tech.is_active ? 'default' : 'secondary'}>
-                        {tech.is_active ? 'Ativo' : 'Inativo'}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => openEditDialog(tech)}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="text-destructive"
-                          onClick={() => handleDelete(tech.id)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
+      <TabsContent value="recipients">
+        <DispatchRecipientsTable />
+      </TabsContent>
+
+      <TabsContent value="technicians">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0">
+            <CardTitle>Cadastro de Técnicos</CardTitle>
+            <Button size="sm" onClick={openCreateDialog}>
+              <Plus className="h-4 w-4 mr-2" />
+              Novo Técnico
+            </Button>
+          </CardHeader>
+          <CardContent>
+            {/* Busca */}
+            <div className="relative mb-4">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Buscar por nome, cidade ou email..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+
+            {/* Tabela */}
+            <div className="rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Nome</TableHead>
+                    <TableHead>Cidade/UF</TableHead>
+                    <TableHead>Contato</TableHead>
+                    <TableHead>Especialidade</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Ações</TableHead>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
-      </CardContent>
+                </TableHeader>
+                <TableBody>
+                  {loading ? (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center py-8">
+                        Carregando...
+                      </TableCell>
+                    </TableRow>
+                  ) : filteredTechnicians.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                        Nenhum técnico cadastrado
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    filteredTechnicians.map((tech) => (
+                      <TableRow key={tech.id}>
+                        <TableCell className="font-medium">{tech.name}</TableCell>
+                        <TableCell>
+                          {tech.city && tech.state ? `${tech.city}/${tech.state}` : '-'}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            {tech.whatsapp && (
+                              <a
+                                href={`https://wa.me/${tech.whatsapp.replace(/\D/g, '')}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-emerald-500 hover:text-emerald-600"
+                              >
+                                <Phone className="h-4 w-4" />
+                              </a>
+                            )}
+                            <span className="text-sm text-muted-foreground">
+                              {tech.email || tech.phone || '-'}
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell>{tech.specialty || '-'}</TableCell>
+                        <TableCell>
+                          <Badge variant={tech.is_active ? 'default' : 'secondary'}>
+                            {tech.is_active ? 'Ativo' : 'Inativo'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => openEditDialog(tech)}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="text-destructive"
+                              onClick={() => handleDelete(tech.id)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+      </TabsContent>
 
       {/* Dialog de Criação/Edição */}
       <Dialog open={showDialog} onOpenChange={setShowDialog}>
@@ -314,6 +335,6 @@ export function TechnicianManagementTab() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </Card>
+    </Tabs>
   );
 }
