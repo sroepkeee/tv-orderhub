@@ -13,6 +13,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useAdminAuth } from "@/hooks/useAdminAuth";
 import { usePrivacyMode } from "@/hooks/usePrivacyMode";
 import { useMenuPermissions } from "@/hooks/useMenuPermissions";
+import { usePendingReturnsCount } from "@/hooks/useReturnRequests";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { KanbanDensity } from "@/hooks/useKanbanDensity";
@@ -48,6 +49,7 @@ const AppSidebar = ({
   const { state } = useSidebar();
   const { isPrivacyMode, togglePrivacyMode } = usePrivacyMode();
   const { canViewMenu } = useMenuPermissions();
+  const pendingReturnsCount = usePendingReturnsCount();
   const navigate = useNavigate();
   const [isDark, setIsDark] = useState(false);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
@@ -111,7 +113,7 @@ const AppSidebar = ({
       { path: "/transportadoras", icon: Truck, label: "Transportadoras", key: "transportadoras" },
       { path: "/carriers-chat", icon: MessageSquare, label: "Conversas", badge: unreadConversationsCount, key: "carriers-chat" },
       { path: "/compras", icon: ShoppingCart, label: "Compras", key: "compras" },
-      { path: "/technician-dispatches", icon: Wrench, label: "Técnicos", key: "technician-dispatches" },
+      { path: "/technician-dispatches", icon: Wrench, label: "Técnicos", badge: pendingReturnsCount > 0 ? pendingReturnsCount : undefined, key: "technician-dispatches" },
     ].filter(item => canViewMenu(item.key));
 
     if (logisticsItems.length > 0) {
