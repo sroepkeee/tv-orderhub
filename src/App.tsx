@@ -20,6 +20,8 @@ import AIAgent from "./pages/AIAgent";
 import Customers from "./pages/Customers";
 import Onboarding from "./pages/Onboarding";
 import PhaseSettings from "./pages/PhaseSettings";
+import TechnicianDispatches from "./pages/TechnicianDispatches";
+import TechnicianPortal from "./pages/TechnicianPortal";
 import Files from "./pages/Files";
 import { CarriersChatRoute } from "./components/CarriersChatRoute";
 import { useAuth } from "./hooks/useAuth";
@@ -244,6 +246,16 @@ const App = () => {
                             <AdminRoute>
                               <PhaseSettings />
                             </AdminRoute>
+                          </ProtectedRoute>
+                        } />
+                        <Route path="/technician-dispatches" element={
+                          <ProtectedRoute>
+                            <TechnicianDispatches />
+                          </ProtectedRoute>
+                        } />
+                        <Route path="/technician-portal" element={
+                          <ProtectedRoute>
+                            <TechnicianPortal />
                           </ProtectedRoute>
                         } />
                         {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
