@@ -1232,7 +1232,10 @@ export const Dashboard = () => {
             requires_image: dbOrder.requires_image || false,
             shipping_date: dbOrder.shipping_date || null,
             vehicle_plate: dbOrder.vehicle_plate || null,
-            driver_name: dbOrder.driver_name || null
+            driver_name: dbOrder.driver_name || null,
+            // Campos WhatsApp cliente (fallback)
+            customer_whatsapp: dbOrder.customer_whatsapp || null,
+            customer_contact_name: dbOrder.customer_contact_name || null
           };
         }));
         console.log('✅ [loadOrders] Fallback concluído', {
