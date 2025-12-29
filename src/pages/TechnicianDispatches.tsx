@@ -24,6 +24,8 @@ export default function TechnicianDispatches() {
   const [activeTab, setActiveTab] = useState('dispatches');
   const { dispatches, metrics, loading: dispatchesLoading, fetchDispatches } = useTechnicianDispatches();
   const { requests: pendingRequests, loading: requestsLoading } = useReturnRequests({ status: 'pending' });
+  
+  const safeMetrics = metrics || defaultMetrics;
 
   return (
     <MainLayout>
@@ -40,7 +42,7 @@ export default function TechnicianDispatches() {
 
         {/* Métricas */}
         <DispatchMetricsCards 
-          metrics={metrics || defaultMetrics} 
+          metrics={safeMetrics} 
           pendingReturns={pendingRequests.length} 
           loading={dispatchesLoading} 
         />
@@ -96,12 +98,12 @@ export default function TechnicianDispatches() {
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">
-                    {metrics.total_items_sent > 0 
-                      ? Math.round((metrics.total_items_returned / metrics.total_items_sent) * 100)
+                    {safeMetrics.total_items_sent > 0 
+                      ? Math.round((safeMetrics.total_items_returned / safeMetrics.total_items_sent) * 100)
                       : 0}%
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    {metrics.total_items_returned} de {metrics.total_items_sent} itens retornados
+                    {safeMetrics.total_items_returned} de {safeMetrics.total_items_sent} itens retornados
                   </p>
                 </CardContent>
               </Card>
@@ -113,7 +115,7 @@ export default function TechnicianDispatches() {
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold text-red-500">
-                    {metrics.overdue_dispatches}
+                    {safeMetrics.overdue_dispatches}
                   </div>
                   <p className="text-xs text-muted-foreground">
                     Aguardando retorno há mais de 30 dias
