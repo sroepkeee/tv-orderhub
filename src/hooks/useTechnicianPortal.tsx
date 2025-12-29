@@ -2,136 +2,189 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
 import { toast } from 'sonner';
-import type { Technician, TechnicianDispatch } from '@/types/technicians';
+
+interface OrderItem {
+  id: string;
+  item_code: string;
+  item_description: string;
+  quantity: number;
+  serial_number?: string;
+  status?: string;
+}
+
+interface TechnicianOrder {
+  id: string;
+  order_number: string;
+  customer_name: string;
+  customer_document?: string;
+  order_type: string;
+  status: string;
+  created_at: string;
+  notes?: string;
+  items: OrderItem[];
+  items_count: number;
+}
+
+interface UserProfile {
+  id: string;
+  full_name: string;
+  user_type: string;
+  document?: string;
+}
 
 export function useTechnicianPortal() {
   const { user } = useAuth();
-  const [technicianInfo, setTechnicianInfo] = useState<Technician | null>(null);
-  const [pendingItems, setPendingItems] = useState<TechnicianDispatch[]>([]);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [orders, setOrders] = useState<TechnicianOrder[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const fetchTechnicianInfo = useCallback(async () => {
+  // Buscar perfil do usuário
+  const fetchUserProfile = useCallback(async () => {
     if (!user?.id) return null;
 
     try {
-      // Buscar técnico vinculado ao usuário
       const { data, error } = await supabase
-        .from('technicians')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('is_active', true)
-        .maybeSingle();
+        .from('profiles')
+        .select('id, full_name, user_type, document')
+        .eq('id', user.id)
+        .single();
 
       if (error) throw error;
       
-      setTechnicianInfo(data as Technician | null);
-      return data;
+      setUserProfile(data as UserProfile);
+      return data as UserProfile;
     } catch (error) {
-      console.error('Error fetching technician info:', error);
+      console.error('Error fetching user profile:', error);
       return null;
     }
   }, [user?.id]);
 
-  const fetchPendingItems = useCallback(async () => {
-    if (!technicianInfo?.id) return;
+  // Buscar ordens de remessa vinculadas ao técnico
+  const fetchOrders = useCallback(async () => {
+    if (!userProfile) return;
 
     setLoading(true);
     try {
-      // Buscar dispatches com itens pendentes
-      const { data: dispatches, error } = await supabase
-        .from('technician_dispatches')
+      // Buscar ordens de remessa_conserto e remessa_garantia
+      // Matching por customer_name ou customer_document
+      let query = supabase
+        .from('orders')
         .select(`
-          *,
-          order:orders(id, order_number, customer_name),
-          technician:technicians(id, name)
+          id,
+          order_number,
+          customer_name,
+          customer_document,
+          order_type,
+          status,
+          created_at,
+          notes,
+          order_items(id, item_code, item_description, requested_quantity)
         `)
-        .eq('technician_id', technicianInfo.id)
-        .in('status', ['dispatched', 'partial_return'])
-        .order('dispatch_date', { ascending: false });
+        .in('order_type', ['remessa_conserto', 'remessa_garantia'])
+        .not('status', 'in', '("completed","cancelled")');
+
+      // Construir filtro de match
+      const filters = [];
+      
+      // Match por nome completo (case insensitive)
+      if (userProfile.full_name) {
+        filters.push(`customer_name.ilike.%${userProfile.full_name}%`);
+      }
+      
+      // Match por documento
+      if (userProfile.document) {
+        // Remover formatação do documento para comparação
+        const cleanDoc = userProfile.document.replace(/[^\d]/g, '');
+        filters.push(`customer_document.ilike.%${cleanDoc}%`);
+      }
+
+      if (filters.length > 0) {
+        query = query.or(filters.join(','));
+      }
+
+      const { data, error } = await query.order('created_at', { ascending: false });
 
       if (error) throw error;
 
-      // Buscar itens para cada dispatch
-      const dispatchesWithItems = await Promise.all(
-        (dispatches || []).map(async (dispatch) => {
-          const { data: items } = await supabase
-            .from('technician_dispatch_items')
-            .select('*')
-            .eq('dispatch_id', dispatch.id)
-            .in('return_status', ['pending', 'partial']);
+      // Formatar dados
+      const formattedOrders: TechnicianOrder[] = (data || []).map(order => ({
+        id: order.id,
+        order_number: order.order_number,
+        customer_name: order.customer_name,
+        customer_document: order.customer_document,
+        order_type: order.order_type,
+        status: order.status,
+        created_at: order.created_at,
+        notes: order.notes,
+        items: (order.order_items || []).map((item: any) => ({
+          id: item.id,
+          item_code: item.item_code,
+          item_description: item.item_description || '',
+          quantity: item.requested_quantity || 0,
+        })),
+        items_count: order.order_items?.length || 0,
+      }));
 
-          const itemsPending = items?.reduce((acc, item) => 
-            acc + (item.quantity_sent - item.quantity_returned), 0
-          ) || 0;
-
-          return {
-            ...dispatch,
-            items: items || [],
-            items_count: items?.length || 0,
-            items_pending: itemsPending,
-          };
-        })
-      );
-
-      setPendingItems(dispatchesWithItems as TechnicianDispatch[]);
+      setOrders(formattedOrders);
     } catch (error) {
-      console.error('Error fetching pending items:', error);
-      toast.error('Erro ao carregar itens pendentes');
+      console.error('Error fetching orders:', error);
+      toast.error('Erro ao carregar remessas');
     } finally {
       setLoading(false);
     }
-  }, [technicianInfo?.id]);
+  }, [userProfile]);
 
-  const searchItemsByCode = useCallback(async (itemCode: string) => {
-    if (!technicianInfo?.id) return [];
-
-    try {
-      const { data, error } = await supabase
-        .from('technician_dispatch_items')
-        .select(`
-          *,
-          dispatch:technician_dispatches!inner(
-            id,
-            technician_id,
-            dispatch_date,
-            origin_warehouse,
-            order:orders(order_number)
-          )
-        `)
-        .ilike('item_code', `%${itemCode}%`)
-        .eq('dispatch.technician_id', technicianInfo.id)
-        .in('return_status', ['pending', 'partial']);
-
-      if (error) throw error;
-      return data || [];
-    } catch (error) {
-      console.error('Error searching items:', error);
-      return [];
-    }
-  }, [technicianInfo?.id]);
-
+  // Carregar dados iniciais
   useEffect(() => {
-    fetchTechnicianInfo().then((tech) => {
-      if (tech) {
-        fetchPendingItems();
+    fetchUserProfile().then((profile) => {
+      if (profile) {
+        // Profile carregado, orders serão buscadas pelo próximo useEffect
       } else {
         setLoading(false);
       }
     });
-  }, [fetchTechnicianInfo]);
+  }, [fetchUserProfile]);
 
+  // Buscar orders quando profile estiver disponível
   useEffect(() => {
-    if (technicianInfo?.id) {
-      fetchPendingItems();
+    if (userProfile) {
+      fetchOrders();
     }
-  }, [technicianInfo?.id, fetchPendingItems]);
+  }, [userProfile, fetchOrders]);
+
+  // Calcular totais
+  const totalItems = orders.reduce((acc, order) => 
+    acc + order.items.reduce((sum, item) => sum + item.quantity, 0), 0
+  );
 
   return {
-    technicianInfo,
-    pendingItems,
+    userProfile,
+    orders,
     loading,
-    fetchTechnicianInfo,
-    fetchPendingItems,
-    searchItemsByCode,
+    totalItems,
+    fetchOrders,
+    // Compatibilidade com interface antiga (para TechnicianReturnForm e TechnicianTransferDialog)
+    technicianInfo: userProfile ? {
+      id: userProfile.id,
+      name: userProfile.full_name,
+      city: '',
+      state: '',
+      address: '',
+    } : null,
+    pendingItems: orders.map(order => ({
+      id: order.id,
+      origin_warehouse: 'imply_rs',
+      items_pending: order.items.reduce((sum, item) => sum + item.quantity, 0),
+      order: { order_number: order.order_number },
+      items: order.items.map(item => ({
+        id: item.id,
+        item_code: item.item_code,
+        item_description: item.item_description,
+        quantity_sent: item.quantity,
+        quantity_returned: 0,
+        return_status: 'pending',
+      })),
+    })),
+    fetchPendingItems: fetchOrders,
   };
 }

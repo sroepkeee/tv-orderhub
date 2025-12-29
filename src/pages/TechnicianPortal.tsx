@@ -1,52 +1,75 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
-import { usePermissions } from '@/contexts/PermissionsContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Package, RotateCcw, ArrowLeftRight, AlertCircle } from 'lucide-react';
-import { TechnicianItemsList } from '@/components/technicians/TechnicianItemsList';
-import { TechnicianReturnForm } from '@/components/technicians/TechnicianReturnForm';
-import { TechnicianTransferDialog } from '@/components/technicians/TechnicianTransferDialog';
+import { Badge } from '@/components/ui/badge';
+import { Package, RotateCcw, AlertCircle, LogOut, FileText, ChevronDown, ChevronUp } from 'lucide-react';
 import { useTechnicianPortal } from '@/hooks/useTechnicianPortal';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 export default function TechnicianPortal() {
+  const navigate = useNavigate();
   const { user } = useAuth();
-  const { isAdmin } = usePermissions();
-  const [showReturnForm, setShowReturnForm] = useState(false);
-  const [showTransferDialog, setShowTransferDialog] = useState(false);
-  const [selectedDispatchId, setSelectedDispatchId] = useState<string | null>(null);
+  const [expandedOrders, setExpandedOrders] = useState<Set<string>>(new Set());
 
   const { 
-    technicianInfo, 
-    pendingItems, 
+    userProfile, 
+    orders, 
     loading, 
-    fetchPendingItems 
+    totalItems,
+    fetchOrders 
   } = useTechnicianPortal();
 
-  const handleStartReturn = (dispatchId: string) => {
-    setSelectedDispatchId(dispatchId);
-    setShowReturnForm(true);
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    navigate('/auth');
   };
 
-  const handleStartTransfer = (dispatchId: string) => {
-    setSelectedDispatchId(dispatchId);
-    setShowTransferDialog(true);
+  const toggleOrderExpanded = (orderId: string) => {
+    const newExpanded = new Set(expandedOrders);
+    if (newExpanded.has(orderId)) {
+      newExpanded.delete(orderId);
+    } else {
+      newExpanded.add(orderId);
+    }
+    setExpandedOrders(newExpanded);
   };
 
-  const handleReturnSuccess = () => {
-    setShowReturnForm(false);
-    setSelectedDispatchId(null);
-    fetchPendingItems();
+  const handleRequestReturn = async (orderId: string) => {
+    toast.info('Funcionalidade de retorno em desenvolvimento');
   };
 
-  const handleTransferSuccess = () => {
-    setShowTransferDialog(false);
-    setSelectedDispatchId(null);
-    fetchPendingItems();
-  };
+  // Loading state
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Carregando suas remessas...</p>
+        </div>
+      </div>
+    );
+  }
 
-  // Se não for técnico nem admin, mostrar mensagem de acesso negado
-  if (!loading && !technicianInfo && !isAdmin) {
+  // Se não tem perfil ou não é técnico com orders
+  if (!userProfile) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <Card className="max-w-md mx-auto">
@@ -54,39 +77,64 @@ export default function TechnicianPortal() {
             <AlertCircle className="h-12 w-12 text-destructive mx-auto mb-2" />
             <CardTitle>Acesso Restrito</CardTitle>
             <CardDescription>
-              Você não está cadastrado como técnico no sistema. 
-              Entre em contato com o administrador.
+              Não foi possível carregar seu perfil. 
+              Por favor, faça login novamente.
             </CardDescription>
           </CardHeader>
+          <CardContent>
+            <Button onClick={handleSignOut} className="w-full">
+              Fazer Login
+            </Button>
+          </CardContent>
         </Card>
       </div>
     );
   }
 
-  const totalPendingItems = pendingItems.reduce(
-    (acc, dispatch) => acc + (dispatch.items_pending || 0), 
-    0
-  );
+  const getOrderTypeBadge = (orderType: string) => {
+    switch (orderType) {
+      case 'remessa_conserto':
+        return <Badge variant="outline" className="bg-orange-500/10 text-orange-600 border-orange-500/30">Conserto</Badge>;
+      case 'remessa_garantia':
+        return <Badge variant="outline" className="bg-blue-500/10 text-blue-600 border-blue-500/30">Garantia</Badge>;
+      default:
+        return <Badge variant="outline">{orderType}</Badge>;
+    }
+  };
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'in_transit':
+        return <Badge className="bg-blue-500">Em Trânsito</Badge>;
+      case 'received':
+        return <Badge className="bg-green-500">Recebido</Badge>;
+      case 'in_progress':
+        return <Badge className="bg-yellow-500">Em Andamento</Badge>;
+      default:
+        return <Badge variant="secondary">{status}</Badge>;
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background">
       {/* Header simplificado */}
-      <header className="border-b bg-card">
+      <header className="border-b bg-card sticky top-0 z-10">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-xl font-bold">Portal do Técnico</h1>
-              {technicianInfo && (
-                <p className="text-sm text-muted-foreground">
-                  {technicianInfo.name} • {technicianInfo.city}/{technicianInfo.state}
-                </p>
-              )}
+              <p className="text-sm text-muted-foreground">
+                {userProfile.full_name}
+              </p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-4">
               <div className="text-right">
-                <p className="text-sm font-medium">{totalPendingItems} itens</p>
-                <p className="text-xs text-muted-foreground">em sua posse</p>
+                <p className="text-sm font-medium">{totalItems} itens</p>
+                <p className="text-xs text-muted-foreground">em {orders.length} remessa(s)</p>
               </div>
+              <Button variant="ghost" size="icon" onClick={handleSignOut}>
+                <LogOut className="h-5 w-5" />
+              </Button>
             </div>
           </div>
         </div>
@@ -95,21 +143,21 @@ export default function TechnicianPortal() {
       {/* Conteúdo principal */}
       <main className="container mx-auto px-4 py-6 space-y-6">
         {/* Cards de resumo */}
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-2">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Itens em Posse</CardTitle>
               <Package className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{totalPendingItems}</div>
+              <div className="text-2xl font-bold">{totalItems}</div>
               <p className="text-xs text-muted-foreground">
-                em {pendingItems.length} remessa(s)
+                em {orders.length} remessa(s) ativa(s)
               </p>
             </CardContent>
           </Card>
 
-          <Card className="cursor-pointer hover:bg-accent/50 transition-colors" onClick={() => pendingItems[0] && handleStartReturn(pendingItems[0].id)}>
+          <Card className="cursor-pointer hover:bg-accent/50 transition-colors">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Solicitar Retorno</CardTitle>
               <RotateCcw className="h-4 w-4 text-blue-500" />
@@ -120,48 +168,109 @@ export default function TechnicianPortal() {
               </p>
             </CardContent>
           </Card>
-
-          <Card className="cursor-pointer hover:bg-accent/50 transition-colors" onClick={() => pendingItems[0] && handleStartTransfer(pendingItems[0].id)}>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Transferir para Técnico</CardTitle>
-              <ArrowLeftRight className="h-4 w-4 text-purple-500" />
-            </CardHeader>
-            <CardContent>
-              <p className="text-xs text-muted-foreground">
-                Enviar para outro técnico
-              </p>
-            </CardContent>
-          </Card>
         </div>
 
-        {/* Lista de itens pendentes */}
-        <TechnicianItemsList 
-          dispatches={pendingItems}
-          loading={loading}
-          onStartReturn={handleStartReturn}
-          onStartTransfer={handleStartTransfer}
-        />
+        {/* Lista de remessas */}
+        <div className="space-y-4">
+          <h2 className="text-lg font-semibold flex items-center gap-2">
+            <FileText className="h-5 w-5" />
+            Suas Remessas
+          </h2>
+
+          {orders.length === 0 ? (
+            <Card>
+              <CardContent className="py-8 text-center">
+                <Package className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <p className="text-muted-foreground">
+                  Nenhuma remessa encontrada vinculada ao seu cadastro.
+                </p>
+                <p className="text-sm text-muted-foreground mt-2">
+                  Verifique se seu nome ou documento está correto nas notas fiscais.
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="space-y-3">
+              {orders.map((order) => (
+                <Collapsible
+                  key={order.id}
+                  open={expandedOrders.has(order.id)}
+                  onOpenChange={() => toggleOrderExpanded(order.id)}
+                >
+                  <Card>
+                    <CollapsibleTrigger className="w-full">
+                      <CardHeader className="pb-2">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className="text-left">
+                              <div className="flex items-center gap-2">
+                                <span className="font-semibold">{order.order_number}</span>
+                                {getOrderTypeBadge(order.order_type)}
+                                {getStatusBadge(order.status)}
+                              </div>
+                              <p className="text-sm text-muted-foreground">
+                                {format(new Date(order.created_at), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <div className="text-right">
+                              <p className="text-sm font-medium">{order.items_count} itens</p>
+                            </div>
+                            {expandedOrders.has(order.id) ? (
+                              <ChevronUp className="h-5 w-5 text-muted-foreground" />
+                            ) : (
+                              <ChevronDown className="h-5 w-5 text-muted-foreground" />
+                            )}
+                          </div>
+                        </div>
+                      </CardHeader>
+                    </CollapsibleTrigger>
+                    
+                    <CollapsibleContent>
+                      <CardContent className="pt-0">
+                        <div className="border rounded-md">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead>Código</TableHead>
+                                <TableHead>Descrição</TableHead>
+                                <TableHead className="text-center">Qtd</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {order.items.map((item) => (
+                                <TableRow key={item.id}>
+                                  <TableCell className="font-mono text-sm">
+                                    {item.item_code}
+                                  </TableCell>
+                                  <TableCell>{item.item_description}</TableCell>
+                                  <TableCell className="text-center">{item.quantity}</TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
+                        
+                        <div className="flex justify-end mt-4">
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => handleRequestReturn(order.id)}
+                          >
+                            <RotateCcw className="h-4 w-4 mr-2" />
+                            Solicitar Retorno
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </CollapsibleContent>
+                  </Card>
+                </Collapsible>
+              ))}
+            </div>
+          )}
+        </div>
       </main>
-
-      {/* Formulário de retorno */}
-      {showReturnForm && selectedDispatchId && (
-        <TechnicianReturnForm 
-          dispatchId={selectedDispatchId}
-          open={showReturnForm}
-          onClose={() => setShowReturnForm(false)}
-          onSuccess={handleReturnSuccess}
-        />
-      )}
-
-      {/* Dialog de transferência */}
-      {showTransferDialog && selectedDispatchId && (
-        <TechnicianTransferDialog 
-          dispatchId={selectedDispatchId}
-          open={showTransferDialog}
-          onClose={() => setShowTransferDialog(false)}
-          onSuccess={handleTransferSuccess}
-        />
-      )}
     </div>
   );
 }
