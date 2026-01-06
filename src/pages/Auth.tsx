@@ -9,8 +9,19 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { trackLogin } from "@/hooks/useLoginTracking";
-import { Activity, Shield, Wrench, Building, Mail } from "lucide-react";
+import { Activity, Shield, Wrench, Building, Mail, Users } from "lucide-react";
 import { ForgotPasswordDialog } from "@/components/ForgotPasswordDialog";
+
+interface InviteData {
+  id: string;
+  organization_id: string;
+  email: string;
+  name: string | null;
+  role: string;
+  invited_by: string;
+  sent_at: string;
+  organization_name?: string;
+}
 
 export default function Auth() {
   const navigate = useNavigate();
@@ -21,10 +32,55 @@ export default function Auth() {
   const [fullName, setFullName] = useState("");
   const [department, setDepartment] = useState("");
   const [location, setLocation] = useState("");
-  const [userType, setUserType] = useState<"internal" | "technician">("internal");
+  const [userType, setUserType] = useState<"internal" | "technician" | "invite">("internal");
   const [document, setDocument] = useState("");
   const [activeTab, setActiveTab] = useState("signin");
   const [inviteToken, setInviteToken] = useState<string | null>(null);
+  const [inviteData, setInviteData] = useState<InviteData | null>(null);
+
+  // Load invite details from token
+  const loadInviteDetails = async (token: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('organization_invites')
+        .select('id, organization_id, email, name, role, invited_by, sent_at, expires_at, status')
+        .eq('invite_token', token)
+        .single();
+
+      if (error || !data) {
+        toast.error('Convite inválido ou não encontrado');
+        return;
+      }
+
+      if (data.status !== 'pending') {
+        toast.error('Este convite já foi utilizado');
+        return;
+      }
+
+      if (new Date(data.expires_at) < new Date()) {
+        toast.error('Este convite expirou');
+        return;
+      }
+
+      // Get organization name
+      const { data: org } = await supabase
+        .from('organizations')
+        .select('name')
+        .eq('id', data.organization_id)
+        .single();
+
+      setInviteData({
+        ...data,
+        organization_name: org?.name || 'Organização'
+      });
+      
+      if (data.email) setEmail(data.email);
+      if (data.name) setFullName(data.name);
+    } catch (err) {
+      console.error('Error loading invite:', err);
+      toast.error('Erro ao carregar convite');
+    }
+  };
 
   // Ler parâmetros de convite da URL
   useEffect(() => {
@@ -39,6 +95,11 @@ export default function Auth() {
       if (name) setFullName(decodeURIComponent(name));
       if (doc) setDocument(decodeURIComponent(doc));
       if (token) setInviteToken(token);
+    } else if (type === 'invite' && token) {
+      setUserType('invite');
+      setActiveTab('signup');
+      setInviteToken(token);
+      loadInviteDetails(token);
     }
   }, [searchParams]);
 
@@ -110,7 +171,7 @@ export default function Auth() {
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Validações para colaborador interno
+    // Validações para colaborador interno (não para convites)
     if (userType === "internal") {
       if (!department) {
         toast.error("Por favor, selecione sua área de trabalho");
@@ -141,9 +202,9 @@ export default function Auth() {
           emailRedirectTo: `${window.location.origin}/`,
           data: {
             full_name: fullName,
-            department: userType === "internal" ? department : "Técnico Externo",
+            department: userType === "internal" ? department : userType === "invite" ? "Convidado" : "Técnico Externo",
             location: userType === "internal" ? location : "Externo",
-            user_type: userType,
+            user_type: userType === "invite" ? "internal" : userType,
             document: userType === "technician" ? document : null,
           },
         },
@@ -154,11 +215,43 @@ export default function Auth() {
       if (data.user) {
         // Atualizar perfil com user_type e document
         await supabase.from('profiles').update({
-          user_type: userType,
+          user_type: userType === "invite" ? "internal" : userType,
           document: userType === "technician" ? document : null,
         }).eq('id', data.user.id);
 
-        if (userType === "technician") {
+        // Process invite - link user to organization
+        if (userType === "invite" && inviteToken && inviteData) {
+          // Add user to organization
+          await supabase.from('organization_members').insert({
+            organization_id: inviteData.organization_id,
+            user_id: data.user.id,
+            role: inviteData.role || 'member',
+            invited_by: inviteData.invited_by,
+            invited_at: inviteData.sent_at,
+          });
+
+          // Update profile with organization_id
+          await supabase.from('profiles').update({
+            organization_id: inviteData.organization_id
+          }).eq('id', data.user.id);
+
+          // Mark invite as used
+          await supabase.from('organization_invites').update({
+            status: 'accepted',
+            used_at: new Date().toISOString(),
+            used_by: data.user.id,
+          }).eq('id', inviteData.id);
+
+          // Auto-approve invited users
+          await supabase.from('user_approval_status').upsert({
+            user_id: data.user.id,
+            status: 'approved',
+            approved_at: new Date().toISOString(),
+            approved_by: inviteData.invited_by,
+          });
+
+          toast.success(`Bem-vindo! Você foi adicionado à ${inviteData.organization_name}.`);
+        } else if (userType === "technician") {
           toast.success("Cadastro realizado! Você será redirecionado ao portal.");
         } else {
           toast.success("Cadastro realizado! Aguarde a aprovação do administrador.");
@@ -208,7 +301,17 @@ export default function Auth() {
               <TabsTrigger value="signup">Cadastrar</TabsTrigger>
             </TabsList>
             
-            {inviteToken && activeTab === 'signup' && (
+            {inviteToken && activeTab === 'signup' && inviteData && (
+              <div className="mt-4 p-3 rounded-lg bg-primary/10 border border-primary/20 flex items-center gap-2">
+                <Users className="h-4 w-4 text-primary" />
+                <div>
+                  <p className="text-sm font-medium">Convite para: {inviteData.organization_name}</p>
+                  <p className="text-xs text-muted-foreground">Complete seu cadastro para acessar</p>
+                </div>
+              </div>
+            )}
+            
+            {inviteToken && activeTab === 'signup' && userType === 'technician' && (
               <div className="mt-4 p-3 rounded-lg bg-primary/10 border border-primary/20 flex items-center gap-2">
                 <Mail className="h-4 w-4 text-primary" />
                 <span className="text-sm">Complete seu cadastro para acessar suas NFs</span>
@@ -272,36 +375,38 @@ export default function Auth() {
             
             <TabsContent value="signup">
               <form onSubmit={handleSignUp} className="space-y-4">
-                {/* Seleção de tipo de usuário */}
-                <div className="space-y-2">
-                  <Label>Tipo de Acesso</Label>
-                  <div className="grid grid-cols-2 gap-2">
-                    <Button
-                      type="button"
-                      variant={userType === "internal" ? "default" : "outline"}
-                      className="flex items-center gap-2 h-auto py-3"
-                      onClick={() => setUserType("internal")}
-                    >
-                      <Building className="h-4 w-4" />
-                      <div className="text-left">
-                        <div className="font-medium text-sm">Colaborador</div>
-                        <div className="text-xs opacity-70">Interno</div>
-                      </div>
-                    </Button>
-                    <Button
-                      type="button"
-                      variant={userType === "technician" ? "default" : "outline"}
-                      className="flex items-center gap-2 h-auto py-3"
-                      onClick={() => setUserType("technician")}
-                    >
-                      <Wrench className="h-4 w-4" />
-                      <div className="text-left">
-                        <div className="font-medium text-sm">Técnico</div>
-                        <div className="text-xs opacity-70">Externo</div>
-                      </div>
-                    </Button>
+                {/* Seleção de tipo de usuário - esconder se for convite */}
+                {userType !== 'invite' && (
+                  <div className="space-y-2">
+                    <Label>Tipo de Acesso</Label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button
+                        type="button"
+                        variant={userType === "internal" ? "default" : "outline"}
+                        className="flex items-center gap-2 h-auto py-3"
+                        onClick={() => setUserType("internal")}
+                      >
+                        <Building className="h-4 w-4" />
+                        <div className="text-left">
+                          <div className="font-medium text-sm">Colaborador</div>
+                          <div className="text-xs opacity-70">Interno</div>
+                        </div>
+                      </Button>
+                      <Button
+                        type="button"
+                        variant={userType === "technician" ? "default" : "outline"}
+                        className="flex items-center gap-2 h-auto py-3"
+                        onClick={() => setUserType("technician")}
+                      >
+                        <Wrench className="h-4 w-4" />
+                        <div className="text-left">
+                          <div className="font-medium text-sm">Técnico</div>
+                          <div className="text-xs opacity-70">Externo</div>
+                        </div>
+                      </Button>
+                    </div>
                   </div>
-                </div>
+                )}
 
                 <div className="space-y-2">
                   <Label htmlFor="signup-name">Nome Completo</Label>

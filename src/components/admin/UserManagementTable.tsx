@@ -7,12 +7,14 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { UserCheck, UserX, Shield, Search, CheckCircle, XCircle, Clock, Crown, Settings } from "lucide-react";
+import { UserCheck, UserX, Shield, Search, CheckCircle, XCircle, Clock, Crown, Settings, UserPlus } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { UserApprovalDialog } from "./UserApprovalDialog";
 import { UserRolesDialog } from "./UserRolesDialog";
 import { DepartmentSelect } from "./DepartmentSelect";
 import { UserActivityHistoryDialog } from "./UserActivityHistoryDialog";
+import { InviteUserDialog } from "./InviteUserDialog";
+import { PendingInvitesTable } from "./PendingInvitesTable";
 import { useToast } from "@/hooks/use-toast";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -42,6 +44,7 @@ export const UserManagementTable = () => {
   const [showApprovalDialog, setShowApprovalDialog] = useState(false);
   const [showRolesDialog, setShowRolesDialog] = useState(false);
   const [showHistoryDialog, setShowHistoryDialog] = useState(false);
+  const [showInviteDialog, setShowInviteDialog] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -303,9 +306,15 @@ export const UserManagementTable = () => {
       </div>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Usuários do Sistema</CardTitle>
-          <CardDescription>Gerencie aprovações e permissões dos usuários</CardDescription>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+          <div>
+            <CardTitle>Usuários do Sistema</CardTitle>
+            <CardDescription>Gerencie aprovações e permissões dos usuários</CardDescription>
+          </div>
+          <Button onClick={() => setShowInviteDialog(true)}>
+            <UserPlus className="mr-2 h-4 w-4" />
+            Convidar Usuário
+          </Button>
         </CardHeader>
         <CardContent>
           <div className="flex gap-4 mb-6">
@@ -531,6 +540,14 @@ export const UserManagementTable = () => {
           </div>
         </CardContent>
       </Card>
+
+      <PendingInvitesTable />
+
+      <InviteUserDialog
+        open={showInviteDialog}
+        onOpenChange={setShowInviteDialog}
+        onSuccess={() => {}}
+      />
 
       {selectedUser && (
         <>
