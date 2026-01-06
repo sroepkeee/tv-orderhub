@@ -3049,6 +3049,71 @@ export type Database = {
           },
         ]
       }
+      organization_invites: {
+        Row: {
+          created_at: string | null
+          email: string
+          expires_at: string | null
+          id: string
+          invite_token: string
+          invited_by: string | null
+          name: string | null
+          organization_id: string
+          role: string
+          sent_at: string | null
+          sent_via_email: boolean | null
+          sent_via_whatsapp: boolean | null
+          status: string | null
+          used_at: string | null
+          used_by: string | null
+          whatsapp: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          email: string
+          expires_at?: string | null
+          id?: string
+          invite_token?: string
+          invited_by?: string | null
+          name?: string | null
+          organization_id: string
+          role?: string
+          sent_at?: string | null
+          sent_via_email?: boolean | null
+          sent_via_whatsapp?: boolean | null
+          status?: string | null
+          used_at?: string | null
+          used_by?: string | null
+          whatsapp?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          email?: string
+          expires_at?: string | null
+          id?: string
+          invite_token?: string
+          invited_by?: string | null
+          name?: string | null
+          organization_id?: string
+          role?: string
+          sent_at?: string | null
+          sent_via_email?: boolean | null
+          sent_via_whatsapp?: boolean | null
+          status?: string | null
+          used_at?: string | null
+          used_by?: string | null
+          whatsapp?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_invites_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       organization_members: {
         Row: {
           id: string
