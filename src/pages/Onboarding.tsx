@@ -114,11 +114,26 @@ export default function Onboarding() {
     }
   }, [user, authLoading, navigate]);
 
-  // Verificar se já tem organização
+  // Verificar se é admin e se já tem organização
   useEffect(() => {
-    const checkExistingOrg = async () => {
+    const checkAdminAndOrg = async () => {
       if (!user) return;
       
+      // Verificar se é admin
+      const { data: roles } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id);
+      
+      const isAdmin = roles?.some(r => r.role === 'admin');
+      
+      if (!isAdmin) {
+        toast.error('Apenas administradores podem criar organizações');
+        navigate('/');
+        return;
+      }
+      
+      // Verificar se já tem organização
       const { data } = await supabase
         .from('organization_members')
         .select('organization_id')
@@ -132,7 +147,7 @@ export default function Onboarding() {
       }
     };
     
-    checkExistingOrg();
+    checkAdminAndOrg();
   }, [user, navigate]);
 
   // Auto-generate slug from company name
@@ -195,38 +210,6 @@ export default function Onboarding() {
     }
   };
 
-  const handleSkip = async () => {
-    if (step === 'company') {
-      // Pular todo onboarding, ir direto pro Kanban
-      navigate('/');
-      return;
-    }
-    
-    if (step === 'phases') {
-      // Se tem nome da empresa, criar com fases padrão
-      // Se não tem, ir direto pro Kanban (pode configurar depois)
-      if (companyName.trim() && slug.trim()) {
-        setLoading(true);
-        try {
-          await supabase.rpc('create_organization_with_defaults', {
-            _org_name: companyName,
-            _slug: slug,
-            _owner_user_id: user?.id,
-            _plan: 'starter'
-          });
-          toast.success('Organização criada com fases padrão!');
-          navigate('/');
-        } catch (error: any) {
-          console.error('Error creating organization:', error);
-          toast.error('Erro ao criar organização');
-        } finally {
-          setLoading(false);
-        }
-      } else {
-        navigate('/');
-      }
-    }
-  };
 
   const createOrganization = async () => {
     if (!user) return;
@@ -468,24 +451,14 @@ export default function Onboarding() {
         {/* Navigation */}
         {step !== 'complete' && (
           <div className="flex justify-between mt-8">
-            <div className="flex gap-2">
-              <Button
-                variant="ghost"
-                onClick={handleBack}
-                disabled={step === 'company'}
-              >
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Voltar
-              </Button>
-              
-              <Button
-                variant="outline"
-                onClick={handleSkip}
-                disabled={loading}
-              >
-                {step === 'phases' ? 'Pular Fases' : 'Pular'}
-              </Button>
-            </div>
+            <Button
+              variant="ghost"
+              onClick={handleBack}
+              disabled={step === 'company'}
+            >
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Voltar
+            </Button>
             
             <Button onClick={handleNext} disabled={loading}>
               {loading ? (
