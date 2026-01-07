@@ -9,7 +9,21 @@ interface CompactItemSLATableProps {
 }
 
 export function CompactItemSLATable({ items }: CompactItemSLATableProps) {
-  const getStatusBadge = (status: string) => {
+  // Verificar se o item está concluído
+  const isItemCompleted = (itemStatus: string | null | undefined) => {
+    return ['completed', 'delivered', 'received', 'shipped'].includes(itemStatus || '');
+  };
+
+  const getStatusBadge = (item: OrderItem) => {
+    // Se o item está concluído, mostrar badge de concluído
+    if (isItemCompleted(item.item_status)) {
+      return <Badge variant="secondary" className="bg-green-600 text-white">Concluído</Badge>;
+    }
+    
+    // Calcular status baseado no prazo
+    const daysUntil = calculateDaysUntilDeadline(item.deliveryDate);
+    const status = getDeadlineStatus(daysUntil);
+    
     switch (status) {
       case 'critical':
         return <Badge variant="destructive">Crítico</Badge>;
@@ -22,7 +36,10 @@ export function CompactItemSLATable({ items }: CompactItemSLATableProps) {
     }
   };
 
-  const getPhaseLabel = (phase: string | null) => {
+  const getPhaseLabel = (item: OrderItem) => {
+    // Priorizar item_status sobre current_phase para consistência
+    const effectivePhase = item.item_status || item.current_phase;
+    
     const labels: Record<string, string> = {
       'pending': 'Pendente',
       'separating': 'Separação',
@@ -37,9 +54,34 @@ export function CompactItemSLATable({ items }: CompactItemSLATableProps) {
       'purchase_requested': 'Compra Solicitada',
       'shipped': 'Expedido',
       'delivered': 'Entregue',
+      'received': 'Recebido',
       'completed': 'Concluído'
     };
-    return labels[phase || ''] || phase || 'N/A';
+    return labels[effectivePhase || ''] || effectivePhase || 'N/A';
+  };
+
+  const getDaysDisplay = (item: OrderItem) => {
+    // Se o item está concluído, mostrar "Entregue"
+    if (isItemCompleted(item.item_status)) {
+      return { text: 'Entregue', className: 'text-green-600 font-semibold' };
+    }
+    
+    const daysUntil = calculateDaysUntilDeadline(item.deliveryDate);
+    const status = getDeadlineStatus(daysUntil);
+    
+    if (daysUntil >= 0) {
+      return { 
+        text: `${daysUntil} dias`, 
+        className: status === 'critical' ? 'text-destructive font-semibold' :
+                   status === 'warning' ? 'text-yellow-600 font-semibold' :
+                   'text-muted-foreground'
+      };
+    } else {
+      return { 
+        text: `${Math.abs(daysUntil)} dias (atraso)`, 
+        className: 'text-destructive font-semibold' 
+      };
+    }
   };
 
   const getSourceBadge = (source: string | null) => {
@@ -77,8 +119,7 @@ export function CompactItemSLATable({ items }: CompactItemSLATableProps) {
             </TableRow>
           ) : (
             items.map((item) => {
-              const daysUntil = calculateDaysUntilDeadline(item.deliveryDate);
-              const status = getDeadlineStatus(daysUntil);
+              const daysDisplay = getDaysDisplay(item);
               
               return (
                 <TableRow key={item.id}>
@@ -87,17 +128,13 @@ export function CompactItemSLATable({ items }: CompactItemSLATableProps) {
                     {cleanItemDescription(item.itemDescription)}
                   </TableCell>
                   <TableCell>{getSourceBadge(item.item_source_type)}</TableCell>
-                  <TableCell>{getStatusBadge(status)}</TableCell>
+                  <TableCell>{getStatusBadge(item)}</TableCell>
                   <TableCell>
-                    <span className={
-                      status === 'critical' ? 'text-destructive font-semibold' :
-                      status === 'warning' ? 'text-yellow-600 font-semibold' :
-                      'text-muted-foreground'
-                    }>
-                      {daysUntil >= 0 ? `${daysUntil} dias` : `${Math.abs(daysUntil)} dias (atraso)`}
+                    <span className={daysDisplay.className}>
+                      {daysDisplay.text}
                     </span>
                   </TableCell>
-                  <TableCell>{getPhaseLabel(item.current_phase)}</TableCell>
+                  <TableCell>{getPhaseLabel(item)}</TableCell>
                 </TableRow>
               );
             })

@@ -45,6 +45,7 @@ interface KanbanCardProps {
   canDrag?: boolean;
   isAnimating?: boolean;
   viewMode?: CardViewMode;
+  daysInPhase?: number | null; // Dias que o pedido está na fase atual
 }
 const KanbanCardComponent = ({
   order,
@@ -52,7 +53,8 @@ const KanbanCardComponent = ({
   onStatusChange,
   canDrag = true,
   isAnimating = false,
-  viewMode = "full"
+  viewMode = "full",
+  daysInPhase
 }: KanbanCardProps) => {
   const [clickStart, setClickStart] = useState<number>(0);
   const { getPhaseInfo } = usePhaseInfo();
@@ -185,6 +187,9 @@ const KanbanCardComponent = ({
   const daysRemaining = calculateDaysRemaining(order.deliveryDeadline);
   const progressBarColor = getProgressBarColor(daysRemaining);
   
+  // Usar dias na fase se disponível, senão mostrar 0
+  const displayDaysInPhase = daysInPhase ?? 0;
+  
   // Contar itens que precisam de compra
   const purchaseItemsCount = order.items?.filter(
     i => i.item_status === 'purchase_required' || i.item_status === 'purchase_requested'
@@ -230,14 +235,14 @@ const KanbanCardComponent = ({
                   #{order.orderNumber.slice(-6)}
                 </span>
                 
-                {/* Days indicator */}
+                {/* Days in phase indicator */}
                 <span className={cn(
                   "text-[9px] font-medium ml-auto flex-shrink-0",
-                  daysRemaining < 0 ? "text-destructive" : 
-                  daysRemaining <= 2 ? "text-priority-medium" : 
+                  displayDaysInPhase > 7 ? "text-destructive" : 
+                  displayDaysInPhase > 3 ? "text-priority-medium" : 
                   "text-muted-foreground"
                 )}>
-                  {daysRemaining < 0 ? `${Math.abs(daysRemaining)}↓` : daysRemaining === 0 ? "•" : `${daysRemaining}d`}
+                  {displayDaysInPhase}d
                 </span>
               </Card>
             </div>
@@ -329,14 +334,14 @@ const KanbanCardComponent = ({
             </span>
           )}
           
-          {/* Deadline - compact mono */}
+          {/* Days in phase - compact mono */}
           <span className={cn(
             "text-[9px] font-mono tabular-nums ml-auto",
-            daysRemaining < 0 ? "text-destructive/80" : 
-            daysRemaining <= 2 ? "text-priority-medium/80" : 
+            displayDaysInPhase > 7 ? "text-destructive/80" : 
+            displayDaysInPhase > 3 ? "text-priority-medium/80" : 
             "text-muted-foreground/70"
           )}>
-            {daysRemaining < 0 ? `-${Math.abs(daysRemaining)}` : daysRemaining === 0 ? "0" : `${daysRemaining}d`}
+            {displayDaysInPhase}d
           </span>
         </div>
         
@@ -431,18 +436,18 @@ const KanbanCardComponent = ({
           )}
         </div>
 
-        {/* Line 3: Deadline - compact */}
+        {/* Line 3: Days in phase */}
         <div className="flex items-center justify-between mt-0.5 text-[9px]">
           <span className="text-muted-foreground/60 font-mono text-[8px]">
             {new Date(order.deliveryDeadline).toLocaleDateString("pt-BR", { day: '2-digit', month: '2-digit' })}
           </span>
           <span className={cn(
             "font-mono tabular-nums text-[9px]",
-            daysRemaining < 0 ? "text-destructive/80" : 
-            daysRemaining <= 2 ? "text-priority-medium/80" : 
+            displayDaysInPhase > 7 ? "text-destructive/80" : 
+            displayDaysInPhase > 3 ? "text-priority-medium/80" : 
             "text-muted-foreground/60"
           )}>
-            {daysRemaining < 0 ? `-${Math.abs(daysRemaining)}` : daysRemaining === 0 ? "0" : `${daysRemaining}d`}
+            {displayDaysInPhase}d
           </span>
         </div>
       </Card>
@@ -456,7 +461,8 @@ const areCardsEqual = (prev: KanbanCardProps, next: KanbanCardProps): boolean =>
   if (
     prev.canDrag !== next.canDrag ||
     prev.isAnimating !== next.isAnimating ||
-    prev.viewMode !== next.viewMode
+    prev.viewMode !== next.viewMode ||
+    prev.daysInPhase !== next.daysInPhase
   ) {
     return false;
   }

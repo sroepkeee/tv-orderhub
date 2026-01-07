@@ -31,6 +31,7 @@ interface KanbanColumnProps {
   animatedCardIds?: Set<string>;
   cardViewMode?: CardViewMode;
   density?: KanbanDensity;
+  getDaysInPhase?: (orderId: string) => number | null;
 }
 const KanbanColumnComponent = ({
   id,
@@ -48,7 +49,8 @@ const KanbanColumnComponent = ({
   linkTo,
   animatedCardIds,
   cardViewMode = "full",
-  density = "comfortable"
+  density = "comfortable",
+  getDaysInPhase
 }: KanbanColumnProps) => {
   const navigate = useNavigate();
   const highCount = orders.filter(o => o.priority === "high").length;
@@ -200,7 +202,8 @@ const KanbanColumnComponent = ({
                 onStatusChange={onStatusChange} 
                 canDrag={canDrag} 
                 isAnimating={animatedCardIds?.has(order.id)} 
-                viewMode={cardViewMode} 
+                viewMode={cardViewMode}
+                daysInPhase={getDaysInPhase?.(order.id)}
               />
             ))}
             {linkTo && !isTV && (

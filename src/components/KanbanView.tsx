@@ -38,6 +38,7 @@ import { AlertCircle } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { KanbanDensity } from "@/hooks/useKanbanDensity";
 import { cn } from "@/lib/utils";
+import { useDaysInPhase } from "@/hooks/useDaysInPhase";
 
 export type Phase = "almox_ssm" | "order_generation" | "purchases" | "almox_general" | "production_client" | "production_stock" | "balance_generation" | "laboratory" | "packaging" | "freight_quote" | "ready_to_invoice" | "invoicing" | "logistics" | "in_transit" | "completion";
 
@@ -66,6 +67,10 @@ export const KanbanView = ({
   const { getPhaseInfo, loading: phaseInfoLoading } = usePhaseInfo();
   const { canViewPhase, canEditPhase, userRoles, loading: authLoading } = usePhaseAuthorization();
   const { user } = useAuth();
+  
+  // Hook para calcular dias na fase atual de cada pedido
+  const orderIds = React.useMemo(() => optimisticOrders.map(o => o.id), [optimisticOrders]);
+  const { getDaysInPhase } = useDaysInPhase(orderIds);
   
   // 📊 Debug: Contador de renders
   const renderCount = React.useRef(0);
@@ -678,6 +683,7 @@ export const KanbanView = ({
                 animatedCardIds={recentlyMovedCards}
                 cardViewMode={effectiveCardViewMode}
                 density={density}
+                getDaysInPhase={getDaysInPhase}
               />
             );
           })}
