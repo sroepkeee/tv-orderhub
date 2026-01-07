@@ -66,16 +66,18 @@ const KanbanColumnComponent = ({
     ? `bg-background border-b border-border/50` 
     : `bg-muted/10 text-muted-foreground/70 border-b border-border/30`;
   
-  const iconSize = isTV ? "h-3 w-3" : isCompact ? "h-3.5 w-3.5" : "h-4 w-4";
+  const iconSize = isTV ? "h-4 w-4" : isCompact ? "h-3.5 w-3.5" : "h-4 w-4";
   const iconOpacity = canDrag ? "opacity-70" : "opacity-40";
-  const titleOpacity = canDrag ? "opacity-90" : "opacity-60";
+  // TV mode gets full opacity for better visibility from distance
+  const titleOpacity = isTV ? "opacity-100" : canDrag ? "opacity-90" : "opacity-60";
   const badgeVariant = canDrag ? "secondary" : "outline";
   const pulseClass = ""; // Remove pulse animation for minimal design
   const containerBg = "bg-background/50";
   const containerBorder = "";
   
-  const headerHeight = isTV ? "h-6" : isCompact ? "h-7" : "h-8";
-  const headerPadding = isTV ? "p-1 px-1.5" : isCompact ? "p-1.5" : "p-2";
+  // TV mode gets larger header for better readability
+  const headerHeight = isTV ? "h-8" : isCompact ? "h-7" : "h-8";
+  const headerPadding = isTV ? "p-1.5 px-2" : isCompact ? "p-1.5" : "p-2";
   const cardGap = isTV ? "gap-0.5" : isCompact ? "gap-1" : "gap-1";
 
   const {
@@ -121,9 +123,9 @@ const KanbanColumnComponent = ({
                   <h3 className={cn(
                     "font-semibold truncate cursor-default",
                     titleOpacity,
-                    isTV ? "text-[9px] max-w-[55px] leading-tight" : isCompact ? "text-xs max-w-[80px]" : "text-sm"
+                    isTV ? "text-xs max-w-[70px] uppercase tracking-tight font-bold" : isCompact ? "text-xs max-w-[80px]" : "text-sm"
                   )}>
-                    {isTV ? title.split(' ')[0].substring(0, 7) : title}
+                    {isTV ? title.split(' ')[0].substring(0, 8) : title}
                   </h3>
                 </TooltipTrigger>
                 <TooltipContent side="bottom" className="text-xs">
@@ -169,15 +171,21 @@ const KanbanColumnComponent = ({
             )}
           </div>
           
-          {/* Count - text only, no badge */}
-          <span 
-            className={cn(
-              "flex-shrink-0 font-mono tabular-nums text-muted-foreground/70",
-              isTV ? "text-[9px]" : "text-[10px]"
-            )}
-          >
-            {orders.length}
-          </span>
+          {/* Count - Badge in TV mode for better visibility */}
+          {isTV ? (
+            <Badge 
+              variant="default" 
+              className="flex-shrink-0 text-sm font-bold px-2 py-0.5 min-w-[28px] justify-center bg-primary text-primary-foreground"
+            >
+              {orders.length}
+            </Badge>
+          ) : (
+            <span 
+              className="flex-shrink-0 font-mono tabular-nums text-muted-foreground/70 text-[10px]"
+            >
+              {orders.length}
+            </span>
+          )}
         </div>
       </div>
 
