@@ -10,6 +10,7 @@ interface PhaseEntry {
 
 interface UseDaysInPhaseResult {
   getDaysInPhase: (orderId: string) => number | null;
+  getPhaseEnteredAt: (orderId: string) => Date | null;
   loading: boolean;
   refresh: () => void;
 }
@@ -91,8 +92,14 @@ export const useDaysInPhase = (orderIds: string[]): UseDaysInPhaseResult => {
     return entry ? entry.daysInPhase : null;
   }, [phaseData]);
 
+  const getPhaseEnteredAt = useCallback((orderId: string): Date | null => {
+    const entry = phaseData.get(orderId);
+    return entry ? entry.phaseEnteredAt : null;
+  }, [phaseData]);
+
   return {
     getDaysInPhase,
+    getPhaseEnteredAt,
     loading,
     refresh: fetchPhaseEntryDates
   };
