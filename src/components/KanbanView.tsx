@@ -607,7 +607,7 @@ export const KanbanView = ({
   const activeOrder = activeId ? optimisticOrders.find((o) => o.id === activeId) : null;
 
   // Loading state
-  if (authLoading || phaseInfoLoading) {
+  if (authLoading || phaseInfoLoading || !user) {
     return (
       <div className="kanban-view">
         <div className="kanban-container flex gap-2 lg:gap-3 overflow-x-auto pb-4 min-h-[calc(100vh-200px)]">

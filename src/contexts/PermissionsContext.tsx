@@ -103,6 +103,7 @@ export function PermissionsProvider({ children }: { children: ReactNode }) {
       setLoading(false);
       return;
     }
+    setLoading(true);
 
     try {
       console.log('🔄 [PermissionsContext] Loading all permissions for user:', user.id);
