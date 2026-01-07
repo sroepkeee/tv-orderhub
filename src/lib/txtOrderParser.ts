@@ -8,7 +8,7 @@ const materialTypeMapping: Record<string, string> = {
   'PA': 'in_stock',        // Produto Acabado
   'ME': 'in_stock',        // Mercadoria
   'MP': 'production',      // Matéria Prima
-  'MC': 'purchase_required', // Material Consumo
+  'MC': 'out_of_stock',    // Material Consumo (precisa comprar)
   'PI': 'production',      // Produto Intermediário
   'BN': 'in_stock',        // Beneficiamento
   'PP': 'production',      // Produto em Processo
