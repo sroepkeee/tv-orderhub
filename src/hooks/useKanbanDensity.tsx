@@ -42,7 +42,7 @@ const DENSITY_CONFIGS: Record<KanbanDensity, KanbanDensityConfig> = {
     columnMinWidth: '110px',
     columnMaxWidth: '1fr',
     cardHeight: '24px',
-    headerHeight: '24px',
+    headerHeight: '32px',
     gap: '3px',
     showFullHeader: false,
     showFullCard: false,
