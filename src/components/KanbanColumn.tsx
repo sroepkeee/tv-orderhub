@@ -75,8 +75,8 @@ const KanbanColumnComponent = ({
   const containerBg = "bg-background/50";
   const containerBorder = "";
   
-  // TV mode gets larger header for better readability
-  const headerHeight = isTV ? "h-8" : isCompact ? "h-7" : "h-8";
+  // TV mode gets balanced header for readability without being too large
+  const headerHeight = isTV ? "h-7" : isCompact ? "h-7" : "h-8";
   const headerPadding = isTV ? "p-1.5 px-2" : isCompact ? "p-1.5" : "p-2";
   const cardGap = isTV ? "gap-0.5" : isCompact ? "gap-1" : "gap-1";
 
@@ -123,7 +123,7 @@ const KanbanColumnComponent = ({
                   <h3 className={cn(
                     "font-semibold truncate cursor-default",
                     titleOpacity,
-                    isTV ? "text-xs max-w-[70px] uppercase tracking-tight font-bold" : isCompact ? "text-xs max-w-[80px]" : "text-sm"
+                    isTV ? "text-[10px] max-w-[65px] uppercase tracking-tight font-bold" : isCompact ? "text-xs max-w-[80px]" : "text-sm"
                   )}>
                     {isTV ? title.split(' ')[0].substring(0, 8) : title}
                   </h3>
@@ -175,7 +175,7 @@ const KanbanColumnComponent = ({
           {isTV ? (
             <Badge 
               variant="default" 
-              className="flex-shrink-0 text-sm font-bold px-2 py-0.5 min-w-[28px] justify-center bg-primary text-primary-foreground"
+              className="flex-shrink-0 text-xs font-bold px-1.5 py-0 min-w-[22px] h-5 justify-center bg-primary text-primary-foreground"
             >
               {orders.length}
             </Badge>
