@@ -239,28 +239,41 @@ export const ImportOrderDialog = ({
         });
       }
 
-      // Fazer upload do PDF para o storage (se for PDF)
-      if (file && file.name.endsWith('.pdf')) {
+      // Fazer upload do arquivo original para o storage (PDF, TXT ou CSV)
+      const fileExtension = file?.name.split('.').pop()?.toLowerCase();
+      const uploadableExtensions = ['pdf', 'txt', 'csv'];
+      
+      if (file && uploadableExtensions.includes(fileExtension || '')) {
         try {
           const timestamp = Date.now();
           const sanitizedFileName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
           const filePath = `${order.id}/${timestamp}-${sanitizedFileName}`;
+          
+          // Determinar content-type correto
+          const contentTypeMap: Record<string, string> = {
+            'pdf': 'application/pdf',
+            'txt': 'text/plain',
+            'csv': 'text/csv'
+          };
+          const contentType = contentTypeMap[fileExtension || 'pdf'] || 'application/octet-stream';
+          
           const {
             error: uploadError
           } = await supabase.storage.from('order-attachments').upload(filePath, file, {
             cacheControl: '3600',
+            contentType: contentType,
             upsert: false
           });
           if (uploadError) {
-            console.error('❌ Erro ao fazer upload do PDF:', uploadError);
+            console.error('❌ Erro ao fazer upload do arquivo:', uploadError);
             console.error('❌ Detalhes:', {
               filePath,
               fileName: file.name,
               fileSize: file.size
             });
-            toast.warning('Pedido criado, mas não foi possível anexar o PDF: ' + uploadError.message);
-            } else {
-              console.log('✅ [executeImport] PDF uploaded:', filePath);
+            toast.warning('Pedido criado, mas não foi possível anexar o arquivo: ' + uploadError.message);
+          } else {
+            console.log('✅ [executeImport] Arquivo uploaded:', filePath);
 
             // Registrar o anexo na tabela order_attachments
             const {
@@ -271,7 +284,7 @@ export const ImportOrderDialog = ({
               file_name: file.name,
               file_path: filePath,
               file_size: file.size,
-              file_type: file.type || 'application/pdf',
+              file_type: contentType,
               uploaded_by: user.id
             });
             if (attachmentError) {
@@ -280,7 +293,7 @@ export const ImportOrderDialog = ({
                 order_id: order.id,
                 file_name: file.name
               });
-              toast.warning('PDF enviado, mas não foi possível registrar no banco');
+              toast.warning('Arquivo enviado, mas não foi possível registrar no banco');
             } else {
               console.log('✅ Anexo registrado com sucesso no banco');
             }
