@@ -1121,6 +1121,7 @@ Use este contexto para:
     return new Response(JSON.stringify({ 
       success: true,
       message: generatedMessage,
+      notificationLogId: logData?.id, // ID do log para referência
       sent: messageSent,
       processing_time_ms: processingTime,
       model: effectiveConfig.llm_model,

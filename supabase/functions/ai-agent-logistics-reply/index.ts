@@ -1089,7 +1089,7 @@ Responda de forma prestativa. Se a pergunta for sobre um pedido espec√≠fico, pe√
     console.log('üí¨ Generated response:', generatedMessage.substring(0, 200));
 
     // 8. LOG THE INTERACTION
-    await supabase
+    const { data: logData } = await supabase
       .from('ai_notification_log')
       .insert({
         channel: 'whatsapp',
@@ -1109,11 +1109,14 @@ Responda de forma prestativa. Se a pergunta for sobre um pedido espec√≠fico, pe√
           sla_status: orderContext?.slaStatus,
           multiple_orders_count: multipleOrdersFound.length,
         }
-      });
+      })
+      .select('id')
+      .single();
 
     return new Response(JSON.stringify({
       success: true,
       message: generatedMessage,
+      notificationLogId: logData?.id, // ID do log para atualizar depois do envio
       orderFound: !!orderContext,
       orderNumber: orderNumber || orderContext?.order?.order_number,
       orderSearchSource: orderContext?.source,
