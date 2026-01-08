@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { UserCheck, UserX, Shield, Search, CheckCircle, XCircle, Clock, Crown, Settings, UserPlus } from "lucide-react";
+import { UserCheck, UserX, Shield, Search, CheckCircle, XCircle, Clock, Crown, Settings, UserPlus, Pencil } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { UserApprovalDialog } from "./UserApprovalDialog";
 import { UserRolesDialog } from "./UserRolesDialog";
@@ -15,6 +15,7 @@ import { DepartmentSelect } from "./DepartmentSelect";
 import { UserActivityHistoryDialog } from "./UserActivityHistoryDialog";
 import { InviteUserDialog } from "./InviteUserDialog";
 import { PendingInvitesTable } from "./PendingInvitesTable";
+import { EditUserDialog } from "./EditUserDialog";
 import { useToast } from "@/hooks/use-toast";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -45,6 +46,7 @@ export const UserManagementTable = () => {
   const [showRolesDialog, setShowRolesDialog] = useState(false);
   const [showHistoryDialog, setShowHistoryDialog] = useState(false);
   const [showInviteDialog, setShowInviteDialog] = useState(false);
+  const [showEditDialog, setShowEditDialog] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -466,6 +468,17 @@ export const UserManagementTable = () => {
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex gap-2 justify-end">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => {
+                              setSelectedUser(user);
+                              setShowEditDialog(true);
+                            }}
+                            title="Editar usuário"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
                           {user.approval_status === 'pending' && (
                             <>
                               <Button
@@ -568,6 +581,12 @@ export const UserManagementTable = () => {
             onOpenChange={setShowHistoryDialog}
             userId={selectedUser.id}
             userName={selectedUser.full_name}
+          />
+          <EditUserDialog
+            open={showEditDialog}
+            onOpenChange={setShowEditDialog}
+            user={selectedUser}
+            onSuccess={loadUsers}
           />
         </>
       )}
