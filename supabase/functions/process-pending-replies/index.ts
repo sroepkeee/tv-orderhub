@@ -61,8 +61,15 @@ Deno.serve(async (req) => {
           media_type?: string;
         }>;
 
-        // Se só tem uma mensagem muito curta (1-2 chars), ignorar (provavelmente digitando)
-        if (messagesBuffer.length === 1 && messagesBuffer[0].content.length <= 2) {
+        // Saudações comuns que devem receber resposta mesmo sendo curtas
+        const greetings = ['oi', 'olá', 'ola', 'oie', 'opa', 'eai', 'e ai', 'bom dia', 'boa tarde', 'boa noite', 'hello', 'hi', 'hey'];
+        
+        // Verificar se é apenas uma mensagem muito curta que NÃO é saudação
+        const firstMessage = messagesBuffer[0]?.content?.toLowerCase()?.trim() || '';
+        const isGreeting = greetings.some(g => firstMessage === g || firstMessage.startsWith(g + ' ') || firstMessage.startsWith(g + ',') || firstMessage.startsWith(g + '!'));
+        
+        // Se só tem uma mensagem muito curta (1-2 chars) E NÃO é saudação, ignorar
+        if (messagesBuffer.length === 1 && messagesBuffer[0].content.length <= 2 && !isGreeting) {
           console.log('⏭️ Skipping single short message (likely typing indicator)');
           
           // Marcar como processado mas não enviar resposta

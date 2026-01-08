@@ -1408,7 +1408,7 @@ Deno.serve(async (req) => {
           // Fallback: responder imediatamente se o debounce falhar
           console.log('⚠️ Falling back to immediate reply...');
           
-          const functionName = contactType === 'customer' 
+          const functionName = (contactType === 'customer' || contactType === 'technician')
             ? 'ai-agent-logistics-reply' 
             : 'ai-agent-auto-reply';
           
@@ -1419,13 +1419,13 @@ Deno.serve(async (req) => {
               'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
             },
             body: JSON.stringify({
-              conversation_id: conversation.id,
-              message_content: messageText,
-              sender_phone: phoneNumber,
+              // Use correct field names expected by the agents
+              message: messageText,
+              from_phone: phoneNumber,
               carrier_id: carrierId,
-              carrier_name: carrierName || 'Contato desconhecido',
-              order_id: orderId,
+              conversation_id: conversation.id,
               contact_type: contactType,
+              is_fallback: true,
             }),
           }).catch(err => console.error('🤖 Fallback auto-reply error:', err));
         }
