@@ -2484,9 +2484,9 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                               </div>
                             </TableHead>
                             <TableHead className="min-w-[150px] h-7 px-1.5 text-[11px]">Descrição</TableHead>
-                            <TableHead className="w-[50px] h-7 px-1.5 text-[11px]">UND</TableHead>
-                            <TableHead className="w-[60px] h-7 px-1.5 text-[11px]">Qtd</TableHead>
-                            <TableHead className="w-[60px] h-7 px-1.5 text-[11px]">Arm.</TableHead>
+                            <TableHead className="w-[55px] h-7 px-1 text-[11px]">UND</TableHead>
+                            <TableHead className="w-[80px] h-7 px-1 text-[11px]">Qtd</TableHead>
+                            <TableHead className="w-[70px] h-7 px-1 text-[11px]">Arm.</TableHead>
                             <TableHead className="w-[100px] h-7 px-1.5 text-[11px]">
                               <div className="flex items-center gap-1">
                                 <Calendar className="h-3 w-3 text-purple-600" />
@@ -2548,14 +2548,14 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
                                   className="h-6 text-xs bg-background/80 dark:bg-muted/40 w-full" 
                                 />
                               </TableCell>
-                              <TableCell className="p-1 px-1.5">
+                              <TableCell className="p-1 px-1">
                                 <Input 
                                   type="number" 
                                   step="0.01" 
                                   value={item.requestedQuantity} 
                                   onChange={e => updateItem(index, "requestedQuantity", parseFloat(e.target.value) || 0)} 
                                   min="0" 
-                                  className="h-6 text-xs bg-background/80 dark:bg-muted/40 w-full" 
+                                  className="h-6 text-xs bg-background/80 dark:bg-muted/40 w-full px-1 text-center" 
                                 />
                               </TableCell>
                               <TableCell className="p-1 px-1.5">
