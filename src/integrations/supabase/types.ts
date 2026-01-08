@@ -3206,6 +3206,7 @@ export type Database = {
           first_message_at: string
           id: string
           messages_buffer: Json
+          organization_id: string | null
           processed_at: string | null
           receiver_phone: string | null
           scheduled_reply_at: string
@@ -3219,6 +3220,7 @@ export type Database = {
           first_message_at?: string
           id?: string
           messages_buffer?: Json
+          organization_id?: string | null
           processed_at?: string | null
           receiver_phone?: string | null
           scheduled_reply_at: string
@@ -3232,6 +3234,7 @@ export type Database = {
           first_message_at?: string
           id?: string
           messages_buffer?: Json
+          organization_id?: string | null
           processed_at?: string | null
           receiver_phone?: string | null
           scheduled_reply_at?: string
@@ -3243,6 +3246,13 @@ export type Database = {
             columns: ["carrier_id"]
             isOneToOne: false
             referencedRelation: "carriers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pending_ai_replies_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
         ]
@@ -5132,6 +5142,7 @@ export type Database = {
         }
         Returns: undefined
       }
+      normalize_brazil_phone: { Args: { phone: string }; Returns: string }
       subtract_business_days: {
         Args: { business_days: number; start_date: string }
         Returns: string

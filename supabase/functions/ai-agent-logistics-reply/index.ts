@@ -442,8 +442,30 @@ serve(async (req) => {
     
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const { message, from_phone, carrier_id, customer_id, conversation_id, contact_type = 'customer' }: LogisticsReplyRequest = await req.json();
+    const payload = await req.json();
+    const { 
+      message, 
+      from_phone, 
+      carrier_id, 
+      customer_id, 
+      conversation_id, 
+      contact_type = 'customer' 
+    }: LogisticsReplyRequest = payload;
+    
     console.log('📦 Logistics Reply - Message:', message, 'From:', from_phone, 'Type:', contact_type, 'Customer:', customer_id);
+
+    // 🛡️ VALIDATION: Ensure message is a valid string
+    if (!message || typeof message !== 'string' || message.trim() === '') {
+      console.error('❌ Invalid or empty message received:', JSON.stringify(payload));
+      return new Response(JSON.stringify({
+        success: false,
+        error: 'Message is required and must be a non-empty string',
+        receivedPayload: Object.keys(payload),
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
     // 0. CHECK FOR SENSITIVE DATA REQUEST (LGPD)
     if (containsSensitiveDataRequest(message)) {
