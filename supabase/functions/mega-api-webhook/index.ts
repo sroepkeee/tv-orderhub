@@ -820,103 +820,124 @@ Deno.serve(async (req) => {
 
       console.log('📝 Processing inbound message:', { phoneNumber, messageText, hasMedia });
 
-      // Find carrier by phone number - search all variations
-      console.log('🔍 Looking for carrier with WhatsApp variations:', uniqueVariations);
+      // 🔍 IMPORTANTE: Buscar PRIMEIRO em customer_contacts, DEPOIS em carriers
+      // Isso garante que clientes cadastrados sejam identificados corretamente
+      console.log('🔍 Searching contacts with phone variations:', uniqueVariations);
       
-      // Build OR query with all phone variations - também buscar com variações no nome
+      // Build OR query with all phone variations
       const orConditions = uniqueVariations
         .map(variation => `whatsapp.ilike.%${variation}%`)
         .join(',');
       
-      // Buscar carrier existente - PRIMEIRO verificar todas as variações
-      let carrier: { id: string; name: string; whatsapp: string | null } | null = null;
-      
-      const { data: carrierData, error: carrierError } = await supabase
-        .from('carriers')
-        .select('id, name, whatsapp')
-        .or(orConditions);
-
-      if (carrierError) {
-        console.error('Error finding carrier:', carrierError);
-      }
-      
-      // Se encontrou múltiplos, pegar o que tem match mais preciso
-      if (carrierData && carrierData.length > 0) {
-        // Preferir match exato sobre match parcial
-        carrier = carrierData.find(c => 
-          uniqueVariations.some(v => c.whatsapp?.includes(v))
-        ) || carrierData[0];
-        console.log(`✅ Found carrier: ${carrier.name} (${carrier.id})`);
-      }
-
-      // Se não encontrou carrier, buscar em customer_contacts
-      let carrierId: string | null = carrier?.id || null;
-      let carrierName: string | null = carrier?.name || null;
-      let contactType = 'carrier';
+      let carrierId: string | null = null;
+      let carrierName: string | null = null;
+      let contactType = 'unknown';
       let customerId: string | null = null;
       let customerName: string | null = null;
       
-      if (!carrier) {
-        console.log('🔍 Carrier not found, searching customer_contacts...');
+      // ====== STEP 1: Buscar PRIMEIRO em customer_contacts ======
+      console.log('🔍 Step 1: Searching customer_contacts FIRST...');
+      
+      const customerOrConditions = uniqueVariations
+        .flatMap(variation => [
+          `whatsapp.ilike.%${variation}%`,
+          `phone.ilike.%${variation}%`
+        ])
+        .join(',');
+      
+      const { data: customer, error: customerError } = await supabase
+        .from('customer_contacts')
+        .select('id, customer_name, whatsapp, phone, last_order_id')
+        .or(customerOrConditions)
+        .maybeSingle();
+      
+      if (customerError) {
+        console.error('Error finding customer:', customerError);
+      }
+      
+      if (customer) {
+        console.log('✅ Found CUSTOMER contact:', customer.customer_name);
+        customerId = customer.id;
+        customerName = customer.customer_name;
+        contactType = 'customer';
         
-        // Build OR query for customer_contacts - search by whatsapp and phone
-        const customerOrConditions = uniqueVariations
-          .flatMap(variation => [
-            `whatsapp.ilike.%${variation}%`,
-            `phone.ilike.%${variation}%`
-          ])
-          .join(',');
+        // Buscar ou criar carrier para o cliente
+        const customerCarrierName = `Cliente: ${customer.customer_name}`;
         
-        const { data: customer, error: customerError } = await supabase
-          .from('customer_contacts')
-          .select('id, customer_name, whatsapp, phone, last_order_id')
-          .or(customerOrConditions)
-          .maybeSingle();
+        const { data: existingCarriers } = await supabase
+          .from('carriers')
+          .select('id, name, whatsapp')
+          .or(orConditions);
         
-        if (customerError) {
-          console.error('Error finding customer:', customerError);
+        if (existingCarriers && existingCarriers.length > 0) {
+          // Usar o carrier existente
+          const existingCarrier = existingCarriers[0];
+          carrierId = existingCarrier.id;
+          carrierName = existingCarrier.name;
+          
+          // Atualizar nome do carrier se estava como "Contato XXXX" 
+          if (existingCarrier.name.startsWith('Contato ') && existingCarrier.name !== customerCarrierName) {
+            console.log('🔄 Updating carrier name from:', existingCarrier.name, 'to:', customerCarrierName);
+            await supabase
+              .from('carriers')
+              .update({ name: customerCarrierName })
+              .eq('id', existingCarrier.id);
+            carrierName = customerCarrierName;
+          }
+          
+          console.log('✅ Using existing carrier for customer:', existingCarrier.id);
+        } else {
+          // Criar carrier para o cliente
+          const normalizedPhone = uniqueVariations[0];
+          const { data: newCarrier, error: createError } = await supabase
+            .from('carriers')
+            .insert({
+              name: customerCarrierName,
+              whatsapp: normalizedPhone,
+              is_active: true,
+              notes: `Contato de cliente criado automaticamente - Customer ID: ${customer.id}`,
+            })
+            .select('id, name')
+            .single();
+          
+          if (!createError && newCarrier) {
+            carrierId = newCarrier.id;
+            carrierName = newCarrier.name;
+            console.log('✅ Created carrier for customer:', newCarrier.id);
+          }
+        }
+      } else {
+        // ====== STEP 2: Se não é cliente, buscar em carriers (transportadoras) ======
+        console.log('🔍 Step 2: Customer not found, searching carriers...');
+        
+        const { data: carrierData, error: carrierError } = await supabase
+          .from('carriers')
+          .select('id, name, whatsapp')
+          .or(orConditions);
+
+        if (carrierError) {
+          console.error('Error finding carrier:', carrierError);
         }
         
-        if (customer) {
-          console.log('✅ Found customer contact:', customer.customer_name);
-          customerId = customer.id;
-          customerName = customer.customer_name;
-          contactType = 'customer';
+        if (carrierData && carrierData.length > 0) {
+          // Verificar se é uma transportadora real ou um contato desconhecido
+          const foundCarrier = carrierData.find(c => 
+            uniqueVariations.some(v => c.whatsapp?.includes(v))
+          ) || carrierData[0];
           
-          // Para clientes, buscar se já existe um carrier para este número
-          // Usar TODAS as variações para evitar duplicatas
-          const customerCarrierName = `Cliente: ${customer.customer_name}`;
+          carrierId = foundCarrier.id;
+          carrierName = foundCarrier.name;
           
-          const { data: existingCarriers } = await supabase
-            .from('carriers')
-            .select('id, name, whatsapp')
-            .or(orConditions);
-          
-          if (existingCarriers && existingCarriers.length > 0) {
-            // Usar o carrier existente (evitar duplicata)
-            const existingCarrier = existingCarriers[0];
-            carrierId = existingCarrier.id;
-            carrierName = existingCarrier.name;
-            console.log('✅ Using existing carrier for customer:', existingCarrier.id);
+          // Se o nome começa com "Contato " ou "Cliente:", é um contato não identificado
+          if (foundCarrier.name.startsWith('Contato ')) {
+            contactType = 'unknown';
+            console.log(`⚠️ Found unidentified carrier: ${foundCarrier.name} (${foundCarrier.id})`);
+          } else if (foundCarrier.name.startsWith('Cliente:')) {
+            contactType = 'customer';
+            console.log(`✅ Found customer carrier: ${foundCarrier.name} (${foundCarrier.id})`);
           } else {
-            // Criar carrier para o cliente - usar número normalizado
-            const normalizedPhone = uniqueVariations[0]; // Usar primeira variação (mais completa)
-            const { data: newCarrier, error: createError } = await supabase
-              .from('carriers')
-              .insert({
-                name: customerCarrierName,
-                whatsapp: normalizedPhone,
-                is_active: true,
-                notes: `Contato de cliente criado automaticamente - Customer ID: ${customer.id}`,
-              })
-              .select('id, name')
-              .single();
-            
-            if (!createError && newCarrier) {
-              carrierId = newCarrier.id;
-              carrierName = newCarrier.name;
-              console.log('✅ Created carrier for customer:', newCarrier.id);
-            }
+            contactType = 'carrier';
+            console.log(`✅ Found carrier: ${foundCarrier.name} (${foundCarrier.id})`);
           }
         }
       }
@@ -1064,7 +1085,7 @@ Deno.serve(async (req) => {
             mega_message_id: messageData.key?.id || null,
             message_timestamp: messageData.messageTimestamp,
             extracted_quote_data: hasQuoteData ? quoteData : null,
-            auto_created_carrier: !carrier,
+            auto_created_carrier: contactType === 'unknown',
             is_group: isGroupMessage,
             group_id: groupId,
             group_name: groupName,
@@ -1384,7 +1405,7 @@ Deno.serve(async (req) => {
           carrierName: carrierName,
           orderId: orderId,
           contactType: contactType,
-          autoCreatedCarrier: !carrier,
+          autoCreatedCarrier: contactType === 'unknown',
           quoteResponseCreated: hasQuoteData && !!lastQuote,
           hasMedia: hasMedia,
           mediaType: hasMedia ? mediaData!.type : null,
