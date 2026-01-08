@@ -20,6 +20,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { useOrganizationId } from "@/hooks/useOrganizationId";
 
 interface Customer {
   id: string;
@@ -47,6 +48,7 @@ interface Customer {
 
 export default function Customers() {
   const navigate = useNavigate();
+  const { organizationId } = useOrganizationId();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -103,10 +105,16 @@ export default function Customers() {
       return;
     }
 
+    if (!organizationId) {
+      toast.error('Organização não identificada');
+      return;
+    }
+
     try {
       const { error } = await supabase
         .from('customer_contacts')
         .insert({
+          organization_id: organizationId,
           customer_name: formData.customer_name,
           customer_document: formData.customer_document,
           email: formData.email,
