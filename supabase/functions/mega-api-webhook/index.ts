@@ -1363,7 +1363,7 @@ Deno.serve(async (req) => {
             console.log(`📬 Added to existing buffer (now ${updatedBuffer.length} messages), reply in ${DEBOUNCE_DELAY_MS}ms`);
           } else {
             // Criar novo buffer
-            await supabase
+            const { data: newBuffer, error: insertError } = await supabase
               .from('pending_ai_replies')
               .insert({
                 carrier_id: carrierId,
@@ -1374,9 +1374,16 @@ Deno.serve(async (req) => {
                 conversation_ids: [conversation.id],
                 first_message_at: new Date().toISOString(),
                 scheduled_reply_at: new Date(Date.now() + DEBOUNCE_DELAY_MS).toISOString(),
-              });
+              })
+              .select()
+              .single();
             
-            console.log(`📬 Created new debounce buffer, reply scheduled in ${DEBOUNCE_DELAY_MS}ms`);
+            if (insertError) {
+              console.error('❌ Failed to insert pending_ai_reply:', insertError);
+              throw insertError;
+            }
+            
+            console.log(`📬 Created new debounce buffer ID: ${newBuffer?.id}, reply scheduled in ${DEBOUNCE_DELAY_MS}ms`);
           }
           
           // Disparar processamento após o delay (fire and forget)
