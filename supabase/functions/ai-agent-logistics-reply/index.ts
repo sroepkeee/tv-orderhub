@@ -497,6 +497,57 @@ serve(async (req) => {
       });
     }
 
+    // 1.5. TRY TO FIND CUSTOMER BY PHONE IF customer_id NOT PROVIDED
+    let effectiveCustomerId = customer_id;
+    if (!effectiveCustomerId && from_phone) {
+      console.log('🔍 Strategy 0: Searching customer by phone number:', from_phone);
+      
+      // Create phone variations for flexible matching
+      const phoneClean = from_phone.replace(/\D/g, '');
+      const phoneVariations: string[] = [];
+      
+      phoneVariations.push(phoneClean);
+      
+      // Remove country code 55 if present
+      let withoutCountry = phoneClean;
+      if (phoneClean.startsWith('55') && phoneClean.length >= 12) {
+        withoutCountry = phoneClean.substring(2);
+        phoneVariations.push(withoutCountry);
+      }
+      
+      // Handle 9th digit variations (Brazilian mobile numbers)
+      if (withoutCountry.length === 10) {
+        const area = withoutCountry.substring(0, 2);
+        const number = withoutCountry.substring(2);
+        phoneVariations.push(area + '9' + number);
+      } else if (withoutCountry.length === 11 && withoutCountry.charAt(2) === '9') {
+        const area = withoutCountry.substring(0, 2);
+        const number = withoutCountry.substring(3);
+        phoneVariations.push(area + number);
+      }
+      
+      // Build OR query with all phone variations
+      const customerOrConditions = phoneVariations
+        .flatMap(variation => [
+          `whatsapp.ilike.%${variation}%`,
+          `phone.ilike.%${variation}%`
+        ])
+        .join(',');
+      
+      const { data: foundCustomer, error: customerSearchError } = await supabase
+        .from('customer_contacts')
+        .select('id, customer_name, whatsapp, phone, last_order_id')
+        .or(customerOrConditions)
+        .maybeSingle();
+      
+      if (foundCustomer && !customerSearchError) {
+        console.log('✅ Found customer by phone:', foundCustomer.customer_name, '(', foundCustomer.id, ')');
+        effectiveCustomerId = foundCustomer.id;
+      } else {
+        console.log('⚠️ Customer not found by phone');
+      }
+    }
+
     // 2. MULTI-STRATEGY ORDER SEARCH
     const orderNumber = extractOrderNumber(message);
     console.log('🔍 Extracted order number:', orderNumber);
@@ -537,13 +588,13 @@ serve(async (req) => {
       }
     }
 
-    // STRATEGY 2: last_order_id from customer_contacts
-    if (!orderContext && customer_id) {
+    // STRATEGY 2: last_order_id from customer_contacts (using effectiveCustomerId)
+    if (!orderContext && effectiveCustomerId) {
       console.log('🔍 Strategy 2: Searching by customer last_order_id...');
       const { data: customer } = await supabase
         .from('customer_contacts')
         .select('last_order_id, customer_name, customer_document')
-        .eq('id', customer_id)
+        .eq('id', effectiveCustomerId)
         .single();
       
       if (customer?.last_order_id) {
@@ -665,7 +716,7 @@ serve(async (req) => {
       
       // Get customer info for the request
       let customerName = orderContext.order.customer_name;
-      let customerContactId = customer_id;
+      let customerContactId = effectiveCustomerId;
 
       // Create change request record
       const { data: changeRequest, error: changeError } = await supabase

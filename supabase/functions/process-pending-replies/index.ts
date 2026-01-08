@@ -110,11 +110,10 @@ Deno.serve(async (req) => {
               'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
             },
             body: JSON.stringify({
-              conversation_id: pending.conversation_ids?.[0] || null,
-              message_content: combinedMessage,
-              sender_phone: pending.sender_phone,
-              receiver_phone: pending.receiver_phone,
+              message: combinedMessage,
+              from_phone: pending.sender_phone,
               carrier_id: pending.carrier_id,
+              conversation_id: pending.conversation_ids?.[0] || null,
               contact_type: pending.contact_type,
               // Passar flag indicando que são mensagens combinadas
               is_debounced: true,
