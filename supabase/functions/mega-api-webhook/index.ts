@@ -907,37 +907,108 @@ Deno.serve(async (req) => {
           }
         }
       } else {
-        // ====== STEP 2: Se não é cliente, buscar em carriers (transportadoras) ======
-        console.log('🔍 Step 2: Customer not found, searching carriers...');
+        // ====== STEP 1.5: Se não é cliente, verificar se é técnico ======
+        console.log('🔍 Step 1.5: Customer not found, checking if technician...');
         
-        const { data: carrierData, error: carrierError } = await supabase
-          .from('carriers')
-          .select('id, name, whatsapp')
-          .or(orConditions);
-
-        if (carrierError) {
-          console.error('Error finding carrier:', carrierError);
+        const technicianOrConditions = uniqueVariations
+          .map(variation => `phone.ilike.%${variation}%`)
+          .join(',');
+        
+        const { data: technician, error: techError } = await supabase
+          .from('technician_invites')
+          .select('id, technician_name, phone, status')
+          .eq('status', 'accepted')
+          .or(technicianOrConditions)
+          .maybeSingle();
+        
+        if (techError) {
+          console.error('Error finding technician:', techError);
         }
         
-        if (carrierData && carrierData.length > 0) {
-          // Verificar se é uma transportadora real ou um contato desconhecido
-          const foundCarrier = carrierData.find(c => 
-            uniqueVariations.some(v => c.whatsapp?.includes(v))
-          ) || carrierData[0];
+        if (technician) {
+          console.log('✅ Found TECHNICIAN contact:', technician.technician_name);
+          contactType = 'technician';
           
-          carrierId = foundCarrier.id;
-          carrierName = foundCarrier.name;
+          // Criar ou atualizar carrier para o técnico
+          const technicianCarrierName = `Técnico: ${technician.technician_name}`;
           
-          // Se o nome começa com "Contato " ou "Cliente:", é um contato não identificado
-          if (foundCarrier.name.startsWith('Contato ')) {
-            contactType = 'unknown';
-            console.log(`⚠️ Found unidentified carrier: ${foundCarrier.name} (${foundCarrier.id})`);
-          } else if (foundCarrier.name.startsWith('Cliente:')) {
-            contactType = 'customer';
-            console.log(`✅ Found customer carrier: ${foundCarrier.name} (${foundCarrier.id})`);
+          const { data: existingCarriers } = await supabase
+            .from('carriers')
+            .select('id, name, whatsapp')
+            .or(orConditions);
+          
+          if (existingCarriers && existingCarriers.length > 0) {
+            const existingCarrier = existingCarriers[0];
+            carrierId = existingCarrier.id;
+            carrierName = existingCarrier.name;
+            
+            // Atualizar nome do carrier se estava como "Contato XXXX"
+            if (existingCarrier.name.startsWith('Contato ') && existingCarrier.name !== technicianCarrierName) {
+              console.log('🔄 Updating carrier name from:', existingCarrier.name, 'to:', technicianCarrierName);
+              await supabase
+                .from('carriers')
+                .update({ name: technicianCarrierName })
+                .eq('id', existingCarrier.id);
+              carrierName = technicianCarrierName;
+            }
+            
+            console.log('✅ Using existing carrier for technician:', existingCarrier.id);
           } else {
-            contactType = 'carrier';
-            console.log(`✅ Found carrier: ${foundCarrier.name} (${foundCarrier.id})`);
+            // Criar carrier para o técnico
+            const normalizedPhone = uniqueVariations[0];
+            const { data: newCarrier, error: createError } = await supabase
+              .from('carriers')
+              .insert({
+                name: technicianCarrierName,
+                whatsapp: normalizedPhone,
+                is_active: true,
+                notes: `Contato de técnico criado automaticamente - Technician ID: ${technician.id}`,
+              })
+              .select('id, name')
+              .single();
+            
+            if (!createError && newCarrier) {
+              carrierId = newCarrier.id;
+              carrierName = newCarrier.name;
+              console.log('✅ Created carrier for technician:', newCarrier.id);
+            }
+          }
+        } else {
+          // ====== STEP 2: Se não é cliente nem técnico, buscar em carriers (transportadoras) ======
+          console.log('🔍 Step 2: Customer/technician not found, searching carriers...');
+          
+          const { data: carrierData, error: carrierError } = await supabase
+            .from('carriers')
+            .select('id, name, whatsapp')
+            .or(orConditions);
+
+          if (carrierError) {
+            console.error('Error finding carrier:', carrierError);
+          }
+          
+          if (carrierData && carrierData.length > 0) {
+            // Verificar se é uma transportadora real ou um contato desconhecido
+            const foundCarrier = carrierData.find(c => 
+              uniqueVariations.some(v => c.whatsapp?.includes(v))
+            ) || carrierData[0];
+            
+            carrierId = foundCarrier.id;
+            carrierName = foundCarrier.name;
+            
+            // Se o nome começa com "Contato ", "Cliente:" ou "Técnico:", identificar tipo
+            if (foundCarrier.name.startsWith('Contato ')) {
+              contactType = 'unknown';
+              console.log(`⚠️ Found unidentified carrier: ${foundCarrier.name} (${foundCarrier.id})`);
+            } else if (foundCarrier.name.startsWith('Cliente:')) {
+              contactType = 'customer';
+              console.log(`✅ Found customer carrier: ${foundCarrier.name} (${foundCarrier.id})`);
+            } else if (foundCarrier.name.startsWith('Técnico:')) {
+              contactType = 'technician';
+              console.log(`✅ Found technician carrier: ${foundCarrier.name} (${foundCarrier.id})`);
+            } else {
+              contactType = 'carrier';
+              console.log(`✅ Found carrier: ${foundCarrier.name} (${foundCarrier.id})`);
+            }
           }
         }
       }
