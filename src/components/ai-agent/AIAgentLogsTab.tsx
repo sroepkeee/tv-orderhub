@@ -29,11 +29,12 @@ interface Props {
 }
 
 const STATUS_CONFIG: Record<string, { label: string; icon: any; className: string }> = {
-  pending: { label: 'Pendente', icon: Clock, className: 'bg-yellow-100 text-yellow-700' },
-  sent: { label: 'Enviado', icon: CheckCircle2, className: 'bg-blue-100 text-blue-700' },
-  delivered: { label: 'Entregue', icon: CheckCircle2, className: 'bg-green-100 text-green-700' },
-  read: { label: 'Lido', icon: CheckCircle2, className: 'bg-green-100 text-green-700' },
-  failed: { label: 'Falhou', icon: XCircle, className: 'bg-red-100 text-red-700' },
+  pending: { label: 'Pendente', icon: Clock, className: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400' },
+  generated: { label: 'Gerada', icon: Clock, className: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400' },
+  sent: { label: 'Enviado', icon: CheckCircle2, className: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' },
+  delivered: { label: 'Entregue', icon: CheckCircle2, className: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' },
+  read: { label: 'Lido', icon: CheckCircle2, className: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' },
+  failed: { label: 'Falhou', icon: XCircle, className: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' },
 };
 
 export function AIAgentLogsTab({ logs, onRefresh }: Props) {
