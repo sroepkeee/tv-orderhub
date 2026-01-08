@@ -96,7 +96,9 @@ Deno.serve(async (req) => {
         console.log(`📝 Combined message (${messagesBuffer.length} parts): ${combinedMessage.substring(0, 100)}...`);
 
         // Determinar qual função chamar baseado no contact_type
-        const functionName = pending.contact_type === 'customer' 
+        // customer e technician usam o agente de atendimento (logistics-reply)
+        // carrier e unknown usam o agente de cotação (auto-reply)
+        const functionName = (pending.contact_type === 'customer' || pending.contact_type === 'technician')
           ? 'ai-agent-logistics-reply' 
           : 'ai-agent-auto-reply';
 

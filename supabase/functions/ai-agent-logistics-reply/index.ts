@@ -844,6 +844,20 @@ Qualquer dúvida, pode me chamar! 😊`;
       ragContext = topDocs.map(d => `[${d.category}] ${d.title}:\n${d.content}`).join('\n\n---\n\n');
     }
 
+    // 4.1 FETCH AI RULES AND POLICIES
+    console.log('📋 Fetching AI rules and policies...');
+    const { data: aiRules } = await supabase
+      .from('ai_rules')
+      .select('policy, rule, rule_description, rule_risk, action')
+      .eq('is_active', true)
+      .limit(20);
+
+    const rulesContext = (aiRules && aiRules.length > 0)
+      ? aiRules.map(r => `- [${r.policy}] ${r.rule_description} (Risco: ${r.rule_risk}, Ação: ${r.action})`).join('\n')
+      : '';
+    
+    console.log(`📋 Found ${aiRules?.length || 0} active rules`)
+
     // 5. CHECK ESCALATION RULES
     let shouldEscalate = false;
     let escalationReason = '';
@@ -895,6 +909,8 @@ REGRAS CRÍTICAS:
 6. Se não houver número de pedido, peça educadamente
 7. NUNCA revele preços, margens, descontos ou dados financeiros
 8. NUNCA mencione nomes de vendedores ou executivos
+
+${rulesContext ? `📋 POLÍTICAS E REGRAS DA EMPRESA:\n${rulesContext}\n` : ''}
 
 TOM DE VOZ: ${config.tone_of_voice}
 PERSONALIDADE: ${config.personality}

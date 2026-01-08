@@ -2926,6 +2926,20 @@ MÉTRICAS ATUAIS (${today.toLocaleDateString('pt-BR')}):
       `[${r.category}] ${r.title}: ${r.content.substring(0, 300)}`
     ).join('\n\n') || '';
 
+    // Buscar regras e políticas ativas
+    console.log('📋 Fetching AI rules and policies for manager...');
+    const { data: aiRules } = await supabase
+      .from('ai_rules')
+      .select('policy, rule, rule_description, rule_risk, action')
+      .eq('is_active', true)
+      .limit(20);
+
+    const rulesContext = (aiRules && aiRules.length > 0)
+      ? aiRules.map((r: any) => `- [${r.policy}] ${r.rule_description} (Risco: ${r.rule_risk})`).join('\n')
+      : '';
+    
+    console.log(`📋 Found ${aiRules?.length || 0} active rules for manager agent`);
+
     const systemPrompt = `Você é o *Assistente Gerencial IMPLY*, especializado em gestão de pedidos e operações logísticas.
 
 ## FASES DO KANBAN (ordem do fluxo):
@@ -2978,12 +2992,14 @@ ${ragContext || 'Nenhum conhecimento específico disponível.'}
 - "transportadora NOME" → Por carrier
 - FASE (ex: "produção", "compras", "à faturar") → Pedidos na fase
 
-## REGRAS:
+## REGRAS GERAIS:
 1. Use formatação WhatsApp: *negrito*, _itálico_
 2. Seja conciso e direto
 3. Sugira comandos quando apropriado
 4. Mencione SLAs quando houver atrasos
-5. Destaque números importantes`;
+5. Destaque números importantes
+
+${rulesContext ? `## 📋 POLÍTICAS E REGRAS ATIVAS:\n${rulesContext}` : ''}`;
 
     const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
