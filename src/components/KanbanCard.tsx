@@ -256,6 +256,11 @@ const KanbanCardComponent = ({
               <p><span className="text-muted-foreground">Prazo:</span> {new Date(order.deliveryDeadline).toLocaleDateString("pt-BR")}</p>
               <p><span className="text-muted-foreground">Itens:</span> {order.items?.length || 0}</p>
               <p><span className="text-muted-foreground">Prioridade:</span> {getPriorityLabel(order.priority)}</p>
+              <div className="border-t pt-1 mt-1">
+                <p><span className="text-muted-foreground">📅 Emissão:</span> {new Date(order.createdDate).toLocaleDateString("pt-BR")}</p>
+                <p><span className="text-muted-foreground">📆 Dias de emissão:</span> {Math.max(0, Math.floor((Date.now() - new Date(order.createdDate).getTime()) / (1000 * 60 * 60 * 24)))}</p>
+                <p><span className="text-muted-foreground">⏱️ Tempo na fase:</span> {displayDaysInPhase}d</p>
+              </div>
             </div>
           </TooltipContent>
         </Tooltip>
@@ -371,6 +376,17 @@ const KanbanCardComponent = ({
                     : `✓ ${daysRemaining} dias restantes`
                 }
               </p>
+              
+              <div className="border-t pt-2 mt-2">
+                <p>
+                  <span className="text-muted-foreground">📅 Emissão:</span>{' '}
+                  {new Date(order.createdDate).toLocaleDateString("pt-BR")}
+                </p>
+                <p>
+                  <span className="text-muted-foreground">📆 Dias de emissão:</span>{' '}
+                  {Math.max(0, Math.floor((Date.now() - new Date(order.createdDate).getTime()) / (1000 * 60 * 60 * 24)))}
+                </p>
+              </div>
               
               <div className="border-t pt-2 mt-2">
                 {phaseEnteredAt && (
