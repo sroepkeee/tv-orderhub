@@ -32,9 +32,27 @@ interface TriggerConfig {
   include_phase_info: boolean;
   include_item_list: boolean;
   include_priority: boolean;
+  filter_purchase_items: boolean;
   priority: number;
   delay_minutes: number;
   custom_template: string | null;
+}
+
+// Status de itens que indicam necessidade de compra
+const PURCHASE_ITEM_STATUSES = [
+  'purchase_required',
+  'purchase_requested', 
+  'out_of_stock',
+  'pending_purchase',
+  'awaiting_purchase'
+];
+
+// Filtrar apenas itens que precisam de compra
+function filterPurchaseItems(items: any[]): any[] {
+  return items.filter(item => 
+    PURCHASE_ITEM_STATUSES.includes(item.item_status) || 
+    !item.item_status // Itens sem status também são considerados para compra
+  );
 }
 
 // Status labels for display
@@ -175,13 +193,34 @@ function buildDynamicMessage(
   }
 
   if (trigger.include_item_list && items.length > 0) {
-    message += `\n📋 *Itens:*\n`;
-    items.slice(0, 5).forEach(item => {
-      const desc = item.description ? item.description.substring(0, 30) : '';
-      message += `• ${item.item_code || 'N/A'}: ${desc}${desc.length >= 30 ? '...' : ''}\n`;
-    });
-    if (items.length > 5) {
-      message += `_...e mais ${items.length - 5} ite${items.length - 5 !== 1 ? 'ns' : 'm'}_\n`;
+    // Aplicar filtro de itens de compra se configurado
+    const itemsToShow = trigger.filter_purchase_items 
+      ? filterPurchaseItems(items) 
+      : items;
+    
+    if (itemsToShow.length > 0) {
+      const headerText = trigger.filter_purchase_items 
+        ? `🛒 *Itens para Compra (${itemsToShow.length}):*` 
+        : `📋 *Itens (${itemsToShow.length}):*`;
+      message += `\n${headerText}\n`;
+      
+      itemsToShow.slice(0, 8).forEach(item => {
+        const desc = (item.item_description || item.description || '').substring(0, 25);
+        const qty = item.requested_quantity || 0;
+        const unit = item.unit || 'un';
+        const code = item.item_code || 'N/A';
+        
+        message += `• ${code}: ${qty} ${unit}\n`;
+        if (desc) {
+          message += `  ${desc}${desc.length >= 25 ? '...' : ''}\n`;
+        }
+      });
+      
+      if (itemsToShow.length > 8) {
+        message += `_...e mais ${itemsToShow.length - 8} ite${itemsToShow.length - 8 !== 1 ? 'ns' : 'm'}_\n`;
+      }
+    } else if (trigger.filter_purchase_items) {
+      message += `\n✅ Nenhum item pendente de compra\n`;
     }
   }
 
@@ -319,7 +358,7 @@ serve(async (req) => {
     // Determinar fase de destino
     const targetPhase = getPhaseFromStatus(newStatus, orderCategory);
 
-    // Buscar dados do pedido com itens para calcular valor total
+    // Buscar dados do pedido com itens detalhados para compras
     const { data: order, error: orderError } = await supabase
       .from('orders')
       .select(`
@@ -332,7 +371,18 @@ serve(async (req) => {
         order_category,
         organization_id,
         priority,
-        order_items(id, item_code, description, total_value)
+        order_items(
+          id, 
+          item_code, 
+          description, 
+          item_description,
+          requested_quantity, 
+          unit, 
+          unit_price, 
+          total_value, 
+          item_status,
+          warehouse
+        )
       `)
       .eq('id', orderId)
       .single();

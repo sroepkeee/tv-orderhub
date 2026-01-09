@@ -60,6 +60,7 @@ interface ManagerTriggerConfig {
   include_phase_info: boolean;
   include_item_list: boolean;
   include_priority: boolean;
+  filter_purchase_items: boolean;
   channels: string[];
   priority: number;
   delay_minutes: number;
@@ -161,6 +162,7 @@ const DEFAULT_TRIGGER: Partial<ManagerTriggerConfig> = {
   include_phase_info: false,
   include_item_list: false,
   include_priority: false,
+  filter_purchase_items: false,
   channels: ['whatsapp'],
   priority: 5,
   delay_minutes: 0,
@@ -286,6 +288,7 @@ export function AIAgentManagerTriggersTab() {
         include_phase_info: editingTrigger.include_phase_info,
         include_item_list: editingTrigger.include_item_list,
         include_priority: editingTrigger.include_priority,
+        filter_purchase_items: editingTrigger.filter_purchase_items,
         channels: editingTrigger.channels,
         priority: editingTrigger.priority,
         delay_minutes: editingTrigger.delay_minutes,
@@ -374,10 +377,22 @@ export function AIAgentManagerTriggersTab() {
     if (trigger.include_phase_info) message += '📍 Fase: Produção Cliente\n';
     if (trigger.include_priority) message += '⚡ Prioridade: Alta\n';
     if (trigger.include_item_list) {
-      message += '\n📋 *Itens:*\n';
-      message += '• PROD001: Produto Exemplo 1\n';
-      message += '• PROD002: Produto Exemplo 2\n';
-      message += '_...e mais 3 itens_\n';
+      if (trigger.filter_purchase_items) {
+        message += '\n🛒 *Itens para Compra (3):*\n';
+        message += '• MOTOR-5HP: 2 un\n';
+        message += '  Motor elétrico 5HP trifás...\n';
+        message += '• REDUTOR-40: 1 un\n';
+        message += '  Redutor de velocidade 40:1...\n';
+        message += '• ROLAMENTO-6205: 8 un\n';
+        message += '  Rolamento 6205-2RS blind...\n';
+      } else {
+        message += '\n📋 *Itens (5):*\n';
+        message += '• PROD001: 2 un\n';
+        message += '  Produto Exemplo 1...\n';
+        message += '• PROD002: 1 un\n';
+        message += '  Produto Exemplo 2...\n';
+        message += '_...e mais 3 itens_\n';
+      }
     }
     
     message += '\n💬 Responda "ver 140037" para detalhes';
@@ -616,6 +631,28 @@ export function AIAgentManagerTriggersTab() {
                     </label>
                   ))}
                 </div>
+                
+                {/* Filtro de Itens de Compra - aparece quando Lista de Itens está marcada */}
+                {editingTrigger.include_item_list && (
+                  <div className="mt-3 p-3 bg-muted/50 rounded-lg border border-dashed">
+                    <label className="flex items-center gap-2 text-sm cursor-pointer">
+                      <Checkbox
+                        checked={!!editingTrigger.filter_purchase_items}
+                        onCheckedChange={(checked) => {
+                          setEditingTrigger({
+                            ...editingTrigger,
+                            filter_purchase_items: !!checked
+                          });
+                        }}
+                      />
+                      <span>🛒</span>
+                      <span className="font-medium">Filtrar apenas itens para compra</span>
+                    </label>
+                    <p className="text-xs text-muted-foreground mt-1 ml-6">
+                      Mostra apenas itens com status de compra pendente (purchase_required, out_of_stock, etc.)
+                    </p>
+                  </div>
+                )}
               </div>
 
               <Separator />
