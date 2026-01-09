@@ -632,6 +632,7 @@ export type Database = {
           created_at: string | null
           custom_template: string | null
           delay_minutes: number | null
+          filter_purchase_items: boolean | null
           id: string
           include_customer_name: boolean | null
           include_days_until_delivery: boolean | null
@@ -656,6 +657,7 @@ export type Database = {
           created_at?: string | null
           custom_template?: string | null
           delay_minutes?: number | null
+          filter_purchase_items?: boolean | null
           id?: string
           include_customer_name?: boolean | null
           include_days_until_delivery?: boolean | null
@@ -680,6 +682,7 @@ export type Database = {
           created_at?: string | null
           custom_template?: string | null
           delay_minutes?: number | null
+          filter_purchase_items?: boolean | null
           id?: string
           include_customer_name?: boolean | null
           include_days_until_delivery?: boolean | null
