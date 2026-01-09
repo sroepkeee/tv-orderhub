@@ -4,6 +4,7 @@ import { ArrowLeft } from 'lucide-react';
 import { WhatsAppConnectionCard } from '@/components/carriers/WhatsAppConnectionCard';
 import { WhatsAppWebhookCard } from '@/components/carriers/WhatsAppWebhookCard';
 import { WhatsAppAuthGuard } from '@/components/carriers/WhatsAppAuthGuard';
+import { MegaAPICredentialsCard } from '@/components/carriers/MegaAPICredentialsCard';
 
 export default function WhatsAppSettings() {
   const navigate = useNavigate();
@@ -26,6 +27,7 @@ export default function WhatsAppSettings() {
         </header>
 
         <div className="container mx-auto p-6 max-w-4xl space-y-6">
+          <MegaAPICredentialsCard />
           <WhatsAppConnectionCard />
           <WhatsAppWebhookCard />
         </div>
