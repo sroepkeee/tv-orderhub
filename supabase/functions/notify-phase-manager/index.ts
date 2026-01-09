@@ -515,7 +515,7 @@ serve(async (req) => {
           whatsapp,
           receive_new_orders,
           receive_urgent_alerts,
-          profiles:user_id (full_name)
+          profiles:user_id (full_name, whatsapp)
         `)
         .eq('phase_key', phaseToQuery)
         .eq('is_active', true)
@@ -525,7 +525,11 @@ serve(async (req) => {
       if (managerError) {
         console.error(`[notify-phase-manager] Error fetching phase managers:`, managerError);
       }
-      recipients = phaseManagers || [];
+      // Map recipients and use profile whatsapp as fallback
+      recipients = (phaseManagers || []).map(pm => ({
+        ...pm,
+        whatsapp: pm.whatsapp || (pm.profiles as any)?.whatsapp
+      }));
       console.log(`[notify-phase-manager] Found ${recipients.length} phase managers`);
     }
 
