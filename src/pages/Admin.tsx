@@ -11,7 +11,9 @@ import { MessageQueueDashboard } from "@/components/admin/MessageQueueDashboard"
 import { PhaseManagersConfig } from "@/components/admin/PhaseManagersConfig";
 import { UserMenuPermissionsMatrix } from "@/components/admin/UserMenuPermissionsMatrix";
 import { ChangeRequestsQueue } from "@/components/admin/ChangeRequestsQueue";
-import { Shield, ArrowLeft, BarChart3, MessageSquare, Settings2, UserCog, Menu, ClipboardEdit } from "lucide-react";
+import { PhaseConfigSection } from "@/components/phases/PhaseConfigSection";
+import { UserPhasePermissionsMatrix } from "@/components/admin/UserPhasePermissionsMatrix";
+import { Shield, ArrowLeft, BarChart3, MessageSquare, Settings2, UserCog, Menu, ClipboardEdit, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 const Admin = () => {
@@ -63,7 +65,7 @@ const Admin = () => {
               <MessageSquare className="h-3 w-3" />
               Fila de Msgs
             </TabsTrigger>
-            <TabsTrigger value="phases" className="flex items-center gap-1" onClick={() => navigate('/settings/phases')}>
+            <TabsTrigger value="phases" className="flex items-center gap-1">
               <Settings2 className="h-3 w-3" />
               Fases
             </TabsTrigger>
@@ -105,6 +107,29 @@ const Admin = () => {
 
           <TabsContent value="queue" className="space-y-4">
             <MessageQueueDashboard />
+          </TabsContent>
+
+          <TabsContent value="phases" className="space-y-4">
+            <Tabs defaultValue="workflow" className="space-y-4">
+              <TabsList>
+                <TabsTrigger value="workflow" className="flex items-center gap-2">
+                  <Settings2 className="h-4 w-4" />
+                  Fases do Workflow
+                </TabsTrigger>
+                <TabsTrigger value="user-permissions" className="flex items-center gap-2">
+                  <Users className="h-4 w-4" />
+                  Permissões por Usuário
+                </TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="workflow">
+                <PhaseConfigSection />
+              </TabsContent>
+
+              <TabsContent value="user-permissions">
+                <UserPhasePermissionsMatrix />
+              </TabsContent>
+            </Tabs>
           </TabsContent>
         </Tabs>
       </div>
