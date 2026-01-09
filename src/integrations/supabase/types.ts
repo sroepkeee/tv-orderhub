@@ -626,6 +626,89 @@ export type Database = {
           },
         ]
       }
+      ai_manager_trigger_config: {
+        Row: {
+          channels: string[] | null
+          created_at: string | null
+          custom_template: string | null
+          delay_minutes: number | null
+          id: string
+          include_customer_name: boolean | null
+          include_days_until_delivery: boolean | null
+          include_delivery_date: boolean | null
+          include_item_count: boolean | null
+          include_item_list: boolean | null
+          include_order_number: boolean | null
+          include_phase_info: boolean | null
+          include_priority: boolean | null
+          include_status: boolean | null
+          include_total_value: boolean | null
+          is_active: boolean | null
+          organization_id: string | null
+          priority: number | null
+          trigger_name: string
+          trigger_status: string[] | null
+          trigger_type: string
+          updated_at: string | null
+        }
+        Insert: {
+          channels?: string[] | null
+          created_at?: string | null
+          custom_template?: string | null
+          delay_minutes?: number | null
+          id?: string
+          include_customer_name?: boolean | null
+          include_days_until_delivery?: boolean | null
+          include_delivery_date?: boolean | null
+          include_item_count?: boolean | null
+          include_item_list?: boolean | null
+          include_order_number?: boolean | null
+          include_phase_info?: boolean | null
+          include_priority?: boolean | null
+          include_status?: boolean | null
+          include_total_value?: boolean | null
+          is_active?: boolean | null
+          organization_id?: string | null
+          priority?: number | null
+          trigger_name: string
+          trigger_status?: string[] | null
+          trigger_type?: string
+          updated_at?: string | null
+        }
+        Update: {
+          channels?: string[] | null
+          created_at?: string | null
+          custom_template?: string | null
+          delay_minutes?: number | null
+          id?: string
+          include_customer_name?: boolean | null
+          include_days_until_delivery?: boolean | null
+          include_delivery_date?: boolean | null
+          include_item_count?: boolean | null
+          include_item_list?: boolean | null
+          include_order_number?: boolean | null
+          include_phase_info?: boolean | null
+          include_priority?: boolean | null
+          include_status?: boolean | null
+          include_total_value?: boolean | null
+          is_active?: boolean | null
+          organization_id?: string | null
+          priority?: number | null
+          trigger_name?: string
+          trigger_status?: string[] | null
+          trigger_type?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_manager_trigger_config_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ai_notification_log: {
         Row: {
           channel: string
