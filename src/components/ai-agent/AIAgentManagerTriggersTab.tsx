@@ -168,7 +168,7 @@ const DEFAULT_TRIGGER: Partial<ManagerTriggerConfig> = {
 };
 
 export function AIAgentManagerTriggersTab() {
-  const organizationId = useOrganizationId();
+  const { organizationId } = useOrganizationId();
   const [triggers, setTriggers] = useState<ManagerTriggerConfig[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -272,7 +272,24 @@ export function AIAgentManagerTriggersTab() {
     setSaving(true);
     try {
       const triggerData = {
-        ...editingTrigger,
+        trigger_name: editingTrigger.trigger_name,
+        trigger_type: editingTrigger.trigger_type,
+        trigger_status: editingTrigger.trigger_status,
+        is_active: editingTrigger.is_active,
+        include_order_number: editingTrigger.include_order_number,
+        include_customer_name: editingTrigger.include_customer_name,
+        include_item_count: editingTrigger.include_item_count,
+        include_total_value: editingTrigger.include_total_value,
+        include_status: editingTrigger.include_status,
+        include_delivery_date: editingTrigger.include_delivery_date,
+        include_days_until_delivery: editingTrigger.include_days_until_delivery,
+        include_phase_info: editingTrigger.include_phase_info,
+        include_item_list: editingTrigger.include_item_list,
+        include_priority: editingTrigger.include_priority,
+        channels: editingTrigger.channels,
+        priority: editingTrigger.priority,
+        delay_minutes: editingTrigger.delay_minutes,
+        custom_template: editingTrigger.custom_template,
         organization_id: organizationId,
       };
 
@@ -289,7 +306,7 @@ export function AIAgentManagerTriggersTab() {
         // Insert
         const { error } = await supabase
           .from('ai_manager_trigger_config')
-          .insert(triggerData);
+          .insert([triggerData]);
 
         if (error) throw error;
         toast.success('Gatilho criado');
