@@ -7,8 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { UserCheck, UserX, Shield, Search, CheckCircle, XCircle, Clock, Crown, Settings, UserPlus, Pencil } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { UserCheck, UserX, Shield, Search, CheckCircle, XCircle, Clock, Crown, UserPlus, Pencil, Layers } from "lucide-react";
 import { UserApprovalDialog } from "./UserApprovalDialog";
 import { UserRolesDialog } from "./UserRolesDialog";
 import { DepartmentSelect } from "./DepartmentSelect";
@@ -16,9 +15,17 @@ import { UserActivityHistoryDialog } from "./UserActivityHistoryDialog";
 import { InviteUserDialog } from "./InviteUserDialog";
 import { PendingInvitesTable } from "./PendingInvitesTable";
 import { EditUserDialog } from "./EditUserDialog";
+import { UserPhasesDialog } from "./UserPhasesDialog";
 import { useToast } from "@/hooks/use-toast";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
+
+interface ManagedPhase {
+  phase_key: string;
+  display_name: string;
+  is_primary: boolean;
+  is_active: boolean;
+}
 
 interface UserData {
   id: string;
@@ -32,10 +39,10 @@ interface UserData {
   is_active: boolean;
   whatsapp: string | null;
   is_manager: boolean;
+  managed_phases: ManagedPhase[];
 }
 
 export const UserManagementTable = () => {
-  const navigate = useNavigate();
   const [users, setUsers] = useState<UserData[]>([]);
   const [filteredUsers, setFilteredUsers] = useState<UserData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -47,6 +54,7 @@ export const UserManagementTable = () => {
   const [showHistoryDialog, setShowHistoryDialog] = useState(false);
   const [showInviteDialog, setShowInviteDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
+  const [showPhasesDialog, setShowPhasesDialog] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -84,10 +92,10 @@ export const UserManagementTable = () => {
       setLoading(true);
       
       // Buscar profiles com novos campos whatsapp e is_manager
-    const { data: profiles, error: profilesError } = await supabase
-      .from('profiles')
-      .select('id, email, full_name, department, location, created_at, is_active, whatsapp, is_manager')
-      .order('created_at', { ascending: false });
+      const { data: profiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, email, full_name, department, location, created_at, is_active, whatsapp, is_manager')
+        .order('created_at', { ascending: false });
       
       if (profilesError) throw profilesError;
       if (!profiles) {
@@ -108,25 +116,56 @@ export const UserManagementTable = () => {
         .select('user_id, role');
       
       if (rolesError) throw rolesError;
+
+      // Buscar fases gerenciadas por cada usuário
+      const { data: phaseManagers, error: pmError } = await supabase
+        .from('phase_managers')
+        .select('user_id, phase_key, is_active');
+      
+      if (pmError) throw pmError;
+
+      // Buscar configuração de fases (para display_name e manager principal)
+      const { data: phaseConfigs, error: pcError } = await supabase
+        .from('phase_config')
+        .select('phase_key, display_name, manager_user_id');
+      
+      if (pcError) throw pcError;
+      
+      // Tipos inline para evitar erros de tipo
+      type PhaseManagerRow = { user_id: string; phase_key: string; is_active: boolean };
+      type PhaseConfigRow = { phase_key: string; display_name: string; manager_user_id: string | null };
       
       // Combinar dados
       const usersData: UserData[] = profiles.map(profile => {
         const approval = approvalStatuses?.find(a => a.user_id === profile.id);
         const roles = userRoles?.filter(r => r.user_id === profile.id).map(r => r.role) || [];
         
-      return {
-        id: profile.id,
-        email: profile.email || '',
-        full_name: profile.full_name || 'Sem nome',
-        department: profile.department || 'Não definido',
-        location: profile.location || null,
-        approval_status: approval?.status || 'pending',
-        roles: roles,
-        created_at: profile.created_at,
-        is_active: profile.is_active ?? false,
-        whatsapp: profile.whatsapp || null,
-        is_manager: profile.is_manager ?? false,
-      };
+        // Montar lista de fases gerenciadas
+        const userPhaseManagers = (phaseManagers as PhaseManagerRow[] || []).filter(pm => pm.user_id === profile.id);
+        const managedPhases: ManagedPhase[] = userPhaseManagers.map(pm => {
+          const phaseConfig = (phaseConfigs as PhaseConfigRow[] || []).find(pc => pc.phase_key === pm.phase_key);
+          return {
+            phase_key: pm.phase_key,
+            display_name: phaseConfig?.display_name || pm.phase_key,
+            is_primary: phaseConfig?.manager_user_id === profile.id,
+            is_active: pm.is_active,
+          };
+        });
+        
+        return {
+          id: profile.id,
+          email: profile.email || '',
+          full_name: profile.full_name || 'Sem nome',
+          department: profile.department || 'Não definido',
+          location: profile.location || null,
+          approval_status: approval?.status || 'pending',
+          roles: roles,
+          created_at: profile.created_at,
+          is_active: profile.is_active ?? false,
+          whatsapp: profile.whatsapp || null,
+          is_manager: profile.is_manager ?? false,
+          managed_phases: managedPhases,
+        };
       });
       
       setUsers(usersData);
@@ -348,29 +387,30 @@ export const UserManagementTable = () => {
             <Table>
               <TableHeader>
                 <TableRow>
-              <TableHead>Nome</TableHead>
-              <TableHead>Email</TableHead>
-              <TableHead>WhatsApp</TableHead>
-              <TableHead>Gestor</TableHead>
-              <TableHead>Departamento</TableHead>
-              <TableHead>Localização</TableHead>
-              <TableHead>Status Ativo</TableHead>
-              <TableHead>Roles</TableHead>
-              <TableHead>Status Aprovação</TableHead>
-              <TableHead>Cadastro</TableHead>
-              <TableHead className="text-right">Ações</TableHead>
+                  <TableHead>Nome</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>WhatsApp</TableHead>
+                  <TableHead>Gestor</TableHead>
+                  <TableHead>Fases</TableHead>
+                  <TableHead>Departamento</TableHead>
+                  <TableHead>Localização</TableHead>
+                  <TableHead>Status Ativo</TableHead>
+                  <TableHead>Roles</TableHead>
+                  <TableHead>Status Aprovação</TableHead>
+                  <TableHead>Cadastro</TableHead>
+                  <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={11} className="text-center py-8">
+                    <TableCell colSpan={12} className="text-center py-8">
                       Carregando usuários...
                     </TableCell>
                   </TableRow>
                 ) : filteredUsers.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={11} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={12} className="text-center py-8 text-muted-foreground">
                       Nenhum usuário encontrado
                     </TableCell>
                   </TableRow>
@@ -416,6 +456,29 @@ export const UserManagementTable = () => {
                             <Crown className="h-4 w-4 text-amber-500" />
                           )}
                         </div>
+                      </TableCell>
+                      <TableCell>
+                        {user.managed_phases.length > 0 ? (
+                          <div className="flex gap-1 flex-wrap max-w-[200px]">
+                            {user.managed_phases.slice(0, 3).map(phase => (
+                              <Badge 
+                                key={phase.phase_key} 
+                                variant="outline" 
+                                className={`text-xs ${!phase.is_active ? 'opacity-50' : ''}`}
+                              >
+                                {phase.is_primary && <Crown className="h-3 w-3 mr-0.5 text-amber-500" />}
+                                {phase.display_name}
+                              </Badge>
+                            ))}
+                            {user.managed_phases.length > 3 && (
+                              <Badge variant="secondary" className="text-xs">
+                                +{user.managed_phases.length - 3}
+                              </Badge>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">-</span>
+                        )}
                       </TableCell>
                       <TableCell>
                         <DepartmentSelect
@@ -520,10 +583,13 @@ export const UserManagementTable = () => {
                           <Button
                             size="sm"
                             variant="ghost"
-                            onClick={() => navigate('/settings/phases?tab=user-permissions')}
-                            title="Configurar permissões de fases"
+                            onClick={() => {
+                              setSelectedUser(user);
+                              setShowPhasesDialog(true);
+                            }}
+                            title="Gerenciar fases"
                           >
-                            <Settings className="h-4 w-4 mr-1" />
+                            <Layers className="h-4 w-4 mr-1" />
                             Fases
                           </Button>
                           <Button
@@ -586,6 +652,14 @@ export const UserManagementTable = () => {
             open={showEditDialog}
             onOpenChange={setShowEditDialog}
             user={selectedUser}
+            onSuccess={loadUsers}
+          />
+          <UserPhasesDialog
+            open={showPhasesDialog}
+            onOpenChange={setShowPhasesDialog}
+            userId={selectedUser.id}
+            userName={selectedUser.full_name}
+            userWhatsapp={selectedUser.whatsapp}
             onSuccess={loadUsers}
           />
         </>

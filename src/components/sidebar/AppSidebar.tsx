@@ -144,7 +144,6 @@ const AppSidebar = ({
       const adminItems = [
         { path: "/admin/users", icon: UserCog, label: "Usuários", badge: pendingApprovalsCount, key: "admin" },
         ...(isSuperAdmin && canViewMenu('ai-agent') ? [{ path: "/ai-agent", icon: Bot, label: "Agente IA", key: "ai-agent" }] : []),
-        { path: "/settings/phases", icon: Settings, label: "Configurações", key: "settings" },
       ].filter(item => canViewMenu(item.key));
 
       if (adminItems.length > 0) {
