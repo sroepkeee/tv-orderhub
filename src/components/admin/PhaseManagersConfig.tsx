@@ -26,6 +26,7 @@ interface PhaseManager {
   profiles?: {
     full_name: string;
     email: string;
+    whatsapp?: string;
   };
 }
 
@@ -117,7 +118,7 @@ export function PhaseManagersConfig() {
       .from('phase_managers')
       .select(`
         *,
-        profiles:user_id (full_name, email)
+        profiles:user_id (full_name, email, whatsapp)
       `)
       .eq('organization_id', organizationId)
       .order('phase_key');
@@ -499,10 +500,15 @@ export function PhaseManagersConfig() {
                             <TableCell className="font-mono text-sm">
                               {isValidWhatsapp(manager.whatsapp) ? (
                                 manager.whatsapp
+                              ) : isValidWhatsapp(manager.profiles?.whatsapp) ? (
+                                <span className="flex items-center gap-1 text-muted-foreground">
+                                  {manager.profiles?.whatsapp}
+                                  <span className="text-xs">(perfil)</span>
+                                </span>
                               ) : (
                                 <span className="flex items-center gap-1 text-destructive">
                                   <AlertCircle className="h-4 w-4" />
-                                  {manager.whatsapp || 'Não configurado'}
+                                  Não configurado
                                 </span>
                               )}
                             </TableCell>
