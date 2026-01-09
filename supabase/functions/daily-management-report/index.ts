@@ -798,18 +798,29 @@ function getTrendArrow(change: number): string {
   return '0%';
 }
 
+// Função auxiliar para converter para horário de São Paulo
+function toSaoPauloTime(date: Date): Date {
+  // São Paulo é UTC-3 (sem horário de verão desde 2019)
+  const saoPauloOffset = -3 * 60; // -180 minutos
+  const utcTime = date.getTime() + (date.getTimezoneOffset() * 60000);
+  return new Date(utcTime + (saoPauloOffset * 60000));
+}
+
 function formatReportMessage(metrics: OrderMetrics, date: Date, scheduleTime?: string): string {
-  const dateStr = date.toLocaleDateString('pt-BR', {
+  // Converter para horário de São Paulo
+  const spDate = toSaoPauloTime(date);
+  
+  const dateStr = spDate.toLocaleDateString('pt-BR', {
     weekday: 'long',
     year: 'numeric',
     month: 'long',
     day: 'numeric',
   });
 
-  const timeLabel = scheduleTime || date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  const timeLabel = scheduleTime || spDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 
   let message = `📊 *RELATÓRIO GERENCIAL DIÁRIO*\n`;
-  message += `📅 ${dateStr} • ${timeLabel}\n\n`;
+  message += `📅 ${dateStr} • ${timeLabel} (Brasília)\n\n`;
 
   // RESUMO EXECUTIVO
   message += `━━━━━━━━━━━━━━━━━━━━━━\n`;
@@ -980,7 +991,8 @@ function formatReportMessage(metrics: OrderMetrics, date: Date, scheduleTime?: s
   }
 
   message += `━━━━━━━━━━━━━━━━━━━━━━\n`;
-  message += `🤖 _Relatório gerado às ${date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}_\n`;
+  const spDateFooter = toSaoPauloTime(date);
+  message += `🤖 _Relatório gerado às ${spDateFooter.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} (Brasília)_\n`;
   message += `_Sistema de Gestão Imply_`;
 
   return message;
@@ -993,8 +1005,11 @@ function formatPhaseSpecificReport(
   phaseName: string,
   date: Date
 ): string {
-  const dateStr = date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
-  const timeStr = date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  // Converter para horário de São Paulo
+  const spDate = toSaoPauloTime(date);
+  
+  const dateStr = spDate.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  const timeStr = spDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 
   // Encontrar dados da fase
   const phaseData = metrics.phaseDetails.find(p => p.phaseKey === phaseKey);
@@ -1002,7 +1017,7 @@ function formatPhaseSpecificReport(
 
   let message = `📊 *RESUMO DA FASE: ${phaseName.toUpperCase()}*\n`;
   message += `─────────────────────\n`;
-  message += `📅 ${dateStr} às ${timeStr}\n\n`;
+  message += `📅 ${dateStr} às ${timeStr} (Brasília)\n\n`;
 
   message += `📦 Pedidos na fase: *${phaseCount}*\n`;
 
@@ -1356,6 +1371,9 @@ async function sendWhatsAppMessage(supabaseClient: any, phone: string, message: 
       { 'Apikey': megaApiToken },
     ];
 
+    let lastStatus = 0;
+    let lastError = '';
+
     for (const authHeader of authFormats) {
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
@@ -1368,19 +1386,24 @@ async function sendWhatsAppMessage(supabaseClient: any, phone: string, message: 
         body: JSON.stringify(body),
       });
 
+      lastStatus = response.status;
+      
       if (response.ok) {
         console.log('✅ WhatsApp message sent to:', phoneNumber);
         return true;
       }
 
+      const errorText = await response.text();
+      lastError = errorText;
+      console.log(`🔄 Auth attempt (${Object.keys(authHeader)[0]}): ${response.status} - ${errorText.substring(0, 200)}`);
+
       if (response.status !== 401 && response.status !== 403) {
-        const errorText = await response.text();
         console.error(`❌ Mega API error: ${response.status} - ${errorText}`);
         return false;
       }
     }
 
-    console.error('❌ All auth methods failed for WhatsApp send');
+    console.error(`❌ All auth methods failed for WhatsApp send. Last status: ${lastStatus}, Last error: ${lastError.substring(0, 200)}`);
     return false;
   } catch (error) {
     console.error('❌ Error sending WhatsApp message:', error);
