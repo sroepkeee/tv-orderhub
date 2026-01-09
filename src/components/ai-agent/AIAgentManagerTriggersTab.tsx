@@ -40,6 +40,7 @@ import {
   RefreshCw,
   Zap,
   AlertTriangle,
+  Users,
 } from "lucide-react";
 
 // Types
@@ -65,8 +66,17 @@ interface ManagerTriggerConfig {
   priority: number;
   delay_minutes: number;
   custom_template: string | null;
+  recipient_type: string;
+  custom_recipients: string[];
   created_at: string;
   updated_at: string;
+}
+
+interface ManagerProfile {
+  id: string;
+  full_name: string | null;
+  whatsapp: string | null;
+  is_manager: boolean;
 }
 
 // Status options grouped by phase
@@ -146,6 +156,13 @@ const STATUS_LABELS: Record<string, string> = {
   invoiced: 'Faturado',
 };
 
+// Recipient type options
+const RECIPIENT_TYPES = [
+  { value: 'phase_managers', label: 'Gestores da Fase', description: 'Envia para gestores cadastrados na fase correspondente' },
+  { value: 'ai_managers', label: 'Todos os Gestores do Agente IA', description: 'Envia para todos marcados como "Gestor" no Agente de IA' },
+  { value: 'custom', label: 'Gestores Específicos', description: 'Selecione os gestores que receberão este gatilho' },
+];
+
 // Default trigger for new ones
 const DEFAULT_TRIGGER: Partial<ManagerTriggerConfig> = {
   trigger_name: '',
@@ -167,11 +184,14 @@ const DEFAULT_TRIGGER: Partial<ManagerTriggerConfig> = {
   priority: 5,
   delay_minutes: 0,
   custom_template: null,
+  recipient_type: 'phase_managers',
+  custom_recipients: [],
 };
 
 export function AIAgentManagerTriggersTab() {
   const { organizationId } = useOrganizationId();
   const [triggers, setTriggers] = useState<ManagerTriggerConfig[]>([]);
+  const [managers, setManagers] = useState<ManagerProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -179,31 +199,42 @@ export function AIAgentManagerTriggersTab() {
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewTrigger, setPreviewTrigger] = useState<ManagerTriggerConfig | null>(null);
 
-  // Load triggers
-  const loadTriggers = useCallback(async () => {
+  // Load triggers and managers
+  const loadData = useCallback(async () => {
     if (!organizationId) return;
     
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('ai_manager_trigger_config')
-        .select('*')
-        .eq('organization_id', organizationId)
-        .order('priority', { ascending: true });
+      // Load triggers and managers in parallel
+      const [triggersRes, managersRes] = await Promise.all([
+        supabase
+          .from('ai_manager_trigger_config')
+          .select('*')
+          .eq('organization_id', organizationId)
+          .order('priority', { ascending: true }),
+        supabase
+          .from('profiles')
+          .select('id, full_name, whatsapp, is_manager')
+          .eq('is_manager', true)
+          .eq('is_active', true)
+      ]);
 
-      if (error) throw error;
-      setTriggers(data || []);
+      if (triggersRes.error) throw triggersRes.error;
+      if (managersRes.error) throw managersRes.error;
+      
+      setTriggers(triggersRes.data || []);
+      setManagers(managersRes.data || []);
     } catch (error) {
-      console.error('Error loading triggers:', error);
-      toast.error('Erro ao carregar gatilhos');
+      console.error('Error loading data:', error);
+      toast.error('Erro ao carregar dados');
     } finally {
       setLoading(false);
     }
   }, [organizationId]);
 
   useEffect(() => {
-    loadTriggers();
-  }, [loadTriggers]);
+    loadData();
+  }, [loadData]);
 
   // Create default triggers if none exist
   const createDefaultTriggers = async () => {
@@ -260,7 +291,7 @@ export function AIAgentManagerTriggersTab() {
 
       if (error) throw error;
       toast.success('Gatilhos padrão criados');
-      loadTriggers();
+      loadData();
     } catch (error) {
       console.error('Error creating default triggers:', error);
       toast.error('Erro ao criar gatilhos padrão');
@@ -293,6 +324,8 @@ export function AIAgentManagerTriggersTab() {
         priority: editingTrigger.priority,
         delay_minutes: editingTrigger.delay_minutes,
         custom_template: editingTrigger.custom_template,
+        recipient_type: editingTrigger.recipient_type || 'phase_managers',
+        custom_recipients: editingTrigger.custom_recipients || [],
         organization_id: organizationId,
       };
 
@@ -317,7 +350,7 @@ export function AIAgentManagerTriggersTab() {
 
       setDialogOpen(false);
       setEditingTrigger(null);
-      loadTriggers();
+      loadData();
     } catch (error) {
       console.error('Error saving trigger:', error);
       toast.error('Erro ao salvar gatilho');
@@ -338,7 +371,7 @@ export function AIAgentManagerTriggersTab() {
 
       if (error) throw error;
       toast.success('Gatilho excluído');
-      loadTriggers();
+      loadData();
     } catch (error) {
       console.error('Error deleting trigger:', error);
       toast.error('Erro ao excluir gatilho');
@@ -419,7 +452,7 @@ export function AIAgentManagerTriggersTab() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={loadTriggers}>
+          <Button variant="outline" size="sm" onClick={loadData}>
             <RefreshCw className="h-4 w-4 mr-2" />
             Atualizar
           </Button>
@@ -652,6 +685,95 @@ export function AIAgentManagerTriggersTab() {
                       Mostra apenas itens com status de compra pendente (purchase_required, out_of_stock, etc.)
                     </p>
                   </div>
+                )}
+              </div>
+
+              <Separator />
+
+              {/* Recipient Selection */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <Users className="h-4 w-4" />
+                  <Label>Destinatários do Gatilho</Label>
+                </div>
+                
+                <div className="space-y-3">
+                  {RECIPIENT_TYPES.map((type) => (
+                    <label
+                      key={type.value}
+                      className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                        editingTrigger.recipient_type === type.value 
+                          ? 'border-primary bg-primary/5' 
+                          : 'border-border hover:bg-muted/50'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="recipient_type"
+                        value={type.value}
+                        checked={editingTrigger.recipient_type === type.value}
+                        onChange={(e) => setEditingTrigger({
+                          ...editingTrigger,
+                          recipient_type: e.target.value,
+                          custom_recipients: e.target.value === 'custom' ? editingTrigger.custom_recipients : []
+                        })}
+                        className="mt-1"
+                      />
+                      <div className="flex-1">
+                        <span className="font-medium text-sm">{type.label}</span>
+                        <p className="text-xs text-muted-foreground mt-0.5">{type.description}</p>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+
+                {/* Custom recipients selection */}
+                {editingTrigger.recipient_type === 'custom' && (
+                  <Card className="bg-muted/30">
+                    <CardContent className="p-4">
+                      <p className="text-sm font-medium mb-3">Selecione os gestores:</p>
+                      {managers.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">
+                          Nenhum gestor cadastrado. Adicione gestores na aba "Gestores Cadastrados".
+                        </p>
+                      ) : (
+                        <div className="space-y-2">
+                          {managers.map((manager) => (
+                            <label
+                              key={manager.id}
+                              className="flex items-center gap-3 p-2 rounded hover:bg-muted cursor-pointer"
+                            >
+                              <Checkbox
+                                checked={editingTrigger.custom_recipients?.includes(manager.id) || false}
+                                onCheckedChange={(checked) => {
+                                  const current = editingTrigger.custom_recipients || [];
+                                  setEditingTrigger({
+                                    ...editingTrigger,
+                                    custom_recipients: checked
+                                      ? [...current, manager.id]
+                                      : current.filter(id => id !== manager.id)
+                                  });
+                                }}
+                              />
+                              <div className="flex-1 min-w-0">
+                                <span className="text-sm font-medium">{manager.full_name || 'Sem nome'}</span>
+                                {manager.whatsapp && (
+                                  <span className="text-xs text-muted-foreground ml-2">
+                                    {manager.whatsapp}
+                                  </span>
+                                )}
+                              </div>
+                              {!manager.whatsapp && (
+                                <Badge variant="outline" className="text-xs text-destructive">
+                                  Sem WhatsApp
+                                </Badge>
+                              )}
+                            </label>
+                          ))}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
                 )}
               </div>
 

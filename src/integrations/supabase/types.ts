@@ -630,6 +630,7 @@ export type Database = {
         Row: {
           channels: string[] | null
           created_at: string | null
+          custom_recipients: string[] | null
           custom_template: string | null
           delay_minutes: number | null
           filter_purchase_items: boolean | null
@@ -647,6 +648,7 @@ export type Database = {
           is_active: boolean | null
           organization_id: string | null
           priority: number | null
+          recipient_type: string | null
           trigger_name: string
           trigger_status: string[] | null
           trigger_type: string
@@ -655,6 +657,7 @@ export type Database = {
         Insert: {
           channels?: string[] | null
           created_at?: string | null
+          custom_recipients?: string[] | null
           custom_template?: string | null
           delay_minutes?: number | null
           filter_purchase_items?: boolean | null
@@ -672,6 +675,7 @@ export type Database = {
           is_active?: boolean | null
           organization_id?: string | null
           priority?: number | null
+          recipient_type?: string | null
           trigger_name: string
           trigger_status?: string[] | null
           trigger_type?: string
@@ -680,6 +684,7 @@ export type Database = {
         Update: {
           channels?: string[] | null
           created_at?: string | null
+          custom_recipients?: string[] | null
           custom_template?: string | null
           delay_minutes?: number | null
           filter_purchase_items?: boolean | null
@@ -697,6 +702,7 @@ export type Database = {
           is_active?: boolean | null
           organization_id?: string | null
           priority?: number | null
+          recipient_type?: string | null
           trigger_name?: string
           trigger_status?: string[] | null
           trigger_type?: string

@@ -36,6 +36,8 @@ interface TriggerConfig {
   priority: number;
   delay_minutes: number;
   custom_template: string | null;
+  recipient_type: string | null;
+  custom_recipients: string[] | null;
 }
 
 // Status de itens que indicam necessidade de compra
@@ -442,48 +444,102 @@ serve(async (req) => {
     // Buscar gestor da fase (usar targetPhase mesmo que tenhamos trigger)
     const phaseToQuery = targetPhase;
     
-    if (!phaseToQuery) {
-      console.log(`[notify-phase-manager] No phase to notify managers`);
+    // Determinar destinatários baseado no tipo configurado no trigger
+    let recipients: any[] = [];
+
+    if (trigger?.recipient_type === 'ai_managers') {
+      // Buscar todos os gestores do Agente IA
+      console.log(`[notify-phase-manager] Using ai_managers recipient type`);
+      const { data: aiManagers, error: aiError } = await supabase
+        .from('profiles')
+        .select('id, full_name, whatsapp')
+        .eq('is_manager', true)
+        .eq('is_active', true)
+        .not('whatsapp', 'is', null);
+      
+      if (aiError) {
+        console.error(`[notify-phase-manager] Error fetching AI managers:`, aiError);
+      }
+      recipients = (aiManagers || []).map(m => ({
+        id: m.id,
+        user_id: m.id,
+        whatsapp: m.whatsapp,
+        profiles: { full_name: m.full_name },
+        receive_new_orders: true,
+        receive_urgent_alerts: true
+      }));
+      console.log(`[notify-phase-manager] Found ${recipients.length} AI managers`);
+      
+    } else if (trigger?.recipient_type === 'custom' && trigger?.custom_recipients?.length) {
+      // Buscar gestores específicos selecionados
+      console.log(`[notify-phase-manager] Using custom recipients: ${trigger.custom_recipients.join(', ')}`);
+      const { data: customManagers, error: customError } = await supabase
+        .from('profiles')
+        .select('id, full_name, whatsapp')
+        .in('id', trigger.custom_recipients)
+        .eq('is_active', true)
+        .not('whatsapp', 'is', null);
+      
+      if (customError) {
+        console.error(`[notify-phase-manager] Error fetching custom recipients:`, customError);
+      }
+      recipients = (customManagers || []).map(m => ({
+        id: m.id,
+        user_id: m.id,
+        whatsapp: m.whatsapp,
+        profiles: { full_name: m.full_name },
+        receive_new_orders: true,
+        receive_urgent_alerts: true
+      }));
+      console.log(`[notify-phase-manager] Found ${recipients.length} custom recipients`);
+      
+    } else {
+      // Default: usar phase_managers (comportamento original)
+      if (!phaseToQuery) {
+        console.log(`[notify-phase-manager] No phase to notify managers`);
+        return new Response(JSON.stringify({ 
+          success: true, 
+          message: 'No phase manager mapping for this status',
+          phase: null
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+
+      console.log(`[notify-phase-manager] Using phase_managers for phase: ${phaseToQuery}`);
+      const { data: phaseManagers, error: managerError } = await supabase
+        .from('phase_managers')
+        .select(`
+          id,
+          user_id,
+          whatsapp,
+          receive_new_orders,
+          receive_urgent_alerts,
+          profiles:user_id (full_name)
+        `)
+        .eq('phase_key', phaseToQuery)
+        .eq('is_active', true)
+        .eq('organization_id', order.organization_id)
+        .order('notification_priority', { ascending: true });
+
+      if (managerError) {
+        console.error(`[notify-phase-manager] Error fetching phase managers:`, managerError);
+      }
+      recipients = phaseManagers || [];
+      console.log(`[notify-phase-manager] Found ${recipients.length} phase managers`);
+    }
+
+    if (recipients.length === 0) {
+      console.log(`[notify-phase-manager] No recipients found`);
       return new Response(JSON.stringify({ 
         success: true, 
-        message: 'No phase manager mapping for this status',
-        phase: null
+        message: 'No recipients configured',
+        phase: phaseToQuery,
+        recipient_type: trigger?.recipient_type || 'phase_managers'
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
-
-    const { data: managers, error: managerError } = await supabase
-      .from('phase_managers')
-      .select(`
-        id,
-        user_id,
-        whatsapp,
-        receive_new_orders,
-        receive_urgent_alerts,
-        profiles:user_id (full_name)
-      `)
-      .eq('phase_key', phaseToQuery)
-      .eq('is_active', true)
-      .eq('organization_id', order.organization_id)
-      .order('notification_priority', { ascending: true });
-
-    if (managerError) {
-      console.error(`[notify-phase-manager] Error fetching managers:`, managerError);
-    }
-
-    if (!managers || managers.length === 0) {
-      console.log(`[notify-phase-manager] No active managers for phase: ${phaseToQuery}`);
-      return new Response(JSON.stringify({ 
-        success: true, 
-        message: 'No managers configured for this phase',
-        phase: phaseToQuery
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
-    }
-
-    console.log(`[notify-phase-manager] Found ${managers.length} managers for phase ${phaseToQuery}`);
 
     // Gerar mensagem
     let messageContent: string;
@@ -492,25 +548,29 @@ serve(async (req) => {
     } else if (trigger) {
       messageContent = buildDynamicMessage(trigger, orderWithTotal, items, phaseToQuery);
     } else {
-      messageContent = getFallbackTemplate(phaseToQuery, orderWithTotal, items, notificationType);
+      messageContent = getFallbackTemplate(phaseToQuery || 'general', orderWithTotal, items, notificationType);
     }
 
-    // Enviar notificação para cada gestor
+    // Enviar notificação para cada destinatário
     const notifications = [];
     
-    for (const manager of managers) {
+    for (const recipient of recipients) {
       // Verificar preferências
-      if (notificationType === 'new_order' && !manager.receive_new_orders) {
-        console.log(`[notify-phase-manager] Manager ${manager.user_id} opted out of new order notifications`);
+      if (notificationType === 'new_order' && !recipient.receive_new_orders) {
+        console.log(`[notify-phase-manager] Recipient ${recipient.user_id} opted out of new order notifications`);
         continue;
       }
-      if (notificationType === 'urgent_alert' && !manager.receive_urgent_alerts) {
-        console.log(`[notify-phase-manager] Manager ${manager.user_id} opted out of urgent alerts`);
+      if (notificationType === 'urgent_alert' && !recipient.receive_urgent_alerts) {
+        console.log(`[notify-phase-manager] Recipient ${recipient.user_id} opted out of urgent alerts`);
         continue;
       }
 
       // Normalizar WhatsApp
-      let whatsapp = manager.whatsapp.replace(/\D/g, '');
+      let whatsapp = recipient.whatsapp?.replace(/\D/g, '') || '';
+      if (!whatsapp) {
+        console.log(`[notify-phase-manager] Recipient ${recipient.user_id} has no WhatsApp`);
+        continue;
+      }
       if (!whatsapp.startsWith('55')) {
         whatsapp = '55' + whatsapp;
       }
@@ -519,7 +579,7 @@ serve(async (req) => {
       const { data: notification, error: notifError } = await supabase
         .from('phase_manager_notifications')
         .insert({
-          phase_manager_id: manager.id,
+          phase_manager_id: recipient.id,
           order_id: orderId,
           notification_type: notificationType,
           message_content: messageContent,
@@ -528,9 +588,10 @@ serve(async (req) => {
             phase: phaseToQuery,
             old_status: oldStatus,
             new_status: newStatus,
-            manager_name: (manager.profiles as any)?.full_name,
+            manager_name: (recipient.profiles as any)?.full_name,
             trigger_id: trigger?.id,
-            trigger_name: trigger?.trigger_name
+            trigger_name: trigger?.trigger_name,
+            recipient_type: trigger?.recipient_type || 'phase_managers'
           }
         })
         .select()
@@ -545,7 +606,7 @@ serve(async (req) => {
         .from('message_queue')
         .insert({
           recipient_whatsapp: whatsapp,
-          recipient_name: (manager.profiles as any)?.full_name || 'Gestor',
+          recipient_name: (recipient.profiles as any)?.full_name || 'Gestor',
           message_content: messageContent,
           message_type: 'phase_manager_alert',
           priority: trigger?.priority || (notificationType === 'urgent_alert' ? 1 : 2),
@@ -577,7 +638,7 @@ serve(async (req) => {
       } else {
         console.log(`[notify-phase-manager] Message queued for ${whatsapp}`);
         notifications.push({
-          manager_id: manager.id,
+          recipient_id: recipient.id,
           whatsapp,
           notification_id: notification?.id
         });
