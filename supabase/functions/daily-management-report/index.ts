@@ -1012,9 +1012,21 @@ function formatSummaryReport(metrics: OrderMetrics, date: Date): string {
   message += `🎯 SLA: *${metrics.sla.onTimeRate}%* no prazo\n\n`;
 
   message += `📊 *Por Fase:*\n`;
-  metrics.phaseDetails.slice(0, 8).forEach((phase) => {
+  
+  // Mostrar TODAS as fases com pedidos (exceto Conclusão)
+  const activePhases = metrics.phaseDetails.filter(
+    (phase) => phase.count > 0 && !phase.phase.includes('Conclusão')
+  );
+  
+  activePhases.forEach((phase) => {
     message += `• ${phase.phase}: *${phase.count}*\n`;
   });
+  
+  // Se não houver nenhuma fase com pedidos
+  if (activePhases.length === 0) {
+    message += `• _Nenhum pedido ativo_\n`;
+  }
+  
   message += `\n`;
 
   if (metrics.alerts.delayed > 0 || metrics.alerts.critical > 0) {
