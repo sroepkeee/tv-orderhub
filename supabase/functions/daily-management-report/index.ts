@@ -998,6 +998,222 @@ function formatReportMessage(metrics: OrderMetrics, date: Date, scheduleTime?: s
   return message;
 }
 
+// ==================== FORMATAÇÃO - RESUMO RÁPIDO ====================
+function formatSummaryReport(metrics: OrderMetrics, date: Date): string {
+  const spDate = toSaoPauloTime(date);
+  const dateStr = spDate.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  const timeStr = spDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+
+  let message = `📋 *RESUMO RÁPIDO* - ${dateStr} ${timeStr}\n`;
+  message += `━━━━━━━━━━━━━━━━━━\n\n`;
+
+  message += `📦 Pedidos Ativos: *${metrics.totalActive}*\n`;
+  message += `💰 Valor Total: *${formatCurrency(metrics.totalValue)}*\n`;
+  message += `🎯 SLA: *${metrics.sla.onTimeRate}%* no prazo\n\n`;
+
+  message += `📊 *Por Fase:*\n`;
+  metrics.phaseDetails.slice(0, 8).forEach((phase) => {
+    message += `• ${phase.phase}: *${phase.count}*\n`;
+  });
+  message += `\n`;
+
+  if (metrics.alerts.delayed > 0 || metrics.alerts.critical > 0) {
+    message += `⚠️ *Alertas:*\n`;
+    if (metrics.alerts.delayed > 0) {
+      message += `• ${metrics.alerts.delayed} pedidos atrasados\n`;
+    }
+    if (metrics.alerts.critical > 0) {
+      message += `• ${metrics.alerts.critical} críticos (entrega hoje)\n`;
+    }
+  }
+
+  message += `\n🤖 _Sistema de Gestão Imply_`;
+  return message;
+}
+
+// ==================== FORMATAÇÃO - PEDIDOS URGENTES ====================
+function formatUrgentReport(metrics: OrderMetrics, date: Date): string {
+  const spDate = toSaoPauloTime(date);
+  const dateStr = spDate.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+
+  let message = `🚨 *PEDIDOS URGENTES* - ${dateStr}\n`;
+  message += `━━━━━━━━━━━━━━━━━━\n\n`;
+
+  // Pedidos críticos (entrega hoje/amanhã)
+  const criticalOrders = metrics.topOrders.filter(o => o.daysUntilDelivery <= 1 && o.daysUntilDelivery >= 0);
+  const nearDeadline = metrics.topOrders.filter(o => o.daysUntilDelivery > 1 && o.daysUntilDelivery <= 3);
+
+  if (metrics.alerts.critical > 0) {
+    message += `⚡ *ENTREGA HOJE/AMANHÃ (${metrics.alerts.critical}):*\n`;
+    criticalOrders.slice(0, 5).forEach((order) => {
+      message += `• *#${order.orderNumber}* - ${order.customer.substring(0, 25)}\n`;
+      message += `  ${formatCurrency(order.totalValue)} | ${order.daysUntilDelivery === 0 ? 'HOJE' : 'Amanhã'}\n`;
+    });
+    message += `\n`;
+  }
+
+  if (nearDeadline.length > 0) {
+    message += `📅 *PRÓXIMOS 2-3 DIAS (${nearDeadline.length}):*\n`;
+    nearDeadline.slice(0, 5).forEach((order) => {
+      message += `• *#${order.orderNumber}* - ${order.customer.substring(0, 25)} (${order.daysUntilDelivery}d)\n`;
+    });
+    message += `\n`;
+  }
+
+  // Extremamente atrasados
+  if (metrics.extremelyOverdueOrders && metrics.extremelyOverdueOrders.length > 0) {
+    message += `🔥 *CRÍTICOS (>7 dias atraso):*\n`;
+    metrics.extremelyOverdueOrders.slice(0, 5).forEach((order) => {
+      message += `• *#${order.orderNumber}* - ${order.daysOverdue} dias atrasado\n`;
+    });
+  }
+
+  if (metrics.alerts.critical === 0 && (!metrics.extremelyOverdueOrders || metrics.extremelyOverdueOrders.length === 0)) {
+    message += `✅ Nenhum pedido urgente no momento!\n`;
+  }
+
+  message += `\n🤖 _Sistema de Gestão Imply_`;
+  return message;
+}
+
+// ==================== FORMATAÇÃO - PEDIDOS ATRASADOS ====================
+function formatDelayedReport(metrics: OrderMetrics, date: Date): string {
+  const spDate = toSaoPauloTime(date);
+  const dateStr = spDate.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+
+  let message = `⏰ *PEDIDOS ATRASADOS* - ${dateStr}\n`;
+  message += `━━━━━━━━━━━━━━━━━━\n\n`;
+
+  message += `Total: *${metrics.alerts.delayed}* pedidos (*${formatCurrency(metrics.sla.lateValue)}*)\n\n`;
+
+  // Top 10 mais atrasados
+  if (metrics.extremelyOverdueOrders && metrics.extremelyOverdueOrders.length > 0) {
+    message += `📍 *TOP MAIS ATRASADOS:*\n`;
+    metrics.extremelyOverdueOrders.slice(0, 10).forEach((order, idx) => {
+      const icon = order.daysOverdue > 30 ? '🆘' : order.daysOverdue > 14 ? '⚠️' : '⏰';
+      message += `${idx + 1}. ${icon} *#${order.orderNumber}* - ${order.daysOverdue}d\n`;
+      message += `   ${formatCurrency(order.value)} | ${order.phaseLabel}\n`;
+    });
+    message += `\n`;
+  }
+
+  // Distribuição por fase
+  message += `📊 *Por Fase:*\n`;
+  const delayedByPhase: Record<string, number> = {};
+  metrics.extremelyOverdueOrders?.forEach(o => {
+    delayedByPhase[o.phaseLabel] = (delayedByPhase[o.phaseLabel] || 0) + 1;
+  });
+  Object.entries(delayedByPhase)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .forEach(([phase, count]) => {
+      message += `• ${phase}: ${count} atrasados\n`;
+    });
+
+  if (metrics.alerts.delayed === 0) {
+    message += `✅ Nenhum pedido atrasado!\n`;
+  }
+
+  message += `\n🤖 _Sistema de Gestão Imply_`;
+  return message;
+}
+
+// ==================== FORMATAÇÃO - RESUMO POR FASE ====================
+function formatPhaseSummaryReport(metrics: OrderMetrics, date: Date): string {
+  const spDate = toSaoPauloTime(date);
+  const dateStr = spDate.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  const timeStr = spDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+
+  let message = `📦 *DISTRIBUIÇÃO POR FASE* - ${dateStr} ${timeStr}\n`;
+  message += `━━━━━━━━━━━━━━━━━━\n\n`;
+
+  // Entrada
+  const entrada = (metrics.byPhase.almoxSsm || 0) + (metrics.byPhase.gerarOrdem || 0);
+  if (entrada > 0) {
+    message += `📥 *Entrada:* ${entrada}\n`;
+    if (metrics.byPhase.almoxSsm > 0) message += `  • Almox SSM: ${metrics.byPhase.almoxSsm}\n`;
+    if (metrics.byPhase.gerarOrdem > 0) message += `  • Gerar Ordem: ${metrics.byPhase.gerarOrdem}\n`;
+  }
+
+  // Compras
+  if (metrics.byPhase.compras > 0) {
+    message += `\n🛒 *Compras:* ${metrics.byPhase.compras}\n`;
+  }
+
+  // Almox Geral
+  if (metrics.byPhase.almoxGeral > 0) {
+    message += `\n📦 *Almox Geral:* ${metrics.byPhase.almoxGeral}\n`;
+  }
+
+  // Produção
+  const producao = (metrics.byPhase.producaoClientes || 0) + (metrics.byPhase.producaoEstoque || 0);
+  if (producao > 0) {
+    message += `\n🔧 *Produção:* ${producao}\n`;
+    if (metrics.byPhase.producaoClientes > 0) message += `  • Clientes: ${metrics.byPhase.producaoClientes}\n`;
+    if (metrics.byPhase.producaoEstoque > 0) message += `  • Estoque: ${metrics.byPhase.producaoEstoque}\n`;
+  }
+
+  // Gerar Saldo
+  if (metrics.byPhase.gerarSaldo > 0) {
+    message += `\n📊 *Gerar Saldo:* ${metrics.byPhase.gerarSaldo}\n`;
+  }
+
+  // Lab
+  if (metrics.byPhase.laboratorio > 0) {
+    message += `\n🔬 *Laboratório:* ${metrics.byPhase.laboratorio}\n`;
+  }
+
+  // Embalagem
+  if (metrics.byPhase.embalagem > 0) {
+    message += `\n📦 *Embalagem:* ${metrics.byPhase.embalagem}\n`;
+  }
+
+  // Cotação
+  if (metrics.byPhase.cotacao > 0) {
+    message += `\n💰 *Cotação Frete:* ${metrics.byPhase.cotacao}\n`;
+  }
+
+  // Faturamento
+  const faturamento = (metrics.byPhase.aFaturar || 0) + (metrics.byPhase.faturamento || 0);
+  if (faturamento > 0) {
+    message += `\n🧾 *Faturamento:* ${faturamento}\n`;
+    if (metrics.byPhase.aFaturar > 0) message += `  • À Faturar: ${metrics.byPhase.aFaturar}\n`;
+    if (metrics.byPhase.faturamento > 0) message += `  • Em Faturamento: ${metrics.byPhase.faturamento}\n`;
+  }
+
+  // Expedição
+  const expedicao = (metrics.byPhase.expedicao || 0) + (metrics.byPhase.emTransito || 0);
+  if (expedicao > 0) {
+    message += `\n🚛 *Expedição/Trânsito:* ${expedicao}\n`;
+    if (metrics.byPhase.expedicao > 0) message += `  • Expedição: ${metrics.byPhase.expedicao}\n`;
+    if (metrics.byPhase.emTransito > 0) message += `  • Em Trânsito: ${metrics.byPhase.emTransito}\n`;
+  }
+
+  message += `\n━━━━━━━━━━━━━━━━━━\n`;
+  message += `Total: *${metrics.totalActive}* pedidos ativos\n`;
+  message += `Valor: *${formatCurrency(metrics.totalValue)}*\n`;
+
+  message += `\n🤖 _Sistema de Gestão Imply_`;
+  return message;
+}
+
+// ==================== SELETOR DE FORMATO ====================
+function formatReportByType(metrics: OrderMetrics, date: Date, reportType: string, scheduleTime?: string): string {
+  switch (reportType) {
+    case 'summary':
+      return formatSummaryReport(metrics, date);
+    case 'urgent':
+      return formatUrgentReport(metrics, date);
+    case 'delayed':
+      return formatDelayedReport(metrics, date);
+    case 'phase_summary':
+      return formatPhaseSummaryReport(metrics, date);
+    case 'full':
+    default:
+      return formatReportMessage(metrics, date, scheduleTime);
+  }
+}
+
 // ==================== FORMATAÇÃO - RELATÓRIO POR FASE ====================
 function formatPhaseSpecificReport(
   metrics: OrderMetrics, 
@@ -1935,6 +2151,7 @@ serve(async (req) => {
     let sendEmail = true;
     let sendPhaseReports = true;
     let scheduleTime: string | undefined;
+    let reportType = 'full'; // New: 'full', 'summary', 'urgent', 'delayed', 'phase_summary'
 
     try {
       const body = await req.json();
@@ -1947,9 +2164,12 @@ serve(async (req) => {
       sendEmail = body.sendEmail !== false;
       sendPhaseReports = body.sendPhaseReports !== false;
       scheduleTime = body.scheduleTime;
+      reportType = body.reportType || 'full';
     } catch {
       // No body provided
     }
+
+    console.log(`📊 Report type: ${reportType}`);
 
     // ========== BUSCAR DESTINATÁRIOS ==========
     let recipients: any[] = [];
@@ -2023,7 +2243,7 @@ serve(async (req) => {
     // ========== CALCULAR MÉTRICAS ==========
     const metrics = await calculateMetrics(supabaseClient);
     const reportDate = new Date();
-    const message = formatReportMessage(metrics, reportDate, scheduleTime);
+    const message = formatReportByType(metrics, reportDate, reportType, scheduleTime);
 
     console.log('📊 Metrics calculated:', {
       totalActive: metrics.totalActive,
