@@ -88,9 +88,18 @@ async function sendViaMegaApi(
     }
     baseUrl = baseUrl.replace(/\/+$/, '');
     
-    // Formatar número (remover caracteres especiais)
-    const cleanNumber = carrierWhatsApp.replace(/\D/g, '');
-    const formattedNumber = cleanNumber.startsWith('55') ? cleanNumber : `55${cleanNumber}`;
+    // NOVO PADRÃO: 55 + DDD + 8 dígitos (SEM o 9)
+    let cleanNumber = carrierWhatsApp.replace(/\D/g, '');
+    if (!cleanNumber.startsWith('55')) {
+      cleanNumber = `55${cleanNumber}`;
+    }
+    // Remover o 9 se presente (formato antigo)
+    if (cleanNumber.length === 13 && cleanNumber.startsWith('55') && cleanNumber.charAt(4) === '9') {
+      const ddd = cleanNumber.substring(2, 4);
+      const numero = cleanNumber.substring(5);
+      cleanNumber = '55' + ddd + numero;
+    }
+    const formattedNumber = cleanNumber;
     
     console.log('Sending via Mega API to:', formattedNumber);
 

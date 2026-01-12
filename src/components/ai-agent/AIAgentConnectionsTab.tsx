@@ -130,6 +130,12 @@ export function AIAgentConnectionsTab() {
   const [loadingLogs, setLoadingLogs] = useState(false);
   const [logFilter, setLogFilter] = useState<'all' | 'success' | 'error' | 'connection'>('all');
   
+  // Test message state
+  const [testPhone, setTestPhone] = useState('');
+  const [testMessage, setTestMessage] = useState('Teste de envio do sistema Imply. Por favor, ignore.');
+  const [sendingTest, setSendingTest] = useState(false);
+  const [testResult, setTestResult] = useState<{ success: boolean; message: string; phoneUsed?: string } | null>(null);
+  
   // Last disconnect info
   const [lastDisconnect, setLastDisconnect] = useState<LastDisconnect | null>(null);
   const [disconnectCount24h, setDisconnectCount24h] = useState(0);
@@ -448,6 +454,114 @@ export function AIAgentConnectionsTab() {
       toast.error('Erro ao limpar dados');
     } finally {
       setCleaningData(false);
+    }
+  };
+
+  // Função para normalizar telefone no novo padrão (55 + DDD + 8 dígitos)
+  const normalizePhoneForTest = (phone: string): string => {
+    let digits = phone.replace(/\D/g, '');
+    
+    if (!digits.startsWith('55')) {
+      digits = '55' + digits;
+    }
+    
+    // Remover o 9 se presente (formato antigo)
+    if (digits.length === 13 && digits.startsWith('55') && digits.charAt(4) === '9') {
+      const ddd = digits.substring(2, 4);
+      const numero = digits.substring(5);
+      digits = '55' + ddd + numero;
+    }
+    
+    return digits;
+  };
+
+  // Função para testar envio de mensagem
+  const handleSendTestMessage = async () => {
+    if (!testPhone.trim()) {
+      toast.error('Informe um número de telefone');
+      return;
+    }
+    
+    setSendingTest(true);
+    setTestResult(null);
+    
+    try {
+      const normalizedPhone = normalizePhoneForTest(testPhone);
+      
+      // Buscar um carrier com esse telefone ou criar um virtual
+      const { data: carrier } = await supabase
+        .from('carriers')
+        .select('id, whatsapp')
+        .or(`whatsapp.eq.${testPhone},whatsapp.ilike.%${testPhone.slice(-8)}%`)
+        .limit(1)
+        .maybeSingle();
+
+      if (!carrier) {
+        // Criar carrier temporário para teste
+        const { data: newCarrier, error: createError } = await supabase
+          .from('carriers')
+          .insert({
+            name: 'Teste de Envio',
+            whatsapp: normalizedPhone,
+            is_active: true,
+            notes: 'Carrier criado para teste de envio'
+          })
+          .select()
+          .single();
+
+        if (createError) {
+          throw new Error('Não foi possível criar carrier para teste');
+        }
+
+        const { data, error } = await supabase.functions.invoke('mega-api-send', {
+          body: {
+            carrierId: newCarrier.id,
+            message: testMessage,
+            conversationType: 'general',
+            contactType: 'carrier'
+          }
+        });
+
+        // Remover carrier de teste
+        await supabase.from('carriers').delete().eq('id', newCarrier.id);
+
+        if (error) throw error;
+
+        setTestResult({
+          success: true,
+          message: `Mensagem enviada com sucesso! ID: ${data?.conversationId}`,
+          phoneUsed: normalizedPhone
+        });
+        toast.success('Mensagem de teste enviada!');
+      } else {
+        const { data, error } = await supabase.functions.invoke('mega-api-send', {
+          body: {
+            carrierId: carrier.id,
+            message: testMessage,
+            conversationType: 'general',
+            contactType: 'carrier'
+          }
+        });
+
+        if (error) throw error;
+
+        setTestResult({
+          success: true,
+          message: `Mensagem enviada para carrier existente! ID: ${data?.conversationId}`,
+          phoneUsed: normalizedPhone
+        });
+        toast.success('Mensagem de teste enviada!');
+      }
+    } catch (error) {
+      console.error('Error sending test message:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
+      setTestResult({
+        success: false,
+        message: `Erro: ${errorMessage}`
+      });
+      toast.error('Falha ao enviar mensagem de teste');
+    } finally {
+      setSendingTest(false);
     }
   };
 
@@ -857,6 +971,76 @@ export function AIAgentConnectionsTab() {
             <RefreshCw className={`h-4 w-4 ${testing ? 'animate-spin' : ''}`} />
             {testing ? 'Testando...' : 'Testar Todas as Conexões'}
           </Button>
+        </CardContent>
+      </Card>
+
+      {/* Test Message Card */}
+      <Card className="border-blue-500/30">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Send className="h-5 w-5" />
+            Teste de Envio de Mensagem
+          </CardTitle>
+          <CardDescription>
+            Teste o envio de mensagem para verificar se a integração está funcionando.
+            Formato: 55 + DDD + 8 dígitos (sem o 9)
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-2">
+              <Label>Telefone de Destino</Label>
+              <Input 
+                value={testPhone}
+                onChange={(e) => setTestPhone(e.target.value)}
+                placeholder="5551XXXXXXXX (12 dígitos)"
+                className="font-mono"
+              />
+              <p className="text-xs text-muted-foreground">
+                Novo padrão: País (55) + DDD (2) + Número (8 dígitos)
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label>Mensagem</Label>
+              <Input 
+                value={testMessage}
+                onChange={(e) => setTestMessage(e.target.value)}
+                placeholder="Mensagem de teste..."
+              />
+            </div>
+          </div>
+
+          {testResult && (
+            <div className={`p-4 rounded-lg border ${testResult.success ? 'bg-green-50 dark:bg-green-950/30 border-green-300' : 'bg-red-50 dark:bg-red-950/30 border-red-300'}`}>
+              <p className={`text-sm ${testResult.success ? 'text-green-700' : 'text-red-700'}`}>
+                {testResult.message}
+              </p>
+              {testResult.phoneUsed && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Número utilizado: <span className="font-mono">{testResult.phoneUsed}</span>
+                </p>
+              )}
+            </div>
+          )}
+
+          <Button 
+            onClick={handleSendTestMessage}
+            disabled={sendingTest || !whatsappConnected}
+            className="gap-2"
+          >
+            {sendingTest ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Send className="h-4 w-4" />
+            )}
+            {sendingTest ? 'Enviando...' : 'Enviar Mensagem de Teste'}
+          </Button>
+          
+          {!whatsappConnected && (
+            <p className="text-xs text-amber-600">
+              Conecte o WhatsApp primeiro para testar o envio.
+            </p>
+          )}
         </CardContent>
       </Card>
 

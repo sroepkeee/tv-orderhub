@@ -5,15 +5,15 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Normaliza telefone Brasil para formato canônico: 55 + DDD + 9 + NÚMERO
+// NOVO PADRÃO: WhatsApp Brasil agora usa 55 + DDD (2) + 8 dígitos (SEM o 9)
+// O 9º dígito foi removido pela operadora
 function normalizeBrazilPhone(phone: string): string {
   if (!phone) return phone;
   
   // Remove tudo que não é dígito
   let digits = phone.replace(/\D/g, '');
   
-  // Se começa com +, já foi removido
-  // Se tem mais de 13 dígitos, provavelmente tem algo errado
+  // Se tem mais de 13 dígitos, truncar
   if (digits.length > 13) {
     digits = digits.slice(-13);
   }
@@ -23,33 +23,32 @@ function normalizeBrazilPhone(phone: string): string {
     digits = '55' + digits;
   }
   
-  // Agora temos: 55 + DDD (2) + número (8 ou 9)
-  // Se tem 12 dígitos (55 + 2 + 8), adicionar o 9
-  if (digits.length === 12) {
+  // Se tem 13 dígitos (55 + DDD + 9 + 8), REMOVER o 9
+  if (digits.length === 13 && digits.startsWith('55') && digits.charAt(4) === '9') {
     const ddd = digits.substring(2, 4);
-    const numero = digits.substring(4);
-    digits = '55' + ddd + '9' + numero;
+    const numero = digits.substring(5); // Pegar os 8 dígitos após o 9
+    digits = '55' + ddd + numero;
   }
   
   return digits;
 }
 
-// Gera variações do telefone para tentar envio (com e sem 9)
+// Gera variações do telefone para retry: primeiro SEM 9, depois COM 9
 function getPhoneVariants(canonical: string): string[] {
-  const variants = [canonical];
+  const variants = [canonical]; // Primeiro tenta o formato sem 9
   
-  // Se tem 13 dígitos (55 + DD + 9 + 8), gerar versão sem 9
-  if (canonical.length === 13 && canonical.startsWith('55') && canonical.charAt(4) === '9') {
-    const withoutNine = canonical.substring(0, 4) + canonical.substring(5);
-    variants.push(withoutNine);
-  }
-  
-  // Se tem 12 dígitos (55 + DD + 8), gerar versão com 9
+  // Se tem 12 dígitos (55 + DD + 8), gerar versão COM 9 como fallback
   if (canonical.length === 12 && canonical.startsWith('55')) {
     const ddd = canonical.substring(2, 4);
     const numero = canonical.substring(4);
     const withNine = '55' + ddd + '9' + numero;
     variants.push(withNine);
+  }
+  
+  // Se por algum motivo ainda tem 13 dígitos, gerar versão sem 9
+  if (canonical.length === 13 && canonical.startsWith('55') && canonical.charAt(4) === '9') {
+    const withoutNine = canonical.substring(0, 4) + canonical.substring(5);
+    variants.unshift(withoutNine); // Colocar SEM 9 primeiro
   }
   
   return variants;
