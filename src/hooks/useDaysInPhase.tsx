@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
 interface PhaseEntry {
@@ -23,8 +23,19 @@ export const useDaysInPhase = (orderIds: string[]): UseDaysInPhaseResult => {
   const [phaseData, setPhaseData] = useState<Map<string, PhaseEntry>>(new Map());
   const [loading, setLoading] = useState(false);
 
+  // Dependência estável para evitar re-fetches desnecessários
+  const orderIdsKey = useMemo(() => {
+    const sorted = [...orderIds].sort();
+    return JSON.stringify(sorted);
+  }, [orderIds]);
+
   const fetchPhaseEntryDates = useCallback(async () => {
-    if (orderIds.length === 0) return;
+    if (orderIds.length === 0) {
+      setPhaseData(new Map());
+      return;
+    }
+
+    console.log('[useDaysInPhase] Buscando dados para', orderIds.length, 'pedidos');
     
     setLoading(true);
     try {
@@ -91,22 +102,35 @@ export const useDaysInPhase = (orderIds: string[]): UseDaysInPhaseResult => {
         const enteredAt = new Date(entry.changed_at);
         
         // Calcular diferença em milissegundos e converter para dias
-        // Usar Math.ceil para que horas parciais contem como 1 dia
         const diffMs = today.getTime() - enteredAt.getTime();
         const diffDays = diffMs / (1000 * 60 * 60 * 24);
         
-        // Se for menos de 24h mas do dia anterior, conta como 1 dia
-        // Se for no mesmo dia, conta como 0
-        const daysInPhase = Math.max(0, Math.floor(diffDays));
+        // Usar Math.ceil para arredondar para cima - qualquer fração = 1 dia
+        // Mas se for do mesmo dia (< 1 dia), mostrar 0
+        const daysInPhase = diffDays < 1 ? 0 : Math.ceil(diffDays);
         
         phaseMap.set(orderId, {
           orderId,
-          daysInPhase,
+          daysInPhase: Math.max(0, daysInPhase),
           phaseEnteredAt: enteredAt
         });
       });
 
       // 7. Pedidos que não têm nem histórico nem created_at = 0 dias
+      orderIds.forEach(id => {
+        if (!phaseMap.has(id)) {
+          phaseMap.set(id, {
+            orderId: id,
+            daysInPhase: 0,
+            phaseEnteredAt: null
+          });
+        }
+      });
+
+      console.log('[useDaysInPhase] Populados', phaseMap.size, 'pedidos');
+      console.log('[useDaysInPhase] Amostra:', Array.from(phaseMap.entries()).slice(0, 3).map(([id, e]) => `${id.slice(0, 8)}... = ${e.daysInPhase}d`));
+
+      setPhaseData(phaseMap);
       orderIds.forEach(id => {
         if (!phaseMap.has(id)) {
           phaseMap.set(id, {
@@ -123,7 +147,7 @@ export const useDaysInPhase = (orderIds: string[]): UseDaysInPhaseResult => {
     } finally {
       setLoading(false);
     }
-  }, [orderIds.join(',')]); // Dependência no conjunto de IDs
+  }, [orderIdsKey]); // Dependência estável
 
   useEffect(() => {
     fetchPhaseEntryDates();
