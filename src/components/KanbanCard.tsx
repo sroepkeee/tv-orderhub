@@ -47,6 +47,7 @@ interface KanbanCardProps {
   viewMode?: CardViewMode;
   daysInPhase?: number | null;
   phaseEnteredAt?: Date | null;
+  daysLoading?: boolean;
 }
 const KanbanCardComponent = ({
   order,
@@ -56,7 +57,8 @@ const KanbanCardComponent = ({
   isAnimating = false,
   viewMode = "full",
   daysInPhase,
-  phaseEnteredAt
+  phaseEnteredAt,
+  daysLoading = false
 }: KanbanCardProps) => {
   const [clickStart, setClickStart] = useState<number>(0);
   const { getPhaseInfo } = usePhaseInfo();
@@ -189,8 +191,10 @@ const KanbanCardComponent = ({
   const daysRemaining = calculateDaysRemaining(order.deliveryDeadline);
   const progressBarColor = getProgressBarColor(daysRemaining);
   
-  // Usar dias na fase se disponível, senão mostrar 0
-  const displayDaysInPhase = daysInPhase ?? 0;
+  // Usar dias na fase se disponível
+  // Se está carregando e não tem valor, mostrar "..." para evitar "0d" falso
+  const displayDaysInPhase = daysInPhase ?? (daysLoading ? null : 0);
+  const daysDisplay = displayDaysInPhase === null ? '...' : `${displayDaysInPhase}d`;
   
   // Contar itens que precisam de compra
   const purchaseItemsCount = order.items?.filter(
@@ -240,11 +244,11 @@ const KanbanCardComponent = ({
                 {/* Days in phase indicator */}
                 <span className={cn(
                   "text-[9px] font-medium ml-auto flex-shrink-0",
-                  displayDaysInPhase > 7 ? "text-destructive" : 
-                  displayDaysInPhase > 3 ? "text-priority-medium" : 
+                  displayDaysInPhase !== null && displayDaysInPhase > 7 ? "text-destructive" : 
+                  displayDaysInPhase !== null && displayDaysInPhase > 3 ? "text-priority-medium" : 
                   "text-muted-foreground"
                 )}>
-                  {displayDaysInPhase}d
+                  {daysDisplay}
                 </span>
               </Card>
             </div>
@@ -259,7 +263,7 @@ const KanbanCardComponent = ({
               <div className="border-t pt-1 mt-1">
                 <p><span className="text-muted-foreground">📅 Emissão:</span> {new Date(order.createdDate).toLocaleDateString("pt-BR")}</p>
                 <p><span className="text-muted-foreground">📆 Dias de emissão:</span> {Math.max(0, Math.floor((Date.now() - new Date(order.createdDate).getTime()) / (1000 * 60 * 60 * 24)))}</p>
-                <p><span className="text-muted-foreground">⏱️ Tempo na fase:</span> {displayDaysInPhase}d</p>
+                <p><span className="text-muted-foreground">⏱️ Tempo na fase:</span> {daysDisplay}</p>
               </div>
             </div>
           </TooltipContent>
@@ -347,11 +351,11 @@ const KanbanCardComponent = ({
                   {/* Days in phase - compact mono */}
                   <span className={cn(
                     "text-[9px] font-mono tabular-nums ml-auto",
-                    displayDaysInPhase > 7 ? "text-destructive/80" : 
-                    displayDaysInPhase > 3 ? "text-priority-medium/80" : 
+                    displayDaysInPhase !== null && displayDaysInPhase > 7 ? "text-destructive/80" : 
+                    displayDaysInPhase !== null && displayDaysInPhase > 3 ? "text-priority-medium/80" : 
                     "text-muted-foreground/70"
                   )}>
-                    {displayDaysInPhase}d
+                    {daysDisplay}
                   </span>
                 </div>
                 
@@ -397,7 +401,7 @@ const KanbanCardComponent = ({
                 )}
                 <p>
                   <span className="text-muted-foreground">⏱️ Tempo na fase:</span>{' '}
-                  {displayDaysInPhase} {displayDaysInPhase === 1 ? 'dia' : 'dias'}
+                  {displayDaysInPhase !== null ? `${displayDaysInPhase} ${displayDaysInPhase === 1 ? 'dia' : 'dias'}` : '...'}
                 </p>
               </div>
               
@@ -510,11 +514,11 @@ const KanbanCardComponent = ({
                 </span>
                 <span className={cn(
                   "font-mono tabular-nums text-[9px]",
-                  displayDaysInPhase > 7 ? "text-destructive/80" : 
-                  displayDaysInPhase > 3 ? "text-priority-medium/80" : 
+                  displayDaysInPhase !== null && displayDaysInPhase > 7 ? "text-destructive/80" : 
+                  displayDaysInPhase !== null && displayDaysInPhase > 3 ? "text-priority-medium/80" : 
                   "text-muted-foreground/60"
                 )}>
-                  {displayDaysInPhase}d
+                  {daysDisplay}
                 </span>
               </div>
             </Card>
@@ -544,7 +548,7 @@ const KanbanCardComponent = ({
               )}
               <p>
                 <span className="text-muted-foreground">⏱️ Tempo na fase:</span>{' '}
-                {displayDaysInPhase} {displayDaysInPhase === 1 ? 'dia' : 'dias'}
+                {displayDaysInPhase !== null ? `${displayDaysInPhase} ${displayDaysInPhase === 1 ? 'dia' : 'dias'}` : '...'}
               </p>
             </div>
             

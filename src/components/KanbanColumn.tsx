@@ -33,6 +33,7 @@ interface KanbanColumnProps {
   density?: KanbanDensity;
   getDaysInPhase?: (orderId: string) => number | null;
   getPhaseEnteredAt?: (orderId: string) => Date | null;
+  daysLoading?: boolean;
 }
 const KanbanColumnComponent = ({
   id,
@@ -52,7 +53,8 @@ const KanbanColumnComponent = ({
   cardViewMode = "full",
   density = "comfortable",
   getDaysInPhase,
-  getPhaseEnteredAt
+  getPhaseEnteredAt,
+  daysLoading = false
 }: KanbanColumnProps) => {
   const navigate = useNavigate();
   const highCount = orders.filter(o => o.priority === "high").length;
@@ -215,6 +217,7 @@ const KanbanColumnComponent = ({
                 viewMode={cardViewMode}
                 daysInPhase={getDaysInPhase?.(order.id)}
                 phaseEnteredAt={getPhaseEnteredAt?.(order.id)}
+                daysLoading={daysLoading}
               />
             ))}
             {linkTo && !isTV && (
