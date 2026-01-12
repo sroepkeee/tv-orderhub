@@ -21,18 +21,13 @@ import {
   Settings,
   Power,
   PowerOff,
-  Send,
   Loader2,
-  Users
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { subDays, format } from "date-fns";
 import { cn } from "@/lib/utils";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { toast } from "@/hooks/use-toast";
+import { QuickActionsPanel } from "./QuickActionsPanel";
+import { ReportScheduleManager } from "./ReportScheduleManager";
 
 interface NotificationMetrics {
   total24h: number;
@@ -103,45 +98,6 @@ export function AIAgentDashboardTab() {
   const [tokenMetrics, setTokenMetrics] = useState<TokenMetrics | null>(null);
   const [agentInstances, setAgentInstances] = useState<AgentInstance[]>([]);
   const [loading, setLoading] = useState(true);
-  
-  // Report sending state
-  const [sendingReport, setSendingReport] = useState(false);
-  const [showReportOptions, setShowReportOptions] = useState(false);
-  const [reportOptions, setReportOptions] = useState({
-    includeChart: true,
-    includeAllCharts: true,
-    testMode: false,
-  });
-
-  const sendManualReport = async () => {
-    setSendingReport(true);
-    try {
-      const { data, error } = await supabase.functions.invoke('daily-management-report', {
-        body: {
-          includeChart: reportOptions.includeChart,
-          includeAllCharts: reportOptions.includeAllCharts,
-          testMode: reportOptions.testMode,
-        }
-      });
-      
-      if (error) throw error;
-      
-      toast({
-        title: "Relatório Enviado!",
-        description: `Enviado para ${data?.sentCount || 0} gestor(es). ${data?.errorCount > 0 ? `${data.errorCount} erro(s).` : ''}`,
-      });
-    } catch (error: any) {
-      console.error('Error sending report:', error);
-      toast({
-        title: "Erro ao Enviar",
-        description: error.message || "Erro desconhecido ao enviar relatório",
-        variant: "destructive",
-      });
-    } finally {
-      setSendingReport(false);
-      setShowReportOptions(false);
-    }
-  };
 
   const loadMetrics = async () => {
     setLoading(true);
@@ -530,97 +486,11 @@ export function AIAgentDashboardTab() {
         </CardContent>
       </Card>
 
-      {/* Quick Actions - Manual Report Trigger */}
-      <Card className="border-2 border-indigo-500/30 bg-gradient-to-br from-indigo-50/50 to-purple-50/50 dark:from-indigo-950/20 dark:to-purple-950/20">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-lg flex items-center gap-2">
-            <Send className="h-5 w-5 text-indigo-500" />
-            Ações Rápidas
-          </CardTitle>
-          <CardDescription>Disparar notificações e relatórios manualmente</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <Button 
-            className="w-full bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 text-white"
-            onClick={() => setShowReportOptions(true)}
-            disabled={sendingReport}
-          >
-            {sendingReport ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Enviando...
-              </>
-            ) : (
-              <>
-                <BarChart3 className="h-4 w-4 mr-2" />
-                📊 Disparar Relatório de Métricas
-              </>
-            )}
-          </Button>
-          
-          <p className="text-xs text-muted-foreground text-center">
-            📅 Envio automático: diariamente às 08:00
-          </p>
-        </CardContent>
-      </Card>
+      {/* Quick Actions Panel */}
+      <QuickActionsPanel />
 
-      {/* Report Options Dialog */}
-      <Dialog open={showReportOptions} onOpenChange={setShowReportOptions}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>📊 Disparar Relatório Gerencial</DialogTitle>
-            <DialogDescription>
-              O relatório será enviado para todos os gestores cadastrados com WhatsApp configurado.
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="space-y-4 py-4">
-            <div className="flex items-center justify-between">
-              <Label htmlFor="includeChart">Incluir gráfico de distribuição</Label>
-              <Switch 
-                id="includeChart" 
-                checked={reportOptions.includeChart}
-                onCheckedChange={(v) => setReportOptions({...reportOptions, includeChart: v})}
-              />
-            </div>
-            
-            <div className="flex items-center justify-between">
-              <Label htmlFor="includeAllCharts">Incluir todos os gráficos (tendência + SLA)</Label>
-              <Switch 
-                id="includeAllCharts" 
-                checked={reportOptions.includeAllCharts}
-                onCheckedChange={(v) => setReportOptions({...reportOptions, includeAllCharts: v})}
-              />
-            </div>
-            
-            <div className="flex items-center justify-between">
-              <Label htmlFor="testMode">Modo de teste (não salva logs)</Label>
-              <Switch 
-                id="testMode" 
-                checked={reportOptions.testMode}
-                onCheckedChange={(v) => setReportOptions({...reportOptions, testMode: v})}
-              />
-            </div>
-            
-            <Alert>
-              <Users className="h-4 w-4" />
-              <AlertDescription>
-                Gestores com <code className="text-xs bg-muted px-1 rounded">is_manager = true</code> e WhatsApp configurado receberão o relatório.
-              </AlertDescription>
-            </Alert>
-          </div>
-          
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowReportOptions(false)}>
-              Cancelar
-            </Button>
-            <Button onClick={sendManualReport} disabled={sendingReport}>
-              {sendingReport ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Send className="h-4 w-4 mr-2" />}
-              Enviar Agora
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* Report Schedule Manager */}
+      <ReportScheduleManager />
 
       {/* Connection Status */}
       <div className="grid gap-4 md:grid-cols-2">
