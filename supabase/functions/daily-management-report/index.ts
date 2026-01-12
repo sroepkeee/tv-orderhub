@@ -1327,7 +1327,86 @@ Requirements:
 }
 
 // ==================== WHATSAPP ====================
+
+// Check MEGA API connection status directly
+async function checkMegaAPIConnectionStatus(instanceKey: string): Promise<{ 
+  connected: boolean; 
+  state: string; 
+  reason?: string;
+}> {
+  try {
+    let megaApiUrl = (Deno.env.get('MEGA_API_URL') ?? '').trim();
+    if (!megaApiUrl.startsWith('http://') && !megaApiUrl.startsWith('https://')) {
+      megaApiUrl = `https://${megaApiUrl}`;
+    }
+    megaApiUrl = megaApiUrl.replace(/\/+$/, '');
+    const megaApiToken = Deno.env.get('MEGA_API_TOKEN') ?? '';
+
+    const statusUrl = `${megaApiUrl}/rest/instance/connectionState/${instanceKey}`;
+    
+    console.log('📡 Checking MEGA API status:', statusUrl);
+    
+    const response = await fetch(statusUrl, {
+      method: 'GET',
+      headers: { 'apikey': megaApiToken },
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.warn(`⚠️ MEGA API status check failed: ${response.status} - ${errorText.substring(0, 200)}`);
+      return { connected: false, state: 'check_failed', reason: errorText };
+    }
+
+    const data = await response.json();
+    console.log('📡 MEGA API connection state:', JSON.stringify(data));
+
+    const state = data?.state || data?.status || 'unknown';
+    const isConnected = state === 'open' || data?.connected === true;
+    
+    return { 
+      connected: isConnected, 
+      state,
+      reason: !isConnected ? (data?.message || state) : undefined
+    };
+  } catch (error) {
+    console.error('❌ Error checking MEGA API status:', error);
+    return { connected: false, state: 'error', reason: String(error) };
+  }
+}
+
 async function sendWhatsAppMessage(supabaseClient: any, phone: string, message: string): Promise<boolean> {
+  const MAX_RETRIES = 2;
+  const RETRY_DELAY_MS = 3000;
+  
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    const result = await attemptSendWhatsAppMessage(supabaseClient, phone, message, attempt);
+    
+    if (result.success) {
+      return true;
+    }
+    
+    // If not connected and we have retries left, wait and retry
+    if (!result.wasConnected && attempt < MAX_RETRIES) {
+      console.log(`⏳ Attempt ${attempt} failed due to disconnection, waiting ${RETRY_DELAY_MS}ms before retry...`);
+      await new Promise(r => setTimeout(r, RETRY_DELAY_MS));
+      continue;
+    }
+    
+    // Other error or last attempt
+    if (attempt === MAX_RETRIES) {
+      console.error(`❌ All ${MAX_RETRIES} attempts failed for WhatsApp send`);
+    }
+  }
+  
+  return false;
+}
+
+async function attemptSendWhatsAppMessage(
+  supabaseClient: any, 
+  phone: string, 
+  message: string,
+  attemptNumber: number
+): Promise<{ success: boolean; wasConnected: boolean }> {
   try {
     // Log all instances for debugging
     const { data: allInstances } = await supabaseClient
@@ -1336,21 +1415,21 @@ async function sendWhatsAppMessage(supabaseClient: any, phone: string, message: 
       .order('created_at', { ascending: false })
       .limit(5);
     
-    console.log('📱 WhatsApp instances status:', JSON.stringify(allInstances || []));
+    console.log(`📱 [Attempt ${attemptNumber}] WhatsApp instances status:`, JSON.stringify(allInstances || []));
 
     // Priority 1: Try to find a connected instance
     let { data: activeInstance } = await supabaseClient
       .from('whatsapp_instances')
-      .select('instance_key, status')
+      .select('instance_key, status, connected_at')
       .eq('status', 'connected')
       .maybeSingle();
 
     // Priority 2: Fallback to any active instance
     if (!activeInstance) {
-      console.log('⚠️ No connected instance, trying active fallback...');
+      console.log('⚠️ No connected instance in DB, trying active fallback...');
       const { data: fallbackInstance } = await supabaseClient
         .from('whatsapp_instances')
-        .select('instance_key, status')
+        .select('instance_key, status, connected_at')
         .eq('is_active', true)
         .order('connected_at', { ascending: false, nullsFirst: false })
         .maybeSingle();
@@ -1363,7 +1442,48 @@ async function sendWhatsAppMessage(supabaseClient: any, phone: string, message: 
 
     if (!activeInstance) {
       console.error('❌ No active WhatsApp instance found (neither connected nor active)');
-      return false;
+      return { success: false, wasConnected: false };
+    }
+
+    // === NEW: Check connection status directly with MEGA API ===
+    const apiStatus = await checkMegaAPIConnectionStatus(activeInstance.instance_key);
+    
+    console.log(`🔍 [Attempt ${attemptNumber}] PRE-SEND DIAGNOSTIC:`, {
+      timestamp: new Date().toISOString(),
+      instanceKey: activeInstance.instance_key,
+      dbStatus: activeInstance.status,
+      apiStatus: apiStatus.state,
+      apiConnected: apiStatus.connected,
+      connectedAt: activeInstance.connected_at,
+      recipient: phone,
+      messageLength: message.length
+    });
+
+    if (!apiStatus.connected) {
+      console.error(`❌ MEGA API reports disconnected: ${apiStatus.state} - ${apiStatus.reason}`);
+      
+      // Update DB to reflect real status
+      await supabaseClient
+        .from('whatsapp_instances')
+        .update({ 
+          status: apiStatus.state === 'close' ? 'disconnected' : 'waiting_scan',
+          updated_at: new Date().toISOString()
+        })
+        .eq('instance_key', activeInstance.instance_key);
+      
+      return { success: false, wasConnected: false };
+    }
+
+    // === Check if connection is too recent (wait for stabilization) ===
+    if (activeInstance.connected_at) {
+      const connectedAt = new Date(activeInstance.connected_at);
+      const now = new Date();
+      const secondsSinceConnection = (now.getTime() - connectedAt.getTime()) / 1000;
+      
+      if (secondsSinceConnection < 10) {
+        console.log(`⏳ Connection very recent (${secondsSinceConnection.toFixed(1)}s), waiting for stabilization...`);
+        await new Promise(r => setTimeout(r, (10 - secondsSinceConnection) * 1000));
+      }
     }
 
     let phoneNumber = phone.replace(/\D/g, '');
@@ -1378,7 +1498,7 @@ async function sendWhatsAppMessage(supabaseClient: any, phone: string, message: 
     megaApiUrl = megaApiUrl.replace(/\/+$/, '');
     const megaApiToken = Deno.env.get('MEGA_API_TOKEN') ?? '';
 
-    console.log(`📤 Sending WhatsApp to ${phoneNumber} via instance ${activeInstance.instance_key}`);
+    console.log(`📤 [Attempt ${attemptNumber}] Sending WhatsApp to ${phoneNumber} via instance ${activeInstance.instance_key}`);
 
     const endpoint = `/rest/sendMessage/${activeInstance.instance_key}/text`;
     const fullUrl = `${megaApiUrl}${endpoint}`;
@@ -1413,6 +1533,14 @@ async function sendWhatsAppMessage(supabaseClient: any, phone: string, message: 
       });
 
       lastStatus = response.status;
+      const responseText = await response.text();
+      
+      console.log(`📬 [Attempt ${attemptNumber}] MEGA API RESPONSE:`, {
+        timestamp: new Date().toISOString(),
+        status: response.status,
+        authMethod: Object.keys(authHeader)[0],
+        body: responseText.substring(0, 300)
+      });
       
       if (response.ok) {
         console.log('✅ WhatsApp message sent to:', phoneNumber);
@@ -1426,24 +1554,36 @@ async function sendWhatsAppMessage(supabaseClient: any, phone: string, message: 
           console.log('✅ Instance status updated to connected');
         }
         
-        return true;
+        return { success: true, wasConnected: true };
       }
 
-      const errorText = await response.text();
-      lastError = errorText;
-      console.log(`🔄 Auth attempt (${Object.keys(authHeader)[0]}): ${response.status} - ${errorText.substring(0, 200)}`);
+      lastError = responseText;
+
+      // Check if error indicates disconnection
+      const lowerError = responseText.toLowerCase();
+      if (lowerError.includes('disconnected') || lowerError.includes('not connected') || lowerError.includes('waiting_scan')) {
+        console.error(`❌ MEGA API indicates disconnection during send: ${responseText}`);
+        
+        // Update DB status
+        await supabaseClient
+          .from('whatsapp_instances')
+          .update({ status: 'waiting_scan', updated_at: new Date().toISOString() })
+          .eq('instance_key', activeInstance.instance_key);
+        
+        return { success: false, wasConnected: false };
+      }
 
       if (response.status !== 401 && response.status !== 403) {
-        console.error(`❌ Mega API error: ${response.status} - ${errorText}`);
-        return false;
+        console.error(`❌ Mega API error: ${response.status} - ${responseText}`);
+        return { success: false, wasConnected: true };
       }
     }
 
     console.error(`❌ All auth methods failed for WhatsApp send. Last status: ${lastStatus}, Last error: ${lastError.substring(0, 200)}`);
-    return false;
+    return { success: false, wasConnected: true };
   } catch (error) {
     console.error('❌ Error sending WhatsApp message:', error);
-    return false;
+    return { success: false, wasConnected: true };
   }
 }
 
