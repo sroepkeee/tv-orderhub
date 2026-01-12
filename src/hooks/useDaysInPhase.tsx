@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { getPhaseFromStatus } from '@/lib/kanbanPhase';
 
 interface PhaseEntry {
   orderId: string;
@@ -14,10 +15,12 @@ interface UseDaysInPhaseResult {
   refresh: () => void;
 }
 
+const CHUNK_SIZE = 50; // Processar em lotes para evitar limite de URL
+
 /**
- * Hook para calcular quantos dias cada pedido está na fase atual.
- * Busca no order_history a última entrada de status do pedido.
- * Se não houver histórico, usa created_at do pedido como fallback.
+ * Hook para calcular quantos dias cada pedido está na FASE atual (não status).
+ * - Zera quando muda de FASE
+ * - NÃO zera quando muda de status dentro da mesma fase
  */
 export const useDaysInPhase = (orderIds: string[]): UseDaysInPhaseResult => {
   const [phaseData, setPhaseData] = useState<Map<string, PhaseEntry>>(new Map());
@@ -35,119 +38,166 @@ export const useDaysInPhase = (orderIds: string[]): UseDaysInPhaseResult => {
       return;
     }
 
-    console.log('[useDaysInPhase] Buscando dados para', orderIds.length, 'pedidos');
+    console.log('[useDaysInPhase] Iniciando busca para', orderIds.length, 'pedidos');
     
     setLoading(true);
     try {
-      // 1. Buscar dados dos pedidos (status atual e data de criação)
-      const { data: ordersData, error: ordersError } = await supabase
-        .from('orders')
-        .select('id, status, created_at')
-        .in('id', orderIds);
-
-      if (ordersError) {
-        console.error('Erro ao buscar pedidos:', ordersError);
-        return;
+      // Dividir em chunks para evitar limite de URL
+      const chunks: string[][] = [];
+      for (let i = 0; i < orderIds.length; i += CHUNK_SIZE) {
+        chunks.push(orderIds.slice(i, i + CHUNK_SIZE));
       }
-
-      // 2. Buscar histórico de mudanças de status
-      const { data: historyData, error: historyError } = await supabase
-        .from('order_history')
-        .select('order_id, new_status, changed_at')
-        .in('order_id', orderIds)
-        .order('changed_at', { ascending: false });
-
-      if (historyError) {
-        console.error('Erro ao buscar histórico:', historyError);
-        return;
-      }
-
-      // 3. Criar mapas de status atual e created_at
-      const currentStatusMap = new Map<string, string>();
-      const createdAtMap = new Map<string, string>();
       
-      ordersData?.forEach(order => {
-        if (order.status) currentStatusMap.set(order.id, order.status);
-        if (order.created_at) createdAtMap.set(order.id, order.created_at);
-      });
+      console.log('[useDaysInPhase] Dividido em', chunks.length, 'chunks de até', CHUNK_SIZE, 'IDs');
 
-      // 4. Para cada pedido, encontrar a entrada mais recente para o STATUS ATUAL
-      const latestByOrder = new Map<string, { changed_at: string }>();
+      // Buscar dados em paralelo por chunk
+      const ordersPromises = chunks.map(chunk =>
+        supabase
+          .from('orders')
+          .select('id, status, created_at, order_category')
+          .in('id', chunk)
+      );
 
-      historyData?.forEach(entry => {
-        const currentStatus = currentStatusMap.get(entry.order_id);
-        
-        // Só considera se new_status = status atual do pedido
-        // E se ainda não temos uma entrada para este pedido
-        if (entry.new_status === currentStatus && !latestByOrder.has(entry.order_id)) {
-          latestByOrder.set(entry.order_id, { changed_at: entry.changed_at });
-        }
-      });
+      const historyPromises = chunks.map(chunk =>
+        supabase
+          .from('order_history')
+          .select('order_id, old_status, new_status, changed_at')
+          .in('order_id', chunk)
+          .order('changed_at', { ascending: false })
+      );
 
-      // 5. Para pedidos sem histórico válido, usar created_at como fallback
-      orderIds.forEach(id => {
-        if (!latestByOrder.has(id)) {
-          const createdAt = createdAtMap.get(id);
-          if (createdAt) {
-            latestByOrder.set(id, { changed_at: createdAt });
-          }
-        }
-      });
+      const [ordersResults, historyResults] = await Promise.all([
+        Promise.all(ordersPromises),
+        Promise.all(historyPromises)
+      ]);
 
-      // 6. Calcular dias na fase para cada pedido
-      const phaseMap = new Map<string, PhaseEntry>();
-      const today = new Date();
+      // Combinar resultados de todos os chunks
+      const ordersData = ordersResults.flatMap(r => r.data || []);
+      const historyData = historyResults.flatMap(r => r.data || []);
 
-      latestByOrder.forEach((entry, orderId) => {
-        const enteredAt = new Date(entry.changed_at);
-        
-        // Calcular diferença em milissegundos e converter para dias
-        const diffMs = today.getTime() - enteredAt.getTime();
-        const diffDays = diffMs / (1000 * 60 * 60 * 24);
-        
-        // Usar Math.ceil para arredondar para cima - qualquer fração = 1 dia
-        // Mas se for do mesmo dia (< 1 dia), mostrar 0
-        const daysInPhase = diffDays < 1 ? 0 : Math.ceil(diffDays);
-        
-        phaseMap.set(orderId, {
-          orderId,
-          daysInPhase: Math.max(0, daysInPhase),
-          phaseEnteredAt: enteredAt
+      // Verificar erros
+      const ordersError = ordersResults.find(r => r.error);
+      const historyError = historyResults.find(r => r.error);
+      
+      if (ordersError?.error) {
+        console.error('[useDaysInPhase] Erro ao buscar pedidos:', ordersError.error);
+      }
+      if (historyError?.error) {
+        console.error('[useDaysInPhase] Erro ao buscar histórico:', historyError.error);
+      }
+
+      console.log('[useDaysInPhase] Dados carregados:', ordersData.length, 'pedidos,', historyData.length, 'registros de histórico');
+
+      // Criar mapas auxiliares
+      const orderInfoMap = new Map<string, { status: string; createdAt: string; category: string }>();
+      ordersData.forEach(order => {
+        orderInfoMap.set(order.id, {
+          status: order.status || '',
+          createdAt: order.created_at || '',
+          category: order.order_category || ''
         });
       });
 
-      // 7. Pedidos que não têm nem histórico nem created_at = 0 dias
-      orderIds.forEach(id => {
-        if (!phaseMap.has(id)) {
-          phaseMap.set(id, {
-            orderId: id,
-            daysInPhase: 0,
-            phaseEnteredAt: null
-          });
+      // Agrupar histórico por pedido
+      const historyByOrder = new Map<string, Array<{ old_status: string | null; new_status: string; changed_at: string }>>();
+      historyData.forEach(entry => {
+        if (!historyByOrder.has(entry.order_id)) {
+          historyByOrder.set(entry.order_id, []);
         }
+        historyByOrder.get(entry.order_id)!.push({
+          old_status: entry.old_status,
+          new_status: entry.new_status,
+          changed_at: entry.changed_at
+        });
       });
 
-      console.log('[useDaysInPhase] Populados', phaseMap.size, 'pedidos');
-      console.log('[useDaysInPhase] Amostra:', Array.from(phaseMap.entries()).slice(0, 3).map(([id, e]) => `${id.slice(0, 8)}... = ${e.daysInPhase}d`));
+      // Calcular entrada na fase para cada pedido
+      const phaseMap = new Map<string, PhaseEntry>();
+      const today = new Date();
 
-      setPhaseData(phaseMap);
-      orderIds.forEach(id => {
-        if (!phaseMap.has(id)) {
-          phaseMap.set(id, {
-            orderId: id,
-            daysInPhase: 0,
-            phaseEnteredAt: null
-          });
+      orderIds.forEach(orderId => {
+        const orderInfo = orderInfoMap.get(orderId);
+        if (!orderInfo) {
+          // Pedido não encontrado
+          phaseMap.set(orderId, { orderId, daysInPhase: 0, phaseEnteredAt: null });
+          return;
         }
+
+        const currentPhase = getPhaseFromStatus(orderInfo.status, orderInfo.category);
+        const history = historyByOrder.get(orderId) || [];
+        
+        let phaseEnteredAt: Date | null = null;
+
+        // Procurar no histórico a ÚLTIMA mudança que ENTROU na fase atual
+        // (onde old_status tinha fase diferente e new_status tem a fase atual)
+        for (const entry of history) {
+          const newPhase = getPhaseFromStatus(entry.new_status, orderInfo.category);
+          const oldPhase = entry.old_status 
+            ? getPhaseFromStatus(entry.old_status, orderInfo.category) 
+            : null;
+
+          if (newPhase === currentPhase && oldPhase !== currentPhase) {
+            // Encontrou a entrada na fase atual
+            phaseEnteredAt = new Date(entry.changed_at);
+            break;
+          }
+        }
+
+        // Se não encontrou mudança de fase, verificar se há histórico na fase atual
+        if (!phaseEnteredAt && history.length > 0) {
+          // Pegar o registro mais ANTIGO que já está na fase atual
+          const historyInCurrentPhase = history
+            .filter(h => getPhaseFromStatus(h.new_status, orderInfo.category) === currentPhase)
+            .sort((a, b) => new Date(a.changed_at).getTime() - new Date(b.changed_at).getTime());
+          
+          if (historyInCurrentPhase.length > 0) {
+            phaseEnteredAt = new Date(historyInCurrentPhase[0].changed_at);
+          }
+        }
+
+        // Fallback final: usar created_at do pedido
+        if (!phaseEnteredAt && orderInfo.createdAt) {
+          phaseEnteredAt = new Date(orderInfo.createdAt);
+        }
+
+        // Calcular dias na fase
+        let daysInPhase = 0;
+        if (phaseEnteredAt) {
+          const diffMs = today.getTime() - phaseEnteredAt.getTime();
+          const diffDays = diffMs / (1000 * 60 * 60 * 24);
+          // Se for menos de 1 dia, mostrar 0. Caso contrário, arredondar para cima.
+          daysInPhase = diffDays < 1 ? 0 : Math.ceil(diffDays);
+        }
+
+        phaseMap.set(orderId, {
+          orderId,
+          daysInPhase: Math.max(0, daysInPhase),
+          phaseEnteredAt
+        });
       });
+
+      console.log('[useDaysInPhase] Calculados', phaseMap.size, 'pedidos');
+      
+      // Log de amostra para debug
+      const sample = Array.from(phaseMap.entries())
+        .slice(0, 5)
+        .map(([id, e]) => `${id.slice(0, 8)}...=${e.daysInPhase}d`);
+      console.log('[useDaysInPhase] Amostra:', sample.join(', '));
+
+      // Log de pedidos com mais dias
+      const topDays = Array.from(phaseMap.entries())
+        .sort((a, b) => b[1].daysInPhase - a[1].daysInPhase)
+        .slice(0, 3)
+        .map(([id, e]) => `${id.slice(0, 8)}...=${e.daysInPhase}d`);
+      console.log('[useDaysInPhase] Maiores:', topDays.join(', '));
 
       setPhaseData(phaseMap);
     } catch (error) {
-      console.error('Erro ao calcular dias na fase:', error);
+      console.error('[useDaysInPhase] Erro geral:', error);
     } finally {
       setLoading(false);
     }
-  }, [orderIdsKey]); // Dependência estável
+  }, [orderIdsKey]);
 
   useEffect(() => {
     fetchPhaseEntryDates();
