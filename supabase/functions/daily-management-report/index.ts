@@ -1676,9 +1676,16 @@ async function sendWhatsAppImage(supabaseClient: any, phone: string, base64Data:
       return false;
     }
 
+    // NOVO PADRÃO: 55 + DDD + 8 dígitos (SEM o 9)
     let phoneNumber = phone.replace(/\D/g, '');
     if (!phoneNumber.startsWith('55')) {
       phoneNumber = `55${phoneNumber}`;
+    }
+    // Remover o 9 se presente (formato antigo)
+    if (phoneNumber.length === 13 && phoneNumber.startsWith('55') && phoneNumber.charAt(4) === '9') {
+      const ddd = phoneNumber.substring(2, 4);
+      const numero = phoneNumber.substring(5);
+      phoneNumber = '55' + ddd + numero;
     }
 
     let megaApiUrl = (Deno.env.get('MEGA_API_URL') ?? '').trim();
