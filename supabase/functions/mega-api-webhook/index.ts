@@ -1503,13 +1503,20 @@ Deno.serve(async (req) => {
       
       // Detectar desconexão explícita (logout) - capturar mais cenários
       const closeReason = connectionData.closeReason || payload.closeReason || connectionMessage;
-      const isLogout = 
+      
+      // === CRITICAL FIX: Separate true manual logout from API disconnection ===
+      // "Number disconnected from api" is NOT a manual logout - it's usually session conflict or API instability
+      const isManualLogout = 
         connectionMessage === 'logout' ||
+        closeReason === 'logout';
+        
+      const isApiDisconnection = 
         connectionMessage === 'Number disconnected from api' ||
-        connectionData.connection === 'close' ||
-        closeReason === 'logout' ||
         closeReason === 'connectionClosed' ||
-        closeReason === 'timedOut';
+        closeReason === 'timedOut' ||
+        connectionData.connection === 'close';
+      
+      const isLogout = isManualLogout || isApiDisconnection;
       
       const isConnected = !isLogout && (
         connectionMessage === 'phone_connected' ||
@@ -1523,12 +1530,16 @@ Deno.serve(async (req) => {
         payload.phoneNumber || 
         null;
       
-      // Determinar causa provável da desconexão
+      // Determinar causa provável da desconexão - with corrected classification
       let disconnectCause = 'unknown';
       if (isLogout) {
-        if (closeReason === 'logout' || connectionMessage === 'logout') {
+        if (isManualLogout) {
+          // Only true manual logout from mobile app
           disconnectCause = 'manual_logout';
-        } else if (closeReason === 'connectionClosed' || connectionMessage === 'Number disconnected from api') {
+        } else if (connectionMessage === 'Number disconnected from api') {
+          // API disconnection - NOT manual logout (usually session conflict or API instability)
+          disconnectCause = 'api_disconnection';
+        } else if (closeReason === 'connectionClosed') {
           disconnectCause = 'session_conflict';
         } else if (closeReason === 'timedOut') {
           disconnectCause = 'timeout';
@@ -1548,16 +1559,19 @@ Deno.serve(async (req) => {
       
       // ⚠️ Log detalhado para desconexões
       if (isLogout) {
-        console.log('⚠️ LOGOUT DETECTED:', {
+        console.log('⚠️ DISCONNECTION DETECTED:', {
           closeReason: closeReason,
           message: connectionMessage,
           cause: disconnectCause,
+          isManualLogout: isManualLogout,
+          isApiDisconnection: isApiDisconnection,
           timestamp: new Date().toISOString(),
           possibleCauses: [
+            disconnectCause === 'api_disconnection' ? '🟠 Desconexão pela MEGA API (instabilidade ou reinício)' : null,
             disconnectCause === 'session_conflict' ? '🔴 WhatsApp Web aberto em outro navegador ou dispositivo' : null,
-            disconnectCause === 'manual_logout' ? '🔴 Desconexão manual pelo app do celular' : null,
-            disconnectCause === 'timeout' ? '🔴 Sessão expirada por inatividade' : null,
-            disconnectCause === 'connection_closed' ? '🔴 Conexão encerrada pelo servidor' : null,
+            disconnectCause === 'manual_logout' ? '🔴 Desconexão manual pelo app do celular (confirmado)' : null,
+            disconnectCause === 'timeout' ? '🟠 Sessão expirada por inatividade' : null,
+            disconnectCause === 'connection_closed' ? '🟠 Conexão encerrada pelo servidor' : null,
           ].filter(Boolean)
         });
       }
@@ -1585,7 +1599,8 @@ Deno.serve(async (req) => {
         eventDescription = `WhatsApp conectado${phoneFromJid ? ` - Número: ${phoneFromJid}` : ''}`;
       } else if (isLogout) {
         const causeLabels: Record<string, string> = {
-          'manual_logout': 'Deslogado pelo app do celular',
+          'manual_logout': 'Deslogado manualmente pelo app do celular',
+          'api_disconnection': 'Desconexão pela MEGA API (instabilidade ou conflito)',
           'session_conflict': 'Conflito de sessão (outra instância ou WhatsApp Web)',
           'timeout': 'Sessão expirada por inatividade',
           'connection_closed': 'Conexão encerrada pelo servidor',
