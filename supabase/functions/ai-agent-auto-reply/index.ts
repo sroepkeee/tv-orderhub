@@ -960,10 +960,16 @@ Use este contexto para:
     }
     baseUrl = baseUrl.replace(/\/+$/, '');
 
-    // Format phone number
+    // NOVO PADRÃO: 55 + DDD + 8 dígitos (SEM o 9)
     let formattedPhone = sender_phone.replace(/\D/g, '');
     if (!formattedPhone.startsWith('55') && formattedPhone.length <= 11) {
       formattedPhone = '55' + formattedPhone;
+    }
+    // Remover o 9 se presente (formato antigo)
+    if (formattedPhone.length === 13 && formattedPhone.startsWith('55') && formattedPhone.charAt(4) === '9') {
+      const ddd = formattedPhone.substring(2, 4);
+      const numero = formattedPhone.substring(5);
+      formattedPhone = '55' + ddd + numero;
     }
 
     const megaApiInstance = instance.instance_key;

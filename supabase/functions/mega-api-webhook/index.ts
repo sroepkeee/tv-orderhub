@@ -365,10 +365,16 @@ async function sendAutoReplyMessage(
     }
     normalizedUrl = normalizedUrl.replace(/\/+$/, '');
 
-    // Formatar número
+    // NOVO PADRÃO: 55 + DDD + 8 dígitos (SEM o 9)
     let formattedPhone = phoneNumber.replace(/\D/g, '');
     if (!formattedPhone.startsWith('55')) {
       formattedPhone = '55' + formattedPhone;
+    }
+    // Remover o 9 se presente (formato antigo)
+    if (formattedPhone.length === 13 && formattedPhone.startsWith('55') && formattedPhone.charAt(4) === '9') {
+      const ddd = formattedPhone.substring(2, 4);
+      const numero = formattedPhone.substring(5);
+      formattedPhone = '55' + ddd + numero;
     }
 
     // Mega API START usa /rest/sendMessage/{instance}/text

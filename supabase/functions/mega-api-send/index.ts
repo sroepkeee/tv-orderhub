@@ -13,6 +13,48 @@ interface SendMessageRequest {
   contactType?: string; // 'carrier' | 'customer' | 'technician' | 'supplier'
 }
 
+// NOVO PADRÃO: WhatsApp Brasil usa 55 + DDD (2) + 8 dígitos (SEM o 9)
+function normalizePhoneWithoutNine(phone: string): string {
+  if (!phone) return phone;
+  
+  let digits = phone.replace(/\D/g, '');
+  
+  // Se tem mais de 13 dígitos, truncar
+  if (digits.length > 13) {
+    digits = digits.slice(-13);
+  }
+  
+  // Adicionar 55 se não tem
+  if (!digits.startsWith('55')) {
+    digits = '55' + digits;
+  }
+  
+  // Se tem 13 dígitos (55 + DDD + 9 + 8), REMOVER o 9
+  if (digits.length === 13 && digits.startsWith('55') && digits.charAt(4) === '9') {
+    const ddd = digits.substring(2, 4);
+    const numero = digits.substring(5); // Pegar os 8 dígitos após o 9
+    digits = '55' + ddd + numero;
+  }
+  
+  return digits;
+}
+
+// Gerar variantes para retry (com e sem o 9)
+function getPhoneVariants(phone: string): string[] {
+  const normalized = normalizePhoneWithoutNine(phone);
+  const variants = [normalized]; // Primeiro tenta SEM o 9
+  
+  // Se tem 12 dígitos (55 + DD + 8), gerar versão COM 9 como fallback
+  if (normalized.length === 12 && normalized.startsWith('55')) {
+    const ddd = normalized.substring(2, 4);
+    const numero = normalized.substring(4);
+    const withNine = '55' + ddd + '9' + numero;
+    variants.push(withNine);
+  }
+  
+  return variants;
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -68,14 +110,8 @@ Deno.serve(async (req) => {
     if (carrierError || !carrier || !carrier.whatsapp) {
       throw new Error('Carrier not found or WhatsApp not configured');
     }
-
-    // Formatar número de telefone (remover caracteres especiais e adicionar código do país)
-    let phoneNumber = carrier.whatsapp.replace(/\D/g, '');
-    
-    // Garantir código do país 55 (Brasil)
-    if (!phoneNumber.startsWith('55')) {
-      phoneNumber = `55${phoneNumber}`;
-    }
+    // Formatar número de telefone (NOVO PADRÃO: 55 + DDD + 8 dígitos, SEM o 9)
+    let phoneNumber = normalizePhoneWithoutNine(carrier.whatsapp);
 
     // Buscar informações do pedido para contexto (opcional)
     let order = null;
