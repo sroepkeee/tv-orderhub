@@ -1040,6 +1040,7 @@ export type Database = {
           notes: string | null
           organization_id: string | null
           phone: string | null
+          phone_format: string | null
           quote_email: string | null
           service_states: string[] | null
           updated_at: string | null
@@ -1060,6 +1061,7 @@ export type Database = {
           notes?: string | null
           organization_id?: string | null
           phone?: string | null
+          phone_format?: string | null
           quote_email?: string | null
           service_states?: string[] | null
           updated_at?: string | null
@@ -1080,6 +1082,7 @@ export type Database = {
           notes?: string | null
           organization_id?: string | null
           phone?: string | null
+          phone_format?: string | null
           quote_email?: string | null
           service_states?: string[] | null
           updated_at?: string | null
@@ -1326,6 +1329,7 @@ export type Database = {
           orders_count: number | null
           organization_id: string | null
           phone: string | null
+          phone_format: string | null
           preferred_channel: string | null
           source: string | null
           state: string | null
@@ -1350,6 +1354,7 @@ export type Database = {
           orders_count?: number | null
           organization_id?: string | null
           phone?: string | null
+          phone_format?: string | null
           preferred_channel?: string | null
           source?: string | null
           state?: string | null
@@ -1374,6 +1379,7 @@ export type Database = {
           orders_count?: number | null
           organization_id?: string | null
           phone?: string | null
+          phone_format?: string | null
           preferred_channel?: string | null
           source?: string | null
           state?: string | null
