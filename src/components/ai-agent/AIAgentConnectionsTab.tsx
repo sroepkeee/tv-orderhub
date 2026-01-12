@@ -627,19 +627,58 @@ export function AIAgentConnectionsTab() {
                 </div>
               )}
 
-              {/* Instability Alert */}
-              {disconnectCount24h > 3 && (
-                <div className="p-4 bg-red-50 dark:bg-red-950/30 rounded-lg border border-red-300 dark:border-red-800">
-                  <div className="flex items-center gap-3">
-                    <AlertTriangle className="h-5 w-5 text-red-600" />
-                    <div>
-                      <p className="font-medium text-red-800 dark:text-red-400">
-                        Instabilidade Detectada
-                      </p>
-                      <p className="text-sm text-red-700 dark:text-red-500">
-                        {disconnectCount24h} desconexões nas últimas 24 horas. 
-                        Verifique se não há conflito de sessões.
-                      </p>
+              {/* Instability Alert - Show if ANY disconnections occurred */}
+              {disconnectCount24h > 0 && (
+                <div className={`p-4 rounded-lg border ${
+                  disconnectCount24h > 3 
+                    ? 'bg-red-50 dark:bg-red-950/30 border-red-300 dark:border-red-800'
+                    : 'bg-amber-50 dark:bg-amber-950/30 border-amber-300 dark:border-amber-800'
+                }`}>
+                  <div className="space-y-3">
+                    <div className="flex items-start gap-3">
+                      <AlertTriangle className={`h-5 w-5 flex-shrink-0 ${
+                        disconnectCount24h > 3 ? 'text-red-600' : 'text-amber-600'
+                      }`} />
+                      <div className="flex-1">
+                        <p className={`font-medium ${
+                          disconnectCount24h > 3 
+                            ? 'text-red-800 dark:text-red-400'
+                            : 'text-amber-800 dark:text-amber-400'
+                        }`}>
+                          {disconnectCount24h > 3 ? 'Problema de Estabilidade Crítico' : 'Atenção: Desconexões Recentes'}
+                        </p>
+                        <p className={`text-sm mt-1 ${
+                          disconnectCount24h > 3 
+                            ? 'text-red-700 dark:text-red-500'
+                            : 'text-amber-700 dark:text-amber-500'
+                        }`}>
+                          <strong>{disconnectCount24h}</strong> desconexão(ões) nas últimas 24 horas.
+                          A MEGA API está desconectando automaticamente.
+                        </p>
+                      </div>
+                    </div>
+                    
+                    <div className="pl-8 space-y-3">
+                      <div className="p-3 bg-white dark:bg-background rounded-md border border-current/20">
+                        <p className="font-medium text-sm mb-2">⚠️ Possíveis causas:</p>
+                        <ul className="list-disc list-inside text-xs space-y-1 text-muted-foreground">
+                          <li>WhatsApp Web aberto em outro navegador/dispositivo</li>
+                          <li>Múltiplas instâncias na MEGA API usando o mesmo número</li>
+                          <li>Configuração de auto-logout na MEGA API</li>
+                          <li>Limite de mensagens ou rate limit excedido</li>
+                        </ul>
+                      </div>
+                      
+                      <div className="p-3 bg-white dark:bg-background rounded-md border border-current/20">
+                        <p className="font-medium text-sm mb-2">✅ Ações recomendadas:</p>
+                        <ol className="list-decimal list-inside text-xs space-y-1 text-muted-foreground">
+                          <li>Feche TODOS os WhatsApp Web em outros navegadores</li>
+                          <li>Acesse o painel da MEGA API e verifique instâncias duplicadas</li>
+                          <li>No celular: WhatsApp → Dispositivos Conectados → Remova antigos</li>
+                          <li>Reconecte escaneando o QR Code abaixo</li>
+                          <li><strong>Aguarde 1 minuto</strong> antes de enviar mensagens</li>
+                        </ol>
+                      </div>
                     </div>
                   </div>
                 </div>
