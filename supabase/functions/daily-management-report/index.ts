@@ -1329,14 +1329,40 @@ Requirements:
 // ==================== WHATSAPP ====================
 async function sendWhatsAppMessage(supabaseClient: any, phone: string, message: string): Promise<boolean> {
   try {
-    const { data: activeInstance, error: instanceError } = await supabaseClient
+    // Log all instances for debugging
+    const { data: allInstances } = await supabaseClient
       .from('whatsapp_instances')
-      .select('instance_key')
+      .select('instance_key, status, is_active, connected_at')
+      .order('created_at', { ascending: false })
+      .limit(5);
+    
+    console.log('📱 WhatsApp instances status:', JSON.stringify(allInstances || []));
+
+    // Priority 1: Try to find a connected instance
+    let { data: activeInstance } = await supabaseClient
+      .from('whatsapp_instances')
+      .select('instance_key, status')
       .eq('status', 'connected')
       .maybeSingle();
 
-    if (instanceError || !activeInstance) {
-      console.error('❌ No connected WhatsApp instance found');
+    // Priority 2: Fallback to any active instance
+    if (!activeInstance) {
+      console.log('⚠️ No connected instance, trying active fallback...');
+      const { data: fallbackInstance } = await supabaseClient
+        .from('whatsapp_instances')
+        .select('instance_key, status')
+        .eq('is_active', true)
+        .order('connected_at', { ascending: false, nullsFirst: false })
+        .maybeSingle();
+      
+      if (fallbackInstance) {
+        console.log(`⚠️ Using fallback instance: ${fallbackInstance.instance_key} (status: ${fallbackInstance.status})`);
+        activeInstance = fallbackInstance;
+      }
+    }
+
+    if (!activeInstance) {
+      console.error('❌ No active WhatsApp instance found (neither connected nor active)');
       return false;
     }
 
@@ -1390,6 +1416,16 @@ async function sendWhatsAppMessage(supabaseClient: any, phone: string, message: 
       
       if (response.ok) {
         console.log('✅ WhatsApp message sent to:', phoneNumber);
+        
+        // Update instance status to connected if it wasn't
+        if (activeInstance.status !== 'connected') {
+          await supabaseClient
+            .from('whatsapp_instances')
+            .update({ status: 'connected', connected_at: new Date().toISOString() })
+            .eq('instance_key', activeInstance.instance_key);
+          console.log('✅ Instance status updated to connected');
+        }
+        
         return true;
       }
 
@@ -1413,14 +1449,25 @@ async function sendWhatsAppMessage(supabaseClient: any, phone: string, message: 
 
 async function sendWhatsAppImage(supabaseClient: any, phone: string, base64Data: string, caption: string): Promise<boolean> {
   try {
-    const { data: activeInstance } = await supabaseClient
+    // Priority 1: Try connected instance
+    let { data: activeInstance } = await supabaseClient
       .from('whatsapp_instances')
-      .select('instance_key')
+      .select('instance_key, status')
       .eq('status', 'connected')
       .maybeSingle();
 
+    // Priority 2: Fallback to active instance
     if (!activeInstance) {
-      console.error('❌ No connected WhatsApp instance for image send');
+      const { data: fallbackInstance } = await supabaseClient
+        .from('whatsapp_instances')
+        .select('instance_key, status')
+        .eq('is_active', true)
+        .maybeSingle();
+      activeInstance = fallbackInstance;
+    }
+
+    if (!activeInstance) {
+      console.error('❌ No active WhatsApp instance for image send');
       return false;
     }
 
