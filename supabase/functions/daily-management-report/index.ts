@@ -1652,6 +1652,48 @@ async function checkMegaAPIConnectionStatus(instanceKey: string): Promise<{
   }
 }
 
+// ==================== CONSTANTES DE ESTABILIDADE ====================
+const DELAY_BETWEEN_SENDS_MS = 3000; // 3 segundos entre envios para evitar anti-spam
+const MIN_CONNECTION_AGE_MS = 60000; // Aguardar 1 minuto após conexão para estabilizar
+
+// Helper para delay
+const delayMs = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+// ==================== VERIFICAR CONEXÃO ANTES DE ENVIAR ====================
+async function verifyConnectionBeforeSend(supabaseClient: any): Promise<{ connected: boolean; instanceKey: string | null; shouldWait: boolean }> {
+  try {
+    const { data: instance } = await supabaseClient
+      .from('whatsapp_instances')
+      .select('instance_key, status, connected_at, is_active')
+      .eq('status', 'connected')
+      .eq('is_active', true)
+      .maybeSingle();
+
+    if (!instance) {
+      console.log('❌ Nenhuma instância WhatsApp conectada encontrada');
+      return { connected: false, instanceKey: null, shouldWait: false };
+    }
+
+    // Verificar se a conexão é muito recente (pode estar instável)
+    if (instance.connected_at) {
+      const connectedAt = new Date(instance.connected_at);
+      const timeSinceConnection = Date.now() - connectedAt.getTime();
+      
+      if (timeSinceConnection < MIN_CONNECTION_AGE_MS) {
+        const waitTime = MIN_CONNECTION_AGE_MS - timeSinceConnection;
+        console.log(`⏳ Conexão muito recente (${Math.round(timeSinceConnection/1000)}s). Aguardando ${Math.round(waitTime/1000)}s para estabilização...`);
+        return { connected: true, instanceKey: instance.instance_key, shouldWait: true };
+      }
+    }
+
+    console.log(`✅ Instância WhatsApp conectada e estável: ${instance.instance_key}`);
+    return { connected: true, instanceKey: instance.instance_key, shouldWait: false };
+  } catch (error) {
+    console.error('Erro ao verificar conexão WhatsApp:', error);
+    return { connected: false, instanceKey: null, shouldWait: false };
+  }
+}
+
 async function sendWhatsAppMessage(supabaseClient: any, phone: string, message: string): Promise<boolean> {
   const MAX_RETRIES = 2;
   const RETRY_DELAY_MS = 3000;
@@ -1804,75 +1846,56 @@ async function attemptSendWhatsAppMessage(
       }
     };
 
-    const authFormats: Record<string, string>[] = [
-      { 'apikey': megaApiToken },
-      { 'Authorization': `Bearer ${megaApiToken}` },
-      { 'Apikey': megaApiToken },
-    ];
+    // Usar apenas o formato de autenticação que funciona (apikey) - evita requisições extras
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'apikey': megaApiToken,
+    };
 
-    let lastStatus = 0;
-    let lastError = '';
+    const response = await fetch(fullUrl, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(body),
+    });
 
-    for (const authHeader of authFormats) {
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-        ...authHeader,
-      };
-
-      const response = await fetch(fullUrl, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(body),
-      });
-
-      lastStatus = response.status;
-      const responseText = await response.text();
+    const responseText = await response.text();
+    
+    console.log(`📬 [Attempt ${attemptNumber}] MEGA API RESPONSE:`, {
+      timestamp: new Date().toISOString(),
+      status: response.status,
+      body: responseText.substring(0, 300)
+    });
+    
+    if (response.ok) {
+      console.log('✅ WhatsApp message sent to:', phoneNumber);
       
-      console.log(`📬 [Attempt ${attemptNumber}] MEGA API RESPONSE:`, {
-        timestamp: new Date().toISOString(),
-        status: response.status,
-        authMethod: Object.keys(authHeader)[0],
-        body: responseText.substring(0, 300)
-      });
-      
-      if (response.ok) {
-        console.log('✅ WhatsApp message sent to:', phoneNumber);
-        
-        // Update instance status to connected if it wasn't
-        if (activeInstance.status !== 'connected') {
-          await supabaseClient
-            .from('whatsapp_instances')
-            .update({ status: 'connected', connected_at: new Date().toISOString() })
-            .eq('instance_key', activeInstance.instance_key);
-          console.log('✅ Instance status updated to connected');
-        }
-        
-        return { success: true, wasConnected: true };
-      }
-
-      lastError = responseText;
-
-      // Check if error indicates disconnection
-      const lowerError = responseText.toLowerCase();
-      if (lowerError.includes('disconnected') || lowerError.includes('not connected') || lowerError.includes('waiting_scan')) {
-        console.error(`❌ MEGA API indicates disconnection during send: ${responseText}`);
-        
-        // Update DB status
+      // Update instance status to connected if it wasn't
+      if (activeInstance.status !== 'connected') {
         await supabaseClient
           .from('whatsapp_instances')
-          .update({ status: 'waiting_scan', updated_at: new Date().toISOString() })
+          .update({ status: 'connected', connected_at: new Date().toISOString() })
           .eq('instance_key', activeInstance.instance_key);
-        
-        return { success: false, wasConnected: false };
+        console.log('✅ Instance status updated to connected');
       }
-
-      if (response.status !== 401 && response.status !== 403) {
-        console.error(`❌ Mega API error: ${response.status} - ${responseText}`);
-        return { success: false, wasConnected: true };
-      }
+      
+      return { success: true, wasConnected: true };
     }
 
-    console.error(`❌ All auth methods failed for WhatsApp send. Last status: ${lastStatus}, Last error: ${lastError.substring(0, 200)}`);
+    // Check if error indicates disconnection
+    const lowerError = responseText.toLowerCase();
+    if (lowerError.includes('disconnected') || lowerError.includes('not connected') || lowerError.includes('waiting_scan')) {
+      console.error(`❌ MEGA API indicates disconnection during send: ${responseText}`);
+      
+      // Update DB status
+      await supabaseClient
+        .from('whatsapp_instances')
+        .update({ status: 'waiting_scan', updated_at: new Date().toISOString() })
+        .eq('instance_key', activeInstance.instance_key);
+      
+      return { success: false, wasConnected: false };
+    }
+
+    console.error(`❌ Mega API error: ${response.status} - ${responseText}`);
     return { success: false, wasConnected: true };
   } catch (error) {
     console.error('❌ Error sending WhatsApp message:', error);
@@ -1934,36 +1957,25 @@ async function sendWhatsAppImage(supabaseClient: any, phone: string, base64Data:
       }
     };
 
-    const authFormats: Record<string, string>[] = [
-      { 'apikey': megaApiToken },
-      { 'Authorization': `Bearer ${megaApiToken}` },
-    ];
+    // Usar apenas o formato de autenticação que funciona
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'apikey': megaApiToken,
+    };
 
-    for (const authHeader of authFormats) {
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-        ...authHeader,
-      };
+    const response = await fetch(fullUrl, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(body),
+    });
 
-      const response = await fetch(fullUrl, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(body),
-      });
-
-      if (response.ok) {
-        console.log('✅ WhatsApp image sent to:', phoneNumber);
-        return true;
-      }
-
-      if (response.status !== 401 && response.status !== 403) {
-        const errorText = await response.text();
-        console.error(`❌ Mega API image error: ${response.status} - ${errorText}`);
-        return false;
-      }
+    if (response.ok) {
+      console.log('✅ WhatsApp image sent to:', phoneNumber);
+      return true;
     }
 
-    console.error('❌ All auth methods failed for image send');
+    const errorText = await response.text();
+    console.error(`❌ Mega API image error: ${response.status} - ${errorText}`);
     return false;
   } catch (error) {
     console.error('❌ Error sending WhatsApp image:', error);
@@ -2293,12 +2305,35 @@ serve(async (req) => {
       }
     }
 
+    // ========== VERIFICAR CONEXÃO ANTES DE ENVIAR ==========
+    const connectionCheck = await verifyConnectionBeforeSend(supabaseClient);
+    
+    if (!connectionCheck.connected) {
+      console.error('❌ WhatsApp não conectado. Abortando envio de relatórios.');
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: 'WhatsApp não conectado. Escaneie o QR Code primeiro.',
+          sentCount: 0 
+        }),
+        { status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Se conexão recente, aguardar estabilização
+    if (connectionCheck.shouldWait) {
+      console.log('⏳ Aguardando 30 segundos para estabilização da conexão...');
+      await delayMs(30000);
+    }
+
     // ========== ENVIAR PARA DESTINATÁRIOS GERAIS ==========
     let sentCount = 0;
     let errorCount = 0;
     let emailSentCount = 0;
 
-    for (const recipient of recipients) {
+    for (let i = 0; i < recipients.length; i++) {
+      const recipient = recipients[i];
+      
       try {
         // Enviar via WhatsApp
         if (recipient.whatsapp) {
@@ -2306,6 +2341,9 @@ serve(async (req) => {
           
           let chartsSent = 0;
           if (messageSent) {
+            // Pequeno delay entre mensagem e imagens
+            await delayMs(1000);
+            
             // Enviar visual do Kanban primeiro
             if (kanbanVisual) {
               const sent = await sendWhatsAppImage(
@@ -2315,6 +2353,7 @@ serve(async (req) => {
                 '📊 Status do Kanban'
               );
               if (sent) chartsSent++;
+              await delayMs(1000);
             }
 
             if (distributionChart) {
@@ -2325,6 +2364,7 @@ serve(async (req) => {
                 '📊 Distribuição por Fase'
               );
               if (sent) chartsSent++;
+              await delayMs(1000);
             }
             
             if (trendChart) {
@@ -2335,6 +2375,7 @@ serve(async (req) => {
                 '📈 Tendência Semanal'
               );
               if (sent) chartsSent++;
+              await delayMs(1000);
             }
             
             if (slaGauge) {
@@ -2391,6 +2432,13 @@ serve(async (req) => {
             console.log(`✅ Email sent to ${recipient.full_name} (${recipient.email})`);
           }
         }
+        
+        // DELAY ENTRE DESTINATÁRIOS para evitar anti-spam (exceto no último)
+        if (i < recipients.length - 1 && recipient.whatsapp) {
+          console.log(`⏳ Aguardando ${DELAY_BETWEEN_SENDS_MS}ms antes do próximo destinatário...`);
+          await delayMs(DELAY_BETWEEN_SENDS_MS);
+        }
+        
       } catch (error) {
         console.error(`Error sending to ${recipient.full_name}:`, error);
         errorCount++;
@@ -2403,7 +2451,11 @@ serve(async (req) => {
     if (sendPhaseReports && phaseManagers.length > 0) {
       console.log('📤 Sending phase-specific reports...');
       
-      for (const manager of phaseManagers) {
+      // Delay inicial entre relatórios gerais e de fase
+      await delayMs(2000);
+      
+      for (let j = 0; j < phaseManagers.length; j++) {
+        const manager = phaseManagers[j];
         try {
           // Converter phase_key do banco para chave interna
           const internalPhaseKey = phaseKeyDbToInternal[manager.phase_key] || manager.phase_key;
@@ -2423,6 +2475,11 @@ serve(async (req) => {
             if (sent) {
               phaseReportsSent++;
               console.log(`✅ Phase report sent to ${manager.full_name} (${phaseName})`);
+            }
+            
+            // Delay entre envios de fase
+            if (j < phaseManagers.length - 1) {
+              await delayMs(DELAY_BETWEEN_SENDS_MS);
             }
           }
 
