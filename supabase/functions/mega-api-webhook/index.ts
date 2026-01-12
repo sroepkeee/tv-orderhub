@@ -1501,11 +1501,19 @@ Deno.serve(async (req) => {
       const connectionData = payload.data || {};
       const connectionMessage = payload.message || connectionData.message;
       
-      const isConnected = 
+      // Detectar desconexão explícita (logout)
+      const isLogout = 
+        connectionMessage === 'logout' ||
+        connectionData.connection === 'close' ||
+        connectionData.closeReason === 'logout' ||
+        payload.closeReason === 'logout';
+      
+      const isConnected = !isLogout && (
         connectionMessage === 'phone_connected' ||
         connectionData.state === 'open' ||
         connectionData.connection === 'open' ||
-        payload.status === 'connected';
+        payload.status === 'connected'
+      );
       
       const phoneFromJid = payload.jid?.replace('@s.whatsapp.net', '').replace('@lid', '') || 
         connectionData.phoneNumber || 
@@ -1514,15 +1522,18 @@ Deno.serve(async (req) => {
       
       console.log('Connection details:', {
         isConnected,
+        isLogout,
         phoneNumber: phoneFromJid,
+        closeReason: connectionData.closeReason || payload.closeReason,
       });
       
+      // Atualizar status da instância
       await supabase
         .from('whatsapp_instances')
         .upsert({
           instance_key: instanceKey,
-          status: isConnected ? 'connected' : 'disconnected',
-          phone_number: phoneFromJid,
+          status: isConnected ? 'connected' : (isLogout ? 'disconnected' : 'waiting_scan'),
+          phone_number: isConnected ? phoneFromJid : null,
           connected_at: isConnected ? new Date().toISOString() : null,
           qrcode: isConnected ? null : undefined,
           updated_at: new Date().toISOString(),
@@ -1530,8 +1541,34 @@ Deno.serve(async (req) => {
       
       console.log('Instance status updated successfully');
       
+      // 📊 Logar evento de conexão na tabela ai_notification_log para histórico
+      const connectionEventStatus = isConnected ? 'connected' : (isLogout ? 'disconnected' : 'waiting_scan');
+      const eventDescription = isConnected 
+        ? `WhatsApp conectado${phoneFromJid ? ` - Número: ${phoneFromJid}` : ''}`
+        : (isLogout 
+            ? `WhatsApp desconectado - Motivo: ${connectionData.closeReason || payload.closeReason || 'logout'}`
+            : 'WhatsApp aguardando QR Code');
+      
+      await supabase.from('ai_notification_log').insert({
+        channel: 'whatsapp_connection',
+        recipient: 'system',
+        status: connectionEventStatus,
+        message_content: eventDescription,
+        metadata: { 
+          event: 'connection.update',
+          instance_key: instanceKey,
+          phone_number: phoneFromJid,
+          connection_state: connectionData.state || connectionData.connection,
+          close_reason: connectionData.closeReason || payload.closeReason,
+          is_logout: isLogout,
+          timestamp: new Date().toISOString()
+        }
+      });
+      
+      console.log('✅ Connection event logged to ai_notification_log');
+      
       return new Response(
-        JSON.stringify({ success: true, event: 'connection.update', isConnected }),
+        JSON.stringify({ success: true, event: 'connection.update', isConnected, isLogout }),
         {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 200,
