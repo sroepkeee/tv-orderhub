@@ -231,10 +231,11 @@ export function AIAgentConnectionsTab() {
 
   const loadInstanceDiagnostic = async () => {
     try {
-      // Buscar todas as instâncias do banco
+      // Buscar apenas instâncias ATIVAS do banco
       const { data: instances, error } = await supabase
         .from('whatsapp_instances')
         .select('*')
+        .eq('is_active', true)
         .order('updated_at', { ascending: false });
 
       if (error) {
