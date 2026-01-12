@@ -92,6 +92,13 @@ interface EventLog {
   metadata: Record<string, any> | null;
 }
 
+interface LastDisconnect {
+  reason: string;
+  cause: string;
+  timestamp: string;
+  troubleshooting: string[] | null;
+}
+
 export function AIAgentConnectionsTab() {
   const [credentials, setCredentials] = useState<MegaAPICredentials>({
     url: '',
@@ -122,6 +129,10 @@ export function AIAgentConnectionsTab() {
   const [eventLogs, setEventLogs] = useState<EventLog[]>([]);
   const [loadingLogs, setLoadingLogs] = useState(false);
   const [logFilter, setLogFilter] = useState<'all' | 'success' | 'error' | 'connection'>('all');
+  
+  // Last disconnect info
+  const [lastDisconnect, setLastDisconnect] = useState<LastDisconnect | null>(null);
+  const [disconnectCount24h, setDisconnectCount24h] = useState(0);
   
   const {
     connected: whatsappConnected,
@@ -171,11 +182,52 @@ export function AIAgentConnectionsTab() {
     }
   }, [logFilter]);
 
+  // Load last disconnect info
+  const loadLastDisconnect = useCallback(async () => {
+    try {
+      // Get last disconnect event
+      const { data: lastEvent } = await supabase
+        .from('ai_notification_log')
+        .select('*')
+        .eq('channel', 'whatsapp_connection')
+        .eq('status', 'disconnected')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (lastEvent) {
+        const metadata = lastEvent.metadata as Record<string, any> | null;
+        setLastDisconnect({
+          reason: lastEvent.message_content,
+          cause: metadata?.disconnect_cause || 'unknown',
+          timestamp: lastEvent.created_at,
+          troubleshooting: metadata?.troubleshooting || null
+        });
+      }
+
+      // Count disconnects in last 24h
+      const yesterday = new Date();
+      yesterday.setHours(yesterday.getHours() - 24);
+
+      const { count } = await supabase
+        .from('ai_notification_log')
+        .select('*', { count: 'exact', head: true })
+        .eq('channel', 'whatsapp_connection')
+        .eq('status', 'disconnected')
+        .gte('created_at', yesterday.toISOString());
+
+      setDisconnectCount24h(count || 0);
+    } catch (error) {
+      console.error('Error loading last disconnect:', error);
+    }
+  }, []);
+
   // Carregar instância do banco e diagnóstico
   useEffect(() => {
     loadInstanceDiagnostic();
     loadEventLogs();
-  }, [loadEventLogs]);
+    loadLastDisconnect();
+  }, [loadEventLogs, loadLastDisconnect]);
 
   const loadInstanceDiagnostic = async () => {
     try {
@@ -526,21 +578,72 @@ export function AIAgentConnectionsTab() {
               </div>
             </div>
           ) : (
-            <div className="text-center py-6 space-y-4">
-              <div className="w-16 h-16 mx-auto bg-muted rounded-full flex items-center justify-center">
-                <QrCode className="h-8 w-8 text-muted-foreground" />
-              </div>
-              <div>
-                <p className="font-medium">WhatsApp não conectado</p>
-                <p className="text-sm text-muted-foreground">
-                  Escaneie o QR Code para conectar sua conta
-                </p>
-                {!diagnostic.dbInstance && (
-                  <p className="text-xs text-amber-600 mt-2">
-                    Configure as credenciais primeiro
+            <div className="space-y-4">
+              <div className="text-center py-6 space-y-4">
+                <div className="w-16 h-16 mx-auto bg-muted rounded-full flex items-center justify-center">
+                  <QrCode className="h-8 w-8 text-muted-foreground" />
+                </div>
+                <div>
+                  <p className="font-medium">WhatsApp não conectado</p>
+                  <p className="text-sm text-muted-foreground">
+                    Escaneie o QR Code para conectar sua conta
                   </p>
-                )}
+                  {!diagnostic.dbInstance && (
+                    <p className="text-xs text-amber-600 mt-2">
+                      Configure as credenciais primeiro
+                    </p>
+                  )}
+                </div>
               </div>
+
+              {/* Last Disconnect Alert */}
+              {lastDisconnect && (
+                <div className="p-4 bg-amber-50 dark:bg-amber-950/30 rounded-lg border border-amber-300 dark:border-amber-800">
+                  <div className="flex items-start gap-3">
+                    <AlertTriangle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                    <div className="flex-1">
+                      <p className="font-medium text-amber-800 dark:text-amber-400">
+                        Última Desconexão
+                      </p>
+                      <p className="text-sm text-amber-700 dark:text-amber-500 mt-1">
+                        {lastDisconnect.reason}
+                      </p>
+                      <p className="text-xs text-amber-600 dark:text-amber-600 mt-1">
+                        {format(new Date(lastDisconnect.timestamp), "dd/MM 'às' HH:mm", { locale: ptBR })}
+                      </p>
+                      
+                      {lastDisconnect.troubleshooting && lastDisconnect.troubleshooting.length > 0 && (
+                        <ul className="mt-3 space-y-1 text-xs text-amber-700 dark:text-amber-500">
+                          {lastDisconnect.troubleshooting.map((tip, idx) => (
+                            <li key={idx} className="flex items-start gap-2">
+                              <span className="text-amber-500">•</span>
+                              {tip}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Instability Alert */}
+              {disconnectCount24h > 3 && (
+                <div className="p-4 bg-red-50 dark:bg-red-950/30 rounded-lg border border-red-300 dark:border-red-800">
+                  <div className="flex items-center gap-3">
+                    <AlertTriangle className="h-5 w-5 text-red-600" />
+                    <div>
+                      <p className="font-medium text-red-800 dark:text-red-400">
+                        Instabilidade Detectada
+                      </p>
+                      <p className="text-sm text-red-700 dark:text-red-500">
+                        {disconnectCount24h} desconexões nas últimas 24 horas. 
+                        Verifique se não há conflito de sessões.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -853,6 +956,16 @@ export function AIAgentConnectionsTab() {
                           <div className="text-destructive text-xs mt-1 truncate" title={log.error_message}>
                             ⚠️ {log.error_message.slice(0, 40)}...
                           </div>
+                        )}
+                        {/* Show disconnect cause for connection events */}
+                        {log.channel === 'whatsapp_connection' && log.metadata?.disconnect_cause && (
+                          <Badge variant="outline" className="mt-1 text-xs border-amber-500 text-amber-600">
+                            {log.metadata.disconnect_cause === 'session_conflict' && '🔄 Conflito de sessão'}
+                            {log.metadata.disconnect_cause === 'manual_logout' && '👆 Logout manual'}
+                            {log.metadata.disconnect_cause === 'timeout' && '⏱️ Timeout'}
+                            {log.metadata.disconnect_cause === 'connection_closed' && '🔌 Conexão fechada'}
+                            {!['session_conflict', 'manual_logout', 'timeout', 'connection_closed'].includes(log.metadata.disconnect_cause) && log.metadata.disconnect_cause}
+                          </Badge>
                         )}
                       </TableCell>
                     </TableRow>
