@@ -1501,12 +1501,15 @@ Deno.serve(async (req) => {
       const connectionData = payload.data || {};
       const connectionMessage = payload.message || connectionData.message;
       
-      // Detectar desconexão explícita (logout)
+      // Detectar desconexão explícita (logout) - capturar mais cenários
+      const closeReason = connectionData.closeReason || payload.closeReason || connectionMessage;
       const isLogout = 
         connectionMessage === 'logout' ||
+        connectionMessage === 'Number disconnected from api' ||
         connectionData.connection === 'close' ||
-        connectionData.closeReason === 'logout' ||
-        payload.closeReason === 'logout';
+        closeReason === 'logout' ||
+        closeReason === 'connectionClosed' ||
+        closeReason === 'timedOut';
       
       const isConnected = !isLogout && (
         connectionMessage === 'phone_connected' ||
@@ -1520,12 +1523,44 @@ Deno.serve(async (req) => {
         payload.phoneNumber || 
         null;
       
-      console.log('Connection details:', {
+      // Determinar causa provável da desconexão
+      let disconnectCause = 'unknown';
+      if (isLogout) {
+        if (closeReason === 'logout' || connectionMessage === 'logout') {
+          disconnectCause = 'manual_logout';
+        } else if (closeReason === 'connectionClosed' || connectionMessage === 'Number disconnected from api') {
+          disconnectCause = 'session_conflict';
+        } else if (closeReason === 'timedOut') {
+          disconnectCause = 'timeout';
+        } else if (connectionData.connection === 'close') {
+          disconnectCause = 'connection_closed';
+        }
+      }
+      
+      console.log('📱 Connection details:', {
         isConnected,
         isLogout,
         phoneNumber: phoneFromJid,
-        closeReason: connectionData.closeReason || payload.closeReason,
+        closeReason: closeReason,
+        disconnectCause: disconnectCause,
+        rawMessage: connectionMessage,
       });
+      
+      // ⚠️ Log detalhado para desconexões
+      if (isLogout) {
+        console.log('⚠️ LOGOUT DETECTED:', {
+          closeReason: closeReason,
+          message: connectionMessage,
+          cause: disconnectCause,
+          timestamp: new Date().toISOString(),
+          possibleCauses: [
+            disconnectCause === 'session_conflict' ? '🔴 WhatsApp Web aberto em outro navegador ou dispositivo' : null,
+            disconnectCause === 'manual_logout' ? '🔴 Desconexão manual pelo app do celular' : null,
+            disconnectCause === 'timeout' ? '🔴 Sessão expirada por inatividade' : null,
+            disconnectCause === 'connection_closed' ? '🔴 Conexão encerrada pelo servidor' : null,
+          ].filter(Boolean)
+        });
+      }
       
       // Atualizar status da instância
       await supabase
@@ -1543,32 +1578,59 @@ Deno.serve(async (req) => {
       
       // 📊 Logar evento de conexão na tabela ai_notification_log para histórico
       const connectionEventStatus = isConnected ? 'connected' : (isLogout ? 'disconnected' : 'waiting_scan');
-      const eventDescription = isConnected 
-        ? `WhatsApp conectado${phoneFromJid ? ` - Número: ${phoneFromJid}` : ''}`
-        : (isLogout 
-            ? `WhatsApp desconectado - Motivo: ${connectionData.closeReason || payload.closeReason || 'logout'}`
-            : 'WhatsApp aguardando QR Code');
+      
+      // Mensagem mais descritiva baseada na causa
+      let eventDescription = '';
+      if (isConnected) {
+        eventDescription = `WhatsApp conectado${phoneFromJid ? ` - Número: ${phoneFromJid}` : ''}`;
+      } else if (isLogout) {
+        const causeLabels: Record<string, string> = {
+          'manual_logout': 'Deslogado pelo app do celular',
+          'session_conflict': 'Conflito de sessão (outra instância ou WhatsApp Web)',
+          'timeout': 'Sessão expirada por inatividade',
+          'connection_closed': 'Conexão encerrada pelo servidor',
+          'unknown': closeReason || 'Motivo desconhecido'
+        };
+        eventDescription = `WhatsApp desconectado - ${causeLabels[disconnectCause] || causeLabels.unknown}`;
+      } else {
+        eventDescription = 'WhatsApp aguardando QR Code';
+      }
       
       await supabase.from('ai_notification_log').insert({
         channel: 'whatsapp_connection',
         recipient: 'system',
         status: connectionEventStatus,
         message_content: eventDescription,
+        error_message: isLogout ? `Causa: ${disconnectCause}` : null,
         metadata: { 
           event: 'connection.update',
           instance_key: instanceKey,
           phone_number: phoneFromJid,
           connection_state: connectionData.state || connectionData.connection,
-          close_reason: connectionData.closeReason || payload.closeReason,
+          close_reason: closeReason,
+          disconnect_cause: disconnectCause,
           is_logout: isLogout,
-          timestamp: new Date().toISOString()
+          raw_message: connectionMessage,
+          timestamp: new Date().toISOString(),
+          troubleshooting: isLogout ? [
+            'Verifique se há outra sessão do WhatsApp Web aberta',
+            'Verifique se outra instância está usando este número',
+            'Evite desconectar pelo app do celular',
+            'Reconecte escaneando um novo QR Code'
+          ] : null
         }
       });
       
       console.log('✅ Connection event logged to ai_notification_log');
       
       return new Response(
-        JSON.stringify({ success: true, event: 'connection.update', isConnected, isLogout }),
+        JSON.stringify({ 
+          success: true, 
+          event: 'connection.update', 
+          isConnected, 
+          isLogout,
+          disconnectCause: isLogout ? disconnectCause : null 
+        }),
         {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 200,
