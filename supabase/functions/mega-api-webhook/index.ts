@@ -764,6 +764,20 @@ Deno.serve(async (req) => {
         .replace(/@lid$/g, '')
         .replace(/\D/g, '');
       
+      // === DETECTAR FORMATO DO TELEFONE RECEBIDO ===
+      // O número recebido do WhatsApp representa o formato REAL usado pelo contato
+      const detectPhoneFormat = (phone: string): 'with_nine' | 'without_nine' => {
+        const digits = phone.replace(/\D/g, '');
+        // Se tem 13 dígitos (55 + DDD + 9 + 8) e o 5º dígito é 9
+        if (digits.length === 13 && digits.startsWith('55') && digits.charAt(4) === '9') {
+          return 'with_nine';
+        }
+        return 'without_nine';
+      };
+      
+      const detectedFormat = detectPhoneFormat(phoneNumber);
+      console.log(`📱 Detected phone format: ${detectedFormat} for ${phoneNumber}`);
+      
       // Normalize phone number - create ALL possible variations for flexible matching
       // WhatsApp sends: 555199050190 (country 55 + area 51 + 99050190)
       // Database may have: 51999050190, 5199050190, 999050190, etc.
@@ -881,17 +895,23 @@ Deno.serve(async (req) => {
           carrierId = existingCarrier.id;
           carrierName = existingCarrier.name;
           
-          // Atualizar nome do carrier se estava como "Contato XXXX" 
+          // Atualizar nome do carrier se estava como "Contato XXXX" e atualizar phone_format
           if (existingCarrier.name.startsWith('Contato ') && existingCarrier.name !== customerCarrierName) {
             console.log('🔄 Updating carrier name from:', existingCarrier.name, 'to:', customerCarrierName);
             await supabase
               .from('carriers')
-              .update({ name: customerCarrierName })
+              .update({ name: customerCarrierName, phone_format: detectedFormat })
               .eq('id', existingCarrier.id);
             carrierName = customerCarrierName;
+          } else {
+            // Apenas atualizar phone_format se não estava definido
+            await supabase
+              .from('carriers')
+              .update({ phone_format: detectedFormat })
+              .eq('id', existingCarrier.id);
           }
           
-          console.log('✅ Using existing carrier for customer:', existingCarrier.id);
+          console.log('✅ Using existing carrier for customer:', existingCarrier.id, 'phone_format:', detectedFormat);
         } else {
           // Criar carrier para o cliente
           const normalizedPhone = uniqueVariations[0];
@@ -899,7 +919,8 @@ Deno.serve(async (req) => {
             .from('carriers')
             .insert({
               name: customerCarrierName,
-              whatsapp: normalizedPhone,
+              whatsapp: phoneNumber, // Salvar número ORIGINAL do WhatsApp
+              phone_format: detectedFormat, // Salvar formato detectado
               is_active: true,
               notes: `Contato de cliente criado automaticamente - Customer ID: ${customer.id}`,
             })
@@ -948,36 +969,43 @@ Deno.serve(async (req) => {
             carrierId = existingCarrier.id;
             carrierName = existingCarrier.name;
             
-            // Atualizar nome do carrier se estava como "Contato XXXX"
+            // Atualizar nome do carrier se estava como "Contato XXXX" e atualizar phone_format
             if (existingCarrier.name.startsWith('Contato ') && existingCarrier.name !== technicianCarrierName) {
               console.log('🔄 Updating carrier name from:', existingCarrier.name, 'to:', technicianCarrierName);
               await supabase
                 .from('carriers')
-                .update({ name: technicianCarrierName })
+                .update({ name: technicianCarrierName, phone_format: detectedFormat })
                 .eq('id', existingCarrier.id);
               carrierName = technicianCarrierName;
+            } else {
+              // Apenas atualizar phone_format se não estava definido
+              await supabase
+                .from('carriers')
+                .update({ phone_format: detectedFormat })
+                .eq('id', existingCarrier.id);
             }
             
-            console.log('✅ Using existing carrier for technician:', existingCarrier.id);
+            console.log('✅ Using existing carrier for technician:', existingCarrier.id, 'phone_format:', detectedFormat);
           } else {
             // Criar carrier para o técnico
             const normalizedPhone = uniqueVariations[0];
             const { data: newCarrier, error: createError } = await supabase
               .from('carriers')
-              .insert({
-                name: technicianCarrierName,
-                whatsapp: normalizedPhone,
-                is_active: true,
-                notes: `Contato de técnico criado automaticamente - Technician ID: ${technician.id}`,
-              })
-              .select('id, name')
-              .single();
-            
-            if (!createError && newCarrier) {
-              carrierId = newCarrier.id;
-              carrierName = newCarrier.name;
-              console.log('✅ Created carrier for technician:', newCarrier.id);
-            }
+            .insert({
+              name: technicianCarrierName,
+              whatsapp: phoneNumber, // Salvar número ORIGINAL do WhatsApp
+              phone_format: detectedFormat, // Salvar formato detectado
+              is_active: true,
+              notes: `Contato de técnico criado automaticamente - Technician ID: ${technician.id}`,
+            })
+            .select('id, name')
+            .single();
+          
+          if (!createError && newCarrier) {
+            carrierId = newCarrier.id;
+            carrierName = newCarrier.name;
+            console.log('✅ Created carrier for technician:', newCarrier.id, 'phone_format:', detectedFormat);
+          }
           }
         } else {
           // ====== STEP 2: Se não é cliente nem técnico, buscar em carriers (transportadoras) ======
@@ -1001,19 +1029,25 @@ Deno.serve(async (req) => {
             carrierId = foundCarrier.id;
             carrierName = foundCarrier.name;
             
+            // Atualizar phone_format para todos os carriers encontrados
+            await supabase
+              .from('carriers')
+              .update({ phone_format: detectedFormat })
+              .eq('id', foundCarrier.id);
+            
             // Se o nome começa com "Contato ", "Cliente:" ou "Técnico:", identificar tipo
             if (foundCarrier.name.startsWith('Contato ')) {
               contactType = 'unknown';
-              console.log(`⚠️ Found unidentified carrier: ${foundCarrier.name} (${foundCarrier.id})`);
+              console.log(`⚠️ Found unidentified carrier: ${foundCarrier.name} (${foundCarrier.id}) phone_format: ${detectedFormat}`);
             } else if (foundCarrier.name.startsWith('Cliente:')) {
               contactType = 'customer';
-              console.log(`✅ Found customer carrier: ${foundCarrier.name} (${foundCarrier.id})`);
+              console.log(`✅ Found customer carrier: ${foundCarrier.name} (${foundCarrier.id}) phone_format: ${detectedFormat}`);
             } else if (foundCarrier.name.startsWith('Técnico:')) {
               contactType = 'technician';
-              console.log(`✅ Found technician carrier: ${foundCarrier.name} (${foundCarrier.id})`);
+              console.log(`✅ Found technician carrier: ${foundCarrier.name} (${foundCarrier.id}) phone_format: ${detectedFormat}`);
             } else {
               contactType = 'carrier';
-              console.log(`✅ Found carrier: ${foundCarrier.name} (${foundCarrier.id})`);
+              console.log(`✅ Found carrier: ${foundCarrier.name} (${foundCarrier.id}) phone_format: ${detectedFormat}`);
             }
           }
         }
@@ -1039,13 +1073,13 @@ Deno.serve(async (req) => {
         } else {
           // Realmente não existe, criar novo
           const unknownCarrierName = `Contato ${phoneNumber.slice(-4)}`;
-          const normalizedPhone = uniqueVariations[0]; // Usar primeira variação
           
           const { data: newCarrier, error: createError } = await supabase
             .from('carriers')
             .insert({
               name: unknownCarrierName,
-              whatsapp: normalizedPhone,
+              whatsapp: phoneNumber, // Salvar número ORIGINAL do WhatsApp
+              phone_format: detectedFormat, // Salvar formato detectado
               is_active: true,
               notes: `Contato criado automaticamente via WhatsApp em ${new Date().toISOString()}`,
             })
