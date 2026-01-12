@@ -569,15 +569,33 @@ serve(async (req) => {
         continue;
       }
 
-      // Normalizar WhatsApp
+      // VALIDAÇÃO ROBUSTA DE WHATSAPP
       let whatsapp = recipient.whatsapp?.replace(/\D/g, '') || '';
-      if (!whatsapp) {
-        console.log(`[notify-phase-manager] Recipient ${recipient.user_id} has no WhatsApp`);
+      
+      // Validação 1: Número não pode estar vazio
+      if (!whatsapp || whatsapp.length < 8) {
+        console.log(`[notify-phase-manager] ❌ Recipient ${recipient.user_id} has invalid/empty WhatsApp: "${recipient.whatsapp}"`);
         continue;
       }
+      
+      // Validação 2: Adicionar 55 se não tem
       if (!whatsapp.startsWith('55')) {
         whatsapp = '55' + whatsapp;
       }
+      
+      // Validação 3: Verificar comprimento final (12-14 dígitos)
+      if (whatsapp.length < 12 || whatsapp.length > 14) {
+        console.log(`[notify-phase-manager] ❌ Recipient ${recipient.user_id} WhatsApp invalid length: ${whatsapp} (${whatsapp.length} digits)`);
+        continue;
+      }
+      
+      // Validação 4: Corrigir números com 55 duplicado
+      if (whatsapp.startsWith('5555') && whatsapp.length > 14) {
+        whatsapp = '55' + whatsapp.substring(4);
+        console.log(`[notify-phase-manager] ⚠️ Fixed duplicated 55: ${whatsapp}`);
+      }
+      
+      console.log(`[notify-phase-manager] ✅ Valid WhatsApp for ${(recipient.profiles as any)?.full_name || recipient.user_id}: ${whatsapp}`);
 
       // Criar log de notificação
       const { data: notification, error: notifError } = await supabase
