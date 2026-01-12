@@ -146,17 +146,36 @@ export function PhaseManagersConfig() {
     }
   };
 
+  // Normalizar WhatsApp para formato de 12 dígitos (novo padrão sem o 9)
+  const normalizeWhatsAppTo12Digits = (phone: string): string => {
+    let digits = phone.replace(/\D/g, '');
+    
+    // Adicionar 55 se não tem
+    if (!digits.startsWith('55') && digits.length <= 11) {
+      digits = '55' + digits;
+    }
+    
+    // Remover o 9 se tem 13 dígitos (formato antigo com 9)
+    if (digits.length === 13 && digits.startsWith('55') && digits.charAt(4) === '9') {
+      const ddd = digits.substring(2, 4);
+      const numero = digits.substring(5);
+      digits = '55' + ddd + numero;
+    }
+    
+    return digits;
+  };
+
   const handleAddManager = async () => {
     if (!selectedUser || !selectedPhase || !whatsapp) {
       toast.error('Preencha todos os campos obrigatórios');
       return;
     }
 
-    const normalizedWhatsapp = whatsapp.replace(/\D/g, '');
+    const normalizedWhatsapp = normalizeWhatsAppTo12Digits(whatsapp);
     
-    // Validação de WhatsApp mínimo
-    if (normalizedWhatsapp.length < 10) {
-      toast.error('WhatsApp deve ter pelo menos 10 dígitos (DDD + número)');
+    // Validação: deve ter exatamente 12 dígitos
+    if (normalizedWhatsapp.length !== 12) {
+      toast.error('WhatsApp deve ter formato: 55 + DDD + 8 dígitos (ex: 551189198570)');
       return;
     }
 
@@ -244,19 +263,39 @@ export function PhaseManagersConfig() {
     setSelectedUser(userId);
     const profile = profiles.find(p => p.id === userId);
     if (profile?.whatsapp) {
-      setWhatsapp(profile.whatsapp);
-      setWhatsappWarning('');
+      // Normalizar ao selecionar usuário
+      const normalized = normalizeWhatsAppTo12Digits(profile.whatsapp);
+      setWhatsapp(normalized);
+      if (normalized.length !== 12) {
+        setWhatsappWarning('Número será convertido para formato de 12 dígitos');
+      } else {
+        setWhatsappWarning('');
+      }
     } else {
       setWhatsapp('');
       setWhatsappWarning('Este usuário não tem WhatsApp cadastrado no perfil');
     }
   };
 
-  // Helper para verificar se WhatsApp é válido
+  // Helper para verificar se WhatsApp é válido (12 dígitos)
   const isValidWhatsapp = (phone: string | undefined | null) => {
     if (!phone) return false;
     const normalized = phone.replace(/\D/g, '');
-    return normalized.length >= 10;
+    return normalized.length === 12;
+  };
+  
+  // Formatar WhatsApp para exibição
+  const formatWhatsappDisplay = (phone: string | undefined | null) => {
+    if (!phone) return '-';
+    const digits = phone.replace(/\D/g, '');
+    if (digits.length === 12) {
+      // Formato: +55 (51) 8919-8570
+      return `+${digits.slice(0,2)} (${digits.slice(2,4)}) ${digits.slice(4,8)}-${digits.slice(8)}`;
+    } else if (digits.length === 13) {
+      // Formato antigo com 9: +55 (51) 9 8919-8570
+      return `+${digits.slice(0,2)} (${digits.slice(2,4)}) ${digits.slice(4,5)} ${digits.slice(5,9)}-${digits.slice(9)} ⚠️`;
+    }
+    return phone;
   };
 
   // Agrupar por fase dinâmica
@@ -350,13 +389,28 @@ export function PhaseManagersConfig() {
                 <div className="space-y-2">
                   <Label>WhatsApp *</Label>
                   <Input
-                    placeholder="51999999999"
+                    placeholder="5551XXXXXXXX (12 dígitos)"
                     value={whatsapp}
-                    onChange={e => setWhatsapp(e.target.value)}
+                    onChange={e => {
+                      const normalized = normalizeWhatsAppTo12Digits(e.target.value);
+                      setWhatsapp(normalized);
+                    }}
+                    maxLength={14}
                   />
                   <p className="text-xs text-muted-foreground">
-                    Apenas números, com DDD
+                    Formato: 55 + DDD + 8 dígitos (ex: 551189198570)
                   </p>
+                  {whatsapp && whatsapp.length !== 12 && (
+                    <p className="text-xs text-amber-600">
+                      Número tem {whatsapp.length} dígitos. O padrão é 12 dígitos.
+                    </p>
+                  )}
+                  {whatsapp && whatsapp.length === 12 && (
+                    <p className="text-xs text-green-600 flex items-center gap-1">
+                      <CheckCircle className="h-3 w-3" />
+                      Formato válido: {formatWhatsappDisplay(whatsapp)}
+                    </p>
+                  )}
                 </div>
 
                 <div className="space-y-3 pt-2">
@@ -465,11 +519,14 @@ export function PhaseManagersConfig() {
                             </TableCell>
                             <TableCell className="font-mono text-sm">
                               {isValidWhatsapp(phase.manager_profile?.whatsapp) ? (
-                                phase.manager_profile?.whatsapp
+                                <span className="flex items-center gap-1">
+                                  <CheckCircle className="h-4 w-4 text-green-500" />
+                                  {formatWhatsappDisplay(phase.manager_profile?.whatsapp)}
+                                </span>
                               ) : (
                                 <span className="flex items-center gap-1 text-destructive">
                                   <AlertCircle className="h-4 w-4" />
-                                  {phase.manager_profile?.whatsapp || 'Não configurado'}
+                                  {formatWhatsappDisplay(phase.manager_profile?.whatsapp) || 'Não configurado'}
                                 </span>
                               )}
                             </TableCell>
@@ -499,16 +556,19 @@ export function PhaseManagersConfig() {
                             </TableCell>
                             <TableCell className="font-mono text-sm">
                               {isValidWhatsapp(manager.whatsapp) ? (
-                                manager.whatsapp
+                                <span className="flex items-center gap-1">
+                                  <CheckCircle className="h-4 w-4 text-green-500" />
+                                  {formatWhatsappDisplay(manager.whatsapp)}
+                                </span>
                               ) : isValidWhatsapp(manager.profiles?.whatsapp) ? (
                                 <span className="flex items-center gap-1 text-muted-foreground">
-                                  {manager.profiles?.whatsapp}
+                                  {formatWhatsappDisplay(manager.profiles?.whatsapp)}
                                   <span className="text-xs">(perfil)</span>
                                 </span>
                               ) : (
                                 <span className="flex items-center gap-1 text-destructive">
                                   <AlertCircle className="h-4 w-4" />
-                                  Não configurado
+                                  {formatWhatsappDisplay(manager.whatsapp) || 'Não configurado'}
                                 </span>
                               )}
                             </TableCell>
