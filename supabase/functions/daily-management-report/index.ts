@@ -1329,8 +1329,9 @@ Requirements:
 // ==================== WHATSAPP ====================
 
 // Check MEGA API connection status directly
+// Returns connected: null when status is unknown (e.g., endpoint not supported)
 async function checkMegaAPIConnectionStatus(instanceKey: string): Promise<{ 
-  connected: boolean; 
+  connected: boolean | null;  // null = unknown (don't block send)
   state: string; 
   reason?: string;
 }> {
@@ -1342,35 +1343,84 @@ async function checkMegaAPIConnectionStatus(instanceKey: string): Promise<{
     megaApiUrl = megaApiUrl.replace(/\/+$/, '');
     const megaApiToken = Deno.env.get('MEGA_API_TOKEN') ?? '';
 
-    const statusUrl = `${megaApiUrl}/rest/instance/connectionState/${instanceKey}`;
-    
-    console.log('📡 Checking MEGA API status:', statusUrl);
-    
-    const response = await fetch(statusUrl, {
-      method: 'GET',
-      headers: { 'apikey': megaApiToken },
-    });
+    // Try multiple endpoints (different MEGA API versions have different routes)
+    const endpoints = [
+      `/rest/instance/connectionState/${instanceKey}`,
+      `/instance/connectionState/${instanceKey}`,
+      `/rest/fetchInstances`,
+    ];
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.warn(`⚠️ MEGA API status check failed: ${response.status} - ${errorText.substring(0, 200)}`);
-      return { connected: false, state: 'check_failed', reason: errorText };
+    for (const endpoint of endpoints) {
+      const statusUrl = `${megaApiUrl}${endpoint}`;
+      
+      console.log('📡 Trying MEGA API status endpoint:', statusUrl);
+      
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 8000);
+        
+        const response = await fetch(statusUrl, {
+          method: 'GET',
+          headers: { 'apikey': megaApiToken },
+          signal: controller.signal,
+        });
+        
+        clearTimeout(timeoutId);
+
+        if (response.status === 404) {
+          console.log(`⚠️ Endpoint not found (404): ${endpoint}, trying next...`);
+          continue; // Try next endpoint
+        }
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.warn(`⚠️ MEGA API status check failed: ${response.status} - ${errorText.substring(0, 200)}`);
+          continue; // Try next endpoint
+        }
+
+        const data = await response.json();
+        console.log('📡 MEGA API connection state:', JSON.stringify(data));
+
+        // Handle fetchInstances response (array of instances)
+        if (Array.isArray(data)) {
+          const instance = data.find((i: any) => i.id === instanceKey || i.instance === instanceKey);
+          if (instance) {
+            const state = instance.connectionStatus || instance.state || 'unknown';
+            const isConnected = state === 'open' || state === 'connected';
+            return { connected: isConnected, state, reason: !isConnected ? state : undefined };
+          }
+          console.warn('⚠️ Instance not found in fetchInstances response');
+          continue;
+        }
+
+        // Handle direct connectionState response
+        const state = data?.state || data?.status || data?.connectionStatus || 'unknown';
+        const isConnected = state === 'open' || data?.connected === true || state === 'connected';
+        
+        return { 
+          connected: isConnected, 
+          state,
+          reason: !isConnected ? (data?.message || state) : undefined
+        };
+      } catch (fetchError: unknown) {
+        const errorName = fetchError instanceof Error ? fetchError.name : '';
+        if (errorName === 'AbortError') {
+          console.warn(`⚠️ Timeout on endpoint: ${endpoint}`);
+        } else {
+          console.warn(`⚠️ Error on endpoint ${endpoint}:`, fetchError);
+        }
+        continue; // Try next endpoint
+      }
     }
 
-    const data = await response.json();
-    console.log('📡 MEGA API connection state:', JSON.stringify(data));
-
-    const state = data?.state || data?.status || 'unknown';
-    const isConnected = state === 'open' || data?.connected === true;
+    // All endpoints failed - return unknown status (don't block send)
+    console.warn('⚠️ All status endpoints failed - status unknown, will attempt send anyway');
+    return { connected: null, state: 'unknown_api_incompatible', reason: 'All status endpoints unavailable' };
     
-    return { 
-      connected: isConnected, 
-      state,
-      reason: !isConnected ? (data?.message || state) : undefined
-    };
   } catch (error) {
     console.error('❌ Error checking MEGA API status:', error);
-    return { connected: false, state: 'error', reason: String(error) };
+    // On error, return unknown (don't block send)
+    return { connected: null, state: 'check_error', reason: String(error) };
   }
 }
 
@@ -1445,7 +1495,7 @@ async function attemptSendWhatsAppMessage(
       return { success: false, wasConnected: false };
     }
 
-    // === NEW: Check connection status directly with MEGA API ===
+    // === Check connection status directly with MEGA API ===
     const apiStatus = await checkMegaAPIConnectionStatus(activeInstance.instance_key);
     
     console.log(`🔍 [Attempt ${attemptNumber}] PRE-SEND DIAGNOSTIC:`, {
@@ -1459,10 +1509,13 @@ async function attemptSendWhatsAppMessage(
       messageLength: message.length
     });
 
-    if (!apiStatus.connected) {
-      console.error(`❌ MEGA API reports disconnected: ${apiStatus.state} - ${apiStatus.reason}`);
+    // === CRITICAL FIX: Only block if EXPLICITLY disconnected ===
+    // If apiStatus.connected is null (unknown), proceed with send attempt
+    // If apiStatus.connected is false (explicitly disconnected), abort and update DB
+    if (apiStatus.connected === false) {
+      console.error(`❌ MEGA API reports EXPLICITLY disconnected: ${apiStatus.state} - ${apiStatus.reason}`);
       
-      // Update DB to reflect real status
+      // Update DB to reflect real status (only for explicit disconnection)
       await supabaseClient
         .from('whatsapp_instances')
         .update({ 
@@ -1472,6 +1525,11 @@ async function attemptSendWhatsAppMessage(
         .eq('instance_key', activeInstance.instance_key);
       
       return { success: false, wasConnected: false };
+    }
+    
+    // If status is unknown (null), log but proceed with send attempt
+    if (apiStatus.connected === null) {
+      console.log(`⚠️ MEGA API status unknown (${apiStatus.state}), proceeding with send attempt...`);
     }
 
     // === Check if connection is too recent (wait for stabilization) ===
