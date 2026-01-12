@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,7 +25,12 @@ import {
   Loader2,
   AlertTriangle,
   Trash2,
-  Zap
+  Zap,
+  History,
+  Send,
+  PhoneOff,
+  Phone,
+  Filter
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -51,6 +56,16 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface MegaAPICredentials {
   url: string;
@@ -64,6 +79,17 @@ interface InstanceDiagnostic {
   dbUpdatedAt: string | null;
   hasMultipleInstances: boolean;
   instanceCount: number;
+}
+
+interface EventLog {
+  id: string;
+  channel: string;
+  recipient: string;
+  status: string;
+  message_content: string;
+  error_message: string | null;
+  created_at: string;
+  metadata: Record<string, any> | null;
 }
 
 export function AIAgentConnectionsTab() {
@@ -92,6 +118,11 @@ export function AIAgentConnectionsTab() {
     instanceCount: 0
   });
   
+  // Event logs state
+  const [eventLogs, setEventLogs] = useState<EventLog[]>([]);
+  const [loadingLogs, setLoadingLogs] = useState(false);
+  const [logFilter, setLogFilter] = useState<'all' | 'success' | 'error' | 'connection'>('all');
+  
   const {
     connected: whatsappConnected,
     status: whatsappStatus,
@@ -106,10 +137,45 @@ export function AIAgentConnectionsTab() {
     restartInstance
   } = useWhatsAppStatus();
 
+  // Load event logs
+  const loadEventLogs = useCallback(async () => {
+    setLoadingLogs(true);
+    try {
+      let query = supabase
+        .from('ai_notification_log')
+        .select('id, channel, recipient, status, message_content, error_message, created_at, metadata')
+        .order('created_at', { ascending: false })
+        .limit(100);
+      
+      // Apply filter
+      if (logFilter === 'success') {
+        query = query.in('status', ['sent', 'delivered', 'connected']);
+      } else if (logFilter === 'error') {
+        query = query.in('status', ['failed', 'error', 'blocked']);
+      } else if (logFilter === 'connection') {
+        query = query.eq('channel', 'whatsapp_connection');
+      }
+      
+      const { data, error } = await query;
+      
+      if (error) {
+        console.error('Error loading event logs:', error);
+        return;
+      }
+      
+      setEventLogs((data || []) as EventLog[]);
+    } catch (error) {
+      console.error('Error in loadEventLogs:', error);
+    } finally {
+      setLoadingLogs(false);
+    }
+  }, [logFilter]);
+
   // Carregar instância do banco e diagnóstico
   useEffect(() => {
     loadInstanceDiagnostic();
-  }, []);
+    loadEventLogs();
+  }, [loadEventLogs]);
 
   const loadInstanceDiagnostic = async () => {
     try {
@@ -648,6 +714,179 @@ export function AIAgentConnectionsTab() {
             <RefreshCw className={`h-4 w-4 ${testing ? 'animate-spin' : ''}`} />
             {testing ? 'Testando...' : 'Testar Todas as Conexões'}
           </Button>
+        </CardContent>
+      </Card>
+
+      {/* Event History Card */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <History className="h-5 w-5" />
+                Histórico de Eventos
+              </CardTitle>
+              <CardDescription>
+                Mensagens enviadas, erros e eventos de conexão
+              </CardDescription>
+            </div>
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => loadEventLogs()}
+              disabled={loadingLogs}
+              className="gap-2"
+            >
+              <RefreshCw className={`h-4 w-4 ${loadingLogs ? 'animate-spin' : ''}`} />
+              Atualizar
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Filter Tabs */}
+          <Tabs value={logFilter} onValueChange={(v) => setLogFilter(v as typeof logFilter)}>
+            <TabsList className="grid w-full grid-cols-4">
+              <TabsTrigger value="all" className="gap-2">
+                <Filter className="h-3 w-3" />
+                Todos
+              </TabsTrigger>
+              <TabsTrigger value="success" className="gap-2">
+                <CheckCircle2 className="h-3 w-3" />
+                Sucesso
+              </TabsTrigger>
+              <TabsTrigger value="error" className="gap-2">
+                <XCircle className="h-3 w-3" />
+                Erros
+              </TabsTrigger>
+              <TabsTrigger value="connection" className="gap-2">
+                <Wifi className="h-3 w-3" />
+                Conexão
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+
+          {/* Logs Table */}
+          <ScrollArea className="h-[300px]">
+            {loadingLogs ? (
+              <div className="flex items-center justify-center h-32">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : eventLogs.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-32 text-muted-foreground">
+                <History className="h-8 w-8 mb-2" />
+                <p className="text-sm">Nenhum evento encontrado</p>
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-[140px]">Data/Hora</TableHead>
+                    <TableHead className="w-[100px]">Canal</TableHead>
+                    <TableHead className="w-[120px]">Destinatário</TableHead>
+                    <TableHead className="w-[90px]">Status</TableHead>
+                    <TableHead>Mensagem</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {eventLogs.map((log) => (
+                    <TableRow key={log.id}>
+                      <TableCell className="text-xs font-mono">
+                        {format(new Date(log.created_at), "dd/MM HH:mm:ss", { locale: ptBR })}
+                      </TableCell>
+                      <TableCell>
+                        <Badge 
+                          variant="outline" 
+                          className={`text-xs ${
+                            log.channel === 'whatsapp_connection' 
+                              ? 'border-blue-500 text-blue-600' 
+                              : log.channel === 'whatsapp'
+                                ? 'border-green-500 text-green-600'
+                                : 'border-muted-foreground'
+                          }`}
+                        >
+                          {log.channel === 'whatsapp_connection' && <Wifi className="h-3 w-3 mr-1" />}
+                          {log.channel === 'whatsapp' && <Send className="h-3 w-3 mr-1" />}
+                          {log.channel === 'whatsapp_connection' 
+                            ? 'Conexão' 
+                            : log.channel === 'whatsapp'
+                              ? 'WhatsApp'
+                              : log.channel
+                          }
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="font-mono text-xs max-w-[120px] truncate" title={log.recipient}>
+                        {log.recipient === 'system' 
+                          ? <span className="text-muted-foreground">Sistema</span>
+                          : log.recipient.length > 15 
+                            ? `...${log.recipient.slice(-8)}`
+                            : log.recipient
+                        }
+                      </TableCell>
+                      <TableCell>
+                        <Badge 
+                          variant={
+                            ['sent', 'delivered', 'connected'].includes(log.status) 
+                              ? 'default' 
+                              : ['failed', 'error', 'blocked'].includes(log.status)
+                                ? 'destructive'
+                                : log.status === 'disconnected'
+                                  ? 'secondary'
+                                  : 'outline'
+                          }
+                          className="text-xs"
+                        >
+                          {log.status === 'connected' && <Phone className="h-3 w-3 mr-1" />}
+                          {log.status === 'disconnected' && <PhoneOff className="h-3 w-3 mr-1" />}
+                          {log.status === 'sent' && <CheckCircle2 className="h-3 w-3 mr-1" />}
+                          {log.status === 'failed' && <XCircle className="h-3 w-3 mr-1" />}
+                          {log.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-xs max-w-[200px]">
+                        <div className="truncate" title={log.message_content}>
+                          {log.message_content.length > 50 
+                            ? `${log.message_content.slice(0, 50)}...` 
+                            : log.message_content
+                          }
+                        </div>
+                        {log.error_message && (
+                          <div className="text-destructive text-xs mt-1 truncate" title={log.error_message}>
+                            ⚠️ {log.error_message.slice(0, 40)}...
+                          </div>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </ScrollArea>
+
+          {/* Summary Stats */}
+          <div className="grid grid-cols-4 gap-2 pt-2 border-t">
+            <div className="text-center p-2 bg-muted/30 rounded">
+              <p className="text-xl font-bold">{eventLogs.length}</p>
+              <p className="text-xs text-muted-foreground">Total</p>
+            </div>
+            <div className="text-center p-2 bg-green-50 dark:bg-green-950/30 rounded">
+              <p className="text-xl font-bold text-green-600">
+                {eventLogs.filter(l => ['sent', 'delivered', 'connected'].includes(l.status)).length}
+              </p>
+              <p className="text-xs text-muted-foreground">Sucesso</p>
+            </div>
+            <div className="text-center p-2 bg-red-50 dark:bg-red-950/30 rounded">
+              <p className="text-xl font-bold text-red-600">
+                {eventLogs.filter(l => ['failed', 'error', 'blocked'].includes(l.status)).length}
+              </p>
+              <p className="text-xs text-muted-foreground">Erros</p>
+            </div>
+            <div className="text-center p-2 bg-blue-50 dark:bg-blue-950/30 rounded">
+              <p className="text-xl font-bold text-blue-600">
+                {eventLogs.filter(l => l.channel === 'whatsapp_connection').length}
+              </p>
+              <p className="text-xs text-muted-foreground">Conexão</p>
+            </div>
+          </div>
         </CardContent>
       </Card>
 
