@@ -1,6 +1,5 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { differenceInDays } from 'date-fns';
 
 interface PhaseEntry {
   orderId: string;
@@ -18,6 +17,7 @@ interface UseDaysInPhaseResult {
 /**
  * Hook para calcular quantos dias cada pedido está na fase atual.
  * Busca no order_history a última entrada de status do pedido.
+ * Se não houver histórico, usa created_at do pedido como fallback.
  */
 export const useDaysInPhase = (orderIds: string[]): UseDaysInPhaseResult => {
   const [phaseData, setPhaseData] = useState<Map<string, PhaseEntry>>(new Map());
@@ -28,43 +28,85 @@ export const useDaysInPhase = (orderIds: string[]): UseDaysInPhaseResult => {
     
     setLoading(true);
     try {
-      // Buscar o histórico de cada pedido - última mudança para o status atual
-      const { data: historyData, error } = await supabase
+      // 1. Buscar dados dos pedidos (status atual e data de criação)
+      const { data: ordersData, error: ordersError } = await supabase
+        .from('orders')
+        .select('id, status, created_at')
+        .in('id', orderIds);
+
+      if (ordersError) {
+        console.error('Erro ao buscar pedidos:', ordersError);
+        return;
+      }
+
+      // 2. Buscar histórico de mudanças de status
+      const { data: historyData, error: historyError } = await supabase
         .from('order_history')
         .select('order_id, new_status, changed_at')
         .in('order_id', orderIds)
         .order('changed_at', { ascending: false });
 
-      if (error) {
-        console.error('Erro ao buscar histórico:', error);
+      if (historyError) {
+        console.error('Erro ao buscar histórico:', historyError);
         return;
       }
 
-      // Para cada pedido, pegar a data da última transição de status
-      const phaseMap = new Map<string, PhaseEntry>();
+      // 3. Criar mapas de status atual e created_at
+      const currentStatusMap = new Map<string, string>();
+      const createdAtMap = new Map<string, string>();
+      
+      ordersData?.forEach(order => {
+        if (order.status) currentStatusMap.set(order.id, order.status);
+        if (order.created_at) createdAtMap.set(order.id, order.created_at);
+      });
+
+      // 4. Para cada pedido, encontrar a entrada mais recente para o STATUS ATUAL
       const latestByOrder = new Map<string, { changed_at: string }>();
 
       historyData?.forEach(entry => {
-        // Apenas a primeira entrada (mais recente) de cada pedido
-        if (!latestByOrder.has(entry.order_id)) {
+        const currentStatus = currentStatusMap.get(entry.order_id);
+        
+        // Só considera se new_status = status atual do pedido
+        // E se ainda não temos uma entrada para este pedido
+        if (entry.new_status === currentStatus && !latestByOrder.has(entry.order_id)) {
           latestByOrder.set(entry.order_id, { changed_at: entry.changed_at });
         }
       });
 
-      // Calcular dias na fase para cada pedido
+      // 5. Para pedidos sem histórico válido, usar created_at como fallback
+      orderIds.forEach(id => {
+        if (!latestByOrder.has(id)) {
+          const createdAt = createdAtMap.get(id);
+          if (createdAt) {
+            latestByOrder.set(id, { changed_at: createdAt });
+          }
+        }
+      });
+
+      // 6. Calcular dias na fase para cada pedido
+      const phaseMap = new Map<string, PhaseEntry>();
+      const today = new Date();
+
       latestByOrder.forEach((entry, orderId) => {
         const enteredAt = new Date(entry.changed_at);
-        const today = new Date();
-        const daysInPhase = differenceInDays(today, enteredAt);
+        
+        // Calcular diferença em milissegundos e converter para dias
+        // Usar Math.ceil para que horas parciais contem como 1 dia
+        const diffMs = today.getTime() - enteredAt.getTime();
+        const diffDays = diffMs / (1000 * 60 * 60 * 24);
+        
+        // Se for menos de 24h mas do dia anterior, conta como 1 dia
+        // Se for no mesmo dia, conta como 0
+        const daysInPhase = Math.max(0, Math.floor(diffDays));
         
         phaseMap.set(orderId, {
           orderId,
-          daysInPhase: Math.max(0, daysInPhase),
+          daysInPhase,
           phaseEnteredAt: enteredAt
         });
       });
 
-      // Pedidos sem histórico = entraram hoje ou não têm registro
+      // 7. Pedidos que não têm nem histórico nem created_at = 0 dias
       orderIds.forEach(id => {
         if (!phaseMap.has(id)) {
           phaseMap.set(id, {
