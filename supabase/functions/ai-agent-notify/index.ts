@@ -30,22 +30,23 @@ interface NotificationRequest {
 }
 
 // =====================================================
-// 🔍 FUNÇÕES DE VERIFICAÇÃO DE CONEXÃO
+// 🔍 FUNÇÕES DE VERIFICAÇÃO DE CONEXÃO (COM FALLBACK ROBUSTO)
 // =====================================================
 
 /**
  * Verifica o status da conexão WhatsApp via API Mega
+ * Com fallback de múltiplos endpoints para evitar falsos negativos
  */
-async function checkMegaAPIConnectionStatus(instanceKey: string): Promise<{
+async function checkMegaAPIConnectionStatus(instanceKey: string, apiToken?: string): Promise<{
   connected: boolean;
-  status: string;
+  status: 'connected' | 'disconnected' | 'waiting_scan' | 'unverifiable';
   error?: string;
 }> {
   const megaApiUrl = Deno.env.get('MEGA_API_URL');
-  const megaApiToken = Deno.env.get('MEGA_API_TOKEN');
+  const megaApiToken = apiToken || Deno.env.get('MEGA_API_TOKEN');
 
   if (!megaApiUrl || !megaApiToken) {
-    return { connected: false, status: 'not_configured', error: 'Mega API not configured' };
+    return { connected: false, status: 'unverifiable', error: 'Mega API not configured' };
   }
 
   let baseUrl = megaApiUrl.trim();
@@ -54,55 +55,119 @@ async function checkMegaAPIConnectionStatus(instanceKey: string): Promise<{
   }
   baseUrl = baseUrl.replace(/\/$/, '');
 
-  try {
-    const statusUrl = `${baseUrl}/rest/instance/connectionState/${instanceKey}`;
-    const response = await fetch(statusUrl, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-        'apikey': megaApiToken,
-      },
-    });
+  // Múltiplos endpoints para fallback (evitar 404 = falso desconectado)
+  const endpoints = [
+    `/rest/instance/connectionState/${instanceKey}`,
+    `/instance/connectionState/${instanceKey}`,
+    `/rest/status/${instanceKey}`,
+    `/status/${instanceKey}`,
+  ];
 
-    const responseText = await response.text();
-    console.log(`📡 Mega API status check: ${response.status} - ${responseText.substring(0, 200)}`);
+  for (const endpoint of endpoints) {
+    try {
+      const statusUrl = `${baseUrl}${endpoint}`;
+      console.log(`📡 Trying status endpoint: ${statusUrl}`);
+      
+      const response = await fetch(statusUrl, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': megaApiToken,
+        },
+        signal: AbortSignal.timeout(8000),
+      });
 
-    if (!response.ok) {
-      return { connected: false, status: 'api_error', error: `HTTP ${response.status}` };
+      // 404 = endpoint não existe, tentar próximo (NÃO é desconexão!)
+      if (response.status === 404) {
+        console.log(`📡 Endpoint 404, trying next...`);
+        continue;
+      }
+
+      // 401/403 = problema de autenticação real
+      if (response.status === 401 || response.status === 403) {
+        console.log(`📡 Auth error: ${response.status}`);
+        return { connected: false, status: 'disconnected', error: `auth_error_${response.status}` };
+      }
+
+      const responseText = await response.text();
+      console.log(`📡 Status response: ${response.status} - ${responseText.substring(0, 200)}`);
+
+      if (!response.ok) {
+        continue; // Tentar próximo endpoint
+      }
+
+      try {
+        const data = JSON.parse(responseText);
+        const state = data?.state || data?.status || data?.connectionState || data?.instance?.state || 'unknown';
+        
+        if (state === 'open' || state === 'connected' || data.connected === true) {
+          return { connected: true, status: 'connected' };
+        } else if (state === 'close' || state === 'disconnected') {
+          return { connected: false, status: 'disconnected' };
+        } else if (state === 'waiting' || state === 'waiting_scan') {
+          return { connected: false, status: 'waiting_scan' };
+        }
+        // Estado desconhecido - continuar para próximo endpoint
+      } catch {
+        continue;
+      }
+    } catch (error) {
+      console.log(`📡 Endpoint failed:`, error);
+      continue; // Timeout ou erro - tentar próximo
     }
-
-    const data = JSON.parse(responseText);
-    const state = data?.state || data?.instance?.state || 'unknown';
-    const isConnected = state === 'open' || state === 'connected';
-
-    return { connected: isConnected, status: state };
-  } catch (error) {
-    console.error('❌ Error checking Mega API status:', error);
-    return { connected: false, status: 'fetch_error', error: String(error) };
   }
+
+  // ⚠️ CRITICAL FIX: Se nenhum endpoint funcionou, retornar "unverifiable"
+  // NÃO considerar como desconectado - confiar no status do banco
+  console.log(`⚠️ All status endpoints failed - status unverifiable, trusting database`);
+  return { connected: false, status: 'unverifiable', error: 'all_endpoints_failed' };
 }
 
 /**
  * Verifica se há instância conectada e se está estável
+ * NÃO marca waiting_scan se API retornar unverifiable (evita falsos positivos)
  */
 async function verifyConnectionBeforeSend(supabase: any): Promise<{
   connected: boolean;
   shouldWait: boolean;
   instanceKey: string | null;
+  apiToken?: string;
   error?: string;
 }> {
   // Buscar instância conectada no banco
   const { data: instance, error } = await supabase
     .from('whatsapp_instances')
-    .select('*')
+    .select('*, api_token')
     .eq('status', 'connected')
     .eq('is_active', true)
     .limit(1)
     .single();
 
   if (error || !instance) {
-    console.log('❌ No connected WhatsApp instance in database');
-    return { connected: false, shouldWait: false, instanceKey: null, error: 'No connected instance' };
+    // Fallback: buscar qualquer instância ativa
+    const { data: fallback } = await supabase
+      .from('whatsapp_instances')
+      .select('*, api_token')
+      .eq('is_active', true)
+      .order('connected_at', { ascending: false, nullsFirst: false })
+      .limit(1)
+      .maybeSingle();
+    
+    if (!fallback) {
+      console.log('❌ No active WhatsApp instance in database');
+      return { connected: false, shouldWait: false, instanceKey: null, error: 'No active instance' };
+    }
+    
+    console.log(`📱 Using fallback instance: ${fallback.instance_key}, status: ${fallback.status}`);
+    
+    // Se status no banco não é connected, mas instância existe, tentar mesmo assim
+    return { 
+      connected: fallback.status === 'connected', 
+      shouldWait: false, 
+      instanceKey: fallback.instance_key,
+      apiToken: fallback.api_token,
+      error: fallback.status !== 'connected' ? `DB status: ${fallback.status}` : undefined
+    };
   }
 
   console.log(`📱 Found instance: ${instance.instance_key}, status: ${instance.status}`);
@@ -119,25 +184,41 @@ async function verifyConnectionBeforeSend(supabase: any): Promise<{
   }
 
   // Verificar status real na API
-  const apiStatus = await checkMegaAPIConnectionStatus(instance.instance_key);
-  if (!apiStatus.connected) {
-    console.log(`❌ API reports disconnected: ${apiStatus.status}`);
+  const apiStatus = await checkMegaAPIConnectionStatus(instance.instance_key, instance.api_token);
+  
+  // ⚠️ CRITICAL FIX: Não marcar waiting_scan se status é "unverifiable"
+  // Só atualizar banco se temos certeza de desconexão
+  if (apiStatus.status === 'disconnected' || apiStatus.status === 'waiting_scan') {
+    console.log(`❌ API confirms disconnected: ${apiStatus.status}`);
     
-    // Atualizar status no banco
+    // Atualizar status no banco apenas com evidência real
     await supabase
       .from('whatsapp_instances')
-      .update({ status: 'waiting_scan' })
+      .update({ status: 'waiting_scan', updated_at: new Date().toISOString() })
       .eq('instance_key', instance.instance_key);
 
     return { 
       connected: false, 
       shouldWait: false, 
       instanceKey: instance.instance_key,
+      apiToken: instance.api_token,
       error: `API status: ${apiStatus.status}` 
     };
   }
+  
+  // Se API retorna "unverifiable" (404s, timeouts), confiar no banco
+  if (apiStatus.status === 'unverifiable') {
+    console.log(`⚠️ API unverifiable, trusting database status: ${instance.status}`);
+    // Não atualizar banco - confiar no status existente
+    return { 
+      connected: instance.status === 'connected', 
+      shouldWait, 
+      instanceKey: instance.instance_key,
+      apiToken: instance.api_token,
+    };
+  }
 
-  return { connected: true, shouldWait, instanceKey: instance.instance_key };
+  return { connected: true, shouldWait, instanceKey: instance.instance_key, apiToken: instance.api_token };
 }
 
 /**
@@ -843,8 +924,52 @@ async function registerConversation(
 }
 
 // =====================================================
-// 📱 FUNÇÃO DE ENVIO COM RETRY E REGISTRO DE ERROS
+// 📱 FUNÇÃO DE ENVIO COM RETRY, VARIANTES E REGISTRO DE ERROS
 // =====================================================
+
+/**
+ * Gera variantes do número brasileiro para fallback:
+ * - Formato SEM 9 adicional (preferido pelo WhatsApp oficial): 55DDXXXXXXXX (12 dígitos)
+ * - Formato COM 9 adicional (legado): 55DD9XXXXXXXX (13 dígitos)
+ */
+function getPhoneVariants(phone: string, preferWithoutNine = true): string[] {
+  let canonical = phone.replace(/\D/g, '');
+  if (!canonical.startsWith('55')) {
+    canonical = '55' + canonical;
+  }
+  
+  const variants: string[] = [];
+  
+  if (canonical.length === 13 && canonical.startsWith('55') && canonical.charAt(4) === '9') {
+    // Tem 13 dígitos COM o 9 extra
+    const ddd = canonical.substring(2, 4);
+    const numero = canonical.substring(5); // 8 dígitos após o 9
+    const withoutNine = '55' + ddd + numero; // 12 dígitos
+    const withNine = canonical; // 13 dígitos
+    
+    if (preferWithoutNine) {
+      variants.push(withoutNine, withNine);
+    } else {
+      variants.push(withNine, withoutNine);
+    }
+  } else if (canonical.length === 12 && canonical.startsWith('55')) {
+    // Tem 12 dígitos SEM o 9 extra
+    const ddd = canonical.substring(2, 4);
+    const numero = canonical.substring(4); // 8 dígitos
+    const withoutNine = canonical; // 12 dígitos
+    const withNine = '55' + ddd + '9' + numero; // 13 dígitos
+    
+    if (preferWithoutNine) {
+      variants.push(withoutNine, withNine);
+    } else {
+      variants.push(withNine, withoutNine);
+    }
+  } else {
+    variants.push(canonical);
+  }
+  
+  return variants;
+}
 
 async function sendWhatsAppMessage(
   supabase: any, 
@@ -853,8 +978,8 @@ async function sendWhatsAppMessage(
   logId: string,
   orderId?: string
 ): Promise<string | null> {
-  // Buscar instância conectada
-  const { data: instance } = await supabase
+  // Buscar instância conectada (ou ativa como fallback)
+  let { data: instance } = await supabase
     .from('whatsapp_instances')
     .select('*, api_token')
     .eq('status', 'connected')
@@ -863,22 +988,34 @@ async function sendWhatsAppMessage(
     .single();
 
   if (!instance) {
+    // Fallback: buscar qualquer instância ativa
+    const { data: fallback } = await supabase
+      .from('whatsapp_instances')
+      .select('*, api_token')
+      .eq('is_active', true)
+      .order('connected_at', { ascending: false, nullsFirst: false })
+      .limit(1)
+      .maybeSingle();
+    
+    instance = fallback;
+  }
+
+  if (!instance) {
     await supabase.from('ai_notification_log').update({ 
       status: 'failed',
-      error_message: 'No connected WhatsApp instance'
+      error_message: 'No active WhatsApp instance'
     }).eq('id', logId);
     
     await recordInfrastructureError(supabase, 'whatsapp_instance_disconnected', {
-      errorMessage: 'No connected WhatsApp instance found in database',
+      errorMessage: 'No active WhatsApp instance found in database',
       orderId,
       recipient: phone
     });
     
-    throw new Error('No connected WhatsApp instance');
+    throw new Error('No active WhatsApp instance');
   }
 
   const megaApiUrl = Deno.env.get('MEGA_API_URL');
-  // BUSCAR TOKEN DO BANCO (prioridade) ou fallback para ENV
   const megaApiToken = instance.api_token || Deno.env.get('MEGA_API_TOKEN') || '';
 
   if (!megaApiUrl || !megaApiToken) {
@@ -896,139 +1033,159 @@ async function sendWhatsAppMessage(
   }
   baseUrl = baseUrl.replace(/\/$/, '');
 
-  // Normalizar telefone - MANTER O 9 (celulares brasileiros precisam do 9)
-  let formattedPhone = phone.replace(/\D/g, '');
-  if (!formattedPhone.startsWith('55')) {
-    formattedPhone = '55' + formattedPhone;
-  }
-  // Garantir que tem 13 dígitos (55 + DDD + 9XXXXXXXX)
-  // Se tem apenas 12 dígitos, adicionar o 9
-  if (formattedPhone.length === 12 && formattedPhone.startsWith('55')) {
-    const ddd = formattedPhone.substring(2, 4);
-    const numero = formattedPhone.substring(4);
-    formattedPhone = '55' + ddd + '9' + numero;
-  }
-  console.log(`📱 Número normalizado: ${phone} -> ${formattedPhone}`);
+  // 🔧 NOVO: Gerar variantes do telefone (preferência: SEM o 9 adicional)
+  const phoneVariants = getPhoneVariants(phone, true); // preferWithoutNine = true
+  console.log(`📱 Phone variants: ${phoneVariants.join(', ')}`);
 
   const endpoint = `/rest/sendMessage/${instance.instance_key}/text`;
   const fullUrl = `${baseUrl}${endpoint}`;
 
-  const body = {
-    messageData: {
-      to: formattedPhone,
-      text: message,
-      linkPreview: false,
-    }
-  };
-
-  console.log(`📱 Sending WhatsApp to: ${formattedPhone} via ${fullUrl}`);
+  console.log(`📱 Sending WhatsApp via ${fullUrl}`);
   console.log(`🔑 Using apikey auth (length: ${megaApiToken.length})`);
 
-  // 🛡️ RETRY COM BACKOFF
-  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-    try {
-      const response = await fetch(fullUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'apikey': megaApiToken,
-        },
-        body: JSON.stringify(body),
-      });
+  // Tentar cada variante do telefone
+  for (let variantIdx = 0; variantIdx < phoneVariants.length; variantIdx++) {
+    const formattedPhone = phoneVariants[variantIdx];
+    const isLastVariant = variantIdx === phoneVariants.length - 1;
+    
+    console.log(`📱 Trying variant ${variantIdx + 1}/${phoneVariants.length}: ${formattedPhone}`);
 
-      const responseText = await response.text();
-      console.log(`📥 Response (attempt ${attempt}):`, response.status, responseText.substring(0, 300));
+    const body = {
+      messageData: {
+        to: formattedPhone,
+        text: message,
+        linkPreview: false,
+      }
+    };
 
-      if (response.ok) {
-        let megaData: any;
-        try {
-          megaData = JSON.parse(responseText);
-        } catch {
-          megaData = { raw: responseText };
+    // 🛡️ RETRY COM BACKOFF para cada variante
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        const response = await fetch(fullUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': megaApiToken,
+          },
+          body: JSON.stringify(body),
+        });
+
+        const responseText = await response.text();
+        console.log(`📥 Response (variant ${variantIdx + 1}, attempt ${attempt}):`, response.status, responseText.substring(0, 300));
+
+        if (response.ok) {
+          let megaData: any;
+          try {
+            megaData = JSON.parse(responseText);
+          } catch {
+            megaData = { raw: responseText };
+          }
+
+          const externalMessageId = megaData.id || megaData.key?.id || megaData.messageId || null;
+          
+          await supabase
+            .from('ai_notification_log')
+            .update({ 
+              status: 'sent',
+              sent_at: new Date().toISOString(),
+              external_message_id: externalMessageId,
+              metadata: { phone_format_used: formattedPhone.length === 12 ? 'without_nine' : 'with_nine' }
+            })
+            .eq('id', logId);
+
+          console.log('✅ WhatsApp sent successfully, messageId:', externalMessageId);
+          return externalMessageId;
         }
 
-        const externalMessageId = megaData.id || megaData.key?.id || megaData.messageId || null;
-        
-        await supabase
-          .from('ai_notification_log')
-          .update({ 
-            status: 'sent',
-            sent_at: new Date().toISOString(),
-            external_message_id: externalMessageId,
-          })
-          .eq('id', logId);
+        // 🛡️ REGISTRAR ERROS 401/403 (não tentar outras variantes)
+        if (response.status === 401 || response.status === 403) {
+          console.error(`❌ Auth error (${response.status}):`, responseText.substring(0, 200));
+          
+          await recordInfrastructureError(supabase, 'mega_api_401', {
+            errorMessage: `HTTP ${response.status}: ${responseText.substring(0, 500)}`,
+            instanceKey: instance.instance_key,
+            endpoint: fullUrl,
+            httpStatus: response.status,
+            orderId,
+            recipient: phone
+          });
+          
+          // Auth error - não adianta tentar outras variantes
+          throw new Error(`Auth error: ${response.status}`);
+        }
 
-        console.log('✅ WhatsApp sent successfully, messageId:', externalMessageId);
-        return externalMessageId;
-      }
+        // Erro 400/404 pode ser número inválido - tentar próxima variante
+        if ((response.status === 400 || response.status === 404) && !isLastVariant) {
+          console.log(`⚠️ Number format issue, trying next variant...`);
+          break; // Sair do retry loop, ir para próxima variante
+        }
 
-      // 🛡️ REGISTRAR ERROS 401/403
-      if (response.status === 401 || response.status === 403) {
-        console.error(`❌ Auth error (${response.status}):`, responseText.substring(0, 200));
+        // Detectar desconexão na resposta (só se for evidência clara)
+        const lowerError = responseText.toLowerCase();
+        const isDisconnected = 
+          (lowerError.includes('disconnected') && lowerError.includes('instance')) ||
+          (lowerError.includes('not connected') && response.status >= 400) ||
+          (lowerError.includes('waiting_scan') && response.status >= 400);
         
-        await recordInfrastructureError(supabase, 'mega_api_401', {
-          errorMessage: `HTTP ${response.status}: ${responseText.substring(0, 500)}`,
-          instanceKey: instance.instance_key,
-          endpoint: fullUrl,
-          httpStatus: response.status,
-          orderId,
-          recipient: phone
-        });
-        
-        // Não tentar retry para erros de autenticação
-        break;
-      }
+        if (isDisconnected) {
+          console.error(`❌ WhatsApp confirmed disconnected:`, responseText.substring(0, 200));
+          
+          await recordInfrastructureError(supabase, 'whatsapp_instance_disconnected', {
+            errorMessage: responseText.substring(0, 500),
+            instanceKey: instance.instance_key,
+            endpoint: fullUrl,
+            httpStatus: response.status,
+            orderId,
+            recipient: phone
+          });
 
-      // Detectar desconexão na resposta
-      const lowerError = responseText.toLowerCase();
-      if (lowerError.includes('disconnected') || lowerError.includes('waiting_scan') || lowerError.includes('not connected')) {
-        console.error(`❌ WhatsApp disconnected:`, responseText.substring(0, 200));
-        
-        await recordInfrastructureError(supabase, 'whatsapp_instance_disconnected', {
-          errorMessage: responseText.substring(0, 500),
-          instanceKey: instance.instance_key,
-          endpoint: fullUrl,
-          httpStatus: response.status,
-          orderId,
-          recipient: phone
-        });
+          // Atualizar status no banco (evidência real de desconexão)
+          await supabase
+            .from('whatsapp_instances')
+            .update({ status: 'waiting_scan', updated_at: new Date().toISOString() })
+            .eq('instance_key', instance.instance_key);
+          
+          throw new Error('WhatsApp instance disconnected');
+        }
 
-        // Atualizar status no banco
-        await supabase
-          .from('whatsapp_instances')
-          .update({ status: 'waiting_scan' })
-          .eq('instance_key', instance.instance_key);
+        // Retry para outros erros
+        if (attempt < MAX_RETRIES) {
+          console.log(`⏳ Retrying in ${RETRY_DELAY_MS * attempt}ms...`);
+          await delayMs(RETRY_DELAY_MS * attempt);
+        }
+      } catch (fetchError) {
+        // Se é erro que jogamos, propagar
+        if (fetchError instanceof Error && (fetchError.message.includes('Auth error') || fetchError.message.includes('disconnected'))) {
+          throw fetchError;
+        }
         
-        break;
+        console.error(`❌ Fetch error (attempt ${attempt}):`, fetchError);
+        
+        if (attempt < MAX_RETRIES) {
+          await delayMs(RETRY_DELAY_MS * attempt);
+        } else if (isLastVariant) {
+          await recordInfrastructureError(supabase, 'mega_api_error', {
+            errorMessage: `Fetch error: ${String(fetchError)}`,
+            instanceKey: instance.instance_key,
+            endpoint: fullUrl,
+            orderId,
+            recipient: phone
+          });
+        }
       }
-
-      // Retry para outros erros
-      if (attempt < MAX_RETRIES) {
-        console.log(`⏳ Retrying in ${RETRY_DELAY_MS * attempt}ms...`);
-        await delayMs(RETRY_DELAY_MS * attempt);
-      }
-    } catch (fetchError) {
-      console.error(`❌ Fetch error (attempt ${attempt}):`, fetchError);
-      
-      if (attempt < MAX_RETRIES) {
-        await delayMs(RETRY_DELAY_MS * attempt);
-      } else {
-        await recordInfrastructureError(supabase, 'mega_api_error', {
-          errorMessage: `Fetch error: ${String(fetchError)}`,
-          instanceKey: instance.instance_key,
-          endpoint: fullUrl,
-          orderId,
-          recipient: phone
-        });
-      }
+    }
+    
+    // Delay entre variantes
+    if (!isLastVariant) {
+      await delayMs(500);
     }
   }
 
-  // Se chegou aqui, todas as tentativas falharam
+  // Se chegou aqui, todas as variantes e tentativas falharam
   await supabase.from('ai_notification_log').update({ 
     status: 'failed',
-    error_message: 'All retry attempts failed'
+    error_message: 'All phone variants and retry attempts failed'
   }).eq('id', logId);
   
-  throw new Error('Failed to send WhatsApp message after retries');
+  throw new Error('Failed to send WhatsApp message after all variants');
 }
