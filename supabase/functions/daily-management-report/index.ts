@@ -2198,14 +2198,36 @@ serve(async (req) => {
     // ========== BUSCAR DESTINATÁRIOS ==========
     let recipients: any[] = [];
     
-    if (testMode && (testPhone || testEmail)) {
-      recipients = [{ 
-        whatsapp: testPhone, 
-        email: testEmail,
-        id: null, 
-        full_name: 'Teste' 
-      }];
-      console.log('🧪 Test mode - sending to:', testPhone || testEmail);
+    // Buscar números de teste da config do agente (suporta múltiplos)
+    const { data: agentConfig } = await supabaseClient
+      .from('ai_agent_config')
+      .select('test_phones, test_phone')
+      .limit(1)
+      .maybeSingle();
+    
+    const configTestPhones = agentConfig?.test_phones || 
+      (agentConfig?.test_phone ? [agentConfig.test_phone] : []);
+    
+    if (testMode) {
+      // Em modo teste, usar números de teste passados no request OU da configuração
+      const testPhonesToUse = testPhone ? [testPhone] : configTestPhones;
+      
+      if (testPhonesToUse.length > 0 || testEmail) {
+        recipients = testPhonesToUse.map((phone: string) => ({
+          whatsapp: phone,
+          email: testEmail,
+          id: null,
+          full_name: 'Teste'
+        }));
+        
+        // Se só tem email e nenhum telefone, adicionar
+        if (testPhonesToUse.length === 0 && testEmail) {
+          recipients = [{ whatsapp: null, email: testEmail, id: null, full_name: 'Teste' }];
+        }
+        
+        console.log(`🧪 Test mode - sending to ${recipients.length} test recipient(s):`, 
+          recipients.map(r => r.whatsapp || r.email));
+      }
     } else {
       // Buscar da tabela management_report_recipients
       const { data: recipientsData, error: recipientsError } = await supabaseClient

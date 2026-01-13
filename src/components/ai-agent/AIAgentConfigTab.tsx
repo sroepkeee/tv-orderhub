@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { Save, MessageSquare, Mail, Clock, Bell, AlertTriangle, FlaskConical, Smartphone, Settings } from "lucide-react";
+import { Save, MessageSquare, Mail, Clock, Bell, AlertTriangle, FlaskConical, Smartphone, Settings, Plus, X } from "lucide-react";
 import { toast } from "sonner";
 import { NOTIFICATION_PHASE_OPTIONS } from "@/lib/notificationPhases";
 
@@ -36,6 +36,7 @@ interface AgentConfig {
   auto_reply_delay_ms?: number;
   auto_reply_contact_types?: string[];
   test_phone?: string | null;
+  test_phones?: string[];
   use_signature?: boolean;
   closing_style?: string;
   conversation_style?: string;
@@ -173,7 +174,7 @@ export function AIAgentConfigTab({ config, onUpdate }: Props) {
         </CardContent>
       </Card>
 
-      {/* Modo Teste */}
+      {/* Modo Teste - Múltiplos Números */}
       <Card className="border-2 border-amber-500/30 bg-gradient-to-br from-amber-500/5 to-transparent">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -184,33 +185,91 @@ export function AIAgentConfigTab({ config, onUpdate }: Props) {
             </Badge>
           </CardTitle>
           <CardDescription>
-            Configure um número de teste para receber cópia de todas as notificações enviadas por qualquer agente
+            Configure números de teste para receber cópia de todas as notificações enviadas por qualquer agente
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-start gap-3 p-4 rounded-lg bg-amber-500/10 border border-amber-500/20">
             <Smartphone className="h-5 w-5 text-amber-500 mt-0.5" />
-            <div className="space-y-2 flex-1">
-              <Label>Número de Teste (WhatsApp)</Label>
-              <Input
-                type="tel"
-                value={formData.test_phone ?? config.test_phone ?? ''}
-                onChange={(e) => updateField('test_phone', e.target.value || null)}
-                placeholder="Ex: 5551999050190"
-                className="bg-background"
-              />
+            <div className="space-y-3 flex-1">
+              <Label>Números de Teste (WhatsApp)</Label>
+              
+              {/* Lista de números cadastrados */}
+              <div className="space-y-2">
+                {(formData.test_phones ?? config.test_phones ?? []).map((phone, index) => (
+                  <div key={index} className="flex items-center gap-2">
+                    <Badge variant="secondary" className="flex-1 justify-between py-2 px-3 font-mono">
+                      {phone}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const currentPhones = formData.test_phones ?? config.test_phones ?? [];
+                          const newPhones = currentPhones.filter((_, i) => i !== index);
+                          updateField('test_phones', newPhones);
+                        }}
+                        className="ml-2 text-muted-foreground hover:text-destructive transition-colors"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </Badge>
+                  </div>
+                ))}
+              </div>
+              
+              {/* Input para adicionar novo número */}
+              <div className="flex gap-2">
+                <Input
+                  type="tel"
+                  id="new-test-phone"
+                  placeholder="Ex: 5551999050190"
+                  className="bg-background font-mono"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      const input = e.target as HTMLInputElement;
+                      const newPhone = input.value.replace(/\D/g, '');
+                      if (newPhone.length >= 10) {
+                        const currentPhones = formData.test_phones ?? config.test_phones ?? [];
+                        if (!currentPhones.includes(newPhone)) {
+                          updateField('test_phones', [...currentPhones, newPhone]);
+                          input.value = '';
+                        }
+                      }
+                    }
+                  }}
+                />
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    const input = document.getElementById('new-test-phone') as HTMLInputElement;
+                    const newPhone = input?.value.replace(/\D/g, '');
+                    if (newPhone && newPhone.length >= 10) {
+                      const currentPhones = formData.test_phones ?? config.test_phones ?? [];
+                      if (!currentPhones.includes(newPhone)) {
+                        updateField('test_phones', [...currentPhones, newPhone]);
+                        input.value = '';
+                      }
+                    }
+                  }}
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
+              
               <p className="text-xs text-muted-foreground">
-                Se configurado, este número receberá uma cópia de TODAS as notificações enviadas aos clientes, 
+                Todos esses números receberão cópia de TODAS as notificações enviadas aos clientes, 
                 com informações de debug (nome do cliente real, telefone, etc.)
               </p>
             </div>
           </div>
           
-          {(formData.test_phone ?? config.test_phone) && (
+          {(formData.test_phones ?? config.test_phones ?? []).length > 0 && (
             <div className="flex items-center gap-2 p-3 rounded-lg bg-green-500/10 border border-green-500/20">
               <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
               <span className="text-sm text-green-700 dark:text-green-400">
-                Modo teste ativo! Notificações serão enviadas para: {formData.test_phone ?? config.test_phone}
+                Modo teste ativo! {(formData.test_phones ?? config.test_phones ?? []).length} número(s) receberão cópias
               </span>
             </div>
           )}
