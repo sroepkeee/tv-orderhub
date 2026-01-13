@@ -856,7 +856,7 @@ async function sendWhatsAppMessage(
   // Buscar instância conectada
   const { data: instance } = await supabase
     .from('whatsapp_instances')
-    .select('*')
+    .select('*, api_token')
     .eq('status', 'connected')
     .eq('is_active', true)
     .limit(1)
@@ -878,7 +878,8 @@ async function sendWhatsAppMessage(
   }
 
   const megaApiUrl = Deno.env.get('MEGA_API_URL');
-  const megaApiToken = Deno.env.get('MEGA_API_TOKEN');
+  // BUSCAR TOKEN DO BANCO (prioridade) ou fallback para ENV
+  const megaApiToken = instance.api_token || Deno.env.get('MEGA_API_TOKEN') || '';
 
   if (!megaApiUrl || !megaApiToken) {
     await supabase.from('ai_notification_log').update({ 

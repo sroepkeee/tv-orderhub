@@ -35,6 +35,16 @@ Deno.serve(async (req) => {
     console.log('Checking connection status for instance:', megaApiInstance);
     console.log('Base URL:', megaApiUrl);
 
+    // Buscar token do banco se disponível
+    const { data: dbInstance } = await supabase
+      .from('whatsapp_instances')
+      .select('api_token')
+      .eq('instance_key', megaApiInstance)
+      .maybeSingle();
+    
+    // Usar token do banco (prioridade) ou fallback para ENV
+    const effectiveToken = dbInstance?.api_token || megaApiToken;
+
     // Lista de endpoints para tentar (diferentes versões da API)
     const endpoints = [
       `/rest/instance/connectionState/${megaApiInstance}`,
@@ -54,10 +64,11 @@ Deno.serve(async (req) => {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout
 
+        // Usar formato apikey (padronizado)
         response = await fetch(statusUrl, {
           method: 'GET',
           headers: {
-            'Authorization': `Bearer ${megaApiToken}`,
+            'apikey': effectiveToken,
             'Content-Type': 'application/json',
           },
           signal: controller.signal,
