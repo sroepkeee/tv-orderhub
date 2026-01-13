@@ -285,6 +285,30 @@ Deno.serve(async (req) => {
           break; // Sucesso
         } else if (megaResponse.status === 401 || megaResponse.status === 403) {
           lastError = `${megaResponse.status}: ${responseText}`;
+          
+          // Registrar erro de autenticação para aprendizado (fire and forget)
+          try {
+            await supabase.from('ai_learning_feedback').insert({
+              agent_instance_id: null,
+              message_content: `[INFRA] mega_api_401: ${fullUrl}`,
+              response_content: responseText.substring(0, 2000),
+              confidence_score: 0,
+              resolution_status: 'failed',
+              response_time_ms: 0,
+              knowledge_gaps_detected: ['mega_api_401'],
+              customer_sentiment: 'neutral',
+              feedback_source: 'infrastructure',
+              feedback_notes: JSON.stringify({
+                instanceKey: megaApiInstance,
+                httpStatus: megaResponse.status,
+                timestamp: new Date().toISOString()
+              })
+            });
+            console.log('📊 Auth error recorded for learning');
+          } catch (recordErr) {
+            console.error('Failed to record auth error:', recordErr);
+          }
+          
           continue; // Tentar próximo header
         } else {
           lastError = `${megaResponse.status}: ${responseText}`;
@@ -296,6 +320,28 @@ Deno.serve(async (req) => {
     }
 
     if (!megaData) {
+      // Registrar erro geral da API
+      try {
+        await supabase.from('ai_learning_feedback').insert({
+          agent_instance_id: null,
+          message_content: `[INFRA] mega_api_error: All phone variants failed`,
+          response_content: lastError.substring(0, 2000),
+          confidence_score: 0,
+          resolution_status: 'failed',
+          response_time_ms: 0,
+          knowledge_gaps_detected: ['mega_api_error'],
+          customer_sentiment: 'neutral',
+          feedback_source: 'infrastructure',
+          feedback_notes: JSON.stringify({
+            instanceKey: megaApiInstance,
+            carrierName: carrier.name,
+            timestamp: new Date().toISOString()
+          })
+        });
+      } catch (recordErr) {
+        console.error('Failed to record API error:', recordErr);
+      }
+      
       throw new Error(`All phone variants failed. Last error: ${lastError}`);
     }
     

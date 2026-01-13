@@ -67,6 +67,42 @@ const ERROR_TYPES: Record<string, {
       keywords: ['whatsapp', 'conexão', 'offline', 'instância']
     }
   },
+  mega_api_401: {
+    label: 'API WhatsApp Não Autorizada',
+    icon: AlertCircle,
+    severity: 'error',
+    description: 'Erro 401 ao tentar enviar mensagem - Token inválido ou instância desconectada',
+    suggestion: {
+      title: 'Verificar credenciais da Mega API',
+      content: '1. Verificar se o token MEGA_API_TOKEN está correto nas secrets\n2. Reconectar a instância via QR Code\n3. Verificar se a instância não expirou\n4. Testar conexão na aba Configurações > WhatsApp',
+      category: 'Infraestrutura',
+      keywords: ['api', 'token', '401', 'autorização', 'mega']
+    }
+  },
+  mega_api_error: {
+    label: 'Erro Mega API',
+    icon: AlertCircle,
+    severity: 'error',
+    description: 'Erro geral na comunicação com a API do WhatsApp',
+    suggestion: {
+      title: 'Diagnosticar erro Mega API',
+      content: '1. Verificar se a URL MEGA_API_URL está correta\n2. Confirmar que a instância existe no painel da Mega API\n3. Verificar logs da edge function para detalhes\n4. Testar envio manual pela interface',
+      category: 'Infraestrutura',
+      keywords: ['mega', 'api', 'erro', 'whatsapp']
+    }
+  },
+  notification_failed: {
+    label: 'Notificação Falhou',
+    icon: AlertTriangle,
+    severity: 'warning',
+    description: 'Falha ao enviar notificação automática para cliente',
+    suggestion: {
+      title: 'Verificar configuração de notificações',
+      content: '1. Verificar se o número de telefone do cliente está correto\n2. Checar status da instância WhatsApp\n3. Revisar logs de erro da edge function\n4. Verificar se o agente está ativo',
+      category: 'Notificações',
+      keywords: ['notificação', 'envio', 'falha', 'cliente']
+    }
+  },
   rag_no_context: {
     label: 'Sem Contexto RAG',
     icon: Database,
@@ -108,6 +144,18 @@ const ERROR_TYPES: Record<string, {
       content: 'O agente respondeu com baixa confiança, indicando incerteza.\n\nRecomendações:\n1. Adicionar mais exemplos de treinamento\n2. Expandir a base de conhecimento sobre o tema\n3. Definir respostas padrão para casos ambíguos\n4. Configurar threshold para escalação automática',
       category: 'Treinamento',
       keywords: ['confiança', 'incerteza', 'treinamento', 'baixa']
+    }
+  },
+  report_send_failed: {
+    label: 'Relatório Não Enviado',
+    icon: AlertTriangle,
+    severity: 'warning',
+    description: 'Falha ao enviar relatório gerencial via WhatsApp',
+    suggestion: {
+      title: 'Verificar envio de relatórios',
+      content: '1. Verificar se a instância WhatsApp está conectada\n2. Confirmar que os números de destino estão corretos\n3. Revisar logs da edge function daily-management-report\n4. Testar envio manual com modo de teste',
+      category: 'Relatórios',
+      keywords: ['relatório', 'envio', 'whatsapp', 'gerencial']
     }
   }
 };
