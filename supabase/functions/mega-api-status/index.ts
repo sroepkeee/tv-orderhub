@@ -42,60 +42,93 @@ Deno.serve(async (req) => {
       .eq('instance_key', megaApiInstance)
       .maybeSingle();
     
-    // Usar token do banco (prioridade) ou fallback para ENV
-    const effectiveToken = dbInstance?.api_token || megaApiToken;
+    // Helper: Verificar se token é placeholder
+    const isPlaceholderToken = (token: string | null | undefined): boolean => {
+      if (!token || token.trim() === '') return true;
+      const placeholders = ['SEU_TOKEN', 'API_KEY', 'YOUR_TOKEN', 'TOKEN_AQUI', 'PLACEHOLDER', 'XXX'];
+      return placeholders.some(p => token.toUpperCase().includes(p));
+    };
+    
+    // Obter token efetivo (banco ou env, ignorando placeholders)
+    let effectiveToken = dbInstance?.api_token;
+    if (isPlaceholderToken(effectiveToken)) {
+      console.log('⚠️ Database token is placeholder, using MEGA_API_TOKEN from env');
+      effectiveToken = megaApiToken;
+    }
+    
+    if (isPlaceholderToken(effectiveToken)) {
+      console.error('❌ No valid token available (db or env)');
+    }
 
     // Lista de endpoints para tentar (diferentes versões da API)
     const endpoints = [
       `/rest/instance/connectionState/${megaApiInstance}`,
       `/instance/connectionState/${megaApiInstance}`,
     ];
+    
+    // Lista de headers para tentar (diferentes formatos de auth)
+    const headerTypes = ['apikey', 'Bearer', 'Apikey'];
 
     let lastError = null;
     let response = null;
     let data = null;
 
-    // Tentar cada endpoint com timeout de 8 segundos
+    // Tentar cada endpoint com múltiplos headers
     for (const endpoint of endpoints) {
       const statusUrl = `${megaApiUrl}${endpoint}`;
       console.log('Trying endpoint:', statusUrl);
 
-      try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout
-
-        // Usar formato apikey (padronizado)
-        response = await fetch(statusUrl, {
-          method: 'GET',
-          headers: {
-            'apikey': effectiveToken,
-            'Content-Type': 'application/json',
-          },
-          signal: controller.signal,
-        });
-
-        clearTimeout(timeoutId);
-
-        if (response.ok) {
-          data = await response.json();
-          console.log('Success with endpoint:', endpoint);
-          break;
-        } else if (response.status === 404) {
-          console.log('Endpoint not found (404):', endpoint);
-          lastError = `Endpoint not found: ${endpoint}`;
+      for (const headerType of headerTypes) {
+        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+        
+        if (headerType === 'apikey') {
+          headers['apikey'] = effectiveToken || '';
+        } else if (headerType === 'Bearer') {
+          headers['Authorization'] = `Bearer ${effectiveToken || ''}`;
         } else {
-          console.log('Endpoint failed:', endpoint, 'Status:', response.status);
-          lastError = `API returned status ${response.status}`;
+          headers['Apikey'] = effectiveToken || '';
         }
-      } catch (fetchError) {
-        console.log('Fetch error for endpoint:', endpoint, 'Error:', fetchError);
-        lastError = fetchError instanceof Error ? fetchError.message : 'Unknown fetch error';
-        // Don't continue if timeout - API is down
-        if (fetchError instanceof Error && fetchError.name === 'AbortError') {
-          console.log('Request timed out, skipping remaining endpoints');
-          break;
+
+        try {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 8000);
+
+          response = await fetch(statusUrl, {
+            method: 'GET',
+            headers,
+            signal: controller.signal,
+          });
+
+          clearTimeout(timeoutId);
+
+          if (response.ok) {
+            data = await response.json();
+            console.log(`✅ Success with endpoint: ${endpoint}, header: ${headerType}`);
+            break;
+          } else if (response.status === 404) {
+            console.log('Endpoint not found (404):', endpoint);
+            lastError = `Endpoint not found: ${endpoint}`;
+            break; // Try next endpoint
+          } else if (response.status === 401 || response.status === 403) {
+            console.log(`Auth failed with ${headerType} (${response.status}), trying next header...`);
+            lastError = `Auth failed with ${headerType}`;
+            continue; // Try next header
+          } else {
+            console.log('Endpoint failed:', endpoint, 'Status:', response.status);
+            lastError = `API returned status ${response.status}`;
+          }
+        } catch (fetchError) {
+          console.log('Fetch error for endpoint:', endpoint, 'Error:', fetchError);
+          lastError = fetchError instanceof Error ? fetchError.message : 'Unknown fetch error';
+          if (fetchError instanceof Error && fetchError.name === 'AbortError') {
+            console.log('Request timed out');
+            break;
+          }
         }
       }
+      
+      // Se obteve dados, sair do loop
+      if (data) break;
     }
 
     // Buscar dados salvos da instância
