@@ -1694,6 +1694,40 @@ async function verifyConnectionBeforeSend(supabaseClient: any): Promise<{ connec
   }
 }
 
+// ==================== FUNÇÃO PARA REGISTRAR ERROS DE INFRAESTRUTURA ====================
+async function recordInfrastructureError(
+  supabaseClient: any,
+  errorType: string,
+  details: {
+    errorMessage: string;
+    instanceKey?: string;
+    endpoint?: string;
+    httpStatus?: number;
+  }
+): Promise<void> {
+  try {
+    await supabaseClient.from('ai_learning_feedback').insert({
+      agent_instance_id: null,
+      message_content: `[INFRA] ${errorType}: ${details.endpoint || 'N/A'}`,
+      response_content: (details.errorMessage || '').substring(0, 2000),
+      confidence_score: 0,
+      resolution_status: 'failed',
+      response_time_ms: 0,
+      knowledge_gaps_detected: [errorType],
+      customer_sentiment: 'neutral',
+      feedback_source: 'infrastructure',
+      feedback_notes: JSON.stringify({
+        instanceKey: details.instanceKey,
+        httpStatus: details.httpStatus,
+        timestamp: new Date().toISOString()
+      })
+    });
+    console.log(`📊 Infrastructure error recorded: ${errorType}`);
+  } catch (err) {
+    console.error('Failed to record infrastructure error:', err);
+  }
+}
+
 async function sendWhatsAppMessage(supabaseClient: any, phone: string, message: string): Promise<boolean> {
   const MAX_RETRIES = 2;
   const RETRY_DELAY_MS = 3000;
@@ -1892,13 +1926,48 @@ async function attemptSendWhatsAppMessage(
         .update({ status: 'waiting_scan', updated_at: new Date().toISOString() })
         .eq('instance_key', activeInstance.instance_key);
       
+      // Registrar erro de infraestrutura para aprendizado
+      await recordInfrastructureError(supabaseClient, 'whatsapp_instance_disconnected', {
+        errorMessage: responseText,
+        instanceKey: activeInstance.instance_key,
+        endpoint: fullUrl,
+        httpStatus: response.status
+      });
+      
       return { success: false, wasConnected: false };
+    }
+
+    // Registrar erros 401/403 para aprendizado
+    if (response.status === 401 || response.status === 403) {
+      await recordInfrastructureError(supabaseClient, 'mega_api_401', {
+        errorMessage: responseText,
+        instanceKey: activeInstance.instance_key,
+        endpoint: fullUrl,
+        httpStatus: response.status
+      });
+    } else {
+      // Outros erros da API
+      await recordInfrastructureError(supabaseClient, 'mega_api_error', {
+        errorMessage: responseText,
+        instanceKey: activeInstance.instance_key,
+        endpoint: fullUrl,
+        httpStatus: response.status
+      });
     }
 
     console.error(`❌ Mega API error: ${response.status} - ${responseText}`);
     return { success: false, wasConnected: true };
   } catch (error) {
     console.error('❌ Error sending WhatsApp message:', error);
+    
+    // Registrar erro de exceção
+    await recordInfrastructureError(supabaseClient, 'mega_api_error', {
+      errorMessage: error instanceof Error ? error.message : String(error),
+      instanceKey: 'unknown',
+      endpoint: 'unknown',
+      httpStatus: 0
+    });
+    
     return { success: false, wasConnected: true };
   }
 }
