@@ -167,6 +167,30 @@ async function getActiveInstance(supabase: any) {
   return instance;
 }
 
+// Helper: Verificar se token é placeholder
+function isPlaceholderToken(token: string | null | undefined): boolean {
+  if (!token || token.trim() === '') return true;
+  const placeholders = ['SEU_TOKEN', 'API_KEY', 'YOUR_TOKEN', 'TOKEN_AQUI', 'PLACEHOLDER'];
+  return placeholders.some(p => token.toUpperCase().includes(p));
+}
+
+// Helper: Gerar variantes de telefone (sem 9 e com 9)
+function getPhoneVariants(phone: string): string[] {
+  let canonical = phone.replace(/\D/g, '');
+  if (!canonical.startsWith('55')) canonical = `55${canonical}`;
+  
+  // Normalizar para 12 dígitos (sem 9)
+  if (canonical.length === 13 && canonical[4] === '9') {
+    canonical = canonical.slice(0, 4) + canonical.slice(5);
+  }
+  
+  const without9 = canonical; // 55DDXXXXXXXX (12 dígitos)
+  const with9 = canonical.slice(0, 4) + '9' + canonical.slice(4); // 55DD9XXXXXXXX (13 dígitos)
+  
+  // Preferir sem 9 primeiro (padrão WhatsApp oficial)
+  return [without9, with9];
+}
+
 async function sendWhatsApp(supabase: any, phone: string, message: string): Promise<boolean> {
   try {
     const instance = await getActiveInstance(supabase);
@@ -175,34 +199,56 @@ async function sendWhatsApp(supabase: any, phone: string, message: string): Prom
       return false;
     }
 
-    let phoneNumber = phone.replace(/\D/g, '');
-    if (!phoneNumber.startsWith('55')) phoneNumber = `55${phoneNumber}`;
-    if (phoneNumber.length === 12) {
-      phoneNumber = phoneNumber.substring(0, 4) + '9' + phoneNumber.substring(4);
+    // Obter token com fallback robusto
+    let token = instance.api_token;
+    if (isPlaceholderToken(token)) {
+      console.warn('⚠️ Token do banco é placeholder, usando MEGA_API_TOKEN do environment');
+      token = Deno.env.get('MEGA_API_TOKEN') || '';
+    }
+    
+    if (!token || token.trim() === '') {
+      console.error('❌ No valid API token available');
+      return false;
     }
 
     let megaApiUrl = (Deno.env.get('MEGA_API_URL') ?? '').trim();
     if (!megaApiUrl.startsWith('http')) megaApiUrl = `https://${megaApiUrl}`;
     megaApiUrl = megaApiUrl.replace(/\/+$/, '');
     
-    const token = instance.api_token || Deno.env.get('MEGA_API_TOKEN') || '';
     const url = `${megaApiUrl}/rest/sendMessage/${instance.instance_key}/text`;
+    const phoneVariants = getPhoneVariants(phone);
 
-    console.log(`📤 Sending to ${phoneNumber} via ${instance.instance_key}`);
+    console.log(`📤 Attempting to send to variants: ${phoneVariants.join(', ')} via ${instance.instance_key}`);
 
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'apikey': token },
-      body: JSON.stringify({ messageData: { to: phoneNumber, text: message, linkPreview: false } }),
-    });
+    // Tentar cada variante de telefone
+    for (const phoneNumber of phoneVariants) {
+      console.log(`📲 Trying ${phoneNumber}...`);
+      
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'apikey': token },
+        body: JSON.stringify({ messageData: { to: phoneNumber, text: message, linkPreview: false } }),
+      });
 
-    if (res.ok) {
-      console.log('✅ WhatsApp sent to:', phoneNumber);
-      return true;
+      if (res.ok) {
+        console.log('✅ WhatsApp sent to:', phoneNumber);
+        return true;
+      }
+
+      const err = await res.text();
+      console.warn(`⚠️ Failed for ${phoneNumber}: ${res.status} - ${err.substring(0, 100)}`);
+      
+      // Se erro 400/404, tentar próxima variante
+      if (res.status === 400 || res.status === 404) {
+        continue;
+      }
+      
+      // Para outros erros (401, 500, etc), não tentar mais
+      console.error(`❌ Error ${res.status}: ${err.substring(0, 200)}`);
+      return false;
     }
 
-    const err = await res.text();
-    console.error(`❌ Error ${res.status}: ${err.substring(0, 200)}`);
+    console.error('❌ All phone variants failed');
     return false;
   } catch (error) {
     console.error('❌ WhatsApp error:', error);
