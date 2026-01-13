@@ -1848,24 +1848,28 @@ async function attemptSendWhatsAppMessage(
       }
     }
 
-    // NOVO PADRÃO: 55 + DDD + 8 dígitos (SEM o 9)
+    // CORREÇÃO: Manter formato brasileiro completo (55 + DDD + 9 + 8 dígitos = 13 dígitos)
+    // Celulares brasileiros PRECISAM do 9 - NÃO remover!
     let phoneNumber = phone.replace(/\D/g, '');
     if (!phoneNumber.startsWith('55')) {
       phoneNumber = `55${phoneNumber}`;
     }
-    // Remover o 9 se presente (formato antigo)
-    if (phoneNumber.length === 13 && phoneNumber.startsWith('55') && phoneNumber.charAt(4) === '9') {
+    // Se tem apenas 12 dígitos, adicionar o 9 (provavelmente está faltando)
+    if (phoneNumber.length === 12 && phoneNumber.startsWith('55')) {
       const ddd = phoneNumber.substring(2, 4);
-      const numero = phoneNumber.substring(5);
-      phoneNumber = '55' + ddd + numero;
+      const numero = phoneNumber.substring(4);
+      phoneNumber = '55' + ddd + '9' + numero;
     }
+    console.log(`📱 Número normalizado: ${phone} -> ${phoneNumber}`);
 
     let megaApiUrl = (Deno.env.get('MEGA_API_URL') ?? '').trim();
     if (!megaApiUrl.startsWith('http://') && !megaApiUrl.startsWith('https://')) {
       megaApiUrl = `https://${megaApiUrl}`;
     }
     megaApiUrl = megaApiUrl.replace(/\/+$/, '');
-    const megaApiToken = Deno.env.get('MEGA_API_TOKEN') ?? '';
+    
+    // BUSCAR TOKEN DO BANCO (prioridade) ou fallback para ENV
+    const megaApiToken = activeInstance.api_token || Deno.env.get('MEGA_API_TOKEN') || '';
 
     console.log(`📤 [Attempt ${attemptNumber}] Sending WhatsApp to ${phoneNumber} via instance ${activeInstance.instance_key}`);
 

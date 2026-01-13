@@ -178,10 +178,10 @@ Deno.serve(async (req) => {
       ? `*Pedido ${order.order_number}* - ${order.customer_name}\n\n${message}`
       : message;
 
-    // Buscar instância conectada do banco de dados
+    // Buscar instância conectada do banco de dados (incluindo api_token)
     const { data: activeInstance } = await supabase
       .from('whatsapp_instances')
-      .select('instance_key')
+      .select('instance_key, api_token')
       .eq('status', 'connected')
       .maybeSingle();
 
@@ -200,7 +200,8 @@ Deno.serve(async (req) => {
     // Remover barra final se houver
     megaApiUrl = megaApiUrl.replace(/\/+$/, '');
     
-    const megaApiToken = Deno.env.get('MEGA_API_TOKEN') ?? '';
+    // BUSCAR TOKEN DO BANCO (prioridade) ou fallback para ENV
+    const megaApiToken = activeInstance.api_token || Deno.env.get('MEGA_API_TOKEN') || '';
     const megaApiInstance = activeInstance.instance_key;
     
     console.log('✅ Using WhatsApp instance from DB:', megaApiInstance);
