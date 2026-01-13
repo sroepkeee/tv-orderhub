@@ -63,6 +63,7 @@ export type Database = {
           respect_working_hours: boolean
           signature: string | null
           test_phone: string | null
+          test_phones: string[] | null
           tone_of_voice: string
           updated_at: string | null
           use_signature: boolean | null
@@ -97,6 +98,7 @@ export type Database = {
           respect_working_hours?: boolean
           signature?: string | null
           test_phone?: string | null
+          test_phones?: string[] | null
           tone_of_voice?: string
           updated_at?: string | null
           use_signature?: boolean | null
@@ -131,6 +133,7 @@ export type Database = {
           respect_working_hours?: boolean
           signature?: string | null
           test_phone?: string | null
+          test_phones?: string[] | null
           tone_of_voice?: string
           updated_at?: string | null
           use_signature?: boolean | null

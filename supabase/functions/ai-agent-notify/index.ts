@@ -215,8 +215,9 @@ serve(async (req) => {
 
     const results = [];
     
-    // 🧪 MODO TESTE: Enviar cópia para número de teste
-    const testPhone = agentConfig.test_phone;
+    // 🧪 MODO TESTE: Enviar cópia para números de teste (suporta múltiplos)
+    const testPhones = agentConfig.test_phones || 
+      (agentConfig.test_phone ? [agentConfig.test_phone] : []);
     const recipientsToNotify = [];
     
     // Adicionar destinatário principal (apenas se tiver WhatsApp)
@@ -228,14 +229,19 @@ serve(async (req) => {
       });
     }
     
-    // ✅ IMPORTANTE: Número de teste SEMPRE recebe cópia (mesmo sem cliente)
-    if (testPhone) {
-      recipientsToNotify.push({
-        phone: testPhone,
-        name: `[TESTE] ${order.customer_name}`,
-        isTest: true
-      });
-      console.log('🧪 Test mode active - will send to test phone:', testPhone);
+    // ✅ IMPORTANTE: Todos os números de teste recebem cópia (mesmo sem cliente)
+    for (const testPhone of testPhones) {
+      if (testPhone) {
+        recipientsToNotify.push({
+          phone: testPhone,
+          name: `[TESTE] ${order.customer_name}`,
+          isTest: true
+        });
+      }
+    }
+    
+    if (testPhones.length > 0) {
+      console.log('🧪 Test mode active - will send to test phones:', testPhones);
     }
     
     // ⚠️ Se não há nenhum destinatário, logar e retornar
