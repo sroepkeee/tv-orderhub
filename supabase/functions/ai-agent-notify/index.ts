@@ -7,6 +7,17 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// =====================================================
+// 🛡️ CONSTANTES DE ESTABILIDADE (sincronizadas com daily-management-report)
+// =====================================================
+const DELAY_BETWEEN_SENDS_MS = 3000; // 3s entre envios
+const MIN_CONNECTION_AGE_MS = 60000; // 60s mínimo de conexão estável
+const MAX_RETRIES = 2;
+const RETRY_DELAY_MS = 3000;
+
+// Helper para delay
+const delayMs = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
 interface NotificationRequest {
   order_id?: string;
   trigger_type?: 'status_change' | 'deadline' | 'manual';
@@ -17,6 +28,162 @@ interface NotificationRequest {
   action?: 'resend';
   notificationId?: string;
 }
+
+// =====================================================
+// 🔍 FUNÇÕES DE VERIFICAÇÃO DE CONEXÃO
+// =====================================================
+
+/**
+ * Verifica o status da conexão WhatsApp via API Mega
+ */
+async function checkMegaAPIConnectionStatus(instanceKey: string): Promise<{
+  connected: boolean;
+  status: string;
+  error?: string;
+}> {
+  const megaApiUrl = Deno.env.get('MEGA_API_URL');
+  const megaApiToken = Deno.env.get('MEGA_API_TOKEN');
+
+  if (!megaApiUrl || !megaApiToken) {
+    return { connected: false, status: 'not_configured', error: 'Mega API not configured' };
+  }
+
+  let baseUrl = megaApiUrl.trim();
+  if (!baseUrl.startsWith('http://') && !baseUrl.startsWith('https://')) {
+    baseUrl = 'https://' + baseUrl;
+  }
+  baseUrl = baseUrl.replace(/\/$/, '');
+
+  try {
+    const statusUrl = `${baseUrl}/rest/instance/connectionState/${instanceKey}`;
+    const response = await fetch(statusUrl, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': megaApiToken,
+      },
+    });
+
+    const responseText = await response.text();
+    console.log(`📡 Mega API status check: ${response.status} - ${responseText.substring(0, 200)}`);
+
+    if (!response.ok) {
+      return { connected: false, status: 'api_error', error: `HTTP ${response.status}` };
+    }
+
+    const data = JSON.parse(responseText);
+    const state = data?.state || data?.instance?.state || 'unknown';
+    const isConnected = state === 'open' || state === 'connected';
+
+    return { connected: isConnected, status: state };
+  } catch (error) {
+    console.error('❌ Error checking Mega API status:', error);
+    return { connected: false, status: 'fetch_error', error: String(error) };
+  }
+}
+
+/**
+ * Verifica se há instância conectada e se está estável
+ */
+async function verifyConnectionBeforeSend(supabase: any): Promise<{
+  connected: boolean;
+  shouldWait: boolean;
+  instanceKey: string | null;
+  error?: string;
+}> {
+  // Buscar instância conectada no banco
+  const { data: instance, error } = await supabase
+    .from('whatsapp_instances')
+    .select('*')
+    .eq('status', 'connected')
+    .eq('is_active', true)
+    .limit(1)
+    .single();
+
+  if (error || !instance) {
+    console.log('❌ No connected WhatsApp instance in database');
+    return { connected: false, shouldWait: false, instanceKey: null, error: 'No connected instance' };
+  }
+
+  console.log(`📱 Found instance: ${instance.instance_key}, status: ${instance.status}`);
+
+  // Verificar se a conexão é recente (pode estar instável)
+  let shouldWait = false;
+  if (instance.connected_at) {
+    const connectedAt = new Date(instance.connected_at).getTime();
+    const connectionAge = Date.now() - connectedAt;
+    if (connectionAge < MIN_CONNECTION_AGE_MS) {
+      console.log(`⏳ Connection is recent (${Math.round(connectionAge / 1000)}s), should wait for stability`);
+      shouldWait = true;
+    }
+  }
+
+  // Verificar status real na API
+  const apiStatus = await checkMegaAPIConnectionStatus(instance.instance_key);
+  if (!apiStatus.connected) {
+    console.log(`❌ API reports disconnected: ${apiStatus.status}`);
+    
+    // Atualizar status no banco
+    await supabase
+      .from('whatsapp_instances')
+      .update({ status: 'waiting_scan' })
+      .eq('instance_key', instance.instance_key);
+
+    return { 
+      connected: false, 
+      shouldWait: false, 
+      instanceKey: instance.instance_key,
+      error: `API status: ${apiStatus.status}` 
+    };
+  }
+
+  return { connected: true, shouldWait, instanceKey: instance.instance_key };
+}
+
+/**
+ * Registra erros de infraestrutura para aparecer no painel de Aprendizado
+ */
+async function recordInfrastructureError(
+  supabase: any,
+  errorType: string,
+  details: {
+    errorMessage: string;
+    instanceKey?: string;
+    endpoint?: string;
+    httpStatus?: number;
+    orderId?: string;
+    recipient?: string;
+  }
+): Promise<void> {
+  try {
+    await supabase.from('ai_learning_feedback').insert({
+      agent_instance_id: null,
+      message_content: `[NOTIFY-INFRA] ${errorType}: ${details.endpoint || details.recipient || 'N/A'}`,
+      response_content: details.errorMessage.substring(0, 2000),
+      confidence_score: 0,
+      resolution_status: 'failed',
+      response_time_ms: 0,
+      knowledge_gaps_detected: [errorType],
+      customer_sentiment: 'neutral',
+      feedback_source: 'infrastructure',
+      feedback_notes: JSON.stringify({
+        function: 'ai-agent-notify',
+        instanceKey: details.instanceKey,
+        httpStatus: details.httpStatus,
+        orderId: details.orderId,
+        recipient: details.recipient,
+        timestamp: new Date().toISOString()
+      })
+    });
+    console.log(`📊 Infrastructure error recorded: ${errorType}`);
+  } catch (err) {
+    console.error('Failed to record infrastructure error:', err);
+  }
+}
+
+// =====================================================
+// 🚀 HANDLER PRINCIPAL
+// =====================================================
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -55,7 +222,8 @@ serve(async (req) => {
             supabase, 
             notification.recipient, 
             notification.message_content, 
-            notification.id
+            notification.id,
+            notification.order_id
           );
           
           return new Response(JSON.stringify({ 
@@ -109,6 +277,34 @@ serve(async (req) => {
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
+    }
+
+    // 🛡️ NOVA VERIFICAÇÃO: Checar conexão WhatsApp ANTES de prosseguir
+    const preCheck = await verifyConnectionBeforeSend(supabase);
+    if (!preCheck.connected) {
+      console.error('❌ WhatsApp não conectado. Notificação cancelada.');
+      
+      // Registrar erro no aprendizado
+      await recordInfrastructureError(supabase, 'whatsapp_instance_disconnected', {
+        errorMessage: preCheck.error || 'No connected WhatsApp instance',
+        instanceKey: preCheck.instanceKey || 'unknown',
+        orderId: payload.order_id
+      });
+      
+      return new Response(JSON.stringify({ 
+        success: false, 
+        message: 'WhatsApp disconnected. Please scan QR code.',
+        error: 'WHATSAPP_DISCONNECTED'
+      }), {
+        status: 503,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Aguardar estabilização se necessário
+    if (preCheck.shouldWait) {
+      console.log('⏳ Connection recent, waiting 30s for stabilization...');
+      await delayMs(30000);
     }
 
     // Verificar se o status está nas fases habilitadas
@@ -179,7 +375,6 @@ serve(async (req) => {
     if (!customerContact && order.customer_whatsapp) {
       customerContact = {
         id: null,
-        // ✨ Priorizar customer_contact_name se disponível
         customer_name: order.customer_contact_name || order.customer_name,
         email: null,
         whatsapp: order.customer_whatsapp,
@@ -188,7 +383,7 @@ serve(async (req) => {
         opt_in_email: true,
       };
       contactSource = 'order_whatsapp';
-      console.log('✅ Using customer_whatsapp from order:', order.customer_whatsapp, '- Contact name:', order.customer_contact_name || order.customer_name);
+      console.log('✅ Using customer_whatsapp from order:', order.customer_whatsapp);
     }
 
     // Se não encontrou nenhum contato
@@ -215,12 +410,12 @@ serve(async (req) => {
 
     const results = [];
     
-    // 🧪 MODO TESTE: Enviar cópia para números de teste (suporta múltiplos)
+    // 🧪 MODO TESTE: Enviar cópia para números de teste
     const testPhones = agentConfig.test_phones || 
       (agentConfig.test_phone ? [agentConfig.test_phone] : []);
     const recipientsToNotify = [];
     
-    // Adicionar destinatário principal (apenas se tiver WhatsApp)
+    // Adicionar destinatário principal
     if (customerContact.whatsapp) {
       recipientsToNotify.push({
         phone: customerContact.whatsapp,
@@ -229,7 +424,7 @@ serve(async (req) => {
       });
     }
     
-    // ✅ IMPORTANTE: Todos os números de teste recebem cópia (mesmo sem cliente)
+    // Adicionar números de teste
     for (const testPhone of testPhones) {
       if (testPhone) {
         recipientsToNotify.push({
@@ -244,9 +439,8 @@ serve(async (req) => {
       console.log('🧪 Test mode active - will send to test phones:', testPhones);
     }
     
-    // ⚠️ Se não há nenhum destinatário, logar e retornar
     if (recipientsToNotify.length === 0) {
-      console.log('❌ No recipients to notify - no customer whatsapp and no test phone configured');
+      console.log('❌ No recipients to notify');
       return new Response(JSON.stringify({ 
         success: false, 
         message: 'No recipients available - configure customer whatsapp or test phone',
@@ -266,7 +460,6 @@ serve(async (req) => {
         ? new Date(order.delivery_date).toLocaleDateString('pt-BR') 
         : 'A definir';
       
-      // Contar itens
       const itemsCount = order.order_items?.length || 0;
       const customerFirstName = customerContact.customer_name?.split(' ')[0] || 'Cliente';
 
@@ -283,8 +476,9 @@ serve(async (req) => {
         agentConfig
       );
 
-      // Enviar para cada destinatário
-      for (const recipient of recipientsToNotify) {
+      // 🛡️ ENVIO COM DELAY ENTRE DESTINATÁRIOS
+      for (let i = 0; i < recipientsToNotify.length; i++) {
+        const recipient = recipientsToNotify[i];
         if (channel === 'whatsapp' && !recipient.phone) continue;
 
         try {
@@ -315,7 +509,13 @@ serve(async (req) => {
               ? `🧪 *[MODO TESTE]*\n👤 Cliente: ${order.customer_name}\n📱 Tel: ${customerContact.whatsapp || 'N/A'}\n\n${messageContent}`
               : messageContent;
             
-            const externalMessageId = await sendWhatsAppMessage(supabase, recipient.phone, finalMessage, logEntry.id);
+            const externalMessageId = await sendWhatsAppMessage(
+              supabase, 
+              recipient.phone, 
+              finalMessage, 
+              logEntry.id,
+              order.id
+            );
             
             // Registrar na tabela de conversas
             if (!recipient.isTest) {
@@ -337,6 +537,12 @@ serve(async (req) => {
             recipient: recipient.phone,
             error: sendError?.message 
           });
+        }
+
+        // 🛡️ DELAY ENTRE ENVIOS (exceto último)
+        if (channel === 'whatsapp' && i < recipientsToNotify.length - 1) {
+          console.log(`⏳ Waiting ${DELAY_BETWEEN_SENDS_MS}ms before next recipient...`);
+          await delayMs(DELAY_BETWEEN_SENDS_MS);
         }
       }
     }
@@ -362,7 +568,10 @@ serve(async (req) => {
   }
 });
 
-// Emoji por status
+// =====================================================
+// 📋 FUNÇÕES AUXILIARES
+// =====================================================
+
 function getStatusEmoji(status: string): string {
   const emojis: Record<string, string> = {
     'almox_ssm_pending': '📥',
@@ -382,7 +591,6 @@ function getStatusEmoji(status: string): string {
     'delivered': '✅',
     'completed': '🎉',
     'delayed': '⚠️',
-    // Faturamento
     'ready_to_invoice': '📋',
     'pending_invoice_request': '📋',
     'invoice_requested': '🧾',
@@ -393,7 +601,6 @@ function getStatusEmoji(status: string): string {
   return emojis[status] || '📍';
 }
 
-// Traduzir status para português
 function translateStatus(status: string): string {
   const labels: Record<string, string> = {
     'almox_ssm_pending': 'Recebido no Almox SSM',
@@ -414,7 +621,6 @@ function translateStatus(status: string): string {
     'delivered': 'Entregue',
     'completed': 'Concluído',
     'delayed': 'Atrasado',
-    // Faturamento
     'ready_to_invoice': 'Pronto para Faturar',
     'pending_invoice_request': 'Aguardando Solicitação de Faturamento',
     'invoice_requested': 'Faturamento Solicitado',
@@ -425,7 +631,6 @@ function translateStatus(status: string): string {
   return labels[status] || status;
 }
 
-// Mapeamento de status para fases
 const STATUS_PHASE_MAP: Record<string, string[]> = {
   order_created: ['almox_ssm_pending', 'almox_ssm_received', 'almox_ssm_approved', 'order_generated'],
   in_production: ['separation_started', 'in_production', 'awaiting_material'],
@@ -434,12 +639,10 @@ const STATUS_PHASE_MAP: Record<string, string[]> = {
   in_transit: ['in_transit', 'collected'],
   delivered: ['delivered', 'completed'],
   delayed: ['delayed'],
-  // Fases de faturamento
   ready_to_invoice: ['ready_to_invoice', 'pending_invoice_request'],
   invoicing: ['invoice_requested', 'awaiting_invoice', 'invoice_issued', 'invoice_sent'],
 };
 
-// Gerar mensagem humanizada usando LLM
 async function generateHumanizedMessage(
   customerName: string,
   orderNumber: string,
@@ -453,7 +656,6 @@ async function generateHumanizedMessage(
 ): Promise<string> {
   const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
   
-  // Get config options
   const useSignature = agentConfig?.use_signature ?? false;
   const closingStyle = agentConfig?.closing_style ?? 'varied';
   const conversationStyle = agentConfig?.conversation_style ?? 'chatty';
@@ -466,7 +668,6 @@ async function generateHumanizedMessage(
   ];
   
   if (!openaiApiKey) {
-    // Fallback para template básico humanizado SEM assinatura repetitiva
     const closings = [
       'Me avisa se precisar de algo! 😊',
       'Qualquer coisa, só chamar!',
@@ -580,7 +781,6 @@ Gere APENAS a mensagem, sem explicações.`;
     throw new Error('No message generated');
   } catch (error) {
     console.error('⚠️ Error generating humanized message, using fallback:', error);
-    // Fallback humanizado SEM assinatura repetitiva
     const closings = [
       'Me avisa se precisar! 😊',
       'Tô aqui se quiser saber mais!',
@@ -642,17 +842,23 @@ async function registerConversation(
   }
 }
 
+// =====================================================
+// 📱 FUNÇÃO DE ENVIO COM RETRY E REGISTRO DE ERROS
+// =====================================================
+
 async function sendWhatsAppMessage(
   supabase: any, 
   phone: string, 
   message: string, 
-  logId: string
+  logId: string,
+  orderId?: string
 ): Promise<string | null> {
   // Buscar instância conectada
   const { data: instance } = await supabase
     .from('whatsapp_instances')
     .select('*')
     .eq('status', 'connected')
+    .eq('is_active', true)
     .limit(1)
     .single();
 
@@ -661,6 +867,13 @@ async function sendWhatsAppMessage(
       status: 'failed',
       error_message: 'No connected WhatsApp instance'
     }).eq('id', logId);
+    
+    await recordInfrastructureError(supabase, 'whatsapp_instance_disconnected', {
+      errorMessage: 'No connected WhatsApp instance found in database',
+      orderId,
+      recipient: phone
+    });
+    
     throw new Error('No connected WhatsApp instance');
   }
 
@@ -682,7 +895,7 @@ async function sendWhatsAppMessage(
   }
   baseUrl = baseUrl.replace(/\/$/, '');
 
-  // NOVO PADRÃO: 55 + DDD + 8 dígitos (SEM o 9)
+  // Normalizar telefone
   let formattedPhone = phone.replace(/\D/g, '');
   if (!formattedPhone.startsWith('55')) {
     formattedPhone = '55' + formattedPhone;
@@ -694,11 +907,9 @@ async function sendWhatsAppMessage(
     formattedPhone = '55' + ddd + numero;
   }
 
-  // ✅ ENDPOINT CORRETO: /rest/sendMessage/{instance}/text
   const endpoint = `/rest/sendMessage/${instance.instance_key}/text`;
   const fullUrl = `${baseUrl}${endpoint}`;
 
-  // ✅ BODY CORRETO: messageData com to, text, linkPreview
   const body = {
     messageData: {
       to: formattedPhone,
@@ -708,74 +919,113 @@ async function sendWhatsAppMessage(
   };
 
   console.log(`📱 Sending WhatsApp to: ${formattedPhone} via ${fullUrl}`);
+  console.log(`🔑 Using apikey auth (length: ${megaApiToken.length})`);
 
-  // Multi-header fallback para compatibilidade com diferentes versões da API
-  const authFormats: Array<Record<string, string>> = [
-    { 'apikey': megaApiToken },
-    { 'Authorization': `Bearer ${megaApiToken}` },
-    { 'Apikey': megaApiToken },
-  ];
-
-  let megaData: any = null;
-  let lastError = '';
-
-  for (const authHeader of authFormats) {
+  // 🛡️ RETRY COM BACKOFF
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-        ...authHeader,
-      };
-
       const response = await fetch(fullUrl, {
         method: 'POST',
-        headers,
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': megaApiToken,
+        },
         body: JSON.stringify(body),
       });
 
       const responseText = await response.text();
-      console.log(`Response (${Object.keys(authHeader)[0]}):`, response.status, responseText.substring(0, 300));
+      console.log(`📥 Response (attempt ${attempt}):`, response.status, responseText.substring(0, 300));
 
       if (response.ok) {
+        let megaData: any;
         try {
           megaData = JSON.parse(responseText);
         } catch {
           megaData = { raw: responseText };
         }
-        break;
-      } else if (response.status === 401 || response.status === 403) {
-        lastError = `Auth failed (${response.status}): ${responseText.substring(0, 200)}`;
-        continue;
-      } else {
-        lastError = `Mega API error: ${response.status} - ${responseText.substring(0, 200)}`;
+
+        const externalMessageId = megaData.id || megaData.key?.id || megaData.messageId || null;
+        
+        await supabase
+          .from('ai_notification_log')
+          .update({ 
+            status: 'sent',
+            sent_at: new Date().toISOString(),
+            external_message_id: externalMessageId,
+          })
+          .eq('id', logId);
+
+        console.log('✅ WhatsApp sent successfully, messageId:', externalMessageId);
+        return externalMessageId;
+      }
+
+      // 🛡️ REGISTRAR ERROS 401/403
+      if (response.status === 401 || response.status === 403) {
+        console.error(`❌ Auth error (${response.status}):`, responseText.substring(0, 200));
+        
+        await recordInfrastructureError(supabase, 'mega_api_401', {
+          errorMessage: `HTTP ${response.status}: ${responseText.substring(0, 500)}`,
+          instanceKey: instance.instance_key,
+          endpoint: fullUrl,
+          httpStatus: response.status,
+          orderId,
+          recipient: phone
+        });
+        
+        // Não tentar retry para erros de autenticação
         break;
       }
+
+      // Detectar desconexão na resposta
+      const lowerError = responseText.toLowerCase();
+      if (lowerError.includes('disconnected') || lowerError.includes('waiting_scan') || lowerError.includes('not connected')) {
+        console.error(`❌ WhatsApp disconnected:`, responseText.substring(0, 200));
+        
+        await recordInfrastructureError(supabase, 'whatsapp_instance_disconnected', {
+          errorMessage: responseText.substring(0, 500),
+          instanceKey: instance.instance_key,
+          endpoint: fullUrl,
+          httpStatus: response.status,
+          orderId,
+          recipient: phone
+        });
+
+        // Atualizar status no banco
+        await supabase
+          .from('whatsapp_instances')
+          .update({ status: 'waiting_scan' })
+          .eq('instance_key', instance.instance_key);
+        
+        break;
+      }
+
+      // Retry para outros erros
+      if (attempt < MAX_RETRIES) {
+        console.log(`⏳ Retrying in ${RETRY_DELAY_MS * attempt}ms...`);
+        await delayMs(RETRY_DELAY_MS * attempt);
+      }
     } catch (fetchError) {
-      lastError = `Fetch error: ${fetchError}`;
-      console.error('Fetch error:', fetchError);
+      console.error(`❌ Fetch error (attempt ${attempt}):`, fetchError);
+      
+      if (attempt < MAX_RETRIES) {
+        await delayMs(RETRY_DELAY_MS * attempt);
+      } else {
+        await recordInfrastructureError(supabase, 'mega_api_error', {
+          errorMessage: `Fetch error: ${String(fetchError)}`,
+          instanceKey: instance.instance_key,
+          endpoint: fullUrl,
+          orderId,
+          recipient: phone
+        });
+      }
     }
   }
 
-  if (!megaData) {
-    await supabase.from('ai_notification_log').update({ 
-      status: 'failed',
-      error_message: lastError
-    }).eq('id', logId);
-    throw new Error(lastError);
-  }
-
-  const externalMessageId = megaData.id || megaData.key?.id || megaData.messageId || null;
+  // Se chegou aqui, todas as tentativas falharam
+  await supabase.from('ai_notification_log').update({ 
+    status: 'failed',
+    error_message: 'All retry attempts failed'
+  }).eq('id', logId);
   
-  // Atualizar log com sucesso
-  await supabase
-    .from('ai_notification_log')
-    .update({ 
-      status: 'sent',
-      sent_at: new Date().toISOString(),
-      external_message_id: externalMessageId,
-    })
-    .eq('id', logId);
-
-  console.log('✅ WhatsApp sent successfully, messageId:', externalMessageId);
-
-  return externalMessageId;
+  throw new Error('Failed to send WhatsApp message after retries');
 }
