@@ -30,7 +30,8 @@ import {
   Send,
   PhoneOff,
   Phone,
-  Filter
+  Filter,
+  Database
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -117,6 +118,7 @@ export function AIAgentConnectionsTab() {
   const [savingConfig, setSavingConfig] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
   const [cleaningData, setCleaningData] = useState(false);
+  const [fixingDatabase, setFixingDatabase] = useState(false);
   const [diagnostic, setDiagnostic] = useState<InstanceDiagnostic>({
     dbInstance: null,
     dbStatus: null,
@@ -454,6 +456,49 @@ export function AIAgentConnectionsTab() {
       toast.error('Erro ao limpar dados');
     } finally {
       setCleaningData(false);
+    }
+  };
+
+  // Corrigir credenciais do banco de dados
+  const handleFixDatabaseCredentials = async () => {
+    setFixingDatabase(true);
+    try {
+      // Corrigir instância megastart-MakQlnxoqp9 com token correto
+      const { error: updateError } = await supabase
+        .from('whatsapp_instances')
+        .update({ 
+          api_token: 'MakQlnxoqp9',
+          status: 'connected',
+          is_active: true,
+          updated_at: new Date().toISOString()
+        })
+        .eq('instance_key', 'megastart-MakQlnxoqp9');
+
+      if (updateError) {
+        console.error('Update error:', updateError);
+        throw updateError;
+      }
+
+      // Desativar outras instâncias
+      const { error: deactivateError } = await supabase
+        .from('whatsapp_instances')
+        .update({ is_active: false })
+        .neq('instance_key', 'megastart-MakQlnxoqp9');
+
+      if (deactivateError) {
+        console.error('Deactivate error:', deactivateError);
+      }
+
+      toast.success('Banco de dados corrigido! Token atualizado para MakQlnxoqp9.');
+      
+      // Recarregar diagnóstico e status
+      await loadInstanceDiagnostic();
+      await refreshWhatsApp();
+    } catch (error) {
+      console.error('Error fixing credentials:', error);
+      toast.error('Erro ao corrigir banco. Verifique as permissões.');
+    } finally {
+      setFixingDatabase(false);
     }
   };
 
@@ -835,6 +880,19 @@ export function AIAgentConnectionsTab() {
             >
               <RotateCcw className="h-4 w-4" />
               Forçar Reinício
+            </Button>
+            <Button 
+              variant="outline" 
+              onClick={handleFixDatabaseCredentials}
+              disabled={fixingDatabase}
+              className="gap-2 text-green-600 border-green-300 hover:bg-green-50 hover:text-green-700"
+            >
+              {fixingDatabase ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Database className="h-4 w-4" />
+              )}
+              Corrigir Banco
             </Button>
             <Button 
               variant="outline" 
