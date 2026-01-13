@@ -895,17 +895,19 @@ async function sendWhatsAppMessage(
   }
   baseUrl = baseUrl.replace(/\/$/, '');
 
-  // Normalizar telefone
+  // Normalizar telefone - MANTER O 9 (celulares brasileiros precisam do 9)
   let formattedPhone = phone.replace(/\D/g, '');
   if (!formattedPhone.startsWith('55')) {
     formattedPhone = '55' + formattedPhone;
   }
-  // Remover o 9 se presente (formato antigo)
-  if (formattedPhone.length === 13 && formattedPhone.startsWith('55') && formattedPhone.charAt(4) === '9') {
+  // Garantir que tem 13 dígitos (55 + DDD + 9XXXXXXXX)
+  // Se tem apenas 12 dígitos, adicionar o 9
+  if (formattedPhone.length === 12 && formattedPhone.startsWith('55')) {
     const ddd = formattedPhone.substring(2, 4);
-    const numero = formattedPhone.substring(5);
-    formattedPhone = '55' + ddd + numero;
+    const numero = formattedPhone.substring(4);
+    formattedPhone = '55' + ddd + '9' + numero;
   }
+  console.log(`📱 Número normalizado: ${phone} -> ${formattedPhone}`);
 
   const endpoint = `/rest/sendMessage/${instance.instance_key}/text`;
   const fullUrl = `${baseUrl}${endpoint}`;

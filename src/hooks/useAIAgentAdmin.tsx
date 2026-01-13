@@ -28,6 +28,15 @@ export interface AgentConfig {
   human_handoff_keywords?: string[];
   auto_reply_delay_ms?: number;
   auto_reply_contact_types?: string[];
+  // Campos de teste
+  test_phone?: string | null;
+  test_phones?: string[];
+  // Campos de estilo
+  use_signature?: boolean;
+  closing_style?: string;
+  conversation_style?: string;
+  avoid_repetition?: boolean;
+  forbidden_phrases?: string[];
 }
 
 export interface KnowledgeBase {
