@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Settings, Eye, EyeOff, Check, X, Loader2, ExternalLink, AlertTriangle, Copy } from 'lucide-react';
+import { Settings, Eye, EyeOff, Check, X, Loader2, ExternalLink, AlertTriangle, Copy, RefreshCw, Database } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -34,6 +34,13 @@ interface APIStatus {
   lastCheck: Date | null;
 }
 
+interface DatabaseInstance {
+  instance_key: string;
+  api_token: string | null;
+  is_active: boolean;
+  status: string;
+}
+
 export function MegaAPICredentialsCard() {
   const [status, setStatus] = useState<APIStatus>({
     url: { configured: false, valid: null },
@@ -52,11 +59,23 @@ export function MegaAPICredentialsCard() {
     token: '',
   });
   const [saving, setSaving] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [dbInstances, setDbInstances] = useState<DatabaseInstance[]>([]);
   const { toast } = useToast();
 
   const loadStatus = async () => {
     setLoading(true);
     try {
+      // Buscar instâncias do banco de dados
+      const { data: instances, error: dbError } = await supabase
+        .from('whatsapp_instances')
+        .select('instance_key, api_token, is_active, status')
+        .order('is_active', { ascending: false });
+      
+      if (!dbError && instances) {
+        setDbInstances(instances as DatabaseInstance[]);
+      }
+
       // Buscar status da API via edge function
       const { data, error } = await supabase.functions.invoke('mega-api-status');
       
@@ -112,6 +131,94 @@ export function MegaAPICredentialsCard() {
     }
   };
 
+  const syncDatabaseToken = async (instanceKey: string, newToken: string) => {
+    setSyncing(true);
+    try {
+      const { error } = await supabase
+        .from('whatsapp_instances')
+        .update({ 
+          api_token: newToken,
+          status: 'connected',
+          is_active: true,
+          updated_at: new Date().toISOString()
+        })
+        .eq('instance_key', instanceKey);
+
+      if (error) throw error;
+
+      // Desativar outras instâncias
+      await supabase
+        .from('whatsapp_instances')
+        .update({ is_active: false })
+        .neq('instance_key', instanceKey);
+
+      toast({
+        title: 'Token sincronizado!',
+        description: `Token atualizado no banco para ${instanceKey}`,
+      });
+
+      // Recarregar status
+      await loadStatus();
+    } catch (err) {
+      console.error('Error syncing token:', err);
+      toast({
+        title: 'Erro ao sincronizar',
+        description: 'Não foi possível atualizar o token no banco.',
+        variant: 'destructive',
+      });
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  const fixDatabaseCredentials = async () => {
+    setSyncing(true);
+    try {
+      // Corrigir instância megastart-MakQlnxoqp9 com token correto
+      const { error: updateError } = await supabase
+        .from('whatsapp_instances')
+        .update({ 
+          api_token: 'MakQlnxoqp9',
+          status: 'connected',
+          is_active: true,
+          updated_at: new Date().toISOString()
+        })
+        .eq('instance_key', 'megastart-MakQlnxoqp9');
+
+      if (updateError) {
+        console.error('Update error:', updateError);
+        throw updateError;
+      }
+
+      // Desativar outras instâncias
+      const { error: deactivateError } = await supabase
+        .from('whatsapp_instances')
+        .update({ is_active: false })
+        .neq('instance_key', 'megastart-MakQlnxoqp9');
+
+      if (deactivateError) {
+        console.error('Deactivate error:', deactivateError);
+      }
+
+      toast({
+        title: 'Banco de dados corrigido!',
+        description: 'Token atualizado para MakQlnxoqp9 e instâncias duplicadas desativadas.',
+      });
+
+      // Recarregar status
+      await loadStatus();
+    } catch (err) {
+      console.error('Error fixing credentials:', err);
+      toast({
+        title: 'Erro ao corrigir',
+        description: 'Não foi possível atualizar o banco. Verifique as permissões.',
+        variant: 'destructive',
+      });
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   const testConnection = async () => {
     setTesting(true);
     try {
@@ -158,12 +265,14 @@ export function MegaAPICredentialsCard() {
 
     setSaving(true);
     try {
-      // Salvar no banco de dados para referência
+      // Salvar no banco de dados com token
       const { error: dbError } = await supabase
         .from('whatsapp_instances')
         .upsert({
           instance_key: credentials.instance.trim(),
+          api_token: credentials.token.trim(),
           status: 'pending_config',
+          is_active: true,
           updated_at: new Date().toISOString(),
         }, {
           onConflict: 'instance_key',
@@ -171,21 +280,24 @@ export function MegaAPICredentialsCard() {
 
       if (dbError) {
         console.error('Error saving to database:', dbError);
+        throw dbError;
       }
 
+      // Desativar outras instâncias
+      await supabase
+        .from('whatsapp_instances')
+        .update({ is_active: false })
+        .neq('instance_key', credentials.instance.trim());
+
       toast({
-        title: 'Credenciais Salvas Localmente',
-        description: 'Agora atualize os Secrets no Supabase Dashboard.',
+        title: 'Credenciais salvas!',
+        description: 'Token e instância atualizados no banco de dados.',
       });
 
       setDialogOpen(false);
       
-      // Mostrar instruções
-      toast({
-        title: '⚠️ Ação Necessária',
-        description: 'Atualize os secrets MEGA_API_URL, MEGA_API_TOKEN e MEGA_API_INSTANCE no Supabase.',
-        duration: 10000,
-      });
+      // Recarregar status
+      await loadStatus();
 
     } catch (err) {
       console.error('Error saving credentials:', err);
@@ -295,7 +407,29 @@ export function MegaAPICredentialsCard() {
                 </div>
               </div>
 
-              <div className="flex gap-2 pt-2">
+              {/* Database Instances Info */}
+              {dbInstances.length > 0 && (
+                <div className="border rounded-lg p-3 bg-muted/50">
+                  <p className="text-xs font-medium mb-2">Instâncias no Banco:</p>
+                  <div className="space-y-1">
+                    {dbInstances.map((inst) => (
+                      <div key={inst.instance_key} className="flex items-center justify-between text-xs">
+                        <span className="font-mono">{inst.instance_key}</span>
+                        <div className="flex items-center gap-2">
+                          <span className={inst.api_token && inst.api_token !== 'SEU_TOKEN_AQUI' ? 'text-green-600' : 'text-red-500'}>
+                            {inst.api_token && inst.api_token !== 'SEU_TOKEN_AQUI' ? `Token: ${inst.api_token.substring(0, 8)}...` : 'Token inválido!'}
+                          </span>
+                          <Badge variant={inst.is_active ? 'default' : 'secondary'} className="text-[10px]">
+                            {inst.is_active ? 'Ativa' : 'Inativa'}
+                          </Badge>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="flex flex-wrap gap-2 pt-2">
                 <Button 
                   variant="outline" 
                   onClick={testConnection}
@@ -309,9 +443,33 @@ export function MegaAPICredentialsCard() {
                   )}
                   Testar Conexão
                 </Button>
+                
+                <Button 
+                  variant="outline"
+                  onClick={fixDatabaseCredentials}
+                  disabled={syncing}
+                  className="gap-2 text-amber-600 border-amber-300 hover:bg-amber-50"
+                >
+                  {syncing ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Database className="h-4 w-4" />
+                  )}
+                  Corrigir Banco
+                </Button>
+                
                 <Button onClick={() => setDialogOpen(true)} className="gap-2">
                   <Settings className="h-4 w-4" />
-                  Configurar Credenciais
+                  Configurar
+                </Button>
+                
+                <Button 
+                  variant="ghost"
+                  size="icon"
+                  onClick={loadStatus}
+                  disabled={loading}
+                >
+                  <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
                 </Button>
               </div>
 
