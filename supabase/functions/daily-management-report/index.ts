@@ -191,6 +191,73 @@ function getPhoneVariants(phone: string): string[] {
   return [without9, with9];
 }
 
+/**
+ * Tenta enviar com múltiplos formatos de header de autenticação
+ */
+async function tryMultiHeaderFetch(
+  url: string,
+  token: string,
+  body: any
+): Promise<Response | null> {
+  const headerTypes = ['apikey', 'Bearer', 'Apikey'];
+  
+  for (const headerType of headerTypes) {
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    
+    if (headerType === 'apikey') {
+      headers['apikey'] = token;
+    } else if (headerType === 'Bearer') {
+      headers['Authorization'] = `Bearer ${token}`;
+    } else {
+      headers['Apikey'] = token;
+    }
+    
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(body),
+      });
+      
+      if (response.ok) {
+        console.log(`✅ Success with header format: ${headerType}`);
+        return response;
+      }
+      
+      if (response.status === 401 || response.status === 403) {
+        console.log(`🔄 Auth failed with ${headerType} (${response.status}), trying next...`);
+        continue;
+      }
+      
+      return response;
+    } catch (err) {
+      console.error(`❌ Fetch error with ${headerType}:`, err);
+      continue;
+    }
+  }
+  
+  return null;
+}
+
+/**
+ * Obtém o melhor token disponível (banco ou env), ignorando placeholders
+ */
+function getEffectiveToken(dbToken: string | null | undefined): string {
+  if (dbToken && !isPlaceholderToken(dbToken)) {
+    console.log('🔑 Using database token');
+    return dbToken;
+  }
+  
+  const envToken = Deno.env.get('MEGA_API_TOKEN') || '';
+  if (envToken && !isPlaceholderToken(envToken)) {
+    console.log('🔑 Database token invalid, using MEGA_API_TOKEN from env');
+    return envToken;
+  }
+  
+  console.error('❌ No valid token available (db or env)');
+  return '';
+}
+
 async function sendWhatsApp(supabase: any, phone: string, message: string): Promise<boolean> {
   try {
     const instance = await getActiveInstance(supabase);
@@ -199,14 +266,9 @@ async function sendWhatsApp(supabase: any, phone: string, message: string): Prom
       return false;
     }
 
-    // Obter token com fallback robusto
-    let token = instance.api_token;
-    if (isPlaceholderToken(token)) {
-      console.warn('⚠️ Token do banco é placeholder, usando MEGA_API_TOKEN do environment');
-      token = Deno.env.get('MEGA_API_TOKEN') || '';
-    }
-    
-    if (!token || token.trim() === '') {
+    // Obter token efetivo (banco ou env, ignorando placeholders)
+    const token = getEffectiveToken(instance.api_token);
+    if (!token) {
       console.error('❌ No valid API token available');
       return false;
     }
@@ -221,31 +283,44 @@ async function sendWhatsApp(supabase: any, phone: string, message: string): Prom
     console.log(`📤 Attempting to send to variants: ${phoneVariants.join(', ')} via ${instance.instance_key}`);
 
     // Tentar cada variante de telefone
-    for (const phoneNumber of phoneVariants) {
+    for (let i = 0; i < phoneVariants.length; i++) {
+      const phoneNumber = phoneVariants[i];
+      const isLastVariant = i === phoneVariants.length - 1;
+      
       console.log(`📲 Trying ${phoneNumber}...`);
       
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'apikey': token },
-        body: JSON.stringify({ messageData: { to: phoneNumber, text: message, linkPreview: false } }),
-      });
+      const body = { messageData: { to: phoneNumber, text: message, linkPreview: false } };
+      
+      // Tentar com múltiplos headers
+      const res = await tryMultiHeaderFetch(url, token, body);
 
-      if (res.ok) {
+      if (res?.ok) {
         console.log('✅ WhatsApp sent to:', phoneNumber);
         return true;
       }
 
-      const err = await res.text();
-      console.warn(`⚠️ Failed for ${phoneNumber}: ${res.status} - ${err.substring(0, 100)}`);
-      
-      // Se erro 400/404, tentar próxima variante
-      if (res.status === 400 || res.status === 404) {
-        continue;
+      if (res) {
+        const err = await res.text();
+        console.warn(`⚠️ Failed for ${phoneNumber}: ${res.status} - ${err.substring(0, 100)}`);
+        
+        // Se erro 400/404 (número inválido), tentar próxima variante
+        if ((res.status === 400 || res.status === 404) && !isLastVariant) {
+          await delayMs(500);
+          continue;
+        }
+        
+        // Erro de auth já tentou todos os headers
+        if (res.status === 401 || res.status === 403) {
+          console.error('❌ Authentication failed with all header formats');
+          return false;
+        }
+      } else {
+        console.error(`❌ All header formats failed for ${phoneNumber}`);
       }
       
-      // Para outros erros (401, 500, etc), não tentar mais
-      console.error(`❌ Error ${res.status}: ${err.substring(0, 200)}`);
-      return false;
+      if (isLastVariant) {
+        return false;
+      }
     }
 
     console.error('❌ All phone variants failed');
