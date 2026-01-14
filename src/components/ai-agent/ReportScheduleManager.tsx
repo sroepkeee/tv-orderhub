@@ -24,7 +24,9 @@ import {
   Layers,
   Users,
   User,
-  Phone
+  Phone,
+  Zap,
+  Info
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
@@ -111,7 +113,11 @@ export function ReportScheduleManager() {
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [saving, setSaving] = useState(false);
   
-  // Form state
+  // Customer real-time notification config (from ai_agent_config)
+  const [customerNotificationPhases, setCustomerNotificationPhases] = useState<string[]>([]);
+  const [savingCustomerConfig, setSavingCustomerConfig] = useState(false);
+  
+  // Form state (only for manager schedules now)
   const [newSchedule, setNewSchedule] = useState({
     name: '',
     frequency: 'daily',
@@ -170,10 +176,63 @@ export function ReportScheduleManager() {
     }
   };
 
+  const loadCustomerNotificationConfig = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('ai_agent_config')
+        .select('notification_phases')
+        .eq('organization_id', organizationId)
+        .single();
+
+      if (error && error.code !== 'PGRST116') throw error;
+      
+      setCustomerNotificationPhases(data?.notification_phases || []);
+    } catch (error) {
+      console.error('Error loading customer notification config:', error);
+    }
+  };
+
+  const saveCustomerNotificationConfig = async (phases: string[]) => {
+    setSavingCustomerConfig(true);
+    try {
+      const { error } = await supabase
+        .from('ai_agent_config')
+        .update({ notification_phases: phases })
+        .eq('organization_id', organizationId);
+
+      if (error) throw error;
+      
+      setCustomerNotificationPhases(phases);
+      toast({
+        title: "Fases de notificação atualizadas!",
+        description: "Clientes serão notificados em tempo real nas fases selecionadas.",
+      });
+    } catch (error) {
+      console.error('Error saving customer notification config:', error);
+      toast({
+        title: "Erro ao salvar configuração",
+        variant: "destructive",
+      });
+    } finally {
+      setSavingCustomerConfig(false);
+    }
+  };
+
+  const toggleCustomerPhase = (phaseValue: string) => {
+    const newPhases = customerNotificationPhases.includes(phaseValue)
+      ? customerNotificationPhases.filter(p => p !== phaseValue)
+      : [...customerNotificationPhases, phaseValue];
+    
+    saveCustomerNotificationConfig(newPhases);
+  };
+
   useEffect(() => {
     loadSchedules();
     loadManagers();
-  }, []);
+    if (organizationId) {
+      loadCustomerNotificationConfig();
+    }
+  }, [organizationId]);
 
   const toggleSchedule = async (id: string, isActive: boolean) => {
     try {
@@ -232,17 +291,8 @@ export function ReportScheduleManager() {
       return;
     }
 
-    // Validate: If customer type, must have at least one phase
-    if (newSchedule.recipient_type === 'customers' && newSchedule.customer_notification_phases.length === 0) {
-      toast({
-        title: "Selecione ao menos uma fase de notificação para clientes",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    // Validate: If managers type, must have managers configured
-    if (newSchedule.recipient_type === 'managers' && managers.length === 0) {
+    // Validate: Must have managers configured
+    if (managers.length === 0) {
       toast({
         title: "Nenhum gestor ativo configurado",
         description: "Configure gestores em Administração > Relatórios Gerenciais",
@@ -256,15 +306,15 @@ export function ReportScheduleManager() {
       const { error } = await supabase
         .from('report_schedules')
         .insert({
-          organization_id: organizationId, // FIX: Include organization_id
+          organization_id: organizationId,
           name: newSchedule.name,
           frequency: newSchedule.frequency,
           send_time: newSchedule.send_time,
           send_days: newSchedule.send_days,
           include_charts: newSchedule.include_charts,
           is_active: true,
-          recipient_type: newSchedule.recipient_type,
-          customer_notification_phases: newSchedule.customer_notification_phases,
+          recipient_type: 'managers', // Always managers now
+          customer_notification_phases: [], // Not used for managers
           report_type: newSchedule.report_type,
         });
 
@@ -272,6 +322,7 @@ export function ReportScheduleManager() {
       
       toast({
         title: "Agendamento criado!",
+        description: "O relatório será enviado nos horários configurados.",
       });
       
       setShowAddDialog(false);
@@ -353,16 +404,99 @@ export function ReportScheduleManager() {
 
   return (
     <>
+      {/* Customer Real-Time Notifications Card */}
+      <Card className="mb-4">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Zap className="h-5 w-5 text-green-600" />
+                Notificações para Clientes
+                <Badge variant="outline" className="bg-green-500/10 text-green-600 border-green-500/30 ml-2">
+                  Tempo Real
+                </Badge>
+              </CardTitle>
+              <CardDescription>
+                Clientes são notificados automaticamente quando o status do pedido muda
+              </CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Info banner */}
+          <div className="flex items-start gap-3 p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
+            <Info className="h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0" />
+            <div className="text-sm text-blue-600">
+              <p className="font-medium">Notificação instantânea</p>
+              <p className="text-blue-600/80">
+                Quando o status de um pedido muda para uma das fases abaixo, o cliente recebe uma mensagem via WhatsApp automaticamente.
+              </p>
+            </div>
+          </div>
+
+          {/* WhatsApp warning */}
+          <Alert className="bg-amber-500/10 border-amber-500/30">
+            <Phone className="h-4 w-4 text-amber-600" />
+            <AlertDescription className="text-amber-600 text-sm">
+              Apenas pedidos com <strong>WhatsApp cadastrado</strong> receberão notificações automáticas.
+            </AlertDescription>
+          </Alert>
+
+          {/* Phase selection */}
+          <div className="space-y-3">
+            <Label className="text-green-600 font-medium">Fases que disparam notificação</Label>
+            <div className="grid gap-2">
+              {NOTIFICATION_PHASE_OPTIONS.map((phase) => (
+                <div
+                  key={phase.value}
+                  className={`flex items-center space-x-3 p-3 rounded-lg border transition-colors cursor-pointer ${
+                    customerNotificationPhases.includes(phase.value)
+                      ? 'bg-green-500/10 border-green-500/30' 
+                      : 'bg-background border-border hover:bg-muted/50'
+                  }`}
+                  onClick={() => toggleCustomerPhase(phase.value)}
+                >
+                  <Checkbox
+                    id={`customer-${phase.value}`}
+                    checked={customerNotificationPhases.includes(phase.value)}
+                    onCheckedChange={() => toggleCustomerPhase(phase.value)}
+                    disabled={savingCustomerConfig}
+                  />
+                  <div className="flex-1">
+                    <label htmlFor={`customer-${phase.value}`} className="text-sm font-medium cursor-pointer">
+                      {phase.label}
+                    </label>
+                    <p className="text-xs text-muted-foreground">
+                      {phase.description}
+                    </p>
+                  </div>
+                  {savingCustomerConfig && customerNotificationPhases.includes(phase.value) && (
+                    <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                  )}
+                </div>
+              ))}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {customerNotificationPhases.length} fase(s) ativa(s) para notificação automática
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Manager Scheduled Reports Card */}
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
               <CardTitle className="text-lg flex items-center gap-2">
-                <Settings2 className="h-5 w-5" />
-                Agendamentos Configurados
+                <Settings2 className="h-5 w-5 text-blue-600" />
+                Relatórios para Gestores
+                <Badge variant="outline" className="bg-blue-500/10 text-blue-600 border-blue-500/30 ml-2">
+                  Agendado
+                </Badge>
               </CardTitle>
               <CardDescription>
-                Configure horários e dias para envio automático de relatórios e notificações
+                Configure horários e dias para envio automático de relatórios gerenciais
               </CardDescription>
             </div>
             <Button onClick={() => setShowAddDialog(true)} size="sm">
@@ -372,7 +506,24 @@ export function ReportScheduleManager() {
           </div>
         </CardHeader>
         <CardContent>
-          {schedules.length === 0 ? (
+          {/* Manager info */}
+          <div className="flex items-center justify-between mb-4 p-3 rounded-lg bg-muted/50 border">
+            <div className="flex items-center gap-2 text-sm">
+              <Users className="h-4 w-4 text-muted-foreground" />
+              <span>Gestores ativos para receber relatórios:</span>
+            </div>
+            <Badge 
+              variant="outline" 
+              className={managers.length > 0 
+                ? "bg-green-500/10 text-green-600 border-green-500/30" 
+                : "bg-amber-500/10 text-amber-600 border-amber-500/30"
+              }
+            >
+              {managers.length} gestor(es)
+            </Badge>
+          </div>
+
+          {schedules.filter(s => s.recipient_type === 'managers').length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               <Calendar className="h-12 w-12 mx-auto mb-4 opacity-50" />
               <p>Nenhum agendamento configurado</p>
@@ -380,7 +531,7 @@ export function ReportScheduleManager() {
             </div>
           ) : (
             <div className="space-y-3">
-              {schedules.map((schedule) => (
+              {schedules.filter(s => s.recipient_type === 'managers').map((schedule) => (
                 <div 
                   key={schedule.id}
                   className={`flex items-center justify-between p-4 rounded-lg border ${
@@ -399,19 +550,6 @@ export function ReportScheduleManager() {
                         <p className={`font-medium ${!schedule.is_active ? 'text-muted-foreground' : ''}`}>
                           {schedule.name}
                         </p>
-                        <Badge 
-                          variant="outline" 
-                          className={schedule.recipient_type === 'managers' 
-                            ? 'bg-blue-500/10 text-blue-600 border-blue-500/30' 
-                            : 'bg-green-500/10 text-green-600 border-green-500/30'
-                          }
-                        >
-                          {schedule.recipient_type === 'managers' ? (
-                            <><Users className="h-3 w-3 mr-1" /> Gestores</>
-                          ) : (
-                            <><User className="h-3 w-3 mr-1" /> Clientes</>
-                          )}
-                        </Badge>
                       </div>
                       <div className="flex items-center gap-2 text-sm text-muted-foreground">
                         <Clock className="h-3 w-3" />
@@ -419,15 +557,11 @@ export function ReportScheduleManager() {
                         <span>•</span>
                         <Calendar className="h-3 w-3" />
                         <span>{formatDays(schedule.send_days || [])}</span>
-                        {schedule.recipient_type === 'managers' && (
-                          <>
-                            <span>•</span>
-                            <Badge variant="secondary" className="text-xs">
-                              {getReportTypeLabel(schedule.report_type)}
-                            </Badge>
-                          </>
-                        )}
-                        {schedule.include_charts && schedule.recipient_type === 'managers' && (
+                        <span>•</span>
+                        <Badge variant="secondary" className="text-xs">
+                          {getReportTypeLabel(schedule.report_type)}
+                        </Badge>
+                        {schedule.include_charts && (
                           <>
                             <span>•</span>
                             <Badge variant="outline" className="text-xs">
@@ -436,11 +570,6 @@ export function ReportScheduleManager() {
                           </>
                         )}
                       </div>
-                      {schedule.recipient_type === 'customers' && schedule.customer_notification_phases?.length > 0 && (
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Fases: {getPhaseLabels(schedule.customer_notification_phases)}
-                        </p>
-                      )}
                       {schedule.last_sent_at && (
                         <p className="text-xs text-muted-foreground mt-1">
                           Último envio: {format(new Date(schedule.last_sent_at), "dd/MM 'às' HH:mm", { locale: ptBR })}
@@ -463,13 +592,16 @@ export function ReportScheduleManager() {
         </CardContent>
       </Card>
 
-      {/* Add Schedule Dialog */}
+      {/* Add Manager Schedule Dialog - Simplified for managers only */}
       <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
         <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Novo Agendamento</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <Users className="h-5 w-5 text-blue-600" />
+              Novo Agendamento para Gestores
+            </DialogTitle>
             <DialogDescription>
-              Configure quando e para quem as notificações serão enviadas automaticamente
+              Configure quando os relatórios gerenciais serão enviados automaticamente
             </DialogDescription>
           </DialogHeader>
           
@@ -485,173 +617,78 @@ export function ReportScheduleManager() {
               />
             </div>
 
-            {/* Tipo de Destinatário */}
-            <div className="space-y-3">
-              <Label>Enviar para</Label>
-              <RadioGroup 
-                value={newSchedule.recipient_type} 
-                onValueChange={(v) => setNewSchedule({ ...newSchedule, recipient_type: v })}
-                className="grid grid-cols-2 gap-4"
-              >
-                <div>
-                  <RadioGroupItem 
-                    value="managers" 
-                    id="managers" 
-                    className="peer sr-only" 
-                  />
-                  <Label 
-                    htmlFor="managers" 
-                    className="flex flex-col items-center justify-between rounded-lg border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary cursor-pointer"
-                  >
-                    <Users className="mb-2 h-6 w-6 text-blue-600" />
-                    <span className="font-medium">Gestores</span>
-                    <span className="text-xs text-muted-foreground text-center mt-1">
-                      Relatórios gerenciais
-                    </span>
-                  </Label>
-                </div>
-                <div>
-                  <RadioGroupItem 
-                    value="customers" 
-                    id="customers" 
-                    className="peer sr-only" 
-                  />
-                  <Label 
-                    htmlFor="customers" 
-                    className="flex flex-col items-center justify-between rounded-lg border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary cursor-pointer"
-                  >
-                    <User className="mb-2 h-6 w-6 text-green-600" />
-                    <span className="font-medium">Clientes</span>
-                    <span className="text-xs text-muted-foreground text-center mt-1">
-                      Notificações de status
-                    </span>
-                  </Label>
-                </div>
-              </RadioGroup>
-            </div>
-
             {/* Opções para Gestores */}
-            {newSchedule.recipient_type === 'managers' && (
-              <div className="space-y-4 p-4 rounded-lg border bg-blue-500/5 border-blue-500/20">
-                <div className="flex items-center justify-between">
-                  <Label className="text-blue-600 font-medium">Tipo de Relatório</Label>
-                  <Badge 
-                    variant="outline" 
-                    className={managers.length > 0 
-                      ? "bg-green-500/10 text-green-600 border-green-500/30" 
-                      : "bg-amber-500/10 text-amber-600 border-amber-500/30"
-                    }
-                  >
-                    <Users className="h-3 w-3 mr-1" />
-                    {managers.length} gestor(es) ativo(s)
-                  </Badge>
-                </div>
-                
-                {/* Lista de gestores ativos */}
-                {managers.length > 0 ? (
-                  <div className="space-y-2 max-h-32 overflow-y-auto">
-                    {managers.map((manager) => (
-                      <div 
-                        key={manager.id}
-                        className="flex items-center justify-between p-2 rounded bg-background border text-sm"
-                      >
-                        <span className="font-medium">{manager.name}</span>
-                        <div className="flex items-center gap-1 text-muted-foreground">
-                          <Phone className="h-3 w-3" />
-                          <span className="text-xs">{formatPhone(manager.whatsapp)}</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <Alert className="bg-amber-500/10 border-amber-500/30">
-                    <AlertTriangle className="h-4 w-4 text-amber-600" />
-                    <AlertDescription className="text-amber-600 text-sm">
-                      Nenhum gestor configurado. Vá em Administração &gt; Relatórios Gerenciais para adicionar gestores.
-                    </AlertDescription>
-                  </Alert>
-                )}
-
-                <Select 
-                  value={newSchedule.report_type} 
-                  onValueChange={(v) => setNewSchedule({ ...newSchedule, report_type: v })}
+            <div className="space-y-4 p-4 rounded-lg border bg-blue-500/5 border-blue-500/20">
+              <div className="flex items-center justify-between">
+                <Label className="text-blue-600 font-medium">Tipo de Relatório</Label>
+                <Badge 
+                  variant="outline" 
+                  className={managers.length > 0 
+                    ? "bg-green-500/10 text-green-600 border-green-500/30" 
+                    : "bg-amber-500/10 text-amber-600 border-amber-500/30"
+                  }
                 >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {REPORT_TYPES.map((type) => (
-                      <SelectItem key={type.id} value={type.id}>
-                        <div className="flex items-center gap-2">
-                          <type.icon className="h-4 w-4" />
-                          <span>{type.label}</span>
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground">
-                  {REPORT_TYPES.find(t => t.id === newSchedule.report_type)?.description}
-                </p>
-
-                <div className="flex items-center justify-between pt-2">
-                  <Label htmlFor="include_charts">Incluir gráficos</Label>
-                  <Switch
-                    id="include_charts"
-                    checked={newSchedule.include_charts}
-                    onCheckedChange={(v) => setNewSchedule({ ...newSchedule, include_charts: v })}
-                  />
-                </div>
+                  <Users className="h-3 w-3 mr-1" />
+                  {managers.length} gestor(es) ativo(s)
+                </Badge>
               </div>
-            )}
-
-            {/* Opções para Clientes */}
-            {newSchedule.recipient_type === 'customers' && (
-              <div className="space-y-3 p-4 rounded-lg border bg-green-500/5 border-green-500/20">
-                {/* Aviso sobre WhatsApp obrigatório */}
-                <Alert className="bg-amber-500/10 border-amber-500/30">
-                  <Phone className="h-4 w-4 text-amber-600" />
-                  <AlertDescription className="text-amber-600 text-sm">
-                    Apenas pedidos com WhatsApp cadastrado receberão notificações automáticas.
-                  </AlertDescription>
-                </Alert>
-
-                <Label className="text-green-600 font-medium">Fases de Notificação</Label>
-                <p className="text-xs text-muted-foreground">
-                  Selecione em quais mudanças de status os clientes receberão notificação
-                </p>
-                <div className="grid gap-2">
-                  {NOTIFICATION_PHASE_OPTIONS.map((phase) => (
-                    <div
-                      key={phase.value}
-                      className={`flex items-center space-x-3 p-3 rounded-lg border transition-colors cursor-pointer ${
-                        newSchedule.customer_notification_phases.includes(phase.value)
-                          ? 'bg-green-500/10 border-green-500/30' 
-                          : 'bg-background border-border hover:bg-muted/50'
-                      }`}
-                      onClick={() => togglePhase(phase.value)}
+              
+              {/* Lista de gestores ativos */}
+              {managers.length > 0 ? (
+                <div className="space-y-2 max-h-32 overflow-y-auto">
+                  {managers.map((manager) => (
+                    <div 
+                      key={manager.id}
+                      className="flex items-center justify-between p-2 rounded bg-background border text-sm"
                     >
-                      <Checkbox
-                        id={phase.value}
-                        checked={newSchedule.customer_notification_phases.includes(phase.value)}
-                        onCheckedChange={() => togglePhase(phase.value)}
-                      />
-                      <div className="flex-1">
-                        <label htmlFor={phase.value} className="text-sm font-medium cursor-pointer">
-                          {phase.label}
-                        </label>
-                        <p className="text-xs text-muted-foreground">
-                          {phase.description}
-                        </p>
+                      <span className="font-medium">{manager.name}</span>
+                      <div className="flex items-center gap-1 text-muted-foreground">
+                        <Phone className="h-3 w-3" />
+                        <span className="text-xs">{formatPhone(manager.whatsapp)}</span>
                       </div>
                     </div>
                   ))}
                 </div>
-                <p className="text-xs text-muted-foreground mt-2">
-                  {newSchedule.customer_notification_phases.length} fase(s) selecionada(s)
-                </p>
+              ) : (
+                <Alert className="bg-amber-500/10 border-amber-500/30">
+                  <AlertTriangle className="h-4 w-4 text-amber-600" />
+                  <AlertDescription className="text-amber-600 text-sm">
+                    Nenhum gestor configurado. Vá em Administração &gt; Relatórios Gerenciais para adicionar gestores.
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              <Select 
+                value={newSchedule.report_type} 
+                onValueChange={(v) => setNewSchedule({ ...newSchedule, report_type: v })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {REPORT_TYPES.map((type) => (
+                    <SelectItem key={type.id} value={type.id}>
+                      <div className="flex items-center gap-2">
+                        <type.icon className="h-4 w-4" />
+                        <span>{type.label}</span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                {REPORT_TYPES.find(t => t.id === newSchedule.report_type)?.description}
+              </p>
+
+              <div className="flex items-center justify-between pt-2">
+                <Label htmlFor="include_charts">Incluir gráficos</Label>
+                <Switch
+                  id="include_charts"
+                  checked={newSchedule.include_charts}
+                  onCheckedChange={(v) => setNewSchedule({ ...newSchedule, include_charts: v })}
+                />
               </div>
-            )}
+            </div>
 
             {/* Horário e Frequência */}
             <div className="grid grid-cols-2 gap-4">
@@ -704,7 +741,7 @@ export function ReportScheduleManager() {
             <Button variant="outline" onClick={() => setShowAddDialog(false)}>
               Cancelar
             </Button>
-            <Button onClick={addSchedule} disabled={saving}>
+            <Button onClick={addSchedule} disabled={saving || managers.length === 0}>
               {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Plus className="h-4 w-4 mr-2" />}
               Criar Agendamento
             </Button>
