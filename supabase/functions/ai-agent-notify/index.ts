@@ -1021,7 +1021,22 @@ async function sendWhatsAppMessage(
   }
 
   const megaApiUrl = Deno.env.get('MEGA_API_URL');
-  const megaApiToken = instance.api_token || Deno.env.get('MEGA_API_TOKEN') || '';
+  
+  // 🔑 ROBUSTO: Verificar se token do banco é válido, senão usar env
+  const isPlaceholder = (token: string | null | undefined): boolean => {
+    if (!token || token.trim() === '') return true;
+    const placeholders = ['SEU_TOKEN', 'API_KEY', 'YOUR_TOKEN', 'TOKEN_AQUI', 'PLACEHOLDER'];
+    return placeholders.some(p => token.toUpperCase().includes(p));
+  };
+  
+  let megaApiToken = '';
+  if (instance.api_token && !isPlaceholder(instance.api_token)) {
+    megaApiToken = instance.api_token;
+    console.log('🔑 Using database token');
+  } else {
+    megaApiToken = Deno.env.get('MEGA_API_TOKEN') || '';
+    console.log('🔑 Database token invalid, using MEGA_API_TOKEN from env');
+  }
 
   if (!megaApiUrl || !megaApiToken) {
     await supabase.from('ai_notification_log').update({ 
@@ -1046,7 +1061,50 @@ async function sendWhatsAppMessage(
   const fullUrl = `${baseUrl}${endpoint}`;
 
   console.log(`📱 Sending WhatsApp via ${fullUrl}`);
-  console.log(`🔑 Using apikey auth (length: ${megaApiToken.length})`);
+  console.log(`🔑 Token source: ${instance.api_token && !isPlaceholder(instance.api_token) ? 'database' : 'env'}, length: ${megaApiToken.length}`);
+
+  // 🔄 MULTI-HEADER: Tentar diferentes formatos de autenticação
+  const tryWithHeaders = async (url: string, token: string, body: any): Promise<Response | null> => {
+    const headerTypes = ['apikey', 'Bearer', 'Apikey'];
+    
+    for (const headerType of headerTypes) {
+      try {
+        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+        
+        if (headerType === 'apikey') {
+          headers['apikey'] = token;
+        } else if (headerType === 'Bearer') {
+          headers['Authorization'] = `Bearer ${token}`;
+        } else {
+          headers['Apikey'] = token;
+        }
+        
+        const response = await fetch(url, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(body),
+        });
+        
+        if (response.ok) {
+          console.log(`✅ Success with header: ${headerType}`);
+          return response;
+        }
+        
+        // Se 401/403, tentar próximo header
+        if (response.status === 401 || response.status === 403) {
+          console.log(`🔄 Header ${headerType} got ${response.status}, trying next...`);
+          continue;
+        }
+        
+        // Outros erros, retornar para tratar
+        return response;
+      } catch (err) {
+        console.error(`❌ Fetch error with ${headerType}:`, err);
+        continue;
+      }
+    }
+    return null;
+  };
 
   // Tentar cada variante do telefone
   for (let variantIdx = 0; variantIdx < phoneVariants.length; variantIdx++) {
@@ -1066,14 +1124,22 @@ async function sendWhatsAppMessage(
     // 🛡️ RETRY COM BACKOFF para cada variante
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
       try {
-        const response = await fetch(fullUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'apikey': megaApiToken,
-          },
-          body: JSON.stringify(body),
-        });
+        // Usar multi-header fetch
+        const response = await tryWithHeaders(fullUrl, megaApiToken, body);
+        
+        if (!response) {
+          // Todos os headers falharam com 401/403
+          console.error('❌ All auth header formats failed');
+          await recordInfrastructureError(supabase, 'mega_api_401', {
+            errorMessage: 'All authentication header formats failed (401/403)',
+            instanceKey: instance.instance_key,
+            endpoint: fullUrl,
+            httpStatus: 401,
+            orderId,
+            recipient: phone
+          });
+          throw new Error('Auth error: 401 - all header formats failed');
+        }
 
         const responseText = await response.text();
         console.log(`📥 Response (variant ${variantIdx + 1}, attempt ${attempt}):`, response.status, responseText.substring(0, 300));
