@@ -12,32 +12,30 @@ interface NotifyParams {
   customMessage?: string;
 }
 
-// Status que disparam notificação para gestores
-const TRIGGER_STATUSES: Record<string, string> = {
-  // Compras
-  'purchase_pending': 'purchases',
-  'purchase_required': 'purchases',
-  'awaiting_material': 'purchases',
-  // Produção
-  'separation_started': 'production',
-  'in_production': 'production',
-  // Laboratório
-  'awaiting_lab': 'laboratory',
-  'in_lab_analysis': 'laboratory',
-  // Frete
-  'freight_quote_requested': 'freight_quote',
-  // Expedição
-  'released_for_shipping': 'logistics',
-  'in_expedition': 'logistics',
-};
-
 export function usePhaseManagerNotification() {
+  // Função para buscar status que disparam gatilhos do banco
+  const getActiveTriggeredStatuses = useCallback(async (): Promise<string[]> => {
+    const { data: triggerConfigs } = await supabase
+      .from('ai_manager_trigger_config')
+      .select('trigger_status')
+      .eq('is_active', true);
+
+    if (!triggerConfigs) return [];
+    
+    // Flatten all trigger_status arrays into a single array of unique statuses
+    const allStatuses = triggerConfigs.flatMap(t => t.trigger_status || []);
+    return [...new Set(allStatuses)];
+  }, []);
+
   const notifyPhaseManager = useCallback(async (params: NotifyParams) => {
     const { orderId, oldStatus, newStatus, orderType, orderCategory, notificationType = 'status_change', customMessage } = params;
 
+    // Buscar status que disparam gatilhos do banco de dados
+    const triggeredStatuses = await getActiveTriggeredStatuses();
+    
     // Verificar se o novo status dispara notificação
-    if (!TRIGGER_STATUSES[newStatus]) {
-      console.log(`[usePhaseManagerNotification] Status ${newStatus} não dispara notificação`);
+    if (!triggeredStatuses.includes(newStatus)) {
+      console.log(`[usePhaseManagerNotification] Status ${newStatus} não está configurado para disparar notificação`);
       return { success: true, skipped: true };
     }
 
@@ -117,6 +115,7 @@ export function usePhaseManagerNotification() {
   return {
     notifyPhaseManager,
     notifyUrgent,
-    notifyNewOrder
+    notifyNewOrder,
+    getActiveTriggeredStatuses
   };
 }
