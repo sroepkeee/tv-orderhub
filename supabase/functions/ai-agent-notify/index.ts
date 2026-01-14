@@ -715,6 +715,121 @@ function getStatusEmoji(status: string): string {
   return emojis[status] || '📍';
 }
 
+// =====================================================
+// 📊 BARRA DE PROGRESSO VISUAL
+// =====================================================
+
+function getProgressBar(status: string): string {
+  // Mapeamento de status para fase do progresso (0-5)
+  const statusToProgress: Record<string, number> = {
+    // Fase 1: Recebido/Ordem
+    'almox_ssm_pending': 1,
+    'almox_ssm_received': 1,
+    'almox_ssm_approved': 1,
+    'order_generated': 1,
+    
+    // Fase 2: Produção
+    'separation_started': 2,
+    'in_production': 2,
+    'awaiting_material': 2,
+    'production_completed': 2,
+    'separation_completed': 2,
+    
+    // Fase 3: Preparação
+    'in_packaging': 3,
+    'ready_for_shipping': 3,
+    'ready_to_invoice': 3,
+    'invoice_requested': 3,
+    'invoice_issued': 3,
+    
+    // Fase 4: Envio
+    'awaiting_pickup': 4,
+    'pickup_scheduled': 4,
+    'in_transit': 4,
+    'collected': 4,
+    
+    // Fase 5: Entregue
+    'delivered': 5,
+    'completed': 5,
+  };
+  
+  const progress = statusToProgress[status] || 0;
+  const total = 5;
+  
+  const filled = '🟢'.repeat(Math.min(progress, total));
+  const empty = '⚪'.repeat(Math.max(0, total - progress));
+  
+  const labels = ['', 'Recebido', 'Produção', 'Preparação', 'Envio', 'Entregue'];
+  const currentLabel = labels[progress] || '';
+  
+  return `${filled}${empty}`;
+}
+
+// =====================================================
+// 📝 FORMATAÇÃO VISUAL DE MENSAGENS
+// =====================================================
+
+function formatTestModeHeader(
+  customerName: string,
+  customerWhatsApp: string,
+  orderNumber: string
+): string {
+  const truncatedName = customerName.length > 25 
+    ? customerName.substring(0, 22) + '...' 
+    : customerName;
+    
+  return `┌────────────────────────────┐
+│  🧪 *MODO TESTE*                    
+├────────────────────────────┤
+│ 👤 ${truncatedName}
+│ 📱 ${customerWhatsApp || 'N/A'}
+│ 📦 #${orderNumber}
+└────────────────────────────┘
+
+`;
+}
+
+function formatVisualMessage(
+  customerName: string,
+  orderNumber: string,
+  status: string,
+  statusLabel: string,
+  deliveryDate: string,
+  carrierName: string | null,
+  trackingCode: string | null,
+  progressBar: string,
+  greeting: string,
+  closing: string,
+  statusEmoji: string
+): string {
+  const deliveryLine = deliveryDate && deliveryDate !== 'A definir' 
+    ? `📅 *Previsão de Entrega:* ${deliveryDate}` 
+    : '';
+  const carrierLine = carrierName ? `🚚 *Transportadora:* ${carrierName}` : '';
+  const trackingLine = trackingCode ? `📋 *Rastreio:* ${trackingCode}` : '';
+  
+  const infoLines = [
+    `${statusEmoji} *Status:* ${statusLabel}`,
+    deliveryLine,
+    carrierLine,
+    trackingLine
+  ].filter(line => line).join('\n');
+
+  return `━━━━━━━━━━━━━━━━━
+📦 *Atualização do seu Pedido*
+━━━━━━━━━━━━━━━━━
+
+${greeting}
+
+Seu pedido *#${orderNumber}* avançou! 🎉
+
+${infoLines}
+
+*Progresso:* ${progressBar}
+
+${closing}`.trim();
+}
+
 function translateStatus(status: string): string {
   const labels: Record<string, string> = {
     'almox_ssm_pending': 'Recebido no Almox SSM',
@@ -773,6 +888,10 @@ async function generateHumanizedMessage(
   const useSignature = agentConfig?.use_signature ?? false;
   const closingStyle = agentConfig?.closing_style ?? 'varied';
   const conversationStyle = agentConfig?.conversation_style ?? 'chatty';
+  const messageStyle = agentConfig?.message_style ?? 'visual';
+  const useProgressBar = agentConfig?.use_progress_bar ?? true;
+  const customGreeting = agentConfig?.custom_greeting;
+  const customClosing = agentConfig?.custom_closing;
   const forbiddenPhrases = agentConfig?.forbidden_phrases ?? [
     'Qualquer dúvida, estou à disposição',
     'Fico no aguardo',
@@ -781,25 +900,68 @@ async function generateHumanizedMessage(
     'Atenciosamente'
   ];
   
-  if (!openaiApiKey) {
-    const closings = [
-      'Me avisa se precisar de algo! 😊',
-      'Qualquer coisa, só chamar!',
-      'Tô por aqui se precisar! ✨',
-      'Conta comigo!',
-      ''
+  const statusLabel = translateStatus(status);
+  const statusEmoji = getStatusEmoji(status);
+  const progressBar = useProgressBar ? getProgressBar(status) : '';
+  
+  // Extrair primeiro nome
+  const firstName = customerName.split(' ')[0];
+  const capitalizedFirstName = firstName.charAt(0).toUpperCase() + firstName.slice(1).toLowerCase();
+  
+  // Saudações variadas
+  const greetings = customGreeting 
+    ? [customGreeting.replace('{nome}', capitalizedFirstName)]
+    : [
+      `Oi, ${capitalizedFirstName}! 😊`,
+      `Olá, ${capitalizedFirstName}! 👋`,
+      `E aí, ${capitalizedFirstName}! ✨`,
+      `Fala, ${capitalizedFirstName}! 😄`,
+      `Oi, ${capitalizedFirstName}!`,
     ];
-    const randomClosing = closings[Math.floor(Math.random() * closings.length)];
-    
-    return `Oi, ${customerName}! 😊
+  const greeting = greetings[Math.floor(Math.random() * greetings.length)];
+  
+  // Fechamentos variados
+  const closings = customClosing
+    ? [customClosing]
+    : [
+      'Me avisa se precisar de algo! ✨',
+      'Qualquer coisa, só chamar! 😊',
+      'Tô por aqui se precisar!',
+      'Conta comigo! 💪',
+      'Estou à disposição!',
+    ];
+  const closing = closings[Math.floor(Math.random() * closings.length)];
+  
+  // Se estilo visual, usar template formatado
+  if (messageStyle === 'visual') {
+    return formatVisualMessage(
+      capitalizedFirstName,
+      orderNumber,
+      status,
+      statusLabel,
+      deliveryDate,
+      carrierName,
+      trackingCode,
+      progressBar,
+      greeting,
+      closing,
+      statusEmoji
+    );
+  }
+  
+  // Se não tem OpenAI, usar fallback melhorado
+  if (!openaiApiKey) {
+    return `${greeting}
 
-Olha só, tenho novidades do seu pedido *#${orderNumber}*!
+Olha só, tenho novidades do seu pedido *#${orderNumber}*! 🎉
 
-${status}${deliveryDate !== 'A definir' ? ` - previsão de entrega ${deliveryDate}` : ''}.
-${carrierName ? `Transportadora: ${carrierName}` : ''}
-${trackingCode ? `Rastreio: ${trackingCode}` : ''}
+${statusEmoji} *Status:* ${statusLabel}
+${deliveryDate !== 'A definir' ? `📅 *Entrega:* ${deliveryDate}` : ''}
+${carrierName ? `🚚 ${carrierName}` : ''}
+${trackingCode ? `📋 Rastreio: ${trackingCode}` : ''}
+${useProgressBar ? `\n*Progresso:* ${progressBar}` : ''}
 
-${randomClosing}`.trim();
+${closing}`.trim();
   }
 
   const forbiddenPhrasesText = forbiddenPhrases.length > 0 
@@ -828,21 +990,40 @@ ${forbiddenPhrases.map((p: string) => `- "${p}"`).join('\n')}`
     ? `Seja direto e conciso, mas ainda amigável`
     : `Mantenha tom profissional mas cordial`;
 
-  const humanizedPrompt = `Você é um assistente humanizado da IMPLY Tecnologia. Gere uma mensagem de WhatsApp NATURAL e CONVERSACIONAL.
+  const visualFormatInstruction = `📊 USE ESTE FORMATO VISUAL:
+━━━━━━━━━━━━━━━━━
+📦 *Atualização do seu Pedido*
+━━━━━━━━━━━━━━━━━
+
+[saudação personalizada]
+
+Seu pedido *#NUMERO* avançou! 🎉
+
+${statusEmoji} *Status:* ${statusLabel}
+${deliveryDate !== 'A definir' ? `📅 *Previsão:* ${deliveryDate}` : ''}
+${carrierName ? `🚚 *Transportadora:* ${carrierName}` : ''}
+
+*Progresso:* ${progressBar}
+
+[fechamento amigável]`;
+
+  const humanizedPrompt = `Você é um assistente humanizado da IMPLY Tecnologia. Gere uma mensagem de WhatsApp VISUALMENTE ATRAENTE e NATURAL.
 
 🎭 PERSONALIDADE:
 - Você é uma PESSOA REAL conversando, NÃO um robô
-- Use expressões naturais: "Olha só...", "Hmm", "Ah!", "Veja bem", "Sabe..."
+- Use expressões naturais: "Olha só...", "Que ótimo!", "Veja bem"
 - Demonstre empatia genuína
 - VARIE suas saudações: "Oi!", "Olá!", "E aí!", "Fala!"
+
+${visualFormatInstruction}
 
 💬 ESTILO:
 ${styleInstruction}
 
 📦 DADOS DO PEDIDO:
-- Cliente: ${customerName}
+- Cliente: ${capitalizedFirstName}
 - Pedido: #${orderNumber}
-- Status: ${status}
+- Status: ${statusLabel}
 - Entrega: ${deliveryDate}
 ${carrierName ? `- Transportadora: ${carrierName}` : ''}
 ${trackingCode ? `- Rastreio: ${trackingCode}` : ''}
@@ -853,13 +1034,13 @@ ${closingInstruction}
 ${signatureInstruction}
 
 ⚠️ REGRAS CRÍTICAS:
-- NUNCA use formato de lista com emojis no início de cada linha
-- NUNCA repita a mesma frase de fechamento que usou antes
-- Use emojis com MODERAÇÃO (1-2 por mensagem)
-- Mantenha entre 3-5 linhas CONVERSACIONAIS
+- USE os separadores visuais (━━━) para destacar a mensagem
+- Destaque informações importantes em *negrito*
+- Use emojis estratégicos (📦📅🚚✨🎉)
+- Inclua a barra de progresso: ${progressBar}
 - Seja ÚNICO a cada mensagem - varie expressões!
 
-Gere APENAS a mensagem, sem explicações.`;
+Gere APENAS a mensagem formatada, sem explicações.`;
 
   try {
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -872,10 +1053,10 @@ Gere APENAS a mensagem, sem explicações.`;
         model: 'gpt-4o-mini',
         messages: [
           { role: 'system', content: humanizedPrompt },
-          { role: 'user', content: `Gere uma mensagem humanizada para notificar ${customerName} sobre o pedido #${orderNumber} que está em "${status}".` }
+          { role: 'user', content: `Gere uma mensagem visualmente formatada para notificar ${capitalizedFirstName} sobre o pedido #${orderNumber} que está em "${statusLabel}".` }
         ],
-        max_tokens: 300,
-        temperature: 0.8,
+        max_tokens: 400,
+        temperature: 0.7,
       }),
     });
 
@@ -888,30 +1069,28 @@ Gere APENAS a mensagem, sem explicações.`;
     const generatedMessage = data.choices?.[0]?.message?.content;
     
     if (generatedMessage) {
-      console.log('✅ Generated humanized message');
+      console.log('✅ Generated visual humanized message');
       return generatedMessage;
     }
     
     throw new Error('No message generated');
   } catch (error) {
-    console.error('⚠️ Error generating humanized message, using fallback:', error);
-    const closings = [
-      'Me avisa se precisar! 😊',
-      'Tô aqui se quiser saber mais!',
-      'Qualquer coisa, chama!',
-      ''
-    ];
-    const randomClosing = closings[Math.floor(Math.random() * closings.length)];
+    console.error('⚠️ Error generating humanized message, using visual fallback:', error);
     
-    return `Oi, ${customerName}! 😊
-
-Tenho novidades do seu pedido *#${orderNumber}*!
-
-${status}${deliveryDate !== 'A definir' ? ` - previsão ${deliveryDate}` : ''}.
-${carrierName ? `Vai com ${carrierName}` : ''}
-${trackingCode ? `Rastreio: ${trackingCode}` : ''}
-
-${randomClosing}`.trim();
+    // Fallback visual
+    return formatVisualMessage(
+      capitalizedFirstName,
+      orderNumber,
+      status,
+      statusLabel,
+      deliveryDate,
+      carrierName,
+      trackingCode,
+      progressBar,
+      greeting,
+      closing,
+      statusEmoji
+    );
   }
 }
 

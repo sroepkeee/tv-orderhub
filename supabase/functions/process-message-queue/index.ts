@@ -6,8 +6,8 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Configurações de proteção contra bloqueio
-const CONFIG = {
+// Configurações padrão de proteção contra bloqueio (serão sobrescritas pelo banco)
+const DEFAULT_CONFIG = {
   MIN_DELAY_MS: 3000,        // 3 segundos mínimo entre mensagens
   MAX_DELAY_MS: 5000,        // 5 segundos máximo
   JITTER_MS: 1000,           // Variação aleatória adicional
@@ -17,13 +17,88 @@ const CONFIG = {
   MAX_RETRIES: 3,            // Tentativas máximas
   BACKOFF_BASE_MS: 10000,    // Base para backoff exponencial (10 seg)
   BACKOFF_MULTIPLIER: 2,     // Multiplicador do backoff
+  SEND_WINDOW_START: '08:00',
+  SEND_WINDOW_END: '20:00',
+  RESPECT_SEND_WINDOW: true,
+  QUEUE_OUTSIDE_WINDOW: true,
 };
 
+interface RateLimitConfig {
+  minDelayMs: number;
+  maxDelayMs: number;
+  jitterMs: number;
+  maxPerMinute: number;
+  maxPerHour: number;
+  sendWindowStart: string;
+  sendWindowEnd: string;
+  respectSendWindow: boolean;
+  queueOutsideWindow: boolean;
+}
+
+// Buscar configurações do banco de dados
+async function fetchRateLimitConfig(supabase: any): Promise<RateLimitConfig> {
+  try {
+    const { data: agentConfig } = await supabase
+      .from('ai_agent_config')
+      .select(`
+        delay_between_messages_ms,
+        max_messages_per_minute,
+        max_messages_per_hour,
+        send_window_start,
+        send_window_end,
+        respect_send_window,
+        queue_outside_window
+      `)
+      .eq('agent_type', 'customer')
+      .limit(1)
+      .maybeSingle();
+
+    if (agentConfig) {
+      console.log('📊 Using rate limit config from database');
+      return {
+        minDelayMs: agentConfig.delay_between_messages_ms || DEFAULT_CONFIG.MIN_DELAY_MS,
+        maxDelayMs: (agentConfig.delay_between_messages_ms || DEFAULT_CONFIG.MIN_DELAY_MS) + 2000,
+        jitterMs: DEFAULT_CONFIG.JITTER_MS,
+        maxPerMinute: agentConfig.max_messages_per_minute || DEFAULT_CONFIG.MAX_PER_MINUTE,
+        maxPerHour: agentConfig.max_messages_per_hour || DEFAULT_CONFIG.MAX_PER_HOUR,
+        sendWindowStart: agentConfig.send_window_start || DEFAULT_CONFIG.SEND_WINDOW_START,
+        sendWindowEnd: agentConfig.send_window_end || DEFAULT_CONFIG.SEND_WINDOW_END,
+        respectSendWindow: agentConfig.respect_send_window ?? DEFAULT_CONFIG.RESPECT_SEND_WINDOW,
+        queueOutsideWindow: agentConfig.queue_outside_window ?? DEFAULT_CONFIG.QUEUE_OUTSIDE_WINDOW,
+      };
+    }
+  } catch (error) {
+    console.log('⚠️ Error fetching config, using defaults:', error);
+  }
+
+  return {
+    minDelayMs: DEFAULT_CONFIG.MIN_DELAY_MS,
+    maxDelayMs: DEFAULT_CONFIG.MAX_DELAY_MS,
+    jitterMs: DEFAULT_CONFIG.JITTER_MS,
+    maxPerMinute: DEFAULT_CONFIG.MAX_PER_MINUTE,
+    maxPerHour: DEFAULT_CONFIG.MAX_PER_HOUR,
+    sendWindowStart: DEFAULT_CONFIG.SEND_WINDOW_START,
+    sendWindowEnd: DEFAULT_CONFIG.SEND_WINDOW_END,
+    respectSendWindow: DEFAULT_CONFIG.RESPECT_SEND_WINDOW,
+    queueOutsideWindow: DEFAULT_CONFIG.QUEUE_OUTSIDE_WINDOW,
+  };
+}
+
+// Verificar se está dentro da janela de envio
+function isWithinSendWindow(config: RateLimitConfig): boolean {
+  if (!config.respectSendWindow) return true;
+  
+  const now = new Date();
+  const currentTime = now.toTimeString().slice(0, 5); // HH:MM
+  
+  return currentTime >= config.sendWindowStart && currentTime <= config.sendWindowEnd;
+}
+
 // Função para delay com jitter aleatório
-function getRandomDelay(): number {
-  const baseDelay = CONFIG.MIN_DELAY_MS + 
-    Math.random() * (CONFIG.MAX_DELAY_MS - CONFIG.MIN_DELAY_MS);
-  const jitter = Math.random() * CONFIG.JITTER_MS;
+function getRandomDelay(config: RateLimitConfig): number {
+  const baseDelay = config.minDelayMs + 
+    Math.random() * (config.maxDelayMs - config.minDelayMs);
+  const jitter = Math.random() * config.jitterMs;
   return Math.floor(baseDelay + jitter);
 }
 
@@ -34,7 +109,7 @@ function sleep(ms: number): Promise<void> {
 
 // Calcular delay de backoff exponencial
 function getBackoffDelay(attempts: number): number {
-  return CONFIG.BACKOFF_BASE_MS * Math.pow(CONFIG.BACKOFF_MULTIPLIER, attempts - 1);
+  return DEFAULT_CONFIG.BACKOFF_BASE_MS * Math.pow(DEFAULT_CONFIG.BACKOFF_MULTIPLIER, attempts - 1);
 }
 
 interface QueueMessage {
@@ -66,6 +141,27 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
+    // Buscar configurações do banco
+    const config = await fetchRateLimitConfig(supabase);
+    console.log(`⚙️ Config loaded: delay=${config.minDelayMs}ms, maxHour=${config.maxPerHour}, maxMin=${config.maxPerMinute}`);
+
+    // Verificar janela de envio
+    if (!isWithinSendWindow(config)) {
+      console.log(`⏰ Outside send window (${config.sendWindowStart}-${config.sendWindowEnd}), skipping`);
+      return new Response(
+        JSON.stringify({ 
+          success: true, 
+          message: `Outside send window (${config.sendWindowStart}-${config.sendWindowEnd})`,
+          processed: 0,
+          config: {
+            sendWindow: `${config.sendWindowStart}-${config.sendWindowEnd}`,
+            queueOutsideWindow: config.queueOutsideWindow
+          }
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     // Verificar rate limits
     const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
     const oneMinuteAgo = new Date(Date.now() - 60 * 1000).toISOString();
@@ -82,27 +178,29 @@ serve(async (req) => {
       .eq('status', 'sent')
       .gte('sent_at', oneMinuteAgo);
 
-    console.log(`📊 Rate limits - Last hour: ${hourlyCount}/${CONFIG.MAX_PER_HOUR}, Last minute: ${minuteCount}/${CONFIG.MAX_PER_MINUTE}`);
+    console.log(`📊 Rate limits - Last hour: ${hourlyCount}/${config.maxPerHour}, Last minute: ${minuteCount}/${config.maxPerMinute}`);
 
-    if ((hourlyCount || 0) >= CONFIG.MAX_PER_HOUR) {
+    if ((hourlyCount || 0) >= config.maxPerHour) {
       console.log('⚠️ Hourly rate limit reached, skipping this run');
       return new Response(
         JSON.stringify({ 
           success: true, 
           message: 'Hourly rate limit reached',
-          processed: 0 
+          processed: 0,
+          limits: { hourly: hourlyCount, max: config.maxPerHour }
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    if ((minuteCount || 0) >= CONFIG.MAX_PER_MINUTE) {
+    if ((minuteCount || 0) >= config.maxPerMinute) {
       console.log('⚠️ Minute rate limit reached, skipping this run');
       return new Response(
         JSON.stringify({ 
           success: true, 
           message: 'Minute rate limit reached',
-          processed: 0 
+          processed: 0,
+          limits: { minutely: minuteCount, max: config.maxPerMinute }
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
@@ -117,7 +215,7 @@ serve(async (req) => {
       .lte('scheduled_for', now)
       .order('priority', { ascending: true })
       .order('scheduled_for', { ascending: true })
-      .limit(CONFIG.MAX_PER_BATCH);
+      .limit(DEFAULT_CONFIG.MAX_PER_BATCH);
 
     if (fetchError) {
       console.error('❌ Error fetching pending messages:', fetchError);
@@ -264,8 +362,8 @@ serve(async (req) => {
 
       // Delay obrigatório antes da próxima mensagem (exceto na última)
       if (pendingMessages.indexOf(message) < pendingMessages.length - 1) {
-        const delay = getRandomDelay();
-        console.log(`   ⏳ Waiting ${delay}ms before next message...`);
+        const delay = getRandomDelay(config);
+        console.log(`   ⏳ Waiting ${delay}ms before next message (configured: ${config.minDelayMs}-${config.maxDelayMs}ms)...`);
         await sleep(delay);
       }
     }

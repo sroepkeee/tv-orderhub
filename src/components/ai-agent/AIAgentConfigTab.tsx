@@ -8,7 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { Save, MessageSquare, Mail, Clock, Bell, AlertTriangle, FlaskConical, Smartphone, Settings, Plus, X } from "lucide-react";
+import { Slider } from "@/components/ui/slider";
+import { Save, MessageSquare, Mail, Clock, Bell, AlertTriangle, FlaskConical, Smartphone, Settings, Plus, X, Shield, Zap, Eye } from "lucide-react";
 import { toast } from "sonner";
 import { NOTIFICATION_PHASE_OPTIONS } from "@/lib/notificationPhases";
 import { QuickActionsPanel } from "./QuickActionsPanel";
@@ -43,6 +44,19 @@ interface AgentConfig {
   conversation_style?: string;
   avoid_repetition?: boolean;
   forbidden_phrases?: string[];
+  // Novos campos de rate limiting
+  delay_between_messages_ms?: number;
+  max_messages_per_minute?: number;
+  max_messages_per_hour?: number;
+  send_window_start?: string;
+  send_window_end?: string;
+  respect_send_window?: boolean;
+  queue_outside_window?: boolean;
+  // Novos campos de estilo de mensagem
+  message_style?: string;
+  use_progress_bar?: boolean;
+  custom_greeting?: string;
+  custom_closing?: string;
 }
 
 interface Props {
@@ -317,6 +331,222 @@ export function AIAgentConfigTab({ config, onUpdate }: Props) {
               checked={formData.email_enabled ?? config.email_enabled}
               onCheckedChange={(checked) => updateField('email_enabled', checked)}
             />
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Proteção Anti-Bloqueio */}
+      <Card className="border-2 border-orange-500/30 bg-gradient-to-br from-orange-500/5 to-transparent">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Shield className="h-5 w-5 text-orange-500" />
+            Proteção Anti-Bloqueio
+            <Badge variant="outline" className="ml-2 border-orange-500/50 text-orange-600">
+              Rate Limiting
+            </Badge>
+          </CardTitle>
+          <CardDescription>
+            Configure limites de envio para evitar bloqueio do número WhatsApp
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Delay entre mensagens */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <Label className="flex items-center gap-2">
+                <Zap className="h-4 w-4 text-muted-foreground" />
+                Delay entre mensagens
+              </Label>
+              <Badge variant="secondary" className="font-mono">
+                {((formData.delay_between_messages_ms ?? config.delay_between_messages_ms ?? 3000) / 1000).toFixed(1)}s
+              </Badge>
+            </div>
+            <Slider
+              value={[(formData.delay_between_messages_ms ?? config.delay_between_messages_ms ?? 3000) / 1000]}
+              onValueChange={([value]) => updateField('delay_between_messages_ms', value * 1000)}
+              min={1}
+              max={10}
+              step={0.5}
+              className="w-full"
+            />
+            <p className="text-xs text-muted-foreground">
+              Tempo mínimo de espera entre cada mensagem enviada (1-10 segundos)
+            </p>
+          </div>
+
+          {/* Limites por período */}
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2">
+                Máximo por minuto
+              </Label>
+              <Input
+                type="number"
+                value={formData.max_messages_per_minute ?? config.max_messages_per_minute ?? 15}
+                onChange={(e) => updateField('max_messages_per_minute', parseInt(e.target.value))}
+                min={1}
+                max={30}
+                className="font-mono"
+              />
+              <p className="text-xs text-muted-foreground">
+                Recomendado: 10-15 por minuto
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2">
+                Máximo por hora
+              </Label>
+              <Input
+                type="number"
+                value={formData.max_messages_per_hour ?? config.max_messages_per_hour ?? 200}
+                onChange={(e) => updateField('max_messages_per_hour', parseInt(e.target.value))}
+                min={10}
+                max={500}
+                className="font-mono"
+              />
+              <p className="text-xs text-muted-foreground">
+                Recomendado: 100-200 por hora
+              </p>
+            </div>
+          </div>
+
+          {/* Janela de envio */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <Label>Respeitar Janela de Envio</Label>
+                <p className="text-sm text-muted-foreground">
+                  Enviar apenas dentro do horário definido
+                </p>
+              </div>
+              <Switch
+                checked={formData.respect_send_window ?? config.respect_send_window ?? true}
+                onCheckedChange={(checked) => updateField('respect_send_window', checked)}
+              />
+            </div>
+
+            {(formData.respect_send_window ?? config.respect_send_window ?? true) && (
+              <div className="grid gap-4 md:grid-cols-2 p-3 rounded-lg bg-muted/50">
+                <div className="space-y-2">
+                  <Label>Início da Janela</Label>
+                  <Input
+                    type="time"
+                    value={(formData.send_window_start ?? config.send_window_start ?? '08:00').toString().slice(0, 5)}
+                    onChange={(e) => updateField('send_window_start', e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Fim da Janela</Label>
+                  <Input
+                    type="time"
+                    value={(formData.send_window_end ?? config.send_window_end ?? '20:00').toString().slice(0, 5)}
+                    onChange={(e) => updateField('send_window_end', e.target.value)}
+                  />
+                </div>
+              </div>
+            )}
+
+            <div className="flex items-center justify-between pt-2">
+              <div>
+                <Label>Enfileirar Fora do Horário</Label>
+                <p className="text-sm text-muted-foreground">
+                  Guardar mensagens para enviar quando a janela abrir
+                </p>
+              </div>
+              <Switch
+                checked={formData.queue_outside_window ?? config.queue_outside_window ?? true}
+                onCheckedChange={(checked) => updateField('queue_outside_window', checked)}
+              />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Estilo Visual das Mensagens */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Eye className="h-5 w-5" />
+            Estilo Visual das Mensagens
+          </CardTitle>
+          <CardDescription>
+            Configure a aparência das mensagens enviadas aos clientes
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label>Estilo da Mensagem</Label>
+            <Select
+              value={formData.message_style ?? config.message_style ?? 'visual'}
+              onValueChange={(value) => updateField('message_style', value)}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione o estilo" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="visual">📊 Visual (com separadores e formatação)</SelectItem>
+                <SelectItem value="simple">💬 Simples (conversa natural)</SelectItem>
+                <SelectItem value="minimal">📝 Minimalista (só informações)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="flex items-center justify-between">
+            <div>
+              <Label>Mostrar Barra de Progresso</Label>
+              <p className="text-sm text-muted-foreground">
+                Exibir progresso visual do pedido (🟢🟢🟢⚪⚪)
+              </p>
+            </div>
+            <Switch
+              checked={formData.use_progress_bar ?? config.use_progress_bar ?? true}
+              onCheckedChange={(checked) => updateField('use_progress_bar', checked)}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Saudação Personalizada (opcional)</Label>
+            <Input
+              value={formData.custom_greeting ?? config.custom_greeting ?? ''}
+              onChange={(e) => updateField('custom_greeting', e.target.value)}
+              placeholder="Ex: Olá, {nome}! 👋"
+            />
+            <p className="text-xs text-muted-foreground">
+              Use {'{nome}'} para incluir o nome do cliente. Deixe vazio para saudações variadas.
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Fechamento Personalizado (opcional)</Label>
+            <Input
+              value={formData.custom_closing ?? config.custom_closing ?? ''}
+              onChange={(e) => updateField('custom_closing', e.target.value)}
+              placeholder="Ex: Qualquer dúvida, estamos à disposição! 😊"
+            />
+            <p className="text-xs text-muted-foreground">
+              Deixe vazio para fechamentos variados e naturais.
+            </p>
+          </div>
+
+          {/* Preview da mensagem */}
+          <div className="p-4 rounded-lg bg-muted/50 border">
+            <Label className="text-xs uppercase text-muted-foreground mb-2 block">Preview</Label>
+            <div className="font-mono text-xs whitespace-pre-wrap text-foreground/80">
+{`━━━━━━━━━━━━━━━━━
+📦 *Atualização do seu Pedido*
+━━━━━━━━━━━━━━━━━
+
+${formData.custom_greeting?.replace('{nome}', 'João') ?? 'Oi, João! 😊'}
+
+Seu pedido *#12345* avançou! 🎉
+
+📍 *Status:* Em Produção
+📅 *Previsão:* 28/01/2026
+
+${(formData.use_progress_bar ?? config.use_progress_bar ?? true) ? '*Progresso:* 🟢🟢⚪⚪⚪' : ''}
+
+${formData.custom_closing ?? 'Me avisa se precisar! ✨'}`}
+            </div>
           </div>
         </CardContent>
       </Card>
