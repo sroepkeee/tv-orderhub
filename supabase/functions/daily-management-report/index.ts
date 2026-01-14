@@ -18,6 +18,66 @@ interface OrderMetrics {
   phaseDetails: Array<{ phase: string; phaseKey: string; count: number }>;
 }
 
+interface ExtendedMetrics {
+  // Saúde do Portfólio
+  healthBreakdown: {
+    onTime: number;
+    delayed1to7: number;
+    delayed8to30: number;
+    delayedOver30: number;
+  };
+  
+  // Extremamente atrasados (>30 dias)
+  extremelyDelayed: Array<{
+    order_number: string;
+    customer_name: string;
+    daysLate: number;
+    value: number;
+    status: string;
+    statusLabel: string;
+  }>;
+  
+  // Análise por fase
+  phaseAnalysis: {
+    compras: { count: number; avgDays: number; maxDelay: number; stuckValue: number; orders: any[] };
+    producaoClientes: { count: number; avgDays: number; value: number; orders: any[] };
+    producaoEstoque: { count: number; avgDays: number; value: number; orders: any[] };
+  };
+  
+  // Tendências vs semana anterior
+  weeklyTrend: {
+    newOrders: number;
+    newOrdersChange: number;
+    delivered: number;
+    deliveredChange: number;
+    value: number;
+    valueChange: number;
+    dateChanges: number;
+  };
+  
+  // Produção
+  productionTime: {
+    avg: number;
+    min: number;
+    max: number;
+    endingToday: number;
+  };
+  
+  // Top pedidos com detalhes
+  topOrdersDetailed: Array<{
+    order_number: string;
+    customer_name: string;
+    value: number;
+    status: string;
+    statusLabel: string;
+    daysLate: number;
+  }>;
+  
+  // Pedidos urgentes e atrasados
+  urgentOrders: any[];
+  delayedOrders: any[];
+}
+
 // ==================== CONSTANTES ====================
 const DELAY_BETWEEN_SENDS_MS = 3000;
 const delayMs = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
@@ -45,6 +105,78 @@ const phaseLabels: Record<string, string> = {
   'conclusao': '✅ Conclusão',
 };
 
+const statusLabels: Record<string, string> = {
+  'almox_ssm_pending': '📥 Almox SSM',
+  'almox_ssm_received': '📥 Almox SSM',
+  'order_generation_pending': '📋 Gerar Ordem',
+  'order_in_creation': '📋 Gerar Ordem',
+  'purchase_pending': '🛒 Compras',
+  'purchase_quoted': '🛒 Compras',
+  'purchase_ordered': '🛒 Compras',
+  'almox_general_received': '📦 Almox Geral',
+  'almox_general_separating': '📦 Almox Geral',
+  'separation_started': '🔧 Em Produção',
+  'in_production': '🔧 Em Produção',
+  'awaiting_material': '🔧 Aguard. Material',
+  'awaiting_lab': '🔬 Laboratório',
+  'in_lab_analysis': '🔬 Laboratório',
+  'in_quality_check': '📦 Qualidade',
+  'in_packaging': '📦 Embalagem',
+  'ready_for_shipping': '📦 Pronto Envio',
+  'freight_quote_requested': '💰 Cotação',
+  'freight_quote_received': '💰 Cotação',
+  'ready_to_invoice': '💳 À Faturar',
+  'invoice_requested': '🧾 Faturamento',
+  'awaiting_invoice': '🧾 Faturamento',
+  'released_for_shipping': '🚛 Expedição',
+  'in_expedition': '🚛 Expedição',
+  'in_transit': '🚚 Em Trânsito',
+  'collected': '🚚 Coletado',
+  'delivered': '✅ Entregue',
+  'completed': '✅ Concluído',
+};
+
+// ==================== HELPERS ====================
+function getSlaEmoji(rate: number): string {
+  if (rate >= 85) return '✅';
+  if (rate >= 70) return '⚠️';
+  return '🔴';
+}
+
+function pct(part: number, total: number): number {
+  return total > 0 ? Math.round((part / total) * 100) : 0;
+}
+
+function formatTrend(change: number): string {
+  if (change > 0) return `+${change}% ↑`;
+  if (change < 0) return `${change}% ↓`;
+  return '0%';
+}
+
+function formatCurrency(value: number): string {
+  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
+}
+
+// Ajustar horário para Brasília (UTC-3)
+function getBrazilDateTime(): { dateStr: string; timeStr: string } {
+  const now = new Date();
+  const brazilOffset = -3 * 60; // UTC-3 em minutos
+  const utcOffset = now.getTimezoneOffset();
+  const brazilTime = new Date(now.getTime() + (utcOffset + brazilOffset) * 60 * 1000);
+  
+  const dateStr = brazilTime.toLocaleDateString('pt-BR', { 
+    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' 
+  });
+  const timeStr = brazilTime.toLocaleTimeString('pt-BR', { 
+    hour: '2-digit', minute: '2-digit' 
+  });
+  return { dateStr, timeStr };
+}
+
+function getStatusLabel(status: string): string {
+  return statusLabels[status] || status;
+}
+
 // ==================== CÁLCULOS ====================
 async function calculateMetrics(supabase: any): Promise<OrderMetrics> {
   const today = new Date();
@@ -52,7 +184,7 @@ async function calculateMetrics(supabase: any): Promise<OrderMetrics> {
 
   const { data: orders } = await supabase
     .from('orders')
-    .select('id, order_number, customer_name, status, delivery_date, created_at, order_items(total_value, unit_price, requested_quantity)')
+    .select('id, order_number, customer_name, status, delivery_date, created_at, order_type, order_items(total_value, unit_price, requested_quantity)')
     .not('status', 'in', '("completed","cancelled","delivered")');
 
   const activeOrders = orders || [];
@@ -114,73 +246,366 @@ async function calculateMetrics(supabase: any): Promise<OrderMetrics> {
   };
 }
 
-// ==================== FORMATAÇÃO ====================
-function formatCurrency(value: number): string {
-  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
-}
+// ==================== MÉTRICAS ESTENDIDAS ====================
+async function calculateExtendedMetrics(supabase: any): Promise<ExtendedMetrics> {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
+  const twoWeeksAgo = new Date(today.getTime() - 14 * 24 * 60 * 60 * 1000);
 
-// Ajustar horário para Brasília (UTC-3)
-function getBrazilDateTime(): { dateStr: string; timeStr: string } {
-  const now = new Date();
-  const brazilOffset = -3 * 60; // UTC-3 em minutos
-  const utcOffset = now.getTimezoneOffset();
-  const brazilTime = new Date(now.getTime() + (utcOffset + brazilOffset) * 60 * 1000);
+  // Buscar pedidos ativos com detalhes
+  const { data: orders } = await supabase
+    .from('orders')
+    .select('id, order_number, customer_name, status, delivery_date, created_at, updated_at, order_type, order_items(total_value, unit_price, requested_quantity)')
+    .not('status', 'in', '("completed","cancelled","delivered")');
+
+  const activeOrders = orders || [];
+
+  // Buscar pedidos criados na última semana
+  const { data: lastWeekNewOrders } = await supabase
+    .from('orders')
+    .select('id')
+    .gte('created_at', weekAgo.toISOString())
+    .lt('created_at', today.toISOString());
+
+  // Buscar pedidos criados na semana anterior (para comparativo)
+  const { data: previousWeekNewOrders } = await supabase
+    .from('orders')
+    .select('id')
+    .gte('created_at', twoWeeksAgo.toISOString())
+    .lt('created_at', weekAgo.toISOString());
+
+  // Buscar entregas da última semana
+  const { data: lastWeekDelivered } = await supabase
+    .from('orders')
+    .select('id')
+    .eq('status', 'delivered')
+    .gte('updated_at', weekAgo.toISOString());
+
+  const { data: previousWeekDelivered } = await supabase
+    .from('orders')
+    .select('id')
+    .eq('status', 'delivered')
+    .gte('updated_at', twoWeeksAgo.toISOString())
+    .lt('updated_at', weekAgo.toISOString());
+
+  // Buscar mudanças de prazo
+  const { data: dateChanges } = await supabase
+    .from('delivery_date_changes')
+    .select('id')
+    .gte('changed_at', weekAgo.toISOString());
+
+  // Processar pedidos
+  const ordersWithDetails = activeOrders.map((order: any) => {
+    const value = (order.order_items || []).reduce((sum: number, item: any) => {
+      return sum + Number(item.total_value || (item.unit_price * item.requested_quantity) || 0);
+    }, 0);
+
+    let daysLate = 0;
+    let daysUntil = null;
+    if (order.delivery_date) {
+      const deliveryDate = new Date(order.delivery_date);
+      daysUntil = Math.ceil((deliveryDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+      if (daysUntil < 0) daysLate = Math.abs(daysUntil);
+    }
+
+    // Calcular dias na fase atual
+    const updatedAt = new Date(order.updated_at || order.created_at);
+    const daysInPhase = Math.floor((today.getTime() - updatedAt.getTime()) / (1000 * 60 * 60 * 24));
+
+    return {
+      ...order,
+      value,
+      daysLate,
+      daysUntil,
+      daysInPhase,
+      statusLabel: getStatusLabel(order.status),
+      phaseKey: statusToPhase[order.status] || 'unknown',
+    };
+  });
+
+  // === SAÚDE DO PORTFÓLIO ===
+  const healthBreakdown = {
+    onTime: ordersWithDetails.filter((o: any) => o.daysLate === 0).length,
+    delayed1to7: ordersWithDetails.filter((o: any) => o.daysLate > 0 && o.daysLate <= 7).length,
+    delayed8to30: ordersWithDetails.filter((o: any) => o.daysLate > 7 && o.daysLate <= 30).length,
+    delayedOver30: ordersWithDetails.filter((o: any) => o.daysLate > 30).length,
+  };
+
+  // === EXTREMAMENTE ATRASADOS (>30 dias) ===
+  const extremelyDelayed = ordersWithDetails
+    .filter((o: any) => o.daysLate > 30)
+    .sort((a: any, b: any) => b.daysLate - a.daysLate)
+    .map((o: any) => ({
+      order_number: o.order_number,
+      customer_name: o.customer_name,
+      daysLate: o.daysLate,
+      value: o.value,
+      status: o.status,
+      statusLabel: o.statusLabel,
+    }));
+
+  // === ANÁLISE POR FASE ===
+  // Compras
+  const comprasOrders = ordersWithDetails.filter((o: any) => o.phaseKey === 'compras');
+  const comprasAnalysis = {
+    count: comprasOrders.length,
+    avgDays: comprasOrders.length > 0 
+      ? Math.round(comprasOrders.reduce((sum: number, o: any) => sum + o.daysInPhase, 0) / comprasOrders.length)
+      : 0,
+    maxDelay: comprasOrders.length > 0 
+      ? Math.max(...comprasOrders.map((o: any) => o.daysLate))
+      : 0,
+    stuckValue: comprasOrders.reduce((sum: number, o: any) => sum + o.value, 0),
+    orders: comprasOrders.sort((a: any, b: any) => b.daysLate - a.daysLate).slice(0, 5),
+  };
+
+  // Produção Clientes
+  const prodClientesOrders = ordersWithDetails.filter((o: any) => 
+    o.phaseKey === 'producao' && o.order_type !== 'estoque'
+  );
+  const prodClientesAnalysis = {
+    count: prodClientesOrders.length,
+    avgDays: prodClientesOrders.length > 0
+      ? Math.round(prodClientesOrders.reduce((sum: number, o: any) => sum + o.daysInPhase, 0) / prodClientesOrders.length * 10) / 10
+      : 0,
+    value: prodClientesOrders.reduce((sum: number, o: any) => sum + o.value, 0),
+    orders: prodClientesOrders.sort((a: any, b: any) => b.daysInPhase - a.daysInPhase).slice(0, 5)
+      .map((o: any) => ({ order_number: o.order_number, days: o.daysInPhase })),
+  };
+
+  // Produção Estoque
+  const prodEstoqueOrders = ordersWithDetails.filter((o: any) => 
+    o.phaseKey === 'producao' && o.order_type === 'estoque'
+  );
+  const prodEstoqueAnalysis = {
+    count: prodEstoqueOrders.length,
+    avgDays: prodEstoqueOrders.length > 0
+      ? Math.round(prodEstoqueOrders.reduce((sum: number, o: any) => sum + o.daysInPhase, 0) / prodEstoqueOrders.length * 10) / 10
+      : 0,
+    value: prodEstoqueOrders.reduce((sum: number, o: any) => sum + o.value, 0),
+    orders: prodEstoqueOrders.sort((a: any, b: any) => b.daysInPhase - a.daysInPhase).slice(0, 5)
+      .map((o: any) => ({ order_number: o.order_number, days: o.daysInPhase })),
+  };
+
+  // === TENDÊNCIAS ===
+  const lastWeekNewCount = lastWeekNewOrders?.length || 0;
+  const previousWeekNewCount = previousWeekNewOrders?.length || 0;
+  const lastWeekDeliveredCount = lastWeekDelivered?.length || 0;
+  const previousWeekDeliveredCount = previousWeekDelivered?.length || 0;
+
+  // Calcular valor da semana
+  const lastWeekValue = ordersWithDetails
+    .filter((o: any) => new Date(o.created_at) >= weekAgo)
+    .reduce((sum: number, o: any) => sum + o.value, 0);
+
+  const weeklyTrend = {
+    newOrders: lastWeekNewCount,
+    newOrdersChange: previousWeekNewCount > 0 
+      ? Math.round(((lastWeekNewCount - previousWeekNewCount) / previousWeekNewCount) * 100)
+      : 0,
+    delivered: lastWeekDeliveredCount,
+    deliveredChange: previousWeekDeliveredCount > 0
+      ? Math.round(((lastWeekDeliveredCount - previousWeekDeliveredCount) / previousWeekDeliveredCount) * 100)
+      : 0,
+    value: lastWeekValue,
+    valueChange: 0, // Simplificado
+    dateChanges: dateChanges?.length || 0,
+  };
+
+  // === PRODUÇÃO TIME ===
+  const allProductionOrders = ordersWithDetails.filter((o: any) => 
+    ['producao', 'laboratorio', 'embalagem'].includes(o.phaseKey)
+  );
+  const productionDays = allProductionOrders.map((o: any) => o.daysInPhase);
   
-  const dateStr = brazilTime.toLocaleDateString('pt-BR', { 
-    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' 
-  });
-  const timeStr = brazilTime.toLocaleTimeString('pt-BR', { 
-    hour: '2-digit', minute: '2-digit' 
-  });
-  return { dateStr, timeStr };
+  const productionTime = {
+    avg: productionDays.length > 0 ? Math.round(productionDays.reduce((a: number, b: number) => a + b, 0) / productionDays.length) : 0,
+    min: productionDays.length > 0 ? Math.min(...productionDays) : 0,
+    max: productionDays.length > 0 ? Math.max(...productionDays) : 0,
+    endingToday: ordersWithDetails.filter((o: any) => o.daysUntil === 0).length,
+  };
+
+  // === TOP PEDIDOS DETALHADOS ===
+  const topOrdersDetailed = ordersWithDetails
+    .sort((a: any, b: any) => b.value - a.value)
+    .slice(0, 5)
+    .map((o: any) => ({
+      order_number: o.order_number,
+      customer_name: o.customer_name,
+      value: o.value,
+      status: o.status,
+      statusLabel: o.statusLabel,
+      daysLate: o.daysLate,
+    }));
+
+  // === URGENTES E ATRASADOS ===
+  const urgentOrders = ordersWithDetails
+    .filter((o: any) => o.daysUntil !== null && o.daysUntil >= 0 && o.daysUntil <= 2)
+    .sort((a: any, b: any) => a.daysUntil - b.daysUntil);
+
+  const delayedOrders = ordersWithDetails
+    .filter((o: any) => o.daysLate > 0)
+    .sort((a: any, b: any) => b.daysLate - a.daysLate);
+
+  return {
+    healthBreakdown,
+    extremelyDelayed,
+    phaseAnalysis: {
+      compras: comprasAnalysis,
+      producaoClientes: prodClientesAnalysis,
+      producaoEstoque: prodEstoqueAnalysis,
+    },
+    weeklyTrend,
+    productionTime,
+    topOrdersDetailed,
+    urgentOrders,
+    delayedOrders,
+  };
 }
 
-// Relatório COMPLETO com todas as métricas
-function formatFullReport(metrics: OrderMetrics & { topOrders?: any[]; weeklyTrend?: any }): string {
+// ==================== FORMATAÇÃO ====================
+
+// Relatório COMPLETO com todas as métricas detalhadas
+function formatFullReport(metrics: OrderMetrics, extended: ExtendedMetrics): string {
   const { dateStr, timeStr } = getBrazilDateTime();
   
-  let msg = `📊 *RELATÓRIO GERENCIAL COMPLETO*\n`;
-  msg += `📅 ${dateStr} • ${timeStr}\n\n`;
+  let msg = `📊 *RELATÓRIO GERENCIAL DIÁRIO*\n`;
+  msg += `📅 ${dateStr} • ${timeStr} (Brasília)\n\n`;
   
+  // ━━━ RESUMO EXECUTIVO ━━━
   msg += `━━━━━━━━━━━━━━━━━━━━━━\n`;
   msg += `📈 *RESUMO EXECUTIVO*\n`;
+  msg += `━━━━━━━━━━━━━━━━━━━━━━\n`;
   msg += `• Pedidos Ativos: *${metrics.totalActive}*\n`;
-  msg += `• Valor Total: *${formatCurrency(metrics.totalValue)}*\n`;
-  msg += `• SLA: *${metrics.sla.onTimeRate}%* ${metrics.sla.onTimeRate >= 85 ? '✅' : metrics.sla.onTimeRate >= 70 ? '⚠️' : '🔴'}\n`;
+  msg += `• Valor em Produção: *${formatCurrency(metrics.totalValue)}*\n`;
+  msg += `• Taxa de Cumprimento: *${metrics.sla.onTimeRate}%* ${getSlaEmoji(metrics.sla.onTimeRate)}\n`;
   msg += `• Novos Hoje: *${metrics.newToday}*\n\n`;
   
-  // Alertas e Gargalos
-  msg += `🚨 *ALERTAS*\n`;
-  msg += `• Atrasados: *${metrics.alerts.delayed}* (${formatCurrency(metrics.sla.lateValue)})\n`;
-  msg += `• Críticos (1-2 dias): *${metrics.alerts.critical}*\n`;
-  if (metrics.alerts.pendingLab > 0) msg += `• Pendentes Lab: *${metrics.alerts.pendingLab}*\n`;
-  if (metrics.alerts.pendingPurchase > 0) msg += `• Aguardando Compras: *${metrics.alerts.pendingPurchase}*\n`;
+  // ━━━ ALERTAS CRÍTICOS ━━━
+  msg += `🚨 *ALERTAS CRÍTICOS*\n`;
+  msg += `━━━━━━━━━━━━━━━━━━━━━━\n`;
+  msg += `⚠️ *${metrics.alerts.delayed}* pedidos ATRASADOS (${formatCurrency(metrics.sla.lateValue)})\n`;
+  msg += `🔴 *${metrics.alerts.critical}* pedidos críticos (< 48h)\n`;
+  if (metrics.alerts.pendingLab > 0) msg += `🔬 *${metrics.alerts.pendingLab}* aguardando Laboratório\n`;
+  if (metrics.alerts.pendingPurchase > 0) msg += `🛒 *${metrics.alerts.pendingPurchase}* aguardando Compras/Material\n`;
   msg += `\n`;
   
-  // SLA Detalhado
-  msg += `📊 *SLA DETALHADO*\n`;
-  msg += `• No prazo: *${metrics.sla.onTimeCount}* pedidos\n`;
-  msg += `• Atrasados: *${metrics.sla.lateCount}* pedidos\n`;
-  msg += `• Taxa: *${metrics.sla.onTimeRate}%*\n\n`;
+  // ━━━ PEDIDOS EXTREMAMENTE ATRASADOS ━━━
+  if (extended.extremelyDelayed.length > 0) {
+    msg += `🆘 *PEDIDOS EXTREMAMENTE ATRASADOS*\n`;
+    msg += `━━━━━━━━━━━━━━━━━━━━━━\n`;
+    msg += `⚠️ *${extended.extremelyDelayed.length}* pedidos com mais de 30 dias de atraso:\n\n`;
+    extended.extremelyDelayed.slice(0, 5).forEach((order, idx) => {
+      msg += `${idx + 1}. *#${order.order_number}* - ${order.daysLate}d atrasado\n`;
+      msg += `   ${formatCurrency(order.value)} | ${order.statusLabel}\n`;
+    });
+    if (extended.extremelyDelayed.length > 5) {
+      msg += `_... e mais ${extended.extremelyDelayed.length - 5} pedidos_\n`;
+    }
+    msg += `\n`;
+  }
   
-  // Distribuição por Fase
+  // ━━━ SAÚDE DO PORTFÓLIO ━━━
+  const health = extended.healthBreakdown;
+  const totalHealth = health.onTime + health.delayed1to7 + health.delayed8to30 + health.delayedOver30;
+  msg += `🩺 *SAÚDE DO PORTFÓLIO*\n`;
+  msg += `━━━━━━━━━━━━━━━━━━━━━━\n`;
+  msg += `✅ Dentro do prazo: *${health.onTime}* (${pct(health.onTime, totalHealth)}%)\n`;
+  msg += `⚠️ 1-7 dias atrasados: *${health.delayed1to7}* (${pct(health.delayed1to7, totalHealth)}%)\n`;
+  msg += `🔴 8-30 dias atrasados: *${health.delayed8to30}* (${pct(health.delayed8to30, totalHealth)}%)\n`;
+  msg += `🆘 > 30 dias atrasados: *${health.delayedOver30}* (${pct(health.delayedOver30, totalHealth)}%)\n\n`;
+  
+  // ━━━ ANÁLISE DETALHADA - COMPRAS ━━━
+  const compras = extended.phaseAnalysis.compras;
+  if (compras.count > 0) {
+    msg += `🛒 *ANÁLISE DETALHADA - COMPRAS*\n`;
+    msg += `━━━━━━━━━━━━━━━━━━━━━━\n`;
+    msg += `• Total na fase: *${compras.count}* pedidos\n`;
+    msg += `• Tempo médio na fase: *${compras.avgDays}* dias\n`;
+    msg += `• Maior atraso: *${compras.maxDelay}* dias\n`;
+    msg += `• Valor parado: *${formatCurrency(compras.stuckValue)}*\n`;
+    if (compras.orders.length > 0) {
+      msg += `📌 *Pedidos mais atrasados:*\n`;
+      compras.orders.slice(0, 3).forEach((o: any) => {
+        msg += `   #${o.order_number} - *${o.daysLate}d* atrasado (${formatCurrency(o.value)})\n`;
+      });
+    }
+    if (compras.avgDays > 10) msg += `⚠️ *GARGALO:* Tempo médio acima do limite (10d)\n`;
+    msg += `\n`;
+  }
+  
+  // ━━━ ANÁLISE DETALHADA - PRODUÇÃO ━━━
+  msg += `🔧 *ANÁLISE DETALHADA - PRODUÇÃO*\n`;
+  msg += `━━━━━━━━━━━━━━━━━━━━━━\n`;
+  
+  const prodClientes = extended.phaseAnalysis.producaoClientes;
+  msg += `👥 *Produção Clientes:*\n`;
+  msg += `• Pedidos: *${prodClientes.count}*\n`;
+  msg += `• Tempo médio: *${prodClientes.avgDays}* dias\n`;
+  msg += `• Valor: *${formatCurrency(prodClientes.value)}*\n`;
+  if (prodClientes.orders.length > 0) {
+    msg += `📌 Mais antigos: ${prodClientes.orders.slice(0, 3).map((o: any) => `#${o.order_number} (${o.days}d)`).join(', ')}\n`;
+  }
+  msg += `\n`;
+  
+  const prodEstoque = extended.phaseAnalysis.producaoEstoque;
+  msg += `📦 *Produção Estoque:*\n`;
+  msg += `• Pedidos: *${prodEstoque.count}*\n`;
+  msg += `• Tempo médio: *${prodEstoque.avgDays}* dias\n`;
+  msg += `• Valor: *${formatCurrency(prodEstoque.value)}*\n`;
+  if (prodEstoque.orders.length > 0) {
+    msg += `📌 Mais antigos: ${prodEstoque.orders.slice(0, 3).map((o: any) => `#${o.order_number} (${o.days}d)`).join(', ')}\n`;
+  }
+  if (prodClientes.avgDays > 7 || prodEstoque.avgDays > 7) {
+    msg += `⚠️ *GARGALO:* Tempo médio de produção acima do limite (7d)\n`;
+  }
+  msg += `\n`;
+  
+  // ━━━ TENDÊNCIAS ━━━
+  const trend = extended.weeklyTrend;
+  msg += `📊 *TENDÊNCIAS (vs semana anterior)*\n`;
+  msg += `━━━━━━━━━━━━━━━━━━━━━━\n`;
+  msg += `• Novos: ${trend.newOrders} (${formatTrend(trend.newOrdersChange)})\n`;
+  msg += `• Entregues: ${trend.delivered} (${formatTrend(trend.deliveredChange)})\n`;
+  msg += `• Valor: ${formatCurrency(trend.value)} (${formatTrend(trend.valueChange)})\n`;
+  msg += `• Mudanças de prazo: ${trend.dateChanges}\n\n`;
+  
+  // ━━━ DISTRIBUIÇÃO POR FASE ━━━
   msg += `📦 *DISTRIBUIÇÃO POR FASE*\n`;
+  msg += `━━━━━━━━━━━━━━━━━━━━━━\n`;
   metrics.phaseDetails.forEach(p => {
-    const bar = '█'.repeat(Math.min(10, Math.ceil(p.count / Math.max(...metrics.phaseDetails.map(x => x.count)) * 10)));
-    msg += `• ${p.phase}: *${p.count}* ${bar}\n`;
+    msg += `• ${p.phase}: *${p.count}*\n`;
   });
   msg += `\n`;
   
-  // Top 5 Pedidos (se disponível)
-  if (metrics.topOrders && metrics.topOrders.length > 0) {
-    msg += `💰 *TOP 5 PEDIDOS POR VALOR*\n`;
-    metrics.topOrders.slice(0, 5).forEach((order, idx) => {
-      msg += `${idx + 1}. ${order.order_number} - ${formatCurrency(order.value)}\n`;
+  // ━━━ TOP 5 PEDIDOS ━━━
+  if (extended.topOrdersDetailed.length > 0) {
+    msg += `💰 *TOP 5 PEDIDOS (MAIOR VALOR)*\n`;
+    msg += `━━━━━━━━━━━━━━━━━━━━━━\n`;
+    extended.topOrdersDetailed.slice(0, 5).forEach((order, idx) => {
+      const customerShort = order.customer_name?.substring(0, 25) || 'N/A';
+      msg += `${idx + 1}. *${order.order_number}* - ${customerShort}\n`;
+      msg += `   ${formatCurrency(order.value)} | ${order.statusLabel}`;
+      if (order.daysLate > 0) msg += ` | ⚠️ ${order.daysLate}d atrasado`;
+      msg += `\n`;
     });
     msg += `\n`;
   }
   
-  msg += `🤖 _Sistema Imply - Relatório Completo_`;
+  // ━━━ TEMPO EM PRODUÇÃO ━━━
+  const prod = extended.productionTime;
+  msg += `🔧 *TEMPO EM PRODUÇÃO*\n`;
+  msg += `━━━━━━━━━━━━━━━━━━━━━━\n`;
+  msg += `• Média: ${prod.avg} dias\n`;
+  msg += `• Mín/Máx: ${prod.min}/${prod.max} dias\n`;
+  msg += `• Vencem hoje: ${prod.endingToday}\n\n`;
+  
+  // Rodapé
+  msg += `━━━━━━━━━━━━━━━━━━━━━━\n`;
+  msg += `🤖 _Relatório gerado às ${timeStr} (Brasília)_\n`;
+  msg += `_Sistema de Gestão Imply_`;
+  
   return msg;
 }
 
@@ -189,11 +614,11 @@ function formatSummaryReport(metrics: OrderMetrics): string {
   const { dateStr, timeStr } = getBrazilDateTime();
   
   let msg = `📋 *RESUMO RÁPIDO*\n`;
-  msg += `📅 ${dateStr} • ${timeStr}\n\n`;
+  msg += `📅 ${dateStr} • ${timeStr} (Brasília)\n\n`;
   
   msg += `📦 Ativos: *${metrics.totalActive}*\n`;
   msg += `💰 Valor: *${formatCurrency(metrics.totalValue)}*\n`;
-  msg += `📊 SLA: *${metrics.sla.onTimeRate}%* ${metrics.sla.onTimeRate >= 85 ? '✅' : '⚠️'}\n\n`;
+  msg += `📊 SLA: *${metrics.sla.onTimeRate}%* ${getSlaEmoji(metrics.sla.onTimeRate)}\n\n`;
   
   msg += `📊 *POR FASE*\n`;
   metrics.phaseDetails.slice(0, 6).forEach(p => {
@@ -205,17 +630,17 @@ function formatSummaryReport(metrics: OrderMetrics): string {
 }
 
 // Relatório URGENTES (entrega em 1-2 dias)
-function formatUrgentReport(metrics: OrderMetrics & { urgentOrders?: any[] }): string {
+function formatUrgentReport(metrics: OrderMetrics, extended: ExtendedMetrics): string {
   const { dateStr, timeStr } = getBrazilDateTime();
   
   let msg = `🚨 *PEDIDOS URGENTES*\n`;
-  msg += `📅 ${dateStr} • ${timeStr}\n\n`;
+  msg += `📅 ${dateStr} • ${timeStr} (Brasília)\n\n`;
   
   msg += `⚡ *${metrics.alerts.critical}* pedidos com entrega em 1-2 dias!\n\n`;
   
-  if (metrics.urgentOrders && metrics.urgentOrders.length > 0) {
+  if (extended.urgentOrders.length > 0) {
     msg += `📋 *LISTA*\n`;
-    metrics.urgentOrders.slice(0, 10).forEach(order => {
+    extended.urgentOrders.slice(0, 10).forEach((order: any) => {
       const daysText = order.daysUntil === 0 ? 'HOJE' : order.daysUntil === 1 ? 'AMANHÃ' : `${order.daysUntil} dias`;
       msg += `• ${order.order_number} - ${order.customer_name?.substring(0, 20)}\n`;
       msg += `  📅 ${daysText} | ${formatCurrency(order.value)}\n`;
@@ -229,18 +654,18 @@ function formatUrgentReport(metrics: OrderMetrics & { urgentOrders?: any[] }): s
 }
 
 // Relatório ATRASADOS
-function formatDelayedReport(metrics: OrderMetrics & { delayedOrders?: any[] }): string {
+function formatDelayedReport(metrics: OrderMetrics, extended: ExtendedMetrics): string {
   const { dateStr, timeStr } = getBrazilDateTime();
   
   let msg = `⏰ *PEDIDOS ATRASADOS*\n`;
-  msg += `📅 ${dateStr} • ${timeStr}\n\n`;
+  msg += `📅 ${dateStr} • ${timeStr} (Brasília)\n\n`;
   
   msg += `⚠️ *${metrics.alerts.delayed}* pedidos atrasados\n`;
   msg += `💰 Valor em risco: *${formatCurrency(metrics.sla.lateValue)}*\n\n`;
   
-  if (metrics.delayedOrders && metrics.delayedOrders.length > 0) {
+  if (extended.delayedOrders.length > 0) {
     msg += `📋 *TOP ATRASADOS*\n`;
-    metrics.delayedOrders.slice(0, 10).forEach(order => {
+    extended.delayedOrders.slice(0, 10).forEach((order: any) => {
       msg += `• ${order.order_number} - ${order.customer_name?.substring(0, 20)}\n`;
       msg += `  📅 ${order.daysLate} dias | ${formatCurrency(order.value)}\n`;
     });
@@ -257,14 +682,14 @@ function formatPhaseReport(metrics: OrderMetrics): string {
   const { dateStr, timeStr } = getBrazilDateTime();
   
   let msg = `📊 *DISTRIBUIÇÃO POR FASE*\n`;
-  msg += `📅 ${dateStr} • ${timeStr}\n\n`;
+  msg += `📅 ${dateStr} • ${timeStr} (Brasília)\n\n`;
   
   msg += `📦 Total: *${metrics.totalActive}* pedidos ativos\n\n`;
   
   metrics.phaseDetails.forEach(p => {
-    const pct = Math.round((p.count / metrics.totalActive) * 100);
-    const bar = '█'.repeat(Math.ceil(pct / 10));
-    msg += `${p.phase}\n  *${p.count}* (${pct}%) ${bar}\n\n`;
+    const pctValue = pct(p.count, metrics.totalActive);
+    const bar = '█'.repeat(Math.ceil(pctValue / 10));
+    msg += `${p.phase}\n  *${p.count}* (${pctValue}%) ${bar}\n\n`;
   });
   
   msg += `🤖 _Sistema Imply_`;
@@ -273,22 +698,23 @@ function formatPhaseReport(metrics: OrderMetrics): string {
 
 // Função principal que seleciona o formato correto
 function formatReport(
-  metrics: OrderMetrics & { topOrders?: any[]; urgentOrders?: any[]; delayedOrders?: any[]; weeklyTrend?: any }, 
+  metrics: OrderMetrics, 
+  extended: ExtendedMetrics,
   reportType: string
 ): string {
   switch (reportType) {
     case 'full':
-      return formatFullReport(metrics);
+      return formatFullReport(metrics, extended);
     case 'summary':
       return formatSummaryReport(metrics);
     case 'urgent':
-      return formatUrgentReport(metrics);
+      return formatUrgentReport(metrics, extended);
     case 'delayed':
-      return formatDelayedReport(metrics);
+      return formatDelayedReport(metrics, extended);
     case 'phase_summary':
       return formatPhaseReport(metrics);
     default:
-      return formatFullReport(metrics);
+      return formatFullReport(metrics, extended);
   }
 }
 
@@ -313,33 +739,26 @@ async function getActiveInstance(supabase: any) {
   return instance;
 }
 
-// Helper: Verificar se token é placeholder
 function isPlaceholderToken(token: string | null | undefined): boolean {
   if (!token || token.trim() === '') return true;
   const placeholders = ['SEU_TOKEN', 'API_KEY', 'YOUR_TOKEN', 'TOKEN_AQUI', 'PLACEHOLDER'];
   return placeholders.some(p => token.toUpperCase().includes(p));
 }
 
-// Helper: Gerar variantes de telefone (sem 9 e com 9)
 function getPhoneVariants(phone: string): string[] {
   let canonical = phone.replace(/\D/g, '');
   if (!canonical.startsWith('55')) canonical = `55${canonical}`;
   
-  // Normalizar para 12 dígitos (sem 9)
   if (canonical.length === 13 && canonical[4] === '9') {
     canonical = canonical.slice(0, 4) + canonical.slice(5);
   }
   
-  const without9 = canonical; // 55DDXXXXXXXX (12 dígitos)
-  const with9 = canonical.slice(0, 4) + '9' + canonical.slice(4); // 55DD9XXXXXXXX (13 dígitos)
+  const without9 = canonical;
+  const with9 = canonical.slice(0, 4) + '9' + canonical.slice(4);
   
-  // Preferir sem 9 primeiro (padrão WhatsApp oficial)
   return [without9, with9];
 }
 
-/**
- * Tenta enviar com múltiplos formatos de header de autenticação
- */
 async function tryMultiHeaderFetch(
   url: string,
   token: string,
@@ -385,9 +804,6 @@ async function tryMultiHeaderFetch(
   return null;
 }
 
-/**
- * Obtém o melhor token disponível (banco ou env), ignorando placeholders
- */
 function getEffectiveToken(dbToken: string | null | undefined): string {
   if (dbToken && !isPlaceholderToken(dbToken)) {
     console.log('🔑 Using database token');
@@ -412,7 +828,6 @@ async function sendWhatsApp(supabase: any, phone: string, message: string): Prom
       return false;
     }
 
-    // Obter token efetivo (banco ou env, ignorando placeholders)
     const token = getEffectiveToken(instance.api_token);
     if (!token) {
       console.error('❌ No valid API token available');
@@ -428,7 +843,6 @@ async function sendWhatsApp(supabase: any, phone: string, message: string): Prom
 
     console.log(`📤 Attempting to send to variants: ${phoneVariants.join(', ')} via ${instance.instance_key}`);
 
-    // Tentar cada variante de telefone
     for (let i = 0; i < phoneVariants.length; i++) {
       const phoneNumber = phoneVariants[i];
       const isLastVariant = i === phoneVariants.length - 1;
@@ -437,7 +851,6 @@ async function sendWhatsApp(supabase: any, phone: string, message: string): Prom
       
       const body = { messageData: { to: phoneNumber, text: message, linkPreview: false } };
       
-      // Tentar com múltiplos headers
       const res = await tryMultiHeaderFetch(url, token, body);
 
       if (res?.ok) {
@@ -449,13 +862,11 @@ async function sendWhatsApp(supabase: any, phone: string, message: string): Prom
         const err = await res.text();
         console.warn(`⚠️ Failed for ${phoneNumber}: ${res.status} - ${err.substring(0, 100)}`);
         
-        // Se erro 400/404 (número inválido), tentar próxima variante
         if ((res.status === 400 || res.status === 404) && !isLastVariant) {
           await delayMs(500);
           continue;
         }
         
-        // Erro de auth já tentou todos os headers
         if (res.status === 401 || res.status === 403) {
           console.error('❌ Authentication failed with all header formats');
           return false;
@@ -505,57 +916,6 @@ async function sendEmail(email: string, name: string, subject: string, content: 
   }
 }
 
-// ==================== MÉTRICAS ADICIONAIS ====================
-async function calculateExtendedMetrics(supabase: any): Promise<{
-  topOrders: any[];
-  urgentOrders: any[];
-  delayedOrders: any[];
-}> {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  
-  const { data: orders } = await supabase
-    .from('orders')
-    .select('id, order_number, customer_name, status, delivery_date, created_at, order_items(total_value, unit_price, requested_quantity)')
-    .not('status', 'in', '("completed","cancelled","delivered")');
-
-  const activeOrders = orders || [];
-  
-  // Calcular valor de cada pedido
-  const ordersWithValue = activeOrders.map((order: any) => {
-    const value = (order.order_items || []).reduce((sum: number, item: any) => {
-      return sum + Number(item.total_value || (item.unit_price * item.requested_quantity) || 0);
-    }, 0);
-    
-    let daysUntil = null;
-    let daysLate = null;
-    if (order.delivery_date) {
-      const deliveryDate = new Date(order.delivery_date);
-      daysUntil = Math.ceil((deliveryDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-      if (daysUntil < 0) daysLate = Math.abs(daysUntil);
-    }
-    
-    return { ...order, value, daysUntil, daysLate };
-  });
-  
-  // Top 10 por valor
-  const topOrders = [...ordersWithValue]
-    .sort((a, b) => b.value - a.value)
-    .slice(0, 10);
-  
-  // Urgentes (entrega em 0-2 dias)
-  const urgentOrders = ordersWithValue
-    .filter((o: any) => o.daysUntil !== null && o.daysUntil >= 0 && o.daysUntil <= 2)
-    .sort((a: any, b: any) => a.daysUntil - b.daysUntil);
-  
-  // Atrasados (ordenados por mais dias de atraso)
-  const delayedOrders = ordersWithValue
-    .filter((o: any) => o.daysLate !== null && o.daysLate > 0)
-    .sort((a: any, b: any) => b.daysLate - a.daysLate);
-  
-  return { topOrders, urgentOrders, delayedOrders };
-}
-
 // ==================== HANDLER ====================
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -572,8 +932,6 @@ serve(async (req) => {
     // Parâmetros do request
     let testMode = false, testPhone = null, testEmail = null, sendEmailFlag = true;
     let reportType = 'full';
-    let includeChart = true;
-    let includeAllCharts = false;
     
     try {
       const body = await req.json();
@@ -582,11 +940,9 @@ serve(async (req) => {
       testEmail = body.testEmail;
       sendEmailFlag = body.sendEmail !== false;
       reportType = body.reportType || 'full';
-      includeChart = body.includeChart !== false;
-      includeAllCharts = body.includeAllCharts === true;
     } catch { /* No body */ }
 
-    console.log(`📋 Report type: ${reportType}, includeChart: ${includeChart}, includeAllCharts: ${includeAllCharts}`);
+    console.log(`📋 Report type: ${reportType}`);
 
     // Buscar destinatários
     let recipients: any[] = [];
@@ -628,23 +984,19 @@ serve(async (req) => {
 
     console.log(`📬 Sending to ${recipients.length} recipients`);
 
-    // Calcular métricas
+    // Calcular métricas básicas e estendidas
     const metrics = await calculateMetrics(supabase);
+    const extendedMetrics = await calculateExtendedMetrics(supabase);
     
-    // Calcular métricas estendidas para relatórios específicos
-    let extendedMetrics: { topOrders: any[]; urgentOrders: any[]; delayedOrders: any[] } = { 
-      topOrders: [], 
-      urgentOrders: [], 
-      delayedOrders: [] 
-    };
-    if (['full', 'urgent', 'delayed'].includes(reportType)) {
-      extendedMetrics = await calculateExtendedMetrics(supabase);
-    }
-    
-    const fullMetrics = { ...metrics, ...extendedMetrics };
-    const message = formatReport(fullMetrics, reportType);
+    const message = formatReport(metrics, extendedMetrics, reportType);
 
-    console.log('📊 Metrics:', { totalActive: metrics.totalActive, sla: metrics.sla.onTimeRate, reportType });
+    console.log('📊 Metrics:', { 
+      totalActive: metrics.totalActive, 
+      sla: metrics.sla.onTimeRate, 
+      reportType,
+      extremelyDelayed: extendedMetrics.extremelyDelayed.length,
+      topOrders: extendedMetrics.topOrdersDetailed.length
+    });
 
     // Verificar conexão
     const instance = await getActiveInstance(supabase);
@@ -672,7 +1024,12 @@ serve(async (req) => {
           report_type: reportType,
           status: sent ? 'sent' : 'failed',
           message_content: message.substring(0, 500),
-          metrics_snapshot: { totalActive: metrics.totalActive, sla: metrics.sla.onTimeRate, reportType },
+          metrics_snapshot: { 
+            totalActive: metrics.totalActive, 
+            sla: metrics.sla.onTimeRate, 
+            reportType,
+            extremelyDelayed: extendedMetrics.extremelyDelayed.length
+          },
         });
       }
 
@@ -696,7 +1053,12 @@ serve(async (req) => {
         emailCount, 
         errorCount, 
         reportType,
-        metrics: { totalActive: metrics.totalActive, sla: metrics.sla.onTimeRate } 
+        metrics: { 
+          totalActive: metrics.totalActive, 
+          sla: metrics.sla.onTimeRate,
+          extremelyDelayed: extendedMetrics.extremelyDelayed.length,
+          healthBreakdown: extendedMetrics.healthBreakdown
+        } 
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
