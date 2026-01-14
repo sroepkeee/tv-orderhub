@@ -13,6 +13,12 @@ export const NOTIFICATION_PHASE_OPTIONS = [
     status: ['separation_started', 'in_production'] as string[],
   },
   {
+    value: 'in_lab',
+    label: 'Análise de Laboratório',
+    description: 'Quando o pedido está em análise no laboratório',
+    status: ['in_lab', 'in_lab_analysis', 'in_lab_firmware', 'in_lab_image'] as string[],
+  },
+  {
     value: 'production_completed',
     label: 'Produção Concluída',
     description: 'Quando a produção do pedido é finalizada',

@@ -17,6 +17,8 @@ import { OrderItemsReviewTable } from "@/components/OrderItemsReviewTable";
 import { enrichWithRateioProject, RateioProject } from "@/lib/rateioEnrichment";
 import { CustomerWhatsAppDialog } from "@/components/CustomerWhatsAppDialog";
 import { useOrganizationId } from "@/hooks/useOrganizationId";
+import { useOrderNotification } from "@/hooks/useOrderNotification";
+
 interface ImportOrderDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -28,6 +30,7 @@ export const ImportOrderDialog = ({
   onImportSuccess
 }: ImportOrderDialogProps) => {
   const { requireOrganization } = useOrganizationId();
+  const { notifyOrderCreated } = useOrderNotification();
   const [file, setFile] = useState<File | null>(null);
   const [parsedData, setParsedData] = useState<ParsedOrderData | null>(null);
   const [validation, setValidation] = useState<ValidationResult | null>(null);
@@ -343,6 +346,14 @@ export const ImportOrderDialog = ({
         );
       } else {
         toast.success(`Pedido ${data.orderInfo.orderNumber} importado com sucesso!`);
+      }
+      
+      // 📬 DISPARAR NOTIFICAÇÃO AO CLIENTE (se fase de criação estiver habilitada)
+      if (order.id && order.customer_whatsapp) {
+        console.log('📬 [ImportOrderDialog] Triggering customer notification for new order:', order.id);
+        notifyOrderCreated(order.id, 'almox_ssm_pending').catch(err => {
+          console.warn('⚠️ [ImportOrderDialog] Notification failed (non-blocking):', err);
+        });
       }
 
       // ✅ Sinalizar conclusão de batch import

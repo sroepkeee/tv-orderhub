@@ -501,6 +501,20 @@ serve(async (req) => {
       (agentConfig.test_phone ? [agentConfig.test_phone] : []);
     const recipientsToNotify = [];
     
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // 📊 DIAGNÓSTICO DETALHADO DE DESTINATÁRIOS
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log('📋 RECIPIENT DIAGNOSIS');
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log('📦 Order:', order.order_number);
+    console.log('👤 Customer Name:', order.customer_name);
+    console.log('📱 Order customer_whatsapp:', order.customer_whatsapp || 'N/A');
+    console.log('🔍 Contact Source:', contactSource);
+    console.log('📞 Contact WhatsApp:', customerContact.whatsapp || 'N/A');
+    console.log('🧪 Test Phones Configured:', testPhones.length > 0 ? testPhones.join(', ') : 'NONE');
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    
     // Adicionar destinatário principal
     if (customerContact.whatsapp) {
       recipientsToNotify.push({
@@ -508,6 +522,9 @@ serve(async (req) => {
         name: customerContact.customer_name,
         isTest: false
       });
+      console.log('✅ Added CUSTOMER recipient:', customerContact.whatsapp);
+    } else {
+      console.log('⚠️ Customer has NO WhatsApp - will not receive notification');
     }
     
     // Adicionar números de teste
@@ -518,19 +535,30 @@ serve(async (req) => {
           name: `[TESTE] ${order.customer_name}`,
           isTest: true
         });
+        console.log('🧪 Added TEST recipient:', testPhone);
       }
     }
+    
+    console.log('📊 TOTAL RECIPIENTS:', recipientsToNotify.length);
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     
     if (testPhones.length > 0) {
       console.log('🧪 Test mode active - will send to test phones:', testPhones);
     }
     
     if (recipientsToNotify.length === 0) {
-      console.log('❌ No recipients to notify');
+      console.log('❌ No recipients to notify - NEITHER customer nor test phones');
       return new Response(JSON.stringify({ 
         success: false, 
         message: 'No recipients available - configure customer whatsapp or test phone',
-        contactSource
+        contactSource,
+        diagnostics: {
+          orderNumber: order.order_number,
+          customerName: order.customer_name,
+          orderWhatsapp: order.customer_whatsapp || null,
+          contactWhatsapp: customerContact.whatsapp || null,
+          testPhonesConfigured: testPhones
+        }
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
