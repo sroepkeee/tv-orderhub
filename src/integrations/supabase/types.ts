@@ -46,7 +46,10 @@ export type Database = {
           closing_style: string | null
           conversation_style: string | null
           created_at: string | null
+          custom_closing: string | null
+          custom_greeting: string | null
           custom_instructions: string | null
+          delay_between_messages_ms: number | null
           email_enabled: boolean
           forbidden_phrases: string[] | null
           human_handoff_keywords: string[] | null
@@ -54,18 +57,26 @@ export type Database = {
           is_active: boolean
           language: string
           llm_model: string
+          max_messages_per_hour: number | null
+          max_messages_per_minute: number | null
           max_notifications_per_day: number | null
           max_response_time_seconds: number
+          message_style: string | null
           min_interval_minutes: number | null
           notification_phases: string[] | null
           organization_id: string | null
           personality: string
+          queue_outside_window: boolean | null
+          respect_send_window: boolean | null
           respect_working_hours: boolean
+          send_window_end: string | null
+          send_window_start: string | null
           signature: string | null
           test_phone: string | null
           test_phones: string[] | null
           tone_of_voice: string
           updated_at: string | null
+          use_progress_bar: boolean | null
           use_signature: boolean | null
           whatsapp_enabled: boolean
           working_hours_end: string | null
@@ -81,7 +92,10 @@ export type Database = {
           closing_style?: string | null
           conversation_style?: string | null
           created_at?: string | null
+          custom_closing?: string | null
+          custom_greeting?: string | null
           custom_instructions?: string | null
+          delay_between_messages_ms?: number | null
           email_enabled?: boolean
           forbidden_phrases?: string[] | null
           human_handoff_keywords?: string[] | null
@@ -89,18 +103,26 @@ export type Database = {
           is_active?: boolean
           language?: string
           llm_model?: string
+          max_messages_per_hour?: number | null
+          max_messages_per_minute?: number | null
           max_notifications_per_day?: number | null
           max_response_time_seconds?: number
+          message_style?: string | null
           min_interval_minutes?: number | null
           notification_phases?: string[] | null
           organization_id?: string | null
           personality?: string
+          queue_outside_window?: boolean | null
+          respect_send_window?: boolean | null
           respect_working_hours?: boolean
+          send_window_end?: string | null
+          send_window_start?: string | null
           signature?: string | null
           test_phone?: string | null
           test_phones?: string[] | null
           tone_of_voice?: string
           updated_at?: string | null
+          use_progress_bar?: boolean | null
           use_signature?: boolean | null
           whatsapp_enabled?: boolean
           working_hours_end?: string | null
@@ -116,7 +138,10 @@ export type Database = {
           closing_style?: string | null
           conversation_style?: string | null
           created_at?: string | null
+          custom_closing?: string | null
+          custom_greeting?: string | null
           custom_instructions?: string | null
+          delay_between_messages_ms?: number | null
           email_enabled?: boolean
           forbidden_phrases?: string[] | null
           human_handoff_keywords?: string[] | null
@@ -124,18 +149,26 @@ export type Database = {
           is_active?: boolean
           language?: string
           llm_model?: string
+          max_messages_per_hour?: number | null
+          max_messages_per_minute?: number | null
           max_notifications_per_day?: number | null
           max_response_time_seconds?: number
+          message_style?: string | null
           min_interval_minutes?: number | null
           notification_phases?: string[] | null
           organization_id?: string | null
           personality?: string
+          queue_outside_window?: boolean | null
+          respect_send_window?: boolean | null
           respect_working_hours?: boolean
+          send_window_end?: string | null
+          send_window_start?: string | null
           signature?: string | null
           test_phone?: string | null
           test_phones?: string[] | null
           tone_of_voice?: string
           updated_at?: string | null
+          use_progress_bar?: boolean | null
           use_signature?: boolean | null
           whatsapp_enabled?: boolean
           working_hours_end?: string | null
