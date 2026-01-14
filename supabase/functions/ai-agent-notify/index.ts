@@ -277,7 +277,12 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     const payload: NotificationRequest = await req.json();
-    console.log('📬 AI Agent Notify - Payload:', payload);
+    
+    // 🔍 DIAGNÓSTICO: Log detalhado do trigger recebido
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log('📬 AI Agent Notify - TRIGGER RECEIVED');
+    console.log('📋 Payload:', JSON.stringify(payload, null, 2));
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
     // 🔄 Handler para reenvio de notificação
     if (payload.action === 'resend' && payload.notificationId) {

@@ -119,31 +119,177 @@ function formatCurrency(value: number): string {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 }
 
-function formatReport(metrics: OrderMetrics, date: Date): string {
-  const dateStr = date.toLocaleDateString('pt-BR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-  const timeStr = date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+// Ajustar horário para Brasília (UTC-3)
+function getBrazilDateTime(): { dateStr: string; timeStr: string } {
+  const now = new Date();
+  const brazilOffset = -3 * 60; // UTC-3 em minutos
+  const utcOffset = now.getTimezoneOffset();
+  const brazilTime = new Date(now.getTime() + (utcOffset + brazilOffset) * 60 * 1000);
+  
+  const dateStr = brazilTime.toLocaleDateString('pt-BR', { 
+    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' 
+  });
+  const timeStr = brazilTime.toLocaleTimeString('pt-BR', { 
+    hour: '2-digit', minute: '2-digit' 
+  });
+  return { dateStr, timeStr };
+}
 
-  let msg = `📊 *RELATÓRIO GERENCIAL*\n📅 ${dateStr} • ${timeStr}\n\n`;
-  msg += `━━━━━━━━━━━━━━━━━━━━━━\n📈 *RESUMO*\n`;
+// Relatório COMPLETO com todas as métricas
+function formatFullReport(metrics: OrderMetrics & { topOrders?: any[]; weeklyTrend?: any }): string {
+  const { dateStr, timeStr } = getBrazilDateTime();
+  
+  let msg = `📊 *RELATÓRIO GERENCIAL COMPLETO*\n`;
+  msg += `📅 ${dateStr} • ${timeStr}\n\n`;
+  
+  msg += `━━━━━━━━━━━━━━━━━━━━━━\n`;
+  msg += `📈 *RESUMO EXECUTIVO*\n`;
   msg += `• Pedidos Ativos: *${metrics.totalActive}*\n`;
   msg += `• Valor Total: *${formatCurrency(metrics.totalValue)}*\n`;
-  msg += `• SLA: *${metrics.sla.onTimeRate}%* ${metrics.sla.onTimeRate >= 85 ? '✅' : '⚠️'}\n`;
+  msg += `• SLA: *${metrics.sla.onTimeRate}%* ${metrics.sla.onTimeRate >= 85 ? '✅' : metrics.sla.onTimeRate >= 70 ? '⚠️' : '🔴'}\n`;
   msg += `• Novos Hoje: *${metrics.newToday}*\n\n`;
-
-  if (metrics.alerts.delayed > 0 || metrics.alerts.critical > 0) {
-    msg += `🚨 *ALERTAS*\n`;
-    if (metrics.alerts.delayed > 0) msg += `⚠️ *${metrics.alerts.delayed}* atrasados (${formatCurrency(metrics.sla.lateValue)})\n`;
-    if (metrics.alerts.critical > 0) msg += `🔴 *${metrics.alerts.critical}* críticos\n`;
+  
+  // Alertas e Gargalos
+  msg += `🚨 *ALERTAS*\n`;
+  msg += `• Atrasados: *${metrics.alerts.delayed}* (${formatCurrency(metrics.sla.lateValue)})\n`;
+  msg += `• Críticos (1-2 dias): *${metrics.alerts.critical}*\n`;
+  if (metrics.alerts.pendingLab > 0) msg += `• Pendentes Lab: *${metrics.alerts.pendingLab}*\n`;
+  if (metrics.alerts.pendingPurchase > 0) msg += `• Aguardando Compras: *${metrics.alerts.pendingPurchase}*\n`;
+  msg += `\n`;
+  
+  // SLA Detalhado
+  msg += `📊 *SLA DETALHADO*\n`;
+  msg += `• No prazo: *${metrics.sla.onTimeCount}* pedidos\n`;
+  msg += `• Atrasados: *${metrics.sla.lateCount}* pedidos\n`;
+  msg += `• Taxa: *${metrics.sla.onTimeRate}%*\n\n`;
+  
+  // Distribuição por Fase
+  msg += `📦 *DISTRIBUIÇÃO POR FASE*\n`;
+  metrics.phaseDetails.forEach(p => {
+    const bar = '█'.repeat(Math.min(10, Math.ceil(p.count / Math.max(...metrics.phaseDetails.map(x => x.count)) * 10)));
+    msg += `• ${p.phase}: *${p.count}* ${bar}\n`;
+  });
+  msg += `\n`;
+  
+  // Top 5 Pedidos (se disponível)
+  if (metrics.topOrders && metrics.topOrders.length > 0) {
+    msg += `💰 *TOP 5 PEDIDOS POR VALOR*\n`;
+    metrics.topOrders.slice(0, 5).forEach((order, idx) => {
+      msg += `${idx + 1}. ${order.order_number} - ${formatCurrency(order.value)}\n`;
+    });
     msg += `\n`;
   }
+  
+  msg += `🤖 _Sistema Imply - Relatório Completo_`;
+  return msg;
+}
 
-  msg += `📦 *POR FASE*\n`;
-  metrics.phaseDetails.slice(0, 10).forEach(p => {
+// Relatório RESUMO (rápido)
+function formatSummaryReport(metrics: OrderMetrics): string {
+  const { dateStr, timeStr } = getBrazilDateTime();
+  
+  let msg = `📋 *RESUMO RÁPIDO*\n`;
+  msg += `📅 ${dateStr} • ${timeStr}\n\n`;
+  
+  msg += `📦 Ativos: *${metrics.totalActive}*\n`;
+  msg += `💰 Valor: *${formatCurrency(metrics.totalValue)}*\n`;
+  msg += `📊 SLA: *${metrics.sla.onTimeRate}%* ${metrics.sla.onTimeRate >= 85 ? '✅' : '⚠️'}\n\n`;
+  
+  msg += `📊 *POR FASE*\n`;
+  metrics.phaseDetails.slice(0, 6).forEach(p => {
     msg += `• ${p.phase}: *${p.count}*\n`;
   });
-
+  
   msg += `\n🤖 _Sistema Imply_`;
   return msg;
+}
+
+// Relatório URGENTES (entrega em 1-2 dias)
+function formatUrgentReport(metrics: OrderMetrics & { urgentOrders?: any[] }): string {
+  const { dateStr, timeStr } = getBrazilDateTime();
+  
+  let msg = `🚨 *PEDIDOS URGENTES*\n`;
+  msg += `📅 ${dateStr} • ${timeStr}\n\n`;
+  
+  msg += `⚡ *${metrics.alerts.critical}* pedidos com entrega em 1-2 dias!\n\n`;
+  
+  if (metrics.urgentOrders && metrics.urgentOrders.length > 0) {
+    msg += `📋 *LISTA*\n`;
+    metrics.urgentOrders.slice(0, 10).forEach(order => {
+      const daysText = order.daysUntil === 0 ? 'HOJE' : order.daysUntil === 1 ? 'AMANHÃ' : `${order.daysUntil} dias`;
+      msg += `• ${order.order_number} - ${order.customer_name?.substring(0, 20)}\n`;
+      msg += `  📅 ${daysText} | ${formatCurrency(order.value)}\n`;
+    });
+  } else {
+    msg += `✅ Nenhum pedido urgente no momento!\n`;
+  }
+  
+  msg += `\n🤖 _Sistema Imply_`;
+  return msg;
+}
+
+// Relatório ATRASADOS
+function formatDelayedReport(metrics: OrderMetrics & { delayedOrders?: any[] }): string {
+  const { dateStr, timeStr } = getBrazilDateTime();
+  
+  let msg = `⏰ *PEDIDOS ATRASADOS*\n`;
+  msg += `📅 ${dateStr} • ${timeStr}\n\n`;
+  
+  msg += `⚠️ *${metrics.alerts.delayed}* pedidos atrasados\n`;
+  msg += `💰 Valor em risco: *${formatCurrency(metrics.sla.lateValue)}*\n\n`;
+  
+  if (metrics.delayedOrders && metrics.delayedOrders.length > 0) {
+    msg += `📋 *TOP ATRASADOS*\n`;
+    metrics.delayedOrders.slice(0, 10).forEach(order => {
+      msg += `• ${order.order_number} - ${order.customer_name?.substring(0, 20)}\n`;
+      msg += `  📅 ${order.daysLate} dias | ${formatCurrency(order.value)}\n`;
+    });
+  } else {
+    msg += `✅ Nenhum pedido atrasado!\n`;
+  }
+  
+  msg += `\n🤖 _Sistema Imply_`;
+  return msg;
+}
+
+// Relatório POR FASE
+function formatPhaseReport(metrics: OrderMetrics): string {
+  const { dateStr, timeStr } = getBrazilDateTime();
+  
+  let msg = `📊 *DISTRIBUIÇÃO POR FASE*\n`;
+  msg += `📅 ${dateStr} • ${timeStr}\n\n`;
+  
+  msg += `📦 Total: *${metrics.totalActive}* pedidos ativos\n\n`;
+  
+  metrics.phaseDetails.forEach(p => {
+    const pct = Math.round((p.count / metrics.totalActive) * 100);
+    const bar = '█'.repeat(Math.ceil(pct / 10));
+    msg += `${p.phase}\n  *${p.count}* (${pct}%) ${bar}\n\n`;
+  });
+  
+  msg += `🤖 _Sistema Imply_`;
+  return msg;
+}
+
+// Função principal que seleciona o formato correto
+function formatReport(
+  metrics: OrderMetrics & { topOrders?: any[]; urgentOrders?: any[]; delayedOrders?: any[]; weeklyTrend?: any }, 
+  reportType: string
+): string {
+  switch (reportType) {
+    case 'full':
+      return formatFullReport(metrics);
+    case 'summary':
+      return formatSummaryReport(metrics);
+    case 'urgent':
+      return formatUrgentReport(metrics);
+    case 'delayed':
+      return formatDelayedReport(metrics);
+    case 'phase_summary':
+      return formatPhaseReport(metrics);
+    default:
+      return formatFullReport(metrics);
+  }
 }
 
 // ==================== WHATSAPP ====================
@@ -359,6 +505,57 @@ async function sendEmail(email: string, name: string, subject: string, content: 
   }
 }
 
+// ==================== MÉTRICAS ADICIONAIS ====================
+async function calculateExtendedMetrics(supabase: any): Promise<{
+  topOrders: any[];
+  urgentOrders: any[];
+  delayedOrders: any[];
+}> {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  
+  const { data: orders } = await supabase
+    .from('orders')
+    .select('id, order_number, customer_name, status, delivery_date, created_at, order_items(total_value, unit_price, requested_quantity)')
+    .not('status', 'in', '("completed","cancelled","delivered")');
+
+  const activeOrders = orders || [];
+  
+  // Calcular valor de cada pedido
+  const ordersWithValue = activeOrders.map((order: any) => {
+    const value = (order.order_items || []).reduce((sum: number, item: any) => {
+      return sum + Number(item.total_value || (item.unit_price * item.requested_quantity) || 0);
+    }, 0);
+    
+    let daysUntil = null;
+    let daysLate = null;
+    if (order.delivery_date) {
+      const deliveryDate = new Date(order.delivery_date);
+      daysUntil = Math.ceil((deliveryDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+      if (daysUntil < 0) daysLate = Math.abs(daysUntil);
+    }
+    
+    return { ...order, value, daysUntil, daysLate };
+  });
+  
+  // Top 10 por valor
+  const topOrders = [...ordersWithValue]
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 10);
+  
+  // Urgentes (entrega em 0-2 dias)
+  const urgentOrders = ordersWithValue
+    .filter((o: any) => o.daysUntil !== null && o.daysUntil >= 0 && o.daysUntil <= 2)
+    .sort((a: any, b: any) => a.daysUntil - b.daysUntil);
+  
+  // Atrasados (ordenados por mais dias de atraso)
+  const delayedOrders = ordersWithValue
+    .filter((o: any) => o.daysLate !== null && o.daysLate > 0)
+    .sort((a: any, b: any) => b.daysLate - a.daysLate);
+  
+  return { topOrders, urgentOrders, delayedOrders };
+}
+
 // ==================== HANDLER ====================
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -372,7 +569,11 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
+    // Parâmetros do request
     let testMode = false, testPhone = null, testEmail = null, sendEmailFlag = true;
+    let reportType = 'full';
+    let includeChart = true;
+    let includeAllCharts = false;
     
     try {
       const body = await req.json();
@@ -380,7 +581,12 @@ serve(async (req) => {
       testPhone = body.testPhone;
       testEmail = body.testEmail;
       sendEmailFlag = body.sendEmail !== false;
+      reportType = body.reportType || 'full';
+      includeChart = body.includeChart !== false;
+      includeAllCharts = body.includeAllCharts === true;
     } catch { /* No body */ }
+
+    console.log(`📋 Report type: ${reportType}, includeChart: ${includeChart}, includeAllCharts: ${includeAllCharts}`);
 
     // Buscar destinatários
     let recipients: any[] = [];
@@ -424,9 +630,21 @@ serve(async (req) => {
 
     // Calcular métricas
     const metrics = await calculateMetrics(supabase);
-    const message = formatReport(metrics, new Date());
+    
+    // Calcular métricas estendidas para relatórios específicos
+    let extendedMetrics: { topOrders: any[]; urgentOrders: any[]; delayedOrders: any[] } = { 
+      topOrders: [], 
+      urgentOrders: [], 
+      delayedOrders: [] 
+    };
+    if (['full', 'urgent', 'delayed'].includes(reportType)) {
+      extendedMetrics = await calculateExtendedMetrics(supabase);
+    }
+    
+    const fullMetrics = { ...metrics, ...extendedMetrics };
+    const message = formatReport(fullMetrics, reportType);
 
-    console.log('📊 Metrics:', { totalActive: metrics.totalActive, sla: metrics.sla.onTimeRate });
+    console.log('📊 Metrics:', { totalActive: metrics.totalActive, sla: metrics.sla.onTimeRate, reportType });
 
     // Verificar conexão
     const instance = await getActiveInstance(supabase);
@@ -451,15 +669,15 @@ serve(async (req) => {
         await supabase.from('management_report_log').insert({
           recipient_id: r.id,
           recipient_whatsapp: r.whatsapp,
-          report_type: 'daily',
+          report_type: reportType,
           status: sent ? 'sent' : 'failed',
           message_content: message.substring(0, 500),
-          metrics_snapshot: { totalActive: metrics.totalActive, sla: metrics.sla.onTimeRate },
+          metrics_snapshot: { totalActive: metrics.totalActive, sla: metrics.sla.onTimeRate, reportType },
         });
       }
 
       if (sendEmailFlag && r.email) {
-        const dateStr = new Date().toLocaleDateString('pt-BR');
+        const { dateStr } = getBrazilDateTime();
         const sent = await sendEmail(r.email, r.full_name, `📊 Relatório Gerencial - ${dateStr}`, message);
         if (sent) emailCount++;
       }
@@ -472,7 +690,14 @@ serve(async (req) => {
     console.log(`📊 Done: ${sentCount} WhatsApp, ${emailCount} emails, ${errorCount} errors`);
 
     return new Response(
-      JSON.stringify({ success: true, sentCount, emailCount, errorCount, metrics: { totalActive: metrics.totalActive, sla: metrics.sla.onTimeRate } }),
+      JSON.stringify({ 
+        success: true, 
+        sentCount, 
+        emailCount, 
+        errorCount, 
+        reportType,
+        metrics: { totalActive: metrics.totalActive, sla: metrics.sla.onTimeRate } 
+      }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
