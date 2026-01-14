@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { 
   Calendar, 
   Clock, 
@@ -22,13 +23,15 @@ import {
   Timer,
   Layers,
   Users,
-  User
+  User,
+  Phone
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { NOTIFICATION_PHASE_OPTIONS } from "@/lib/notificationPhases";
+import { useOrganizationId } from "@/hooks/useOrganizationId";
 
 interface ReportSchedule {
   id: string;
@@ -43,6 +46,13 @@ interface ReportSchedule {
   recipient_type: string;
   customer_notification_phases: string[];
   report_type: string;
+}
+
+interface Manager {
+  id: string;
+  whatsapp: string;
+  name: string;
+  user_id: string;
 }
 
 const REPORT_TYPES = [
@@ -94,7 +104,9 @@ const DAYS_OF_WEEK = [
 ];
 
 export function ReportScheduleManager() {
+  const { organizationId } = useOrganizationId();
   const [schedules, setSchedules] = useState<ReportSchedule[]>([]);
+  const [managers, setManagers] = useState<Manager[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -136,8 +148,31 @@ export function ReportScheduleManager() {
     }
   };
 
+  const loadManagers = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('management_report_recipients')
+        .select('id, whatsapp, user_id, profiles(full_name)')
+        .eq('is_active', true);
+
+      if (error) throw error;
+      
+      const mappedManagers = (data || []).map((m: any) => ({
+        id: m.id,
+        whatsapp: m.whatsapp || '',
+        name: m.profiles?.full_name || 'Gestor',
+        user_id: m.user_id,
+      }));
+      
+      setManagers(mappedManagers);
+    } catch (error) {
+      console.error('Error loading managers:', error);
+    }
+  };
+
   useEffect(() => {
     loadSchedules();
+    loadManagers();
   }, []);
 
   const toggleSchedule = async (id: string, isActive: boolean) => {
@@ -206,11 +241,22 @@ export function ReportScheduleManager() {
       return;
     }
 
+    // Validate: If managers type, must have managers configured
+    if (newSchedule.recipient_type === 'managers' && managers.length === 0) {
+      toast({
+        title: "Nenhum gestor ativo configurado",
+        description: "Configure gestores em Administração > Relatórios Gerenciais",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setSaving(true);
     try {
       const { error } = await supabase
         .from('report_schedules')
         .insert({
+          organization_id: organizationId, // FIX: Include organization_id
           name: newSchedule.name,
           frequency: newSchedule.frequency,
           send_time: newSchedule.send_time,
@@ -284,6 +330,15 @@ export function ReportScheduleManager() {
 
   const getPhaseLabels = (phases: string[]) => {
     return phases.map(p => NOTIFICATION_PHASE_OPTIONS.find(o => o.value === p)?.label || p).join(', ');
+  };
+
+  const formatPhone = (phone: string) => {
+    if (!phone) return '';
+    const cleaned = phone.replace(/\D/g, '');
+    if (cleaned.length === 13) {
+      return `+${cleaned.slice(0, 2)} (${cleaned.slice(2, 4)}) ${cleaned.slice(4, 9)}-${cleaned.slice(9)}`;
+    }
+    return phone;
   };
 
   if (loading) {
@@ -478,7 +533,45 @@ export function ReportScheduleManager() {
             {/* Opções para Gestores */}
             {newSchedule.recipient_type === 'managers' && (
               <div className="space-y-4 p-4 rounded-lg border bg-blue-500/5 border-blue-500/20">
-                <Label className="text-blue-600 font-medium">Tipo de Relatório</Label>
+                <div className="flex items-center justify-between">
+                  <Label className="text-blue-600 font-medium">Tipo de Relatório</Label>
+                  <Badge 
+                    variant="outline" 
+                    className={managers.length > 0 
+                      ? "bg-green-500/10 text-green-600 border-green-500/30" 
+                      : "bg-amber-500/10 text-amber-600 border-amber-500/30"
+                    }
+                  >
+                    <Users className="h-3 w-3 mr-1" />
+                    {managers.length} gestor(es) ativo(s)
+                  </Badge>
+                </div>
+                
+                {/* Lista de gestores ativos */}
+                {managers.length > 0 ? (
+                  <div className="space-y-2 max-h-32 overflow-y-auto">
+                    {managers.map((manager) => (
+                      <div 
+                        key={manager.id}
+                        className="flex items-center justify-between p-2 rounded bg-background border text-sm"
+                      >
+                        <span className="font-medium">{manager.name}</span>
+                        <div className="flex items-center gap-1 text-muted-foreground">
+                          <Phone className="h-3 w-3" />
+                          <span className="text-xs">{formatPhone(manager.whatsapp)}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <Alert className="bg-amber-500/10 border-amber-500/30">
+                    <AlertTriangle className="h-4 w-4 text-amber-600" />
+                    <AlertDescription className="text-amber-600 text-sm">
+                      Nenhum gestor configurado. Vá em Administração &gt; Relatórios Gerenciais para adicionar gestores.
+                    </AlertDescription>
+                  </Alert>
+                )}
+
                 <Select 
                   value={newSchedule.report_type} 
                   onValueChange={(v) => setNewSchedule({ ...newSchedule, report_type: v })}
@@ -515,6 +608,14 @@ export function ReportScheduleManager() {
             {/* Opções para Clientes */}
             {newSchedule.recipient_type === 'customers' && (
               <div className="space-y-3 p-4 rounded-lg border bg-green-500/5 border-green-500/20">
+                {/* Aviso sobre WhatsApp obrigatório */}
+                <Alert className="bg-amber-500/10 border-amber-500/30">
+                  <Phone className="h-4 w-4 text-amber-600" />
+                  <AlertDescription className="text-amber-600 text-sm">
+                    Apenas pedidos com WhatsApp cadastrado receberão notificações automáticas.
+                  </AlertDescription>
+                </Alert>
+
                 <Label className="text-green-600 font-medium">Fases de Notificação</Label>
                 <p className="text-xs text-muted-foreground">
                   Selecione em quais mudanças de status os clientes receberão notificação
