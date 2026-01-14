@@ -645,7 +645,7 @@ async function getOrderVolumes(supabase: any, orderNumber: string): Promise<stri
 // Buscar cotações de frete
 async function getFreightQuotes(supabase: any, orderNumber: string): Promise<string> {
   // Usar busca robusta
-  const order = await findOrderByNumber(supabase, orderNumber, 'id, order_number, customer_name, destination_city, destination_state');
+  const order = await findOrderByNumber(supabase, orderNumber, 'id, order_number, customer_name, municipality, delivery_address');
 
   if (!order) {
     return getOrderNotFoundMessage(orderNumber);
@@ -668,7 +668,7 @@ async function getFreightQuotes(supabase: any, orderNumber: string): Promise<str
   let response = `💰 *Cotações de Frete - #${order.order_number}*
 ━━━━━━━━━━━━━━━━━━
 👤 Cliente: ${order.customer_name}
-📍 Destino: ${order.destination_city || 'N/A'}/${order.destination_state || 'N/A'}
+📍 Destino: ${order.municipality || 'N/A'}
 📋 Cotações: ${quotes.length}`;
 
   quotes.forEach((q: any, idx: number) => {
@@ -1329,7 +1329,7 @@ async function getOrderDetails(supabase: any, orderNumber: string): Promise<stri
     supabase, 
     orderNumber,
     `id, order_number, customer_name, status, delivery_date, 
-     notes, created_at, updated_at, freight_type, destination_city, destination_state,
+     notes, created_at, updated_at, freight_type, delivery_address, municipality,
      order_items(id, item_code, item_description, requested_quantity, delivered_quantity, item_status, delivery_date, unit_price, total_value)`
   );
 
@@ -2154,7 +2154,7 @@ async function getFreightCostAnalysis(supabase: any): Promise<string> {
     .from('freight_quote_responses')
     .select(`
       freight_value, delivery_time_days, is_selected, created_at,
-      freight_quotes(orders(destination_state, destination_city))
+      freight_quotes(orders(municipality, delivery_address))
     `)
     .eq('is_selected', true)
     .gte('created_at', new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString())
@@ -2177,7 +2177,7 @@ _Sem dados de frete aprovados nos últimos 90 dias._`;
   // Por estado
   const byState: Record<string, { count: number; total: number }> = {};
   responses.forEach((r: any) => {
-    const state = r.freight_quotes?.orders?.destination_state || 'N/A';
+    const state = r.freight_quotes?.orders?.municipality || 'N/A';
     const value = Number(r.freight_value) || 0;
     
     if (!byState[state]) byState[state] = { count: 0, total: 0 };
@@ -2214,7 +2214,7 @@ _Sem dados de frete aprovados nos últimos 90 dias._`;
 async function getDestinationAnalysis(supabase: any): Promise<string> {
   const { data: orders } = await supabase
     .from('orders')
-    .select('id, destination_state, destination_city, order_items(total_value, unit_price, requested_quantity)')
+    .select('id, municipality, delivery_address, order_items(total_value, unit_price, requested_quantity)')
     .not('status', 'in', '("completed","cancelled","delivered")');
 
   const calcOrderValue = (order: any) => {
@@ -2228,8 +2228,8 @@ async function getDestinationAnalysis(supabase: any): Promise<string> {
   const byCity: Record<string, { count: number; value: number; state: string }> = {};
 
   (orders || []).forEach((order: any) => {
-    const state = order.destination_state || 'N/A';
-    const city = order.destination_city || 'N/A';
+    const state = order.municipality || 'N/A';
+    const city = order.delivery_address?.split(',')[0] || 'N/A';
     const value = calcOrderValue(order);
 
     if (!byState[state]) byState[state] = { count: 0, value: 0 };
