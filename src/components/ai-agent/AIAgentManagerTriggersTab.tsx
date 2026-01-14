@@ -41,7 +41,9 @@ import {
   Zap,
   AlertTriangle,
   Users,
+  Calendar,
 } from "lucide-react";
+import { ReportScheduleManager } from "./ReportScheduleManager";
 
 // Types
 interface ManagerTriggerConfig {
@@ -883,6 +885,20 @@ export function AIAgentManagerTriggersTab() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Separator and Scheduled Reports Section */}
+      <div className="mt-8 pt-8 border-t space-y-4">
+        <div className="flex items-center gap-3">
+          <Calendar className="h-5 w-5 text-muted-foreground" />
+          <div>
+            <h3 className="text-lg font-medium">Relatórios Agendados</h3>
+            <p className="text-sm text-muted-foreground">
+              Configure envio de relatórios periódicos em horários fixos
+            </p>
+          </div>
+        </div>
+        <ReportScheduleManager />
+      </div>
     </div>
   );
 }
