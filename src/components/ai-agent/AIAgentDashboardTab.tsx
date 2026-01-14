@@ -26,8 +26,6 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { subDays, format } from "date-fns";
 import { cn } from "@/lib/utils";
-import { QuickActionsPanel } from "./QuickActionsPanel";
-import { ReportScheduleManager } from "./ReportScheduleManager";
 
 interface NotificationMetrics {
   total24h: number;
@@ -486,11 +484,7 @@ export function AIAgentDashboardTab() {
         </CardContent>
       </Card>
 
-      {/* Quick Actions Panel */}
-      <QuickActionsPanel />
-
-      {/* Report Schedule Manager */}
-      <ReportScheduleManager />
+      {/* Quick Actions and Report Schedule Manager moved to Config tab */}
 
       {/* Connection Status */}
       <div className="grid gap-4 md:grid-cols-2">
