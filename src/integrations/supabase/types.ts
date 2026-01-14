@@ -3965,6 +3965,7 @@ export type Database = {
           chart_provider: string
           created_at: string
           created_by: string | null
+          customer_notification_phases: string[] | null
           frequency: string
           id: string
           include_charts: boolean
@@ -3973,7 +3974,9 @@ export type Database = {
           name: string
           next_send_at: string | null
           organization_id: string | null
+          recipient_type: string | null
           recipients: Json
+          report_type: string | null
           send_days: number[] | null
           send_time: string
           template_id: string | null
@@ -3984,6 +3987,7 @@ export type Database = {
           chart_provider?: string
           created_at?: string
           created_by?: string | null
+          customer_notification_phases?: string[] | null
           frequency?: string
           id?: string
           include_charts?: boolean
@@ -3992,7 +3996,9 @@ export type Database = {
           name: string
           next_send_at?: string | null
           organization_id?: string | null
+          recipient_type?: string | null
           recipients?: Json
+          report_type?: string | null
           send_days?: number[] | null
           send_time?: string
           template_id?: string | null
@@ -4003,6 +4009,7 @@ export type Database = {
           chart_provider?: string
           created_at?: string
           created_by?: string | null
+          customer_notification_phases?: string[] | null
           frequency?: string
           id?: string
           include_charts?: boolean
@@ -4011,7 +4018,9 @@ export type Database = {
           name?: string
           next_send_at?: string | null
           organization_id?: string | null
+          recipient_type?: string | null
           recipients?: Json
+          report_type?: string | null
           send_days?: number[] | null
           send_time?: string
           template_id?: string | null

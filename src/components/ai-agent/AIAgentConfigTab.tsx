@@ -11,6 +11,8 @@ import { Badge } from "@/components/ui/badge";
 import { Save, MessageSquare, Mail, Clock, Bell, AlertTriangle, FlaskConical, Smartphone, Settings, Plus, X } from "lucide-react";
 import { toast } from "sonner";
 import { NOTIFICATION_PHASE_OPTIONS } from "@/lib/notificationPhases";
+import { QuickActionsPanel } from "./QuickActionsPanel";
+import { ReportScheduleManager } from "./ReportScheduleManager";
 
 interface AgentConfig {
   id: string;
@@ -384,6 +386,12 @@ export function AIAgentConfigTab({ config, onUpdate }: Props) {
           </div>
         </CardContent>
       </Card>
+
+      {/* Ações Rápidas */}
+      <QuickActionsPanel />
+
+      {/* Agendamentos */}
+      <ReportScheduleManager />
 
       {/* Botão Salvar */}
       <div className="flex justify-end">
