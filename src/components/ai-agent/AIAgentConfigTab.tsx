@@ -12,7 +12,6 @@ import { Save, MessageSquare, Mail, Clock, Bell, AlertTriangle, FlaskConical, Sm
 import { toast } from "sonner";
 import { NOTIFICATION_PHASE_OPTIONS } from "@/lib/notificationPhases";
 import { QuickActionsPanel } from "./QuickActionsPanel";
-import { ReportScheduleManager } from "./ReportScheduleManager";
 
 interface AgentConfig {
   id: string;
@@ -389,9 +388,6 @@ export function AIAgentConfigTab({ config, onUpdate }: Props) {
 
       {/* Ações Rápidas */}
       <QuickActionsPanel />
-
-      {/* Agendamentos */}
-      <ReportScheduleManager />
 
       {/* Botão Salvar */}
       <div className="flex justify-end">
