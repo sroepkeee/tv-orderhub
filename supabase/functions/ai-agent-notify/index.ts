@@ -620,7 +620,7 @@ serve(async (req) => {
 
           if (channel === 'whatsapp') {
             const finalMessage = recipient.isTest 
-              ? `🧪 *[MODO TESTE]*\n👤 Cliente: ${order.customer_name}\n📱 Tel: ${customerContact.whatsapp || 'N/A'}\n\n${messageContent}`
+              ? `[MODO TESTE]\n👤 Cliente: ${order.customer_name}\n📱 Tel: ${customerContact.whatsapp || 'N/A'}\n📦 Pedido: #${order.order_number}\n\n${messageContent}`
               : messageContent;
             
             const externalMessageId = await sendWhatsAppMessage(
@@ -720,49 +720,41 @@ function getStatusEmoji(status: string): string {
 // =====================================================
 
 function getProgressBar(status: string): string {
-  // Mapeamento de status para fase do progresso (0-5)
+  // Mapeamento de status para porcentagem de progresso
   const statusToProgress: Record<string, number> = {
-    // Fase 1: Recebido/Ordem
-    'almox_ssm_pending': 1,
-    'almox_ssm_received': 1,
-    'almox_ssm_approved': 1,
-    'order_generated': 1,
+    // 20% - Recebido/Ordem
+    'almox_ssm_pending': 20,
+    'almox_ssm_received': 20,
+    'almox_ssm_approved': 20,
+    'order_generated': 20,
     
-    // Fase 2: Produção
-    'separation_started': 2,
-    'in_production': 2,
-    'awaiting_material': 2,
-    'production_completed': 2,
-    'separation_completed': 2,
+    // 40% - Produção
+    'separation_started': 40,
+    'in_production': 40,
+    'awaiting_material': 40,
+    'production_completed': 40,
+    'separation_completed': 40,
     
-    // Fase 3: Preparação
-    'in_packaging': 3,
-    'ready_for_shipping': 3,
-    'ready_to_invoice': 3,
-    'invoice_requested': 3,
-    'invoice_issued': 3,
+    // 60% - Preparação
+    'in_packaging': 60,
+    'ready_for_shipping': 60,
+    'ready_to_invoice': 60,
+    'invoice_requested': 60,
+    'invoice_issued': 60,
     
-    // Fase 4: Envio
-    'awaiting_pickup': 4,
-    'pickup_scheduled': 4,
-    'in_transit': 4,
-    'collected': 4,
+    // 80% - Envio
+    'awaiting_pickup': 80,
+    'pickup_scheduled': 80,
+    'in_transit': 80,
+    'collected': 80,
     
-    // Fase 5: Entregue
-    'delivered': 5,
-    'completed': 5,
+    // 100% - Entregue
+    'delivered': 100,
+    'completed': 100,
   };
   
   const progress = statusToProgress[status] || 0;
-  const total = 5;
-  
-  const filled = '🟢'.repeat(Math.min(progress, total));
-  const empty = '⚪'.repeat(Math.max(0, total - progress));
-  
-  const labels = ['', 'Recebido', 'Produção', 'Preparação', 'Envio', 'Entregue'];
-  const currentLabel = labels[progress] || '';
-  
-  return `${filled}${empty}`;
+  return `${progress}%`;
 }
 
 // =====================================================
@@ -774,17 +766,10 @@ function formatTestModeHeader(
   customerWhatsApp: string,
   orderNumber: string
 ): string {
-  const truncatedName = customerName.length > 25 
-    ? customerName.substring(0, 22) + '...' 
-    : customerName;
-    
-  return `┌────────────────────────────┐
-│  🧪 *MODO TESTE*                    
-├────────────────────────────┤
-│ 👤 ${truncatedName}
-│ 📱 ${customerWhatsApp || 'N/A'}
-│ 📦 #${orderNumber}
-└────────────────────────────┘
+  return `[MODO TESTE]
+👤 Cliente: ${customerName}
+📱 Tel: ${customerWhatsApp || 'N/A'}
+📦 Pedido: #${orderNumber}
 
 `;
 }
@@ -802,32 +787,53 @@ function formatVisualMessage(
   closing: string,
   statusEmoji: string
 ): string {
-  const deliveryLine = deliveryDate && deliveryDate !== 'A definir' 
-    ? `📅 *Previsão de Entrega:* ${deliveryDate}` 
-    : '';
+  const isFinalStatus = ['delivered', 'completed'].includes(status);
+  
+  // Linha de data contextualizada
+  let dateLine = '';
+  if (isFinalStatus) {
+    dateLine = deliveryDate && deliveryDate !== 'A definir' 
+      ? `📅 *Entregue em:* ${deliveryDate}` 
+      : '';
+  } else {
+    dateLine = deliveryDate && deliveryDate !== 'A definir' 
+      ? `📅 *Previsão:* ${deliveryDate}` 
+      : '';
+  }
+  
+  // Mensagem principal contextualizada
+  const mainMessage = isFinalStatus
+    ? `Seu pedido *#${orderNumber}* foi concluído com sucesso! ✅`
+    : `Seu pedido *#${orderNumber}* avançou! 🎉`;
+  
+  // Mostrar progresso só se não for final
+  const progressLine = isFinalStatus ? '' : `📊 *Progresso:* ${progressBar}`;
+  
   const carrierLine = carrierName ? `🚚 *Transportadora:* ${carrierName}` : '';
   const trackingLine = trackingCode ? `📋 *Rastreio:* ${trackingCode}` : '';
   
   const infoLines = [
     `${statusEmoji} *Status:* ${statusLabel}`,
-    deliveryLine,
+    dateLine,
     carrierLine,
-    trackingLine
+    trackingLine,
+    progressLine
   ].filter(line => line).join('\n');
 
-  return `━━━━━━━━━━━━━━━━━
-📦 *Atualização do seu Pedido*
-━━━━━━━━━━━━━━━━━
+  // Fechamento contextualizado
+  const finalClosing = isFinalStatus
+    ? 'Obrigado pela preferência! 🙏'
+    : closing;
+
+  return `📦 *Atualização do seu Pedido*
 
 ${greeting}
 
-Seu pedido *#${orderNumber}* avançou! 🎉
+${mainMessage}
 
 ${infoLines}
 
-*Progresso:* ${progressBar}
-
-${closing}`.trim();
+${finalClosing}`.trim();
 }
 
 function translateStatus(status: string): string {
@@ -948,99 +954,48 @@ async function generateHumanizedMessage(
       statusEmoji
     );
   }
+  const isFinalStatus = ['delivered', 'completed'].includes(status);
   
-  // Se não tem OpenAI, usar fallback melhorado
+  // Se não tem OpenAI, usar fallback otimizado
   if (!openaiApiKey) {
-    return `${greeting}
-
-Olha só, tenho novidades do seu pedido *#${orderNumber}*! 🎉
-
-${statusEmoji} *Status:* ${statusLabel}
-${deliveryDate !== 'A definir' ? `📅 *Entrega:* ${deliveryDate}` : ''}
-${carrierName ? `🚚 ${carrierName}` : ''}
-${trackingCode ? `📋 Rastreio: ${trackingCode}` : ''}
-${useProgressBar ? `\n*Progresso:* ${progressBar}` : ''}
-
-${closing}`.trim();
+    return formatVisualMessage(
+      capitalizedFirstName,
+      orderNumber,
+      status,
+      statusLabel,
+      deliveryDate,
+      carrierName,
+      trackingCode,
+      progressBar,
+      greeting,
+      closing,
+      statusEmoji
+    );
   }
 
-  const forbiddenPhrasesText = forbiddenPhrases.length > 0 
-    ? `⛔ NUNCA USE ESTAS FRASES (são robóticas e repetitivas):
-${forbiddenPhrases.map((p: string) => `- "${p}"`).join('\n')}`
-    : '';
+  // Prompt COMPACTO para economizar tokens (~60% menos)
+  const humanizedPrompt = `Gere mensagem WhatsApp amigável para IMPLY Tecnologia.
 
-  const signatureInstruction = useSignature 
-    ? `Termine com assinatura: _${signature}_`
-    : 'NÃO inclua assinatura formal no final';
-
-  const closingInstruction = closingStyle === 'varied'
-    ? `✅ VARIE o fechamento a cada mensagem. Exemplos:
-- "Me avisa se precisar de algo!"
-- "Tô por aqui se quiser saber algo!"
-- "Qualquer coisa, só chamar!"
-- "Conta comigo!"
-- (às vezes nem precisa fechar, só a informação já basta)`
-    : closingStyle === 'none'
-    ? 'NÃO inclua fechamento ou despedida'
-    : `Use sempre o mesmo fechamento: "Me avisa se precisar!"`;
-
-  const styleInstruction = conversationStyle === 'chatty'
-    ? `Escreva como conversa com amigo - natural, fluído, com expressões como "Olha só", "Sabe o que é", "Hmm"`
-    : conversationStyle === 'concise'
-    ? `Seja direto e conciso, mas ainda amigável`
-    : `Mantenha tom profissional mas cordial`;
-
-  const visualFormatInstruction = `📊 USE ESTE FORMATO VISUAL:
-━━━━━━━━━━━━━━━━━
-📦 *Atualização do seu Pedido*
-━━━━━━━━━━━━━━━━━
-
-[saudação personalizada]
-
-Seu pedido *#NUMERO* avançou! 🎉
-
-${statusEmoji} *Status:* ${statusLabel}
-${deliveryDate !== 'A definir' ? `📅 *Previsão:* ${deliveryDate}` : ''}
-${carrierName ? `🚚 *Transportadora:* ${carrierName}` : ''}
-
-*Progresso:* ${progressBar}
-
-[fechamento amigável]`;
-
-  const humanizedPrompt = `Você é um assistente humanizado da IMPLY Tecnologia. Gere uma mensagem de WhatsApp VISUALMENTE ATRAENTE e NATURAL.
-
-🎭 PERSONALIDADE:
-- Você é uma PESSOA REAL conversando, NÃO um robô
-- Use expressões naturais: "Olha só...", "Que ótimo!", "Veja bem"
-- Demonstre empatia genuína
-- VARIE suas saudações: "Oi!", "Olá!", "E aí!", "Fala!"
-
-${visualFormatInstruction}
-
-💬 ESTILO:
-${styleInstruction}
-
-📦 DADOS DO PEDIDO:
+DADOS:
 - Cliente: ${capitalizedFirstName}
 - Pedido: #${orderNumber}
-- Status: ${statusLabel}
-- Entrega: ${deliveryDate}
+- Status: ${statusLabel} ${statusEmoji}
+${isFinalStatus ? '- PEDIDO CONCLUÍDO' : `- Previsão: ${deliveryDate}`}
 ${carrierName ? `- Transportadora: ${carrierName}` : ''}
 ${trackingCode ? `- Rastreio: ${trackingCode}` : ''}
+${!isFinalStatus ? `- Progresso: ${progressBar}` : ''}
 
-${forbiddenPhrasesText}
+REGRAS:
+1. Saudação curta (Oi/Olá + nome)
+2. ${isFinalStatus ? 'Confirmar conclusão do pedido' : 'Informar atualização'}
+3. Listar status e dados relevantes
+4. ${isFinalStatus ? 'Agradecer pela preferência' : 'Fechamento amigável curto'}
+5. Use *negrito* e emojis moderados
+6. NÃO use "Equipe Imply", "Atenciosamente" ou despedidas formais
+7. ${!isFinalStatus ? 'Incluir progresso em porcentagem' : 'NÃO mostrar progresso para pedido concluído'}
+8. ${isFinalStatus ? 'Usar "Entregue em" para data' : 'Usar "Previsão" para data'}
 
-${closingInstruction}
-${signatureInstruction}
-
-⚠️ REGRAS CRÍTICAS:
-- USE os separadores visuais (━━━) para destacar a mensagem
-- Destaque informações importantes em *negrito*
-- Use emojis estratégicos (📦📅🚚✨🎉)
-- Inclua a barra de progresso: ${progressBar}
-- Seja ÚNICO a cada mensagem - varie expressões!
-
-Gere APENAS a mensagem formatada, sem explicações.`;
+Máximo 120 palavras.`;
 
   try {
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -1053,10 +1008,10 @@ Gere APENAS a mensagem formatada, sem explicações.`;
         model: 'gpt-4o-mini',
         messages: [
           { role: 'system', content: humanizedPrompt },
-          { role: 'user', content: `Gere uma mensagem visualmente formatada para notificar ${capitalizedFirstName} sobre o pedido #${orderNumber} que está em "${statusLabel}".` }
+          { role: 'user', content: `Gere mensagem para ${capitalizedFirstName} sobre pedido #${orderNumber} - ${statusLabel}.` }
         ],
-        max_tokens: 400,
-        temperature: 0.7,
+        max_tokens: 250,
+        temperature: 0.6,
       }),
     });
 
