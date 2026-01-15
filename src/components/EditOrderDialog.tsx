@@ -1519,6 +1519,24 @@ export const EditOrderDialog = ({
       });
       if (historyError) console.error('Erro ao registrar histórico:', historyError);
 
+      // ✨ Notificar gestor da fase sobre a mudança de status
+      supabase.functions.invoke('notify-phase-manager', {
+        body: {
+          orderId: order.id,
+          oldStatus: oldStatus,
+          newStatus: newStatus,
+          orderType: order.type,
+          orderCategory: order.order_category,
+          notificationType: 'status_change'
+        }
+      }).then(({ data, error }) => {
+        if (error) {
+          console.warn('⚠️ Erro ao notificar gestor:', error);
+        } else if (data?.notifications_sent > 0) {
+          console.log(`📱 [PhaseManager] ${data.notifications_sent} gestor(es) notificado(s)`);
+        }
+      }).catch(err => console.warn('⚠️ Falha na notificação:', err));
+
       // Atualizar o formulário
       setValue("status", newStatus as any, {
         shouldDirty: false,

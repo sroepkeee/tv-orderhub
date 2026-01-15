@@ -290,31 +290,60 @@ export function MessageQueueDashboard() {
       {/* Rate Limit Info */}
       <Card className="border-dashed">
         <CardContent className="p-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <AlertTriangle className="h-4 w-4 text-yellow-500" />
-              <span className="text-sm text-muted-foreground">
-                <strong>Proteção anti-bloqueio:</strong> Máximo 15 msg/min, 200 msg/hora, delay de 3-5 seg entre mensagens
-              </span>
+          <div className="flex flex-col gap-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4 text-yellow-500" />
+                <span className="text-sm text-muted-foreground">
+                  <strong>Proteção anti-bloqueio:</strong> Máximo 15 msg/min, 200 msg/hora, delay de 3-5 seg entre mensagens
+                </span>
+              </div>
+              <div className="flex gap-2">
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={fetchData}
+                  disabled={loading}
+                >
+                  <RefreshCw className={`h-4 w-4 mr-1 ${loading ? 'animate-spin' : ''}`} />
+                  Atualizar
+                </Button>
+                <Button 
+                  size="sm"
+                  onClick={handleProcessQueue}
+                  disabled={processing || stats.pending === 0}
+                >
+                  <Play className={`h-4 w-4 mr-1 ${processing ? 'animate-pulse' : ''}`} />
+                  Processar Fila
+                </Button>
+              </div>
             </div>
-            <div className="flex gap-2">
-              <Button 
-                variant="outline" 
-                size="sm"
-                onClick={fetchData}
-                disabled={loading}
-              >
-                <RefreshCw className={`h-4 w-4 mr-1 ${loading ? 'animate-spin' : ''}`} />
-                Atualizar
-              </Button>
-              <Button 
-                size="sm"
-                onClick={handleProcessQueue}
-                disabled={processing || stats.pending === 0}
-              >
-                <Play className={`h-4 w-4 mr-1 ${processing ? 'animate-pulse' : ''}`} />
-                Processar Fila
-              </Button>
+            
+            {/* Cron Job Info */}
+            <div className="p-3 bg-muted/50 rounded-lg border border-dashed">
+              <div className="flex items-start gap-2">
+                <TrendingUp className="h-4 w-4 text-primary mt-0.5" />
+                <div className="flex-1 text-xs">
+                  <p className="font-medium text-foreground mb-1">🕐 Processamento Automático (Cron Job)</p>
+                  <p className="text-muted-foreground mb-2">
+                    Para automatizar o envio, configure um cron job no Supabase SQL Editor:
+                  </p>
+                  <pre className="bg-background p-2 rounded text-[10px] overflow-x-auto border">
+{`SELECT cron.schedule(
+  'process-message-queue',
+  '*/1 * * * *',
+  $$SELECT net.http_post(
+    url := 'https://wejkyyjhckdlttieuyku.supabase.co/functions/v1/process-message-queue',
+    headers := '{"Content-Type": "application/json", "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."}'::jsonb,
+    body := '{}'::jsonb
+  )$$
+);`}
+                  </pre>
+                  <p className="text-muted-foreground mt-1">
+                    ⚠️ Substitua o token pelo seu SUPABASE_ANON_KEY completo.
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
         </CardContent>

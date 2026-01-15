@@ -207,14 +207,15 @@ serve(async (req) => {
     }
 
     // Buscar mensagens pendentes ordenadas por prioridade e data de agendamento
+    // IMPORTANTE: Incluir mensagens com scheduled_for NULL ou já no passado
     const now = new Date().toISOString();
     const { data: pendingMessages, error: fetchError } = await supabase
       .from('message_queue')
       .select('*')
       .eq('status', 'pending')
-      .lte('scheduled_for', now)
+      .or(`scheduled_for.is.null,scheduled_for.lte.${now}`)
       .order('priority', { ascending: true })
-      .order('scheduled_for', { ascending: true })
+      .order('scheduled_for', { ascending: true, nullsFirst: true })
       .limit(DEFAULT_CONFIG.MAX_PER_BATCH);
 
     if (fetchError) {
