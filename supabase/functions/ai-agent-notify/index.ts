@@ -569,7 +569,8 @@ serve(async (req) => {
       if (channel === 'email' && !agentConfig.email_enabled) continue;
 
       // Preparar contexto para mensagem humanizada
-      const statusLabel = translateStatus(payload.new_status || order.status);
+      const rawStatus = payload.new_status || order.status;
+      const status = normalizeStatus(rawStatus);
       const deliveryDate = order.delivery_date 
         ? new Date(order.delivery_date).toLocaleDateString('pt-BR') 
         : 'A definir';
@@ -581,7 +582,7 @@ serve(async (req) => {
       const messageContent = payload.custom_message || await generateHumanizedMessage(
         customerFirstName,
         order.order_number,
-        statusLabel,
+        status,
         deliveryDate,
         order.carrier_name,
         order.tracking_code,
@@ -685,6 +686,16 @@ serve(async (req) => {
 // =====================================================
 // 📋 FUNÇÕES AUXILIARES
 // =====================================================
+
+function normalizeStatus(status: string): string {
+  const s = (status || '').trim().toLowerCase();
+  const map: Record<string, string> = {
+    'concluido': 'completed',
+    'concluído': 'completed',
+    'entregue': 'delivered',
+  };
+  return map[s] || s;
+}
 
 function getStatusEmoji(status: string): string {
   const emojis: Record<string, string> = {
@@ -940,9 +951,13 @@ async function generateHumanizedMessage(
     'Atenciosamente'
   ];
   
-  const statusLabel = translateStatus(status);
-  const statusEmoji = getStatusEmoji(status);
-  const progressBar = useProgressBar ? getProgressBar(status) : '';
+  const normalizedStatus = normalizeStatus(status);
+
+  const statusLabel = translateStatus(normalizedStatus);
+  const statusEmoji = getStatusEmoji(normalizedStatus);
+  const progressBar = useProgressBar ? getProgressBar(normalizedStatus) : '';
+
+  const isFinalStatus = ['delivered', 'completed'].includes(normalizedStatus);
   
   // Extrair primeiro nome
   const firstName = customerName.split(' ')[0];
@@ -971,26 +986,8 @@ async function generateHumanizedMessage(
       'Estou à disposição!',
     ];
   const closing = closings[Math.floor(Math.random() * closings.length)];
-  
-  // Se estilo visual, usar template formatado
-  if (messageStyle === 'visual') {
-    return formatVisualMessage(
-      capitalizedFirstName,
-      orderNumber,
-      status,
-      statusLabel,
-      deliveryDate,
-      carrierName,
-      trackingCode,
-      progressBar,
-      greeting,
-      closing,
-      statusEmoji
-    );
-  }
-  const isFinalStatus = ['delivered', 'completed'].includes(status);
-  
-  // Status final usa template fixo para consistência e economia de tokens
+
+  // ✅ Status final sempre usa template fixo (sem progresso) e com agradecimento
   if (isFinalStatus) {
     return formatFinalStatusMessage(
       capitalizedFirstName,
@@ -1001,12 +998,29 @@ async function generateHumanizedMessage(
     );
   }
   
+  // Se estilo visual, usar template formatado
+  if (messageStyle === 'visual') {
+    return formatVisualMessage(
+      capitalizedFirstName,
+      orderNumber,
+      normalizedStatus,
+      statusLabel,
+      deliveryDate,
+      carrierName,
+      trackingCode,
+      progressBar,
+      greeting,
+      closing,
+      statusEmoji
+    );
+  }
+  
   // Se não tem OpenAI, usar fallback otimizado
   if (!openaiApiKey) {
     return formatVisualMessage(
       capitalizedFirstName,
       orderNumber,
-      status,
+      normalizedStatus,
       statusLabel,
       deliveryDate,
       carrierName,
