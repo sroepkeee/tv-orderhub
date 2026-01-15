@@ -618,9 +618,9 @@ serve(async (req) => {
             .select()
             .single();
 
-          if (channel === 'whatsapp') {
+        if (channel === 'whatsapp') {
             const finalMessage = recipient.isTest 
-              ? `[MODO TESTE]\n👤 Cliente: ${order.customer_name}\n📱 Tel: ${customerContact.whatsapp || 'N/A'}\n📦 Pedido: #${order.order_number}\n\n${messageContent}`
+              ? `[MODO TESTE]\n👤 ${order.customer_name}\n📱 ${customerContact.whatsapp || 'N/A'}\n\n${messageContent}`
               : messageContent;
             
             const externalMessageId = await sendWhatsAppMessage(
@@ -836,6 +836,40 @@ ${infoLines}
 ${finalClosing}`.trim();
 }
 
+// Template fixo para status finais (concluído/entregue) - economiza tokens
+function formatFinalStatusMessage(
+  customerName: string,
+  orderNumber: string,
+  statusLabel: string,
+  deliveryDate: string,
+  statusEmoji: string
+): string {
+  const greetings = [
+    `Oi, ${customerName}! 😊`,
+    `Olá, ${customerName}! 👋`,
+  ];
+  const greeting = greetings[Math.floor(Math.random() * greetings.length)];
+  
+  const dateLine = deliveryDate && deliveryDate !== 'A definir'
+    ? `📅 *Concluído em:* ${deliveryDate}`
+    : '';
+
+  const infoLines = [
+    `${statusEmoji} *Status:* ${statusLabel}`,
+    dateLine
+  ].filter(line => line).join('\n');
+
+  return `📦 *Atualização do seu Pedido*
+
+${greeting}
+
+Seu pedido *#${orderNumber}* foi concluído! ✅
+
+${infoLines}
+
+Agradecemos a confiança! 🙏`.trim();
+}
+
 function translateStatus(status: string): string {
   const labels: Record<string, string> = {
     'almox_ssm_pending': 'Recebido no Almox SSM',
@@ -955,6 +989,17 @@ async function generateHumanizedMessage(
     );
   }
   const isFinalStatus = ['delivered', 'completed'].includes(status);
+  
+  // Status final usa template fixo para consistência e economia de tokens
+  if (isFinalStatus) {
+    return formatFinalStatusMessage(
+      capitalizedFirstName,
+      orderNumber,
+      statusLabel,
+      deliveryDate,
+      statusEmoji
+    );
+  }
   
   // Se não tem OpenAI, usar fallback otimizado
   if (!openaiApiKey) {
