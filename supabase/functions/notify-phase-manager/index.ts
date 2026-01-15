@@ -624,6 +624,11 @@ serve(async (req) => {
       }
 
       // Adicionar à fila de mensagens com delay configurado
+      // IMPORTANTE: Sempre definir scheduled_for para evitar NULL (imediato ou com delay)
+      const scheduledTime = new Date(
+        Date.now() + (trigger?.delay_minutes || 0) * 60 * 1000
+      ).toISOString();
+      
       const { error: queueError } = await supabase
         .from('message_queue')
         .insert({
@@ -632,9 +637,7 @@ serve(async (req) => {
           message_content: messageContent,
           message_type: 'phase_manager_alert',
           priority: trigger?.priority || (notificationType === 'urgent_alert' ? 1 : 2),
-          scheduled_for: trigger?.delay_minutes 
-            ? new Date(Date.now() + trigger.delay_minutes * 60 * 1000).toISOString()
-            : null,
+          scheduled_for: scheduledTime,
           metadata: {
             notification_id: notification?.id,
             order_id: orderId,
