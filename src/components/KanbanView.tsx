@@ -15,10 +15,7 @@ import {
   Receipt,
   ClipboardCheck,
   ShoppingCart,
-  ChevronLeft,
-  ChevronRight,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import {
   DndContext,
   closestCenter,
@@ -644,56 +641,6 @@ export const KanbanView = ({
     density === 'compact' ? 'compact' : 
     cardViewMode;
 
-  // Ref para o container de scroll horizontal
-  const scrollContainerRef = React.useRef<HTMLDivElement>(null);
-  const [showLeftArrow, setShowLeftArrow] = React.useState(false);
-  const [showRightArrow, setShowRightArrow] = React.useState(true);
-
-  // Função para scrollar horizontalmente
-  const scrollHorizontal = (direction: 'left' | 'right') => {
-    const container = scrollContainerRef.current;
-    if (!container) return;
-    
-    const scrollAmount = 320; // Largura aproximada de uma coluna
-    const newScrollLeft = direction === 'left' 
-      ? container.scrollLeft - scrollAmount 
-      : container.scrollLeft + scrollAmount;
-    
-    container.scrollTo({
-      left: newScrollLeft,
-      behavior: 'smooth'
-    });
-  };
-
-  // Atualizar visibilidade das setas baseado na posição do scroll
-  const handleScroll = React.useCallback(() => {
-    const container = scrollContainerRef.current;
-    if (!container) return;
-    
-    const { scrollLeft, scrollWidth, clientWidth } = container;
-    setShowLeftArrow(scrollLeft > 10);
-    setShowRightArrow(scrollLeft < scrollWidth - clientWidth - 10);
-  }, []);
-
-  // Listener de scroll
-  React.useEffect(() => {
-    const container = scrollContainerRef.current;
-    if (!container) return;
-    
-    container.addEventListener('scroll', handleScroll);
-    // Checar estado inicial
-    handleScroll();
-    
-    // Rechecar quando redimensionar
-    const resizeObserver = new ResizeObserver(handleScroll);
-    resizeObserver.observe(container);
-    
-    return () => {
-      container.removeEventListener('scroll', handleScroll);
-      resizeObserver.disconnect();
-    };
-  }, [handleScroll, visibleColumns]);
-
   return (
     <DndContext
       sensors={sensors}
@@ -703,45 +650,16 @@ export const KanbanView = ({
       onDragCancel={handleDragCancel}
     >
       <div className={cn(
-        "kanban-view h-full min-h-0 relative",
+        "kanban-view h-full min-h-0",
         density === 'tv' && "kanban-view-tv",
         density === 'compact' && "kanban-view-compact"
       )}>
-        {/* Botão flutuante esquerdo */}
-        {showLeftArrow && (
-          <Button
-            variant="secondary"
-            size="icon"
-            onClick={() => scrollHorizontal('left')}
-            className="fixed left-16 top-1/2 -translate-y-1/2 z-50 h-12 w-12 rounded-full shadow-lg opacity-80 hover:opacity-100 transition-opacity bg-background/90 backdrop-blur-sm border"
-            aria-label="Rolar para esquerda"
-          >
-            <ChevronLeft className="h-6 w-6" />
-          </Button>
-        )}
-        
-        {/* Botão flutuante direito */}
-        {showRightArrow && (
-          <Button
-            variant="secondary"
-            size="icon"
-            onClick={() => scrollHorizontal('right')}
-            className="fixed right-4 top-1/2 -translate-y-1/2 z-50 h-12 w-12 rounded-full shadow-lg opacity-80 hover:opacity-100 transition-opacity bg-background/90 backdrop-blur-sm border"
-            aria-label="Rolar para direita"
-          >
-            <ChevronRight className="h-6 w-6" />
-          </Button>
-        )}
-
-        <div 
-          ref={scrollContainerRef}
-          className={cn(
-            "kanban-container overflow-x-auto",
-            density === 'tv' && "kanban-container-tv gap-1",
-            density === 'compact' && "kanban-container-compact gap-2",
-            density === 'comfortable' && "gap-2 lg:gap-3"
-          )}
-        >
+        <div className={cn(
+          "kanban-container",
+          density === 'tv' && "kanban-container-tv gap-1",
+          density === 'compact' && "kanban-container-compact gap-2",
+          density === 'comfortable' && "gap-2 lg:gap-3"
+        )}>
           {visibleColumns.map((column) => {
             const phaseDetails = getPhaseDetails(column.id);
             const canDrag = canEditPhase(column.id) || userRoles.includes('admin');
