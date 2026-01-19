@@ -1,14 +1,16 @@
 import { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Package, RotateCcw, Users, BarChart3, AlertTriangle, Clock, CheckCircle2 } from 'lucide-react';
+import { Package, RotateCcw, Users, BarChart3, AlertTriangle, Clock, CheckCircle2, ClipboardList } from 'lucide-react';
 import MainLayout from '@/layouts/MainLayout';
 import { TechnicianDispatchesTable } from '@/components/technicians/TechnicianDispatchesTable';
 import { TechnicianManagementTab } from '@/components/technicians/TechnicianManagementTab';
 import { ReturnRequestsQueue } from '@/components/technicians/ReturnRequestsQueue';
+import { ReturnProcessesTab } from '@/components/technicians/ReturnProcessesTab';
 import { DispatchMetricsCards } from '@/components/technicians/DispatchMetricsCards';
 import { useTechnicianDispatches } from '@/hooks/useTechnicianDispatches';
 import { useReturnRequests } from '@/hooks/useReturnRequests';
+import { useReturnProcesses } from '@/hooks/useReturnProcesses';
 import { DispatchMetrics } from '@/types/technicians';
 
 const defaultMetrics: DispatchMetrics = {
@@ -24,8 +26,10 @@ export default function TechnicianDispatches() {
   const [activeTab, setActiveTab] = useState('dispatches');
   const { dispatches, metrics, loading: dispatchesLoading, fetchDispatches } = useTechnicianDispatches();
   const { requests: pendingRequests, loading: requestsLoading } = useReturnRequests({ status: 'pending' });
+  const { processes } = useReturnProcesses();
   
   const safeMetrics = metrics || defaultMetrics;
+  const activeProcesses = processes.filter(p => !['finalizado', 'cancelado'].includes(p.status)).length;
 
   return (
     <MainLayout>
@@ -49,10 +53,19 @@ export default function TechnicianDispatches() {
 
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-4 lg:w-auto lg:inline-grid">
+          <TabsList className="grid w-full grid-cols-5 lg:w-auto lg:inline-grid">
             <TabsTrigger value="dispatches" className="gap-2">
               <Package className="h-4 w-4" />
               <span className="hidden sm:inline">Envios</span>
+            </TabsTrigger>
+            <TabsTrigger value="processes" className="gap-2">
+              <ClipboardList className="h-4 w-4" />
+              <span className="hidden sm:inline">Processos</span>
+              {activeProcesses > 0 && (
+                <span className="ml-1 rounded-full bg-blue-500 px-2 py-0.5 text-xs text-white">
+                  {activeProcesses}
+                </span>
+              )}
             </TabsTrigger>
             <TabsTrigger value="returns" className="gap-2">
               <RotateCcw className="h-4 w-4" />
@@ -79,6 +92,10 @@ export default function TechnicianDispatches() {
               loading={dispatchesLoading}
               onRefresh={fetchDispatches}
             />
+          </TabsContent>
+
+          <TabsContent value="processes" className="mt-6">
+            <ReturnProcessesTab />
           </TabsContent>
 
           <TabsContent value="returns" className="mt-6">
