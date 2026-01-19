@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Slider } from "@/components/ui/slider";
-import { Save, MessageSquare, Mail, Clock, Bell, AlertTriangle, FlaskConical, Smartphone, Settings, Plus, X, Shield, Zap, Eye } from "lucide-react";
+import { Save, MessageSquare, Mail, Clock, Bell, AlertTriangle, FlaskConical, Smartphone, Settings, Plus, X, Shield, Zap, Eye, Rocket, TestTube } from "lucide-react";
 import { toast } from "sonner";
 import { NOTIFICATION_PHASE_OPTIONS } from "@/lib/notificationPhases";
 import { QuickActionsPanel } from "./QuickActionsPanel";
@@ -57,6 +57,8 @@ interface AgentConfig {
   use_progress_bar?: boolean;
   custom_greeting?: string;
   custom_closing?: string;
+  // Modo teste/produção
+  test_mode_enabled?: boolean;
 }
 
 interface Props {
@@ -189,25 +191,97 @@ export function AIAgentConfigTab({ config, onUpdate }: Props) {
         </CardContent>
       </Card>
 
-      {/* Modo Teste - Múltiplos Números */}
-      <Card className="border-2 border-amber-500/30 bg-gradient-to-br from-amber-500/5 to-transparent">
+      {/* Modo de Operação: Teste vs Produção */}
+      <Card className={`border-2 transition-all ${
+        (formData.test_mode_enabled ?? config.test_mode_enabled ?? true)
+          ? 'border-amber-500/30 bg-gradient-to-br from-amber-500/5 to-transparent'
+          : 'border-green-500/30 bg-gradient-to-br from-green-500/5 to-transparent'
+      }`}>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <FlaskConical className="h-5 w-5 text-amber-500" />
-            Modo Teste
-            <Badge variant="outline" className="ml-2 border-amber-500/50 text-amber-600">
-              Debug
+            {(formData.test_mode_enabled ?? config.test_mode_enabled ?? true) 
+              ? <TestTube className="h-5 w-5 text-amber-500" />
+              : <Rocket className="h-5 w-5 text-green-500" />
+            }
+            Modo de Operação
+            <Badge 
+              variant="outline" 
+              className={`ml-2 ${
+                (formData.test_mode_enabled ?? config.test_mode_enabled ?? true)
+                  ? 'border-amber-500/50 text-amber-600'
+                  : 'border-green-500/50 text-green-600'
+              }`}
+            >
+              {(formData.test_mode_enabled ?? config.test_mode_enabled ?? true) ? 'TESTE' : 'PRODUÇÃO'}
             </Badge>
           </CardTitle>
           <CardDescription>
-            Configure números de teste para receber cópia de todas as notificações enviadas por qualquer agente
+            Controle se as notificações vão para números de teste ou para clientes reais
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex items-start gap-3 p-4 rounded-lg bg-amber-500/10 border border-amber-500/20">
-            <Smartphone className="h-5 w-5 text-amber-500 mt-0.5" />
+          {/* Toggle principal */}
+          <div className={`flex items-center justify-between p-4 rounded-lg border ${
+            (formData.test_mode_enabled ?? config.test_mode_enabled ?? true)
+              ? 'bg-amber-500/10 border-amber-500/20'
+              : 'bg-green-500/10 border-green-500/20'
+          }`}>
+            <div className="flex items-center gap-3">
+              {(formData.test_mode_enabled ?? config.test_mode_enabled ?? true) 
+                ? <TestTube className="h-5 w-5 text-amber-500" />
+                : <Rocket className="h-5 w-5 text-green-500" />
+              }
+              <div>
+                <Label className="font-medium">
+                  {(formData.test_mode_enabled ?? config.test_mode_enabled ?? true) 
+                    ? 'Modo Teste Ativo'
+                    : 'Modo Produção Ativo'
+                  }
+                </Label>
+                <p className="text-sm text-muted-foreground">
+                  {(formData.test_mode_enabled ?? config.test_mode_enabled ?? true) 
+                    ? 'Notificações vão APENAS para números de teste abaixo'
+                    : 'Notificações vão para o WhatsApp REAL do cliente'
+                  }
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="text-xs text-muted-foreground">Teste</span>
+              <Switch
+                checked={!(formData.test_mode_enabled ?? config.test_mode_enabled ?? true)}
+                onCheckedChange={(checked) => updateField('test_mode_enabled', !checked)}
+              />
+              <span className="text-xs text-muted-foreground">Produção</span>
+            </div>
+          </div>
+
+          {/* Aviso de produção */}
+          {!(formData.test_mode_enabled ?? config.test_mode_enabled ?? true) && (
+            <div className="flex items-start gap-3 p-4 rounded-lg bg-destructive/10 border border-destructive/30">
+              <AlertTriangle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-medium text-destructive">
+                  ⚠️ Atenção: Modo Produção Ativo!
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Todas as notificações serão enviadas para os clientes REAIS. 
+                  Cópias ainda serão enviadas aos números de teste para monitoramento.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Números de teste */}
+          <div className="flex items-start gap-3 p-4 rounded-lg bg-muted/30 border border-border">
+            <Smartphone className="h-5 w-5 text-muted-foreground mt-0.5" />
             <div className="space-y-3 flex-1">
-              <Label>Números de Teste (WhatsApp)</Label>
+              <Label>
+                {(formData.test_mode_enabled ?? config.test_mode_enabled ?? true)
+                  ? 'Números que Receberão as Notificações'
+                  : 'Números para Cópia de Monitoramento'
+                }
+              </Label>
               
               {/* Lista de números cadastrados */}
               <div className="space-y-2">
@@ -274,17 +348,44 @@ export function AIAgentConfigTab({ config, onUpdate }: Props) {
               </div>
               
               <p className="text-xs text-muted-foreground">
-                Todos esses números receberão cópia de TODAS as notificações enviadas aos clientes, 
-                com informações de debug (nome do cliente real, telefone, etc.)
+                {(formData.test_mode_enabled ?? config.test_mode_enabled ?? true)
+                  ? 'Em modo TESTE, apenas estes números receberão notificações. Clientes reais NÃO são notificados.'
+                  : 'Em modo PRODUÇÃO, estes números recebem cópias das notificações para monitoramento.'
+                }
               </p>
             </div>
           </div>
           
+          {/* Status */}
           {(formData.test_phones ?? config.test_phones ?? []).length > 0 && (
-            <div className="flex items-center gap-2 p-3 rounded-lg bg-green-500/10 border border-green-500/20">
-              <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
-              <span className="text-sm text-green-700 dark:text-green-400">
-                Modo teste ativo! {(formData.test_phones ?? config.test_phones ?? []).length} número(s) receberão cópias
+            <div className={`flex items-center gap-2 p-3 rounded-lg ${
+              (formData.test_mode_enabled ?? config.test_mode_enabled ?? true)
+                ? 'bg-amber-500/10 border border-amber-500/20'
+                : 'bg-green-500/10 border border-green-500/20'
+            }`}>
+              <div className={`h-2 w-2 rounded-full animate-pulse ${
+                (formData.test_mode_enabled ?? config.test_mode_enabled ?? true)
+                  ? 'bg-amber-500'
+                  : 'bg-green-500'
+              }`} />
+              <span className={`text-sm ${
+                (formData.test_mode_enabled ?? config.test_mode_enabled ?? true)
+                  ? 'text-amber-700 dark:text-amber-400'
+                  : 'text-green-700 dark:text-green-400'
+              }`}>
+                {(formData.test_mode_enabled ?? config.test_mode_enabled ?? true)
+                  ? `Modo teste ativo! ${(formData.test_phones ?? config.test_phones ?? []).length} número(s) receberão notificações`
+                  : `Modo produção ativo! Clientes reais receberão notificações + ${(formData.test_phones ?? config.test_phones ?? []).length} cópia(s)`
+                }
+              </span>
+            </div>
+          )}
+
+          {(formData.test_phones ?? config.test_phones ?? []).length === 0 && (formData.test_mode_enabled ?? config.test_mode_enabled ?? true) && (
+            <div className="flex items-center gap-2 p-3 rounded-lg bg-destructive/10 border border-destructive/30">
+              <AlertTriangle className="h-4 w-4 text-destructive" />
+              <span className="text-sm text-destructive">
+                Adicione pelo menos um número de teste para receber notificações
               </span>
             </div>
           )}
