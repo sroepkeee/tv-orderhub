@@ -22,6 +22,7 @@ import Onboarding from "./pages/Onboarding";
 import PhaseSettings from "./pages/PhaseSettings";
 import TechnicianDispatches from "./pages/TechnicianDispatches";
 import TechnicianPortal from "./pages/TechnicianPortal";
+import ReturnProcessDetail from "./pages/ReturnProcessDetail";
 import Files from "./pages/Files";
 import { CarriersChatRoute } from "./components/CarriersChatRoute";
 import { useAuth } from "./hooks/useAuth";
@@ -251,6 +252,11 @@ const App = () => {
                         <Route path="/technician-dispatches" element={
                           <ProtectedRoute>
                             <TechnicianDispatches />
+                          </ProtectedRoute>
+                        } />
+                        <Route path="/return-process/:processId" element={
+                          <ProtectedRoute>
+                            <ReturnProcessDetail />
                           </ProtectedRoute>
                         } />
                         <Route path="/technician-portal" element={
