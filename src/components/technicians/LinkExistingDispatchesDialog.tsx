@@ -14,7 +14,7 @@ import { useTechnicians } from '@/hooks/useTechnicians';
 import { useTechnicianDispatches } from '@/hooks/useTechnicianDispatches';
 import { useReturnTickets } from '@/hooks/useReturnTickets';
 import { toast } from 'sonner';
-import { Search, Package, Loader2, MapPin, Calendar, FileText, ArrowRight, Ticket } from 'lucide-react';
+import { Search, Package, Loader2, MapPin, Calendar, FileText, ArrowRight, Ticket, CheckCircle2, UserPlus } from 'lucide-react';
 import { format, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { ReturnTicketDialog } from './ReturnTicketDialog';
@@ -134,6 +134,17 @@ export function LinkExistingDispatchesDialog({ open, onClose, onSuccess }: LinkE
 
   const selectedOrder = orders.find(o => o.id === selectedOrderId);
 
+  // Check if technician is auto-matched
+  const autoMatchedTechnician = useMemo(() => {
+    if (!selectedOrderId) return null;
+    const order = orders.find(o => o.id === selectedOrderId);
+    if (!order) return null;
+    
+    return uniqueTechnicians.find(
+      tech => tech.name.toLowerCase().trim() === order.customer_name.toLowerCase().trim()
+    );
+  }, [selectedOrderId, orders, uniqueTechnicians]);
+
   const handleSelectOrder = (orderId: string) => {
     setSelectedOrderId(orderId);
     const order = orders.find(o => o.id === orderId);
@@ -148,6 +159,14 @@ export function LinkExistingDispatchesDialog({ open, onClose, onSuccess }: LinkE
         unit: item.unit || 'un',
         selected: true,
       })));
+      
+      // Auto-select technician if customer name matches
+      const matchingTechnician = uniqueTechnicians.find(
+        tech => tech.name.toLowerCase().trim() === order.customer_name.toLowerCase().trim()
+      );
+      if (matchingTechnician) {
+        setSelectedTechnicianId(matchingTechnician.id);
+      }
     }
   };
 
@@ -397,21 +416,53 @@ export function LinkExistingDispatchesDialog({ open, onClose, onSuccess }: LinkE
                     </div>
                   </div>
 
-                  {/* Technician Selection */}
+                  {/* Technician Selection - Auto-matched or manual */}
                   <div className="space-y-2">
                     <Label>Técnico Responsável *</Label>
-                    <Select value={selectedTechnicianId} onValueChange={setSelectedTechnicianId}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione o técnico..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {uniqueTechnicians.map((tech) => (
-                          <SelectItem key={tech.id} value={tech.id}>
-                            {tech.name} {tech.city && tech.state ? `- ${tech.city}/${tech.state}` : ''}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    
+                    {autoMatchedTechnician && selectedTechnicianId === autoMatchedTechnician.id ? (
+                      <div className="flex items-center justify-between p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
+                        <div className="flex items-center gap-2">
+                          <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                          <div>
+                            <p className="font-medium text-sm">{autoMatchedTechnician.name}</p>
+                            <p className="text-xs text-emerald-600">Técnico identificado automaticamente</p>
+                          </div>
+                        </div>
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          onClick={() => setSelectedTechnicianId('')}
+                        >
+                          Alterar
+                        </Button>
+                      </div>
+                    ) : uniqueTechnicians.length === 0 ? (
+                      <div className="flex items-center justify-between p-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
+                        <div className="flex items-center gap-2">
+                          <UserPlus className="h-4 w-4 text-amber-600" />
+                          <div>
+                            <p className="text-sm text-amber-700">Nenhum técnico cadastrado</p>
+                            <p className="text-xs text-amber-600">
+                              Cadastre técnicos na aba "Técnicos" para vincular remessas
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <Select value={selectedTechnicianId} onValueChange={setSelectedTechnicianId}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione o técnico..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {uniqueTechnicians.map((tech) => (
+                            <SelectItem key={tech.id} value={tech.id}>
+                              {tech.name} {tech.city && tech.state ? `- ${tech.city}/${tech.state}` : ''}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
                   </div>
 
                   <Separator />
