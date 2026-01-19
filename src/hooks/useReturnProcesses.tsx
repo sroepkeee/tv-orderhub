@@ -21,7 +21,8 @@ interface UseReturnProcessesOptions {
 export function useReturnProcesses(options: UseReturnProcessesOptions = {}) {
   const [processes, setProcesses] = useState<ReturnProcess[]>([]);
   const [loading, setLoading] = useState(true);
-  const { organizationId } = useOrganizationId();
+  const orgContext = useOrganizationId();
+  const organizationId = orgContext.organizationId;
 
   const fetchProcesses = useCallback(async () => {
     if (!organizationId) return;
@@ -340,7 +341,8 @@ export function useProcessChecklist(processId: string | null) {
 export function useDivergencias(processId: string | null) {
   const [divergencias, setDivergencias] = useState<Divergencia[]>([]);
   const [loading, setLoading] = useState(false);
-  const { organizationId } = useOrganizationId();
+  const orgContext = useOrganizationId();
+  const organizationId = orgContext.organizationId;
 
   const fetchDivergencias = useCallback(async () => {
     if (!processId) return;
@@ -481,7 +483,8 @@ export function useAccessBlocks(processId: string | null) {
 export function useProcessShipping(processId: string | null) {
   const [shipping, setShipping] = useState<ProcessShipping | null>(null);
   const [loading, setLoading] = useState(false);
-  const { organizationId } = useOrganizationId();
+  const orgContext = useOrganizationId();
+  const organizationId = orgContext.organizationId;
 
   const fetchShipping = useCallback(async () => {
     if (!processId) return;
