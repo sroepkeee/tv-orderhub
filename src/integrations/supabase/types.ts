@@ -1604,6 +1604,165 @@ export type Database = {
           },
         ]
       }
+      delivery_confirmation_config: {
+        Row: {
+          auto_complete_on_confirm: boolean | null
+          auto_create_analysis_on_not_received: boolean | null
+          created_at: string | null
+          followup_after_hours: number | null
+          followup_enabled: boolean | null
+          followup_message_template: string | null
+          id: string
+          is_active: boolean | null
+          max_attempts: number | null
+          message_template: string | null
+          organization_id: string | null
+          retry_interval_hours: number | null
+          trigger_after_hours: number | null
+          trigger_status: string[] | null
+          updated_at: string | null
+        }
+        Insert: {
+          auto_complete_on_confirm?: boolean | null
+          auto_create_analysis_on_not_received?: boolean | null
+          created_at?: string | null
+          followup_after_hours?: number | null
+          followup_enabled?: boolean | null
+          followup_message_template?: string | null
+          id?: string
+          is_active?: boolean | null
+          max_attempts?: number | null
+          message_template?: string | null
+          organization_id?: string | null
+          retry_interval_hours?: number | null
+          trigger_after_hours?: number | null
+          trigger_status?: string[] | null
+          updated_at?: string | null
+        }
+        Update: {
+          auto_complete_on_confirm?: boolean | null
+          auto_create_analysis_on_not_received?: boolean | null
+          created_at?: string | null
+          followup_after_hours?: number | null
+          followup_enabled?: boolean | null
+          followup_message_template?: string | null
+          id?: string
+          is_active?: boolean | null
+          max_attempts?: number | null
+          message_template?: string | null
+          organization_id?: string | null
+          retry_interval_hours?: number | null
+          trigger_after_hours?: number | null
+          trigger_status?: string[] | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "delivery_confirmation_config_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: true
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      delivery_confirmations: {
+        Row: {
+          analysis_notes: string | null
+          analyzed_at: string | null
+          analyzed_by: string | null
+          attempts_count: number | null
+          conversation_id: string | null
+          created_at: string | null
+          customer_name: string | null
+          customer_whatsapp: string
+          id: string
+          last_attempt_at: string | null
+          max_attempts: number | null
+          notification_log_id: string | null
+          order_id: string
+          order_status: string
+          organization_id: string | null
+          requires_analysis: boolean | null
+          responded_at: string | null
+          response_received: boolean | null
+          response_text: string | null
+          response_type: string | null
+          sent_at: string
+          updated_at: string | null
+        }
+        Insert: {
+          analysis_notes?: string | null
+          analyzed_at?: string | null
+          analyzed_by?: string | null
+          attempts_count?: number | null
+          conversation_id?: string | null
+          created_at?: string | null
+          customer_name?: string | null
+          customer_whatsapp: string
+          id?: string
+          last_attempt_at?: string | null
+          max_attempts?: number | null
+          notification_log_id?: string | null
+          order_id: string
+          order_status: string
+          organization_id?: string | null
+          requires_analysis?: boolean | null
+          responded_at?: string | null
+          response_received?: boolean | null
+          response_text?: string | null
+          response_type?: string | null
+          sent_at?: string
+          updated_at?: string | null
+        }
+        Update: {
+          analysis_notes?: string | null
+          analyzed_at?: string | null
+          analyzed_by?: string | null
+          attempts_count?: number | null
+          conversation_id?: string | null
+          created_at?: string | null
+          customer_name?: string | null
+          customer_whatsapp?: string
+          id?: string
+          last_attempt_at?: string | null
+          max_attempts?: number | null
+          notification_log_id?: string | null
+          order_id?: string
+          order_status?: string
+          organization_id?: string | null
+          requires_analysis?: boolean | null
+          responded_at?: string | null
+          response_received?: boolean | null
+          response_text?: string | null
+          response_type?: string | null
+          sent_at?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "delivery_confirmations_notification_log_id_fkey"
+            columns: ["notification_log_id"]
+            isOneToOne: false
+            referencedRelation: "ai_notification_log"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_confirmations_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_confirmations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       delivery_date_changes: {
         Row: {
           change_category: string | null
