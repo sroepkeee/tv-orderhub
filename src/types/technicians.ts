@@ -143,6 +143,40 @@ export interface DispatchMetrics {
   pending_return_requests: number;
 }
 
+// Return Ticket for TOTVS Protheus integration
+export type ReturnTicketStatus = 'pending' | 'processed' | 'cancelled';
+
+export interface ReturnTicketItem {
+  item_code: string;
+  item_description: string;
+  quantity: number;
+  unit: string;
+}
+
+export interface ReturnTicket {
+  id: string;
+  organization_id?: string;
+  dispatch_id?: string;
+  ticket_number: string;
+  totvs_order_number?: string;
+  technician_id?: string;
+  technician_name?: string;
+  customer_name?: string;
+  order_number?: string;
+  origin_warehouse?: string;
+  destination_warehouse: string;
+  status: ReturnTicketStatus;
+  items: ReturnTicketItem[];
+  total_items: number;
+  total_quantity: number;
+  notes?: string;
+  created_by?: string;
+  created_at: string;
+  processed_at?: string;
+  processed_by?: string;
+  totvs_return_number?: string;
+}
+
 // Labels para exibição
 export const dispatchStatusLabels: Record<DispatchStatus, string> = {
   dispatched: 'Enviado',
@@ -177,6 +211,12 @@ export const itemConditionLabels: Record<ItemCondition, string> = {
   for_disposal: 'Para Descarte',
 };
 
+export const returnTicketStatusLabels: Record<ReturnTicketStatus, string> = {
+  pending: 'Pendente',
+  processed: 'Processado',
+  cancelled: 'Cancelado',
+};
+
 // Cores para badges
 export const dispatchStatusColors: Record<DispatchStatus, string> = {
   dispatched: 'bg-blue-500/10 text-blue-500 border-blue-500/20',
@@ -201,6 +241,12 @@ export const itemConditionColors: Record<ItemCondition, string> = {
   damaged: 'bg-amber-500/10 text-amber-500 border-amber-500/20',
   for_repair: 'bg-blue-500/10 text-blue-500 border-blue-500/20',
   for_disposal: 'bg-red-500/10 text-red-500 border-red-500/20',
+};
+
+export const returnTicketStatusColors: Record<ReturnTicketStatus, string> = {
+  pending: 'bg-amber-500/10 text-amber-500 border-amber-500/20',
+  processed: 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20',
+  cancelled: 'bg-muted text-muted-foreground border-muted',
 };
 
 // Destinos de armazém disponíveis
