@@ -78,7 +78,7 @@ const phases = [
   },
   {
     id: "production_client",
-    label: "🔧 Produção Clientes",
+    label: "🔧 Clientes",
     icon: PackageCheck,
     forCategory: "vendas",
     statuses: [

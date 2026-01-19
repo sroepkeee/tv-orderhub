@@ -230,7 +230,7 @@ export const KanbanView = ({
     },
     {
       id: "production_client" as Phase,
-      title: "Produção Clientes",
+      title: "Clientes",
       icon: PackageCheck,
       colorClass: "bg-phase-production-client-bg text-phase-production-client border-b-4 border-phase-production-client-border",
     },

@@ -44,7 +44,7 @@ export function OrdersTrackingTable({
     { value: 'order_generation', label: 'Gerar Ordem' },
     { value: 'purchases', label: 'Compras' },
     { value: 'almox_general', label: 'Almox Geral' },
-    { value: 'production_client', label: 'Produção Clientes' },
+    { value: 'production_client', label: 'Clientes' },
     { value: 'production_stock', label: 'Produção Estoque' },
     { value: 'balance_generation', label: 'Gerar Saldo' },
     { value: 'laboratory', label: 'Laboratório' },
