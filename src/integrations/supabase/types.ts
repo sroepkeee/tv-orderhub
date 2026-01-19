@@ -5198,6 +5198,100 @@ export type Database = {
           },
         ]
       }
+      return_tickets: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          customer_name: string | null
+          destination_warehouse: string | null
+          dispatch_id: string | null
+          id: string
+          items: Json
+          notes: string | null
+          order_number: string | null
+          organization_id: string | null
+          origin_warehouse: string | null
+          processed_at: string | null
+          processed_by: string | null
+          status: string | null
+          technician_id: string | null
+          technician_name: string | null
+          ticket_number: string
+          total_items: number | null
+          total_quantity: number | null
+          totvs_order_number: string | null
+          totvs_return_number: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          customer_name?: string | null
+          destination_warehouse?: string | null
+          dispatch_id?: string | null
+          id?: string
+          items?: Json
+          notes?: string | null
+          order_number?: string | null
+          organization_id?: string | null
+          origin_warehouse?: string | null
+          processed_at?: string | null
+          processed_by?: string | null
+          status?: string | null
+          technician_id?: string | null
+          technician_name?: string | null
+          ticket_number: string
+          total_items?: number | null
+          total_quantity?: number | null
+          totvs_order_number?: string | null
+          totvs_return_number?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          customer_name?: string | null
+          destination_warehouse?: string | null
+          dispatch_id?: string | null
+          id?: string
+          items?: Json
+          notes?: string | null
+          order_number?: string | null
+          organization_id?: string | null
+          origin_warehouse?: string | null
+          processed_at?: string | null
+          processed_by?: string | null
+          status?: string | null
+          technician_id?: string | null
+          technician_name?: string | null
+          ticket_number?: string
+          total_items?: number | null
+          total_quantity?: number | null
+          totvs_order_number?: string | null
+          totvs_return_number?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "return_tickets_dispatch_id_fkey"
+            columns: ["dispatch_id"]
+            isOneToOne: false
+            referencedRelation: "technician_dispatches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "return_tickets_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "return_tickets_technician_id_fkey"
+            columns: ["technician_id"]
+            isOneToOne: false
+            referencedRelation: "technicians"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       saas_leads: {
         Row: {
           company_name: string
@@ -5991,6 +6085,7 @@ export type Database = {
         Returns: string
       }
       generate_purchase_order_number: { Args: never; Returns: string }
+      generate_return_ticket_number: { Args: never; Returns: string }
       get_app_roles: {
         Args: never
         Returns: {
