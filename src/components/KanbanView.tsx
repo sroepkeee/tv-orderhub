@@ -236,7 +236,7 @@ export const KanbanView = ({
     },
     {
       id: "production_stock" as Phase,
-      title: "Produção Estoque",
+      title: "Estoque",
       icon: PackageCheck,
       colorClass: "bg-phase-production-bg text-phase-production border-b-4 border-phase-border",
     },

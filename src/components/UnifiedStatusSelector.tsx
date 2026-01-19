@@ -91,7 +91,7 @@ const phases = [
   },
   {
     id: "production_stock",
-    label: "📦 Produção Estoque",
+    label: "📦 Estoque",
     icon: Boxes,
     forCategory: "not_vendas",
     statuses: [

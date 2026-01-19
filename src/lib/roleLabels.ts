@@ -8,7 +8,7 @@ export const ROLE_LABELS: Record<string, { name: string; area: string }> = {
   'purchases': { name: 'Compras', area: 'Suprimentos' },
   'almox_general': { name: 'Almox Geral', area: 'Almoxarifado' },
   'production_client': { name: 'Clientes', area: 'Produção' },
-  'production_stock': { name: 'Produção Estoque', area: 'Produção' },
+  'production_stock': { name: 'Estoque', area: 'Produção' },
   'balance_generation': { name: 'Gerar Saldo', area: 'Financeiro' },
   'laboratory': { name: 'Laboratório', area: 'Laboratório' },
   'packaging': { name: 'Embalagem', area: 'Expedição' },
