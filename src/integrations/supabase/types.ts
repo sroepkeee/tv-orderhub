@@ -142,6 +142,7 @@ export type Database = {
           send_window_end: string | null
           send_window_start: string | null
           signature: string | null
+          test_mode_enabled: boolean | null
           test_phone: string | null
           test_phones: string[] | null
           tone_of_voice: string
@@ -188,6 +189,7 @@ export type Database = {
           send_window_end?: string | null
           send_window_start?: string | null
           signature?: string | null
+          test_mode_enabled?: boolean | null
           test_phone?: string | null
           test_phones?: string[] | null
           tone_of_voice?: string
@@ -234,6 +236,7 @@ export type Database = {
           send_window_end?: string | null
           send_window_start?: string | null
           signature?: string | null
+          test_mode_enabled?: boolean | null
           test_phone?: string | null
           test_phones?: string[] | null
           tone_of_voice?: string

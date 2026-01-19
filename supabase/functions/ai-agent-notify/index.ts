@@ -496,7 +496,8 @@ serve(async (req) => {
 
     const results = [];
     
-    // 🧪 MODO TESTE: Enviar cópia para números de teste
+    // 🧪 MODO TESTE/PRODUÇÃO
+    const testModeEnabled = agentConfig.test_mode_enabled ?? true; // Default: teste
     const testPhones = agentConfig.test_phones || 
       (agentConfig.test_phone ? [agentConfig.test_phone] : []);
     const recipientsToNotify = [];
@@ -507,6 +508,7 @@ serve(async (req) => {
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     console.log('📋 RECIPIENT DIAGNOSIS');
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log('🎯 MODE:', testModeEnabled ? '🧪 TESTE' : '🚀 PRODUÇÃO');
     console.log('📦 Order:', order.order_number);
     console.log('👤 Customer Name:', order.customer_name);
     console.log('📱 Order customer_whatsapp:', order.customer_whatsapp || 'N/A');
@@ -515,42 +517,66 @@ serve(async (req) => {
     console.log('🧪 Test Phones Configured:', testPhones.length > 0 ? testPhones.join(', ') : 'NONE');
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     
-    // Adicionar destinatário principal
-    if (customerContact.whatsapp) {
-      recipientsToNotify.push({
-        phone: customerContact.whatsapp,
-        name: customerContact.customer_name,
-        isTest: false
-      });
-      console.log('✅ Added CUSTOMER recipient:', customerContact.whatsapp);
+    if (testModeEnabled) {
+      // 🧪 MODO TESTE: Envia APENAS para números de teste
+      console.log('🧪 TEST MODE ACTIVE - Sending ONLY to test phones');
+      
+      for (const testPhone of testPhones) {
+        if (testPhone) {
+          recipientsToNotify.push({
+            phone: testPhone,
+            name: `[TESTE] ${order.customer_name}`,
+            isTest: true
+          });
+          console.log('🧪 Added TEST recipient:', testPhone);
+        }
+      }
+      
+      if (recipientsToNotify.length === 0) {
+        console.log('⚠️ TEST MODE: No test phones configured!');
+      }
     } else {
-      console.log('⚠️ Customer has NO WhatsApp - will not receive notification');
-    }
-    
-    // Adicionar números de teste
-    for (const testPhone of testPhones) {
-      if (testPhone) {
+      // 🚀 MODO PRODUÇÃO: Envia para cliente real + cópias para teste
+      console.log('🚀 PRODUCTION MODE ACTIVE - Sending to real customer');
+      
+      // Adicionar cliente real
+      if (customerContact.whatsapp) {
         recipientsToNotify.push({
-          phone: testPhone,
-          name: `[TESTE] ${order.customer_name}`,
-          isTest: true
+          phone: customerContact.whatsapp,
+          name: customerContact.customer_name,
+          isTest: false
         });
-        console.log('🧪 Added TEST recipient:', testPhone);
+        console.log('✅ Added CUSTOMER recipient:', customerContact.whatsapp);
+      } else {
+        console.log('⚠️ Customer has NO WhatsApp - will not receive notification');
+      }
+      
+      // Adicionar números de teste como cópias de monitoramento
+      for (const testPhone of testPhones) {
+        if (testPhone) {
+          recipientsToNotify.push({
+            phone: testPhone,
+            name: `[CÓPIA] ${order.customer_name}`,
+            isTest: true
+          });
+          console.log('📋 Added MONITORING COPY recipient:', testPhone);
+        }
       }
     }
     
     console.log('📊 TOTAL RECIPIENTS:', recipientsToNotify.length);
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     
-    if (testPhones.length > 0) {
-      console.log('🧪 Test mode active - will send to test phones:', testPhones);
-    }
-    
     if (recipientsToNotify.length === 0) {
-      console.log('❌ No recipients to notify - NEITHER customer nor test phones');
+      const errorMessage = testModeEnabled 
+        ? 'No test phones configured - add numbers in AI Agent settings'
+        : 'No customer WhatsApp available and no test phones configured';
+      
+      console.log('❌ No recipients to notify -', errorMessage);
       return new Response(JSON.stringify({ 
         success: false, 
-        message: 'No recipients available - configure customer whatsapp or test phone',
+        message: errorMessage,
+        mode: testModeEnabled ? 'test' : 'production',
         contactSource,
         diagnostics: {
           orderNumber: order.order_number,

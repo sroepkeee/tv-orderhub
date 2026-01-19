@@ -31,6 +31,7 @@ export interface AgentConfig {
   // Campos de teste
   test_phone?: string | null;
   test_phones?: string[];
+  test_mode_enabled?: boolean; // true = envia apenas para test_phones, false = envia para cliente real
   // Campos de estilo
   use_signature?: boolean;
   closing_style?: string;
