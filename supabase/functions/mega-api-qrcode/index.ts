@@ -17,6 +17,13 @@ function normalizeUrl(url: string): string {
   return normalized.replace(/\/+$/, '');
 }
 
+// Helper: Verificar se token é placeholder
+function isPlaceholderToken(token: string | null | undefined): boolean {
+  if (!token || token.trim() === '') return true;
+  const placeholders = ['SEU_TOKEN', 'API_KEY', 'YOUR_TOKEN', 'TOKEN_AQUI', 'PLACEHOLDER', 'XXX'];
+  return placeholders.some(p => token.toUpperCase().includes(p));
+}
+
 // Try multiple auth header formats
 async function tryApiCall(
   baseUrl: string, 
@@ -52,7 +59,13 @@ async function tryApiCall(
         fetchOptions.body = JSON.stringify(body);
       }
       
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+      fetchOptions.signal = controller.signal;
+      
       const response = await fetch(url, fetchOptions);
+      clearTimeout(timeoutId);
+      
       console.log(`[API] Response: ${response.status} ${response.statusText}`);
       
       if (response.ok) {
@@ -75,6 +88,10 @@ async function tryApiCall(
         return { success: false, status: response.status, error: errorText };
       }
     } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') {
+        console.log('[API] Request timeout');
+        return { success: false, error: 'Timeout' };
+      }
       console.error(`[API] Network error:`, error);
     }
   }
@@ -86,10 +103,15 @@ async function tryApiCall(
 function extractQrCode(data: any): string | null {
   if (!data) return null;
   
-  // Direct fields
-  const directFields = ['qrcode', 'base64', 'qr', 'qrCode', 'code', 'pairingCode', 'qrcode_url'];
+  // Direct fields - ordem de prioridade para Mega API Start v2
+  const directFields = [
+    'qrcode', 'base64', 'qr', 'qrCode', 'code', 
+    'pairingCode', 'qrcode_url', 'qrcodeUrl', 'qr_code'
+  ];
+  
   for (const field of directFields) {
     if (data[field] && typeof data[field] === 'string') {
+      console.log(`[QR] Found in field: ${field}`);
       return data[field];
     }
   }
@@ -99,6 +121,7 @@ function extractQrCode(data: any): string | null {
     const instance = Array.isArray(data.instance) ? data.instance[0] : data.instance;
     for (const field of directFields) {
       if (instance?.[field] && typeof instance[field] === 'string') {
+        console.log(`[QR] Found in instance.${field}`);
         return instance[field];
       }
     }
@@ -109,7 +132,18 @@ function extractQrCode(data: any): string | null {
     const nestedData = Array.isArray(data.data) ? data.data[0] : data.data;
     for (const field of directFields) {
       if (nestedData?.[field] && typeof nestedData[field] === 'string') {
+        console.log(`[QR] Found in data.${field}`);
         return nestedData[field];
+      }
+    }
+  }
+  
+  // Nested in response object
+  if (data.response) {
+    for (const field of directFields) {
+      if (data.response[field] && typeof data.response[field] === 'string') {
+        console.log(`[QR] Found in response.${field}`);
+        return data.response[field];
       }
     }
   }
@@ -193,7 +227,7 @@ Deno.serve(async (req) => {
       tokenLength: megaApiToken.length,
     });
 
-    if (!megaApiUrl || !megaApiToken || !megaApiInstance) {
+    if (!megaApiUrl || !megaApiInstance) {
       console.error('[Config] Missing Mega API configuration');
       return new Response(
         JSON.stringify({ 
@@ -208,33 +242,38 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Check cache first
-    console.log('[Cache] Checking for instance:', megaApiInstance);
-    const { data: instanceData, error: cacheError } = await supabaseClient
+    // Get effective token (from DB or env)
+    const { data: dbInstance } = await supabaseClient
       .from('whatsapp_instances')
-      .select('qrcode, qrcode_updated_at, status, phone_number')
+      .select('api_token, qrcode, qrcode_updated_at, status, phone_number')
       .eq('instance_key', megaApiInstance)
       .maybeSingle();
 
-    if (cacheError) {
-      console.error('[Cache] Error:', cacheError);
+    let effectiveToken = dbInstance?.api_token;
+    if (isPlaceholderToken(effectiveToken)) {
+      effectiveToken = megaApiToken;
     }
 
-    console.log('[Cache] Data:', { 
-      hasQrcode: !!instanceData?.qrcode, 
-      status: instanceData?.status,
-      updatedAt: instanceData?.qrcode_updated_at 
-    });
+    if (isPlaceholderToken(effectiveToken)) {
+      console.error('[Config] No valid token available');
+      return new Response(
+        JSON.stringify({ 
+          error: 'Token da API não configurado',
+          details: 'Configure o MEGA_API_TOKEN nos secrets do Supabase'
+        }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     // If instance is connected
-    if (instanceData?.status === 'connected') {
+    if (dbInstance?.status === 'connected') {
       console.log('[Status] Instance already connected');
       return new Response(
         JSON.stringify({
           success: true,
           qrcode: null,
           status: 'connected',
-          phoneNumber: instanceData.phone_number,
+          phoneNumber: dbInstance.phone_number,
           message: 'Instância já está conectada',
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
@@ -242,8 +281,8 @@ Deno.serve(async (req) => {
     }
 
     // Check if cached QR code is still valid
-    if (instanceData?.qrcode && instanceData?.qrcode_updated_at) {
-      const updatedAt = new Date(instanceData.qrcode_updated_at);
+    if (dbInstance?.qrcode && dbInstance?.qrcode_updated_at) {
+      const updatedAt = new Date(dbInstance.qrcode_updated_at);
       const ageSeconds = (Date.now() - updatedAt.getTime()) / 1000;
       
       if (ageSeconds < QR_CODE_VALIDITY_SECONDS) {
@@ -251,7 +290,7 @@ Deno.serve(async (req) => {
         return new Response(
           JSON.stringify({
             success: true,
-            qrcode: instanceData.qrcode,
+            qrcode: dbInstance.qrcode,
             expiresIn: Math.max(0, QR_CODE_VALIDITY_SECONDS - Math.floor(ageSeconds)),
             status: 'available',
           }),
@@ -262,41 +301,52 @@ Deno.serve(async (req) => {
     }
 
     // =========================================================================
-    // MEGA API START - QR CODE GENERATION ENDPOINTS
+    // MEGA API START v2 - QR CODE GENERATION ENDPOINTS
+    // Documentação: https://doc.megaapi.com.br
     // =========================================================================
     
-    console.log('[API] Attempting to fetch QR code from Mega API START');
+    console.log('[API] Attempting to fetch QR code from Mega API START v2');
     
-    // Primary endpoints for Mega API START (based on documentation)
+    // Endpoints para Mega API Start v2 (ordem de prioridade)
     const qrCodeEndpoints = [
-      // Connect/QR endpoints
+      // Endpoints principais de QR Code
+      { path: `/rest/instance/qrcode/base64/${megaApiInstance}`, method: 'GET' },
       { path: `/rest/instance/connect/${megaApiInstance}`, method: 'GET' },
       { path: `/rest/instance/qrcode/${megaApiInstance}`, method: 'GET' },
-      { path: `/rest/qrcode/image/${megaApiInstance}`, method: 'GET' },
-      // Alternative formats
+      // Variantes POST
+      { path: `/rest/instance/connect/${megaApiInstance}`, method: 'POST' },
+      { path: `/rest/instance/qrcode/base64/${megaApiInstance}`, method: 'POST' },
+      // Formatos alternativos sem /rest
+      { path: `/instance/qrcode/base64/${megaApiInstance}`, method: 'GET' },
       { path: `/instance/connect/${megaApiInstance}`, method: 'GET' },
       { path: `/instance/qrcode/${megaApiInstance}`, method: 'GET' },
-      // POST variants
-      { path: `/rest/instance/connect/${megaApiInstance}`, method: 'POST' },
-      { path: `/instance/connect/${megaApiInstance}`, method: 'POST' },
     ];
 
     for (const { path, method } of qrCodeEndpoints) {
-      const result = await tryApiCall(megaApiUrl, path, method, megaApiToken);
+      const result = await tryApiCall(megaApiUrl, path, method, effectiveToken);
       
       if (result.success && result.data) {
+        // Log full response for debugging
+        console.log('[API] Full response:', JSON.stringify(result.data).substring(0, 500));
+        
         const qrcode = extractQrCode(result.data);
         
         if (qrcode) {
-          console.log('[API] QR code found via:', path);
+          console.log('[API] ✅ QR code found via:', path);
           
-          // Save to cache
-          await supabaseClient.from('whatsapp_instances').upsert({
+          // Save to cache using service role
+          const supabaseAdmin = createClient(
+            Deno.env.get('SUPABASE_URL') ?? '',
+            Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+          );
+          
+          await supabaseAdmin.from('whatsapp_instances').upsert({
             instance_key: megaApiInstance,
             qrcode: qrcode,
             qrcode_updated_at: new Date().toISOString(),
             status: 'waiting_scan',
-          });
+            is_active: true,
+          }, { onConflict: 'instance_key' });
           
           return new Response(
             JSON.stringify({
@@ -309,9 +359,23 @@ Deno.serve(async (req) => {
           );
         }
         
-        // Check if response indicates we need to wait
-        if (result.data.status === 'waiting' || result.data.state === 'connecting') {
-          console.log('[API] Instance is connecting, QR should arrive via webhook');
+        // Check if response indicates connected or waiting
+        const state = result.data.state || result.data.status;
+        if (state === 'open' || state === 'connected') {
+          console.log('[API] Instance already connected');
+          return new Response(
+            JSON.stringify({
+              success: true,
+              qrcode: null,
+              status: 'connected',
+              message: 'Instância já está conectada',
+            }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+          );
+        }
+        
+        if (state === 'connecting' || result.data.connecting) {
+          console.log('[API] Instance is connecting, waiting for QR...');
         }
       }
     }
@@ -323,32 +387,66 @@ Deno.serve(async (req) => {
     console.log('[API] No QR via direct endpoints, attempting restart/reconnect');
     
     const restartEndpoints = [
-      // Logout to force new QR
-      { path: `/rest/instance/logout/${megaApiInstance}`, method: 'DELETE' },
-      { path: `/rest/instance/logout/${megaApiInstance}`, method: 'POST' },
-      // Restart instance
+      // Restart instance to force new QR
       { path: `/rest/instance/restart/${megaApiInstance}`, method: 'PUT' },
       { path: `/rest/instance/restart/${megaApiInstance}`, method: 'POST' },
+      // Logout and reconnect
+      { path: `/rest/instance/logout/${megaApiInstance}`, method: 'DELETE' },
       // Reconnect
       { path: `/rest/instance/reconnect/${megaApiInstance}`, method: 'POST' },
+      // Without /rest prefix
       { path: `/instance/restart/${megaApiInstance}`, method: 'POST' },
     ];
 
     let restartSuccess = false;
     for (const { path, method } of restartEndpoints) {
-      const result = await tryApiCall(megaApiUrl, path, method, megaApiToken);
+      const result = await tryApiCall(megaApiUrl, path, method, effectiveToken);
       
       if (result.success) {
-        console.log('[API] Restart/reconnect successful via:', path);
+        console.log('[API] ✅ Restart/reconnect successful via:', path);
         restartSuccess = true;
         
-        // Update instance status
-        await supabaseClient.from('whatsapp_instances').upsert({
+        // Update instance status using service role
+        const supabaseAdmin = createClient(
+          Deno.env.get('SUPABASE_URL') ?? '',
+          Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+        );
+        
+        await supabaseAdmin.from('whatsapp_instances').upsert({
           instance_key: megaApiInstance,
-          status: 'reconnecting',
+          status: 'waiting_scan',
           qrcode: null,
           qrcode_updated_at: null,
-        });
+          is_active: true,
+        }, { onConflict: 'instance_key' });
+        
+        // Try to get QR code immediately after restart
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+        for (const { path: qrPath, method: qrMethod } of qrCodeEndpoints.slice(0, 3)) {
+          const qrResult = await tryApiCall(megaApiUrl, qrPath, qrMethod, effectiveToken);
+          if (qrResult.success && qrResult.data) {
+            const qrcode = extractQrCode(qrResult.data);
+            if (qrcode) {
+              console.log('[API] ✅ QR code found after restart via:', qrPath);
+              
+              await supabaseAdmin.from('whatsapp_instances').update({
+                qrcode: qrcode,
+                qrcode_updated_at: new Date().toISOString(),
+              }).eq('instance_key', megaApiInstance);
+              
+              return new Response(
+                JSON.stringify({
+                  success: true,
+                  qrcode: qrcode,
+                  expiresIn: QR_CODE_VALIDITY_SECONDS,
+                  status: 'available',
+                }),
+                { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+              );
+            }
+          }
+        }
         
         break;
       }
@@ -360,7 +458,7 @@ Deno.serve(async (req) => {
           success: true,
           qrcode: null,
           status: 'waiting',
-          message: 'Reconectando instância. QR Code será enviado em alguns segundos...',
+          message: 'Reconectando instância. QR Code será enviado em alguns segundos. Atualize a página.',
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
       );
@@ -373,15 +471,15 @@ Deno.serve(async (req) => {
     console.log('[Fallback] All API attempts failed');
     
     // Return cached QR code even if expired as last resort
-    if (instanceData?.qrcode) {
+    if (dbInstance?.qrcode) {
       console.log('[Fallback] Returning cached QR code (may be expired)');
       return new Response(
         JSON.stringify({
           success: true,
-          qrcode: instanceData.qrcode,
+          qrcode: dbInstance.qrcode,
           expiresIn: 0,
-          status: 'available',
-          warning: 'QR Code pode ter expirado. Tente escanear ou clique em "Gerar Novo" para solicitar outro.',
+          status: 'expired',
+          warning: 'QR Code pode ter expirado. Tente escanear ou clique em "Gerar Novo".',
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
       );
@@ -393,9 +491,12 @@ Deno.serve(async (req) => {
         success: false,
         qrcode: null,
         status: 'error',
-        message: 'Não foi possível gerar o QR Code. Verifique a configuração do webhook no painel Mega API.',
-        webhookUrl: 'https://wejkyyjhckdlttieuyku.supabase.co/functions/v1/mega-api-webhook',
-        requiredEvents: ['qrcode', 'connection.update', 'messages.upsert'],
+        message: 'Não foi possível gerar o QR Code. Verifique se a instância está ativa no painel Mega API.',
+        help: {
+          webhookUrl: 'https://wejkyyjhckdlttieuyku.supabase.co/functions/v1/mega-api-webhook',
+          requiredEvents: ['qrcode', 'connection.update', 'messages.upsert'],
+          panelUrl: 'https://painel.megaapi.com.br',
+        },
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
     );
@@ -405,7 +506,6 @@ Deno.serve(async (req) => {
     return new Response(
       JSON.stringify({ 
         error: error instanceof Error ? error.message : 'Erro desconhecido',
-        stack: error instanceof Error ? error.stack : undefined,
       }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
