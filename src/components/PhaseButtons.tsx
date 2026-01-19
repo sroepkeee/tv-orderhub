@@ -98,7 +98,7 @@ export const PhaseButtons = ({ order, onStatusChange }: PhaseButtonsProps) => {
     },
     {
       id: "production_stock",
-      label: "Produção Estoque",
+      label: "Estoque",
       icon: Boxes,
       color: "text-purple-600",
       statuses: [
