@@ -55,7 +55,7 @@ export default function ReturnProcessDetail() {
         const { data, error } = await (supabase.from('return_processes') as any)
           .select(`
             *,
-            technician:technicians(id, name, email, phone, specialty, location)
+            technician:technicians(id, name, email, phone, specialty, city, state)
           `)
           .eq('id', processId)
           .single();
@@ -100,7 +100,7 @@ export default function ReturnProcessDetail() {
     // Refetch process
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data } = await (supabase.from('return_processes') as any)
-      .select(`*, technician:technicians(id, name, email, phone, specialty, location)`)
+      .select(`*, technician:technicians(id, name, email, phone, specialty, city, state)`)
       .eq('id', processId)
       .single();
     if (data) setProcess(data);
