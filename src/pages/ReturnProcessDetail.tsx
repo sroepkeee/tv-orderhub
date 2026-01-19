@@ -4,10 +4,9 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Separator } from '@/components/ui/separator';
 import { 
-  ArrowLeft, User, Package, ClipboardCheck, Shield, 
-  AlertTriangle, Truck, FileText, Clock, CheckCircle2,
+  ArrowLeft, User, ClipboardCheck, Shield, 
+  AlertTriangle, Truck, FileText, Clock,
   Loader2, MoreVertical
 } from 'lucide-react';
 import {
@@ -41,7 +40,7 @@ export default function ReturnProcessDetail() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('checklist');
 
-  const { updateProcessStatus, logAuditAction } = useReturnProcesses();
+  const { updateProcessStatus } = useReturnProcesses();
   const { items: checklistItems } = useProcessChecklist(processId || null);
   const { blocks: accessBlocks } = useAccessBlocks(processId || null);
   const { divergencias } = useDivergencias(processId || null);

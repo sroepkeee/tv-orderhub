@@ -28,8 +28,8 @@ export function useReturnProcesses(options: UseReturnProcessesOptions = {}) {
     
     setLoading(true);
     try {
-      let query = supabase
-        .from('return_processes')
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let query = (supabase.from('return_processes') as any)
         .select(`
           *,
           technician:technicians(id, name, email, phone, specialty)
@@ -72,8 +72,8 @@ export function useReturnProcesses(options: UseReturnProcessesOptions = {}) {
     try {
       const { data: userData } = await supabase.auth.getUser();
       
-      const { data, error } = await supabase
-        .from('return_processes')
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data, error } = await (supabase.from('return_processes') as any)
         .insert({
           organization_id: organizationId,
           technician_id: technicianId,
@@ -113,8 +113,10 @@ export function useReturnProcesses(options: UseReturnProcessesOptions = {}) {
     notes?: string
   ) => {
     try {
-      const { data: oldData } = await supabase
-        .from('return_processes')
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const table = supabase.from('return_processes') as any;
+      
+      const { data: oldData } = await table
         .select('*')
         .eq('id', processId)
         .single();
@@ -131,8 +133,7 @@ export function useReturnProcesses(options: UseReturnProcessesOptions = {}) {
         updates.notes = notes;
       }
 
-      const { error } = await supabase
-        .from('return_processes')
+      const { error } = await table
         .update(updates)
         .eq('id', processId);
 
@@ -151,8 +152,8 @@ export function useReturnProcesses(options: UseReturnProcessesOptions = {}) {
   const initializeChecklistFromTemplate = async (processId: string) => {
     try {
       // Buscar template padrão
-      const { data: template } = await supabase
-        .from('checklist_templates')
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: template } = await (supabase.from('checklist_templates') as any)
         .select('id')
         .eq('is_default', true)
         .eq('is_active', true)
@@ -161,8 +162,8 @@ export function useReturnProcesses(options: UseReturnProcessesOptions = {}) {
       if (!template) return;
 
       // Buscar itens do template
-      const { data: templateItems } = await supabase
-        .from('checklist_template_items')
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: templateItems } = await (supabase.from('checklist_template_items') as any)
         .select('*')
         .eq('template_id', template.id)
         .order('sort_order');
@@ -170,7 +171,7 @@ export function useReturnProcesses(options: UseReturnProcessesOptions = {}) {
       if (!templateItems || templateItems.length === 0) return;
 
       // Criar itens do checklist para o processo
-      const checklistItems = templateItems.map(item => ({
+      const checklistItems = templateItems.map((item: { id: string; name: string; category: string }) => ({
         process_id: processId,
         template_item_id: item.id,
         item_name: item.name,
@@ -178,7 +179,8 @@ export function useReturnProcesses(options: UseReturnProcessesOptions = {}) {
         status: 'pendente'
       }));
 
-      await supabase
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (supabase as any)
         .from('process_checklist_items')
         .insert(checklistItems);
     } catch (error) {
@@ -200,8 +202,8 @@ export function useReturnProcesses(options: UseReturnProcessesOptions = {}) {
         status: 'pendente'
       }));
 
-      await supabase
-        .from('access_blocks')
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (supabase.from('access_blocks') as any)
         .insert(accessBlocks);
     } catch (error) {
       console.error('Error initializing access blocks:', error);
@@ -285,8 +287,8 @@ export function useProcessChecklist(processId: string | null) {
     
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('process_checklist_items')
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data, error } = await (supabase.from('process_checklist_items') as any)
         .select('*')
         .eq('process_id', processId)
         .order('category')
@@ -308,8 +310,8 @@ export function useProcessChecklist(processId: string | null) {
     try {
       const { data: userData } = await supabase.auth.getUser();
       
-      const { error } = await supabase
-        .from('process_checklist_items')
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error } = await (supabase.from('process_checklist_items') as any)
         .update({
           ...updates,
           verified_by: userData.user?.id,
