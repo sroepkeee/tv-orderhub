@@ -107,3 +107,15 @@ verify_jwt = true
 
 [functions.send-technician-invite]
 verify_jwt = true
+
+[functions.send-organization-invite]
+verify_jwt = true
+
+[functions.mega-api-sync-credentials]
+verify_jwt = true
+
+[functions.check-delivery-confirmations]
+verify_jwt = false
+
+[functions.process-delivery-response]
+verify_jwt = false
