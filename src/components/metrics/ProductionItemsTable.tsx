@@ -2,14 +2,18 @@ import { useState, useMemo, useCallback } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ArrowUpDown, ExternalLink, CheckCircle2, XCircle, Download } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { ArrowUpDown, ExternalLink, CheckCircle2, XCircle, Download, Loader2 } from "lucide-react";
 import { ProductionItem } from "@/types/production";
 import { format, differenceInDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 interface ProductionItemsTableProps {
   items: ProductionItem[];
   onOrderClick?: (orderId: string) => void;
+  onItemUpdated?: () => void;
 }
 
 type SortField = 'orderNumber' | 'itemCode' | 'deliveryDate' | 'requestedQuantity' | 'item_status' | 'createdAt' | 'daysInSystem' | 'productionOrderNumber' | 'productionReleasedAt';
@@ -29,12 +33,79 @@ const getItemStatusBadge = (status: string) => {
   return <Badge className={variant.className}>{variant.label}</Badge>;
 };
 
-export const ProductionItemsTable = ({ items, onOrderClick }: ProductionItemsTableProps) => {
+export const ProductionItemsTable = ({ items, onOrderClick, onItemUpdated }: ProductionItemsTableProps) => {
   const [sortField, setSortField] = useState<SortField>('deliveryDate');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 50;
   const today = new Date();
+  
+  // State for inline editing of production order number
+  const [editingItemId, setEditingItemId] = useState<string | null>(null);
+  const [editingValue, setEditingValue] = useState<string>('');
+  const [savingItemId, setSavingItemId] = useState<string | null>(null);
+
+  // Handle inline save of production order number
+  const handleProductionOrderNumberSave = useCallback(async (itemId: string, newValue: string) => {
+    const trimmedValue = newValue.trim();
+    const item = items.find(i => i.id === itemId);
+    
+    // Skip if value hasn't changed
+    if (item?.production_order_number === trimmedValue || (!item?.production_order_number && !trimmedValue)) {
+      setEditingItemId(null);
+      setEditingValue('');
+      return;
+    }
+    
+    setSavingItemId(itemId);
+    
+    try {
+      const { error } = await supabase
+        .from('order_items')
+        .update({ production_order_number: trimmedValue || null })
+        .eq('id', itemId);
+      
+      if (error) throw error;
+      
+      // Log to history
+      const { data: userData } = await supabase.auth.getUser();
+      if (userData.user && item) {
+        await supabase.from('order_item_history').insert({
+          order_item_id: itemId,
+          order_id: item.orderId,
+          user_id: userData.user.id,
+          field_changed: 'production_order_number',
+          old_value: item.production_order_number || null,
+          new_value: trimmedValue || 'null',
+        });
+      }
+      
+      toast.success('Nº OP atualizado com sucesso');
+      onItemUpdated?.();
+    } catch (error) {
+      console.error('Error updating production order number:', error);
+      toast.error('Erro ao atualizar Nº OP');
+    } finally {
+      setSavingItemId(null);
+      setEditingItemId(null);
+      setEditingValue('');
+    }
+  }, [items, onItemUpdated]);
+
+  const handleStartEditing = (itemId: string, currentValue: string | null) => {
+    setEditingItemId(itemId);
+    setEditingValue(currentValue || '');
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent, itemId: string) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleProductionOrderNumberSave(itemId, editingValue);
+    } else if (e.key === 'Escape') {
+      setEditingItemId(null);
+      setEditingValue('');
+    }
+  };
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -349,13 +420,35 @@ export const ProductionItemsTable = ({ items, onOrderClick }: ProductionItemsTab
                   <TableCell>
                     {format(new Date(item.deliveryDate), 'dd/MM/yyyy', { locale: ptBR })}
                   </TableCell>
-                  <TableCell>
-                    {item.production_order_number ? (
-                      <span className="font-mono text-sm font-semibold text-blue-600 dark:text-blue-400">
-                        {item.production_order_number}
-                      </span>
+                  <TableCell className="p-1">
+                    {savingItemId === item.id ? (
+                      <div className="flex items-center justify-center h-8">
+                        <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                      </div>
+                    ) : editingItemId === item.id ? (
+                      <Input
+                        value={editingValue}
+                        onChange={(e) => setEditingValue(e.target.value)}
+                        onBlur={() => handleProductionOrderNumberSave(item.id, editingValue)}
+                        onKeyDown={(e) => handleKeyDown(e, item.id)}
+                        autoFocus
+                        className="h-8 w-24 font-mono text-sm px-2"
+                        placeholder={item.item_status === 'purchase_requested' || item.item_status === 'purchase_required' ? 'OC' : 'OP'}
+                      />
                     ) : (
-                      <span className="text-xs text-muted-foreground">-</span>
+                      <div
+                        onClick={() => handleStartEditing(item.id, item.production_order_number)}
+                        className="cursor-pointer min-h-[32px] flex items-center px-2 rounded border border-transparent hover:border-border hover:bg-muted/50 transition-colors"
+                        title="Clique para editar"
+                      >
+                        {item.production_order_number ? (
+                          <span className="font-mono text-sm font-semibold text-blue-600 dark:text-blue-400">
+                            {item.production_order_number}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-muted-foreground italic">Clique para editar</span>
+                        )}
+                      </div>
                     )}
                   </TableCell>
                   <TableCell>
