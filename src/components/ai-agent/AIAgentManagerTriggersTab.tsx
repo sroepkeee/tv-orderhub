@@ -44,6 +44,7 @@ import {
   Calendar,
 } from "lucide-react";
 import { ReportScheduleManager } from "./ReportScheduleManager";
+import { DeliveryConfirmationConfig } from "./DeliveryConfirmationConfig";
 
 // Types
 interface ManagerTriggerConfig {
@@ -885,6 +886,11 @@ export function AIAgentManagerTriggersTab() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Delivery Confirmation Section */}
+      <div className="mt-8 pt-8 border-t">
+        <DeliveryConfirmationConfig />
+      </div>
 
       {/* Separator and Scheduled Reports Section */}
       <div className="mt-8 pt-8 border-t space-y-4">

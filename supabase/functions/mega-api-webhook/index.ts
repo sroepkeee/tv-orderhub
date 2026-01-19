@@ -1293,6 +1293,59 @@ Deno.serve(async (req) => {
         );
       }
 
+      // 🚚 CHECK FOR DELIVERY CONFIRMATION RESPONSE
+      // Detect if this is a response to delivery confirmation (SIM/NÃO)
+      const deliveryResponsePatterns = [
+        /^sim$/i, /^s$/i, /^yes$/i, /^y$/i, /^recebi$/i, /^recebido$/i, /^chegou$/i, /^ok$/i, /^✅$/, /^👍$/,
+        /^n[aã]o$/i, /^n$/i, /^no$/i, /^nao recebi$/i, /^não recebi$/i, /^n[aã]o chegou$/i, /^ainda n[aã]o$/i, /^❌$/, /^👎$/,
+      ];
+      
+      const isDeliveryResponse = deliveryResponsePatterns.some(p => p.test(messageText.trim()));
+      
+      if (isDeliveryResponse && contactType === 'customer') {
+        console.log('📦 Detected potential DELIVERY CONFIRMATION response:', messageText);
+        
+        // Call process-delivery-response to handle it
+        try {
+          const deliveryResponseUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/process-delivery-response`;
+          const deliveryResponse = await fetch(deliveryResponseUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+            },
+            body: JSON.stringify({
+              sender_phone: phoneNumber,
+              message_content: messageText,
+              conversation_id: conversation.id,
+            }),
+          });
+          
+          const deliveryResult = await deliveryResponse.json();
+          console.log('📦 Delivery confirmation result:', deliveryResult);
+          
+          if (deliveryResult.success && deliveryResult.response_type !== 'invalid_response') {
+            // Successfully processed as delivery confirmation - skip other AI agents
+            return new Response(
+              JSON.stringify({ 
+                success: true, 
+                conversationId: conversation.id,
+                carrierId: carrierId,
+                processedAs: 'delivery_confirmation',
+                responseType: deliveryResult.response_type,
+              }),
+              {
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                status: 200,
+              }
+            );
+          }
+        } catch (err) {
+          console.error('📦 Error processing delivery confirmation:', err);
+          // Continue to normal flow if error
+        }
+      }
+
       // 🤖 VERIFICAR SE É GESTOR - Resposta instantânea sem debounce
       // Gestores cadastrados em management_report_recipients recebem respostas imediatas
       console.log('🔍 [DIAGNOSTIC] Checking if sender is manager:', phoneNumber);
