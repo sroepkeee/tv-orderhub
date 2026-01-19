@@ -59,7 +59,7 @@ interface ItemSelection {
 
 export function LinkExistingDispatchesDialog({ open, onClose, onSuccess }: LinkExistingDispatchesDialogProps) {
   const { organizationId } = useOrganizationId();
-  const { technicians } = useTechnicians();
+  const { technicians, createTechnician, fetchTechnicians } = useTechnicians();
   const { createDispatch, dispatches } = useTechnicianDispatches();
   const { createTicket, updateTicketStatus } = useReturnTickets();
   
@@ -70,6 +70,8 @@ export function LinkExistingDispatchesDialog({ open, onClose, onSuccess }: LinkE
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [selectedTechnicianId, setSelectedTechnicianId] = useState<string>('');
   const [itemSelections, setItemSelections] = useState<ItemSelection[]>([]);
+  const [autoCreatingTechnician, setAutoCreatingTechnician] = useState(false);
+  const [wasAutoCreated, setWasAutoCreated] = useState(false);
   
   // Return ticket state
   const [createdTicket, setCreatedTicket] = useState<ReturnTicket | null>(null);
@@ -145,8 +147,9 @@ export function LinkExistingDispatchesDialog({ open, onClose, onSuccess }: LinkE
     );
   }, [selectedOrderId, orders, uniqueTechnicians]);
 
-  const handleSelectOrder = (orderId: string) => {
+  const handleSelectOrder = async (orderId: string) => {
     setSelectedOrderId(orderId);
+    setWasAutoCreated(false);
     const order = orders.find(o => o.id === orderId);
     if (order) {
       // Initialize item selections with quantities
@@ -161,10 +164,29 @@ export function LinkExistingDispatchesDialog({ open, onClose, onSuccess }: LinkE
       })));
       
       // Auto-select technician if customer name matches
-      const matchingTechnician = uniqueTechnicians.find(
+      let matchingTechnician = uniqueTechnicians.find(
         tech => tech.name.toLowerCase().trim() === order.customer_name.toLowerCase().trim()
       );
-      if (matchingTechnician) {
+      
+      // If no matching technician, auto-create one
+      if (!matchingTechnician && order.customer_name) {
+        setAutoCreatingTechnician(true);
+        try {
+          const newTechnician = await createTechnician({
+            name: order.customer_name,
+            is_active: true,
+          });
+          if (newTechnician) {
+            setSelectedTechnicianId(newTechnician.id);
+            setWasAutoCreated(true);
+            await fetchTechnicians(); // Refresh list
+          }
+        } catch (error) {
+          console.error('Error auto-creating technician:', error);
+        } finally {
+          setAutoCreatingTechnician(false);
+        }
+      } else if (matchingTechnician) {
         setSelectedTechnicianId(matchingTechnician.id);
       }
     }
@@ -276,6 +298,7 @@ export function LinkExistingDispatchesDialog({ open, onClose, onSuccess }: LinkE
     setItemSelections([]);
     setSearchTerm('');
     setCreatedTicket(null);
+    setWasAutoCreated(false);
   };
 
   const getDaysSinceCreation = (dateString: string) => {
@@ -416,17 +439,26 @@ export function LinkExistingDispatchesDialog({ open, onClose, onSuccess }: LinkE
                     </div>
                   </div>
 
-                  {/* Technician Selection - Auto-matched or manual */}
+                  {/* Technician Selection - Auto-created/matched or manual */}
                   <div className="space-y-2">
                     <Label>Técnico Responsável *</Label>
                     
-                    {autoMatchedTechnician && selectedTechnicianId === autoMatchedTechnician.id ? (
+                    {autoCreatingTechnician ? (
+                      <div className="flex items-center gap-2 p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
+                        <Loader2 className="h-4 w-4 text-blue-600 animate-spin" />
+                        <p className="text-sm text-blue-700">Cadastrando técnico automaticamente...</p>
+                      </div>
+                    ) : selectedTechnicianId ? (
                       <div className="flex items-center justify-between p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
                         <div className="flex items-center gap-2">
                           <CheckCircle2 className="h-4 w-4 text-emerald-600" />
                           <div>
-                            <p className="font-medium text-sm">{autoMatchedTechnician.name}</p>
-                            <p className="text-xs text-emerald-600">Técnico identificado automaticamente</p>
+                            <p className="font-medium text-sm">
+                              {uniqueTechnicians.find(t => t.id === selectedTechnicianId)?.name || selectedOrder?.customer_name}
+                            </p>
+                            <p className="text-xs text-emerald-600">
+                              {wasAutoCreated ? 'Técnico cadastrado automaticamente' : 'Técnico identificado automaticamente'}
+                            </p>
                           </div>
                         </div>
                         <Button 
@@ -436,18 +468,6 @@ export function LinkExistingDispatchesDialog({ open, onClose, onSuccess }: LinkE
                         >
                           Alterar
                         </Button>
-                      </div>
-                    ) : uniqueTechnicians.length === 0 ? (
-                      <div className="flex items-center justify-between p-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
-                        <div className="flex items-center gap-2">
-                          <UserPlus className="h-4 w-4 text-amber-600" />
-                          <div>
-                            <p className="text-sm text-amber-700">Nenhum técnico cadastrado</p>
-                            <p className="text-xs text-amber-600">
-                              Cadastre técnicos na aba "Técnicos" para vincular remessas
-                            </p>
-                          </div>
-                        </div>
                       </div>
                     ) : (
                       <Select value={selectedTechnicianId} onValueChange={setSelectedTechnicianId}>
