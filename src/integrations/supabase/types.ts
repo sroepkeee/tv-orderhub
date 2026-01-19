@@ -14,6 +14,76 @@ export type Database = {
   }
   public: {
     Tables: {
+      access_blocks: {
+        Row: {
+          access_name: string | null
+          access_type: string
+          blocked_at: string | null
+          blocked_by: string | null
+          created_at: string
+          evidence_url: string | null
+          id: string
+          notes: string | null
+          organization_id: string | null
+          process_id: string
+          status: string
+          technician_id: string
+          updated_at: string
+        }
+        Insert: {
+          access_name?: string | null
+          access_type: string
+          blocked_at?: string | null
+          blocked_by?: string | null
+          created_at?: string
+          evidence_url?: string | null
+          id?: string
+          notes?: string | null
+          organization_id?: string | null
+          process_id: string
+          status?: string
+          technician_id: string
+          updated_at?: string
+        }
+        Update: {
+          access_name?: string | null
+          access_type?: string
+          blocked_at?: string | null
+          blocked_by?: string | null
+          created_at?: string
+          evidence_url?: string | null
+          id?: string
+          notes?: string | null
+          organization_id?: string | null
+          process_id?: string
+          status?: string
+          technician_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "access_blocks_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "access_blocks_process_id_fkey"
+            columns: ["process_id"]
+            isOneToOne: false
+            referencedRelation: "return_processes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "access_blocks_technician_id_fkey"
+            columns: ["technician_id"]
+            isOneToOne: false
+            referencedRelation: "technicians"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ai_agent_admins: {
         Row: {
           created_at: string | null
@@ -1190,6 +1260,100 @@ export type Database = {
           },
         ]
       }
+      checklist_template_items: {
+        Row: {
+          category: string
+          created_at: string
+          description: string | null
+          id: string
+          is_required: boolean | null
+          name: string
+          requires_photo: boolean | null
+          requires_signature: boolean | null
+          requires_video: boolean | null
+          sort_order: number | null
+          template_id: string
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_required?: boolean | null
+          name: string
+          requires_photo?: boolean | null
+          requires_signature?: boolean | null
+          requires_video?: boolean | null
+          sort_order?: number | null
+          template_id: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_required?: boolean | null
+          name?: string
+          requires_photo?: boolean | null
+          requires_signature?: boolean | null
+          requires_video?: boolean | null
+          sort_order?: number | null
+          template_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "checklist_template_items_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "checklist_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      checklist_templates: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean | null
+          is_default: boolean | null
+          name: string
+          organization_id: string | null
+          target_role: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          is_default?: boolean | null
+          name: string
+          organization_id?: string | null
+          target_role?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          is_default?: boolean | null
+          name?: string
+          organization_id?: string | null
+          target_role?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "checklist_templates_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       conversation_sentiment_cache: {
         Row: {
           carrier_id: string
@@ -1539,6 +1703,91 @@ export type Database = {
           id?: string
         }
         Relationships: []
+      }
+      divergencias: {
+        Row: {
+          actual_value: string | null
+          checklist_item_id: string | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          estimated_cost: number | null
+          evidence_urls: string[] | null
+          expected_value: string | null
+          id: string
+          item_name: string
+          organization_id: string | null
+          process_id: string
+          resolution_notes: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+          status: string
+          tipo: string
+          updated_at: string
+        }
+        Insert: {
+          actual_value?: string | null
+          checklist_item_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          estimated_cost?: number | null
+          evidence_urls?: string[] | null
+          expected_value?: string | null
+          id?: string
+          item_name: string
+          organization_id?: string | null
+          process_id: string
+          resolution_notes?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: string
+          tipo: string
+          updated_at?: string
+        }
+        Update: {
+          actual_value?: string | null
+          checklist_item_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          estimated_cost?: number | null
+          evidence_urls?: string[] | null
+          expected_value?: string | null
+          id?: string
+          item_name?: string
+          organization_id?: string | null
+          process_id?: string
+          resolution_notes?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: string
+          tipo?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "divergencias_checklist_item_id_fkey"
+            columns: ["checklist_item_id"]
+            isOneToOne: false
+            referencedRelation: "process_checklist_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "divergencias_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "divergencias_process_id_fkey"
+            columns: ["process_id"]
+            isOneToOne: false
+            referencedRelation: "return_processes"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       freight_quote_responses: {
         Row: {
@@ -3728,6 +3977,160 @@ export type Database = {
           },
         ]
       }
+      process_checklist_items: {
+        Row: {
+          category: string
+          condition: string | null
+          created_at: string
+          evidence_urls: string[] | null
+          id: string
+          item_name: string
+          notes: string | null
+          process_id: string
+          signature_url: string | null
+          status: string
+          template_item_id: string | null
+          updated_at: string
+          verified_at: string | null
+          verified_by: string | null
+        }
+        Insert: {
+          category: string
+          condition?: string | null
+          created_at?: string
+          evidence_urls?: string[] | null
+          id?: string
+          item_name: string
+          notes?: string | null
+          process_id: string
+          signature_url?: string | null
+          status?: string
+          template_item_id?: string | null
+          updated_at?: string
+          verified_at?: string | null
+          verified_by?: string | null
+        }
+        Update: {
+          category?: string
+          condition?: string | null
+          created_at?: string
+          evidence_urls?: string[] | null
+          id?: string
+          item_name?: string
+          notes?: string | null
+          process_id?: string
+          signature_url?: string | null
+          status?: string
+          template_item_id?: string | null
+          updated_at?: string
+          verified_at?: string | null
+          verified_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "process_checklist_items_process_id_fkey"
+            columns: ["process_id"]
+            isOneToOne: false
+            referencedRelation: "return_processes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "process_checklist_items_template_item_id_fkey"
+            columns: ["template_item_id"]
+            isOneToOne: false
+            referencedRelation: "checklist_template_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      process_shipping: {
+        Row: {
+          carrier_name: string | null
+          carrier_type: string | null
+          created_at: string
+          delivered_at: string | null
+          delivery_confirmed_by: string | null
+          destination_address: Json | null
+          destination_type: string | null
+          estimated_delivery: string | null
+          id: string
+          label_url: string | null
+          notes: string | null
+          organization_id: string | null
+          origin_address: Json | null
+          process_id: string
+          receiver_technician_id: string | null
+          shipped_at: string | null
+          status: string
+          tracking_code: string | null
+          updated_at: string
+        }
+        Insert: {
+          carrier_name?: string | null
+          carrier_type?: string | null
+          created_at?: string
+          delivered_at?: string | null
+          delivery_confirmed_by?: string | null
+          destination_address?: Json | null
+          destination_type?: string | null
+          estimated_delivery?: string | null
+          id?: string
+          label_url?: string | null
+          notes?: string | null
+          organization_id?: string | null
+          origin_address?: Json | null
+          process_id: string
+          receiver_technician_id?: string | null
+          shipped_at?: string | null
+          status?: string
+          tracking_code?: string | null
+          updated_at?: string
+        }
+        Update: {
+          carrier_name?: string | null
+          carrier_type?: string | null
+          created_at?: string
+          delivered_at?: string | null
+          delivery_confirmed_by?: string | null
+          destination_address?: Json | null
+          destination_type?: string | null
+          estimated_delivery?: string | null
+          id?: string
+          label_url?: string | null
+          notes?: string | null
+          organization_id?: string | null
+          origin_address?: Json | null
+          process_id?: string
+          receiver_technician_id?: string | null
+          shipped_at?: string | null
+          status?: string
+          tracking_code?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "process_shipping_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "process_shipping_process_id_fkey"
+            columns: ["process_id"]
+            isOneToOne: false
+            referencedRelation: "return_processes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "process_shipping_receiver_technician_id_fkey"
+            columns: ["receiver_technician_id"]
+            isOneToOne: false
+            referencedRelation: "technicians"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           created_at: string
@@ -4206,6 +4609,198 @@ export type Database = {
           },
         ]
       }
+      responsibility_terms: {
+        Row: {
+          created_at: string
+          description: string | null
+          document_url: string | null
+          id: string
+          items: Json | null
+          organization_id: string | null
+          signature_url: string | null
+          signed_at: string | null
+          status: string
+          technician_id: string
+          term_type: string
+          title: string
+          updated_at: string
+          valid_until: string | null
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          document_url?: string | null
+          id?: string
+          items?: Json | null
+          organization_id?: string | null
+          signature_url?: string | null
+          signed_at?: string | null
+          status?: string
+          technician_id: string
+          term_type: string
+          title: string
+          updated_at?: string
+          valid_until?: string | null
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          document_url?: string | null
+          id?: string
+          items?: Json | null
+          organization_id?: string | null
+          signature_url?: string | null
+          signed_at?: string | null
+          status?: string
+          technician_id?: string
+          term_type?: string
+          title?: string
+          updated_at?: string
+          valid_until?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "responsibility_terms_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "responsibility_terms_technician_id_fkey"
+            columns: ["technician_id"]
+            isOneToOne: false
+            referencedRelation: "technicians"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      return_audit_log: {
+        Row: {
+          action: string
+          created_at: string
+          entity_id: string | null
+          entity_type: string
+          id: string
+          ip_address: unknown
+          metadata: Json | null
+          new_value: Json | null
+          old_value: Json | null
+          organization_id: string | null
+          process_id: string | null
+          user_agent: string | null
+          user_id: string | null
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          entity_id?: string | null
+          entity_type: string
+          id?: string
+          ip_address?: unknown
+          metadata?: Json | null
+          new_value?: Json | null
+          old_value?: Json | null
+          organization_id?: string | null
+          process_id?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string
+          id?: string
+          ip_address?: unknown
+          metadata?: Json | null
+          new_value?: Json | null
+          old_value?: Json | null
+          organization_id?: string | null
+          process_id?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "return_audit_log_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "return_audit_log_process_id_fkey"
+            columns: ["process_id"]
+            isOneToOne: false
+            referencedRelation: "return_processes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      return_processes: {
+        Row: {
+          closed_at: string | null
+          closed_by: string | null
+          created_at: string
+          id: string
+          motivo: string
+          motivo_detalhes: string | null
+          notes: string | null
+          opened_at: string
+          opened_by: string | null
+          organization_id: string | null
+          status: string
+          technician_id: string
+          updated_at: string
+        }
+        Insert: {
+          closed_at?: string | null
+          closed_by?: string | null
+          created_at?: string
+          id?: string
+          motivo: string
+          motivo_detalhes?: string | null
+          notes?: string | null
+          opened_at?: string
+          opened_by?: string | null
+          organization_id?: string | null
+          status?: string
+          technician_id: string
+          updated_at?: string
+        }
+        Update: {
+          closed_at?: string | null
+          closed_by?: string | null
+          created_at?: string
+          id?: string
+          motivo?: string
+          motivo_detalhes?: string | null
+          notes?: string | null
+          opened_at?: string
+          opened_by?: string | null
+          organization_id?: string | null
+          status?: string
+          technician_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "return_processes_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "return_processes_technician_id_fkey"
+            columns: ["technician_id"]
+            isOneToOne: false
+            referencedRelation: "technicians"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       return_request_items: {
         Row: {
           condition: string
@@ -4275,6 +4870,7 @@ export type Database = {
           dispatch_id: string | null
           freight_value: number | null
           id: string
+          motivo: string | null
           notes: string | null
           order_id: string | null
           order_ids: string[] | null
@@ -4286,6 +4882,7 @@ export type Database = {
           pickup_phone: string | null
           pickup_state: string | null
           pickup_zip_code: string | null
+          process_id: string | null
           received_at: string | null
           received_by: string | null
           rejection_reason: string | null
@@ -4314,6 +4911,7 @@ export type Database = {
           dispatch_id?: string | null
           freight_value?: number | null
           id?: string
+          motivo?: string | null
           notes?: string | null
           order_id?: string | null
           order_ids?: string[] | null
@@ -4325,6 +4923,7 @@ export type Database = {
           pickup_phone?: string | null
           pickup_state?: string | null
           pickup_zip_code?: string | null
+          process_id?: string | null
           received_at?: string | null
           received_by?: string | null
           rejection_reason?: string | null
@@ -4353,6 +4952,7 @@ export type Database = {
           dispatch_id?: string | null
           freight_value?: number | null
           id?: string
+          motivo?: string | null
           notes?: string | null
           order_id?: string | null
           order_ids?: string[] | null
@@ -4364,6 +4964,7 @@ export type Database = {
           pickup_phone?: string | null
           pickup_state?: string | null
           pickup_zip_code?: string | null
+          process_id?: string | null
           received_at?: string | null
           received_by?: string | null
           rejection_reason?: string | null
@@ -4413,6 +5014,13 @@ export type Database = {
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "return_requests_process_id_fkey"
+            columns: ["process_id"]
+            isOneToOne: false
+            referencedRelation: "return_processes"
             referencedColumns: ["id"]
           },
           {
