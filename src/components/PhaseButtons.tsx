@@ -85,7 +85,7 @@ export const PhaseButtons = ({ order, onStatusChange }: PhaseButtonsProps) => {
     },
     {
       id: "production_client",
-      label: "Produção Clientes",
+      label: "Clientes",
       icon: PackageCheck,
       color: "text-orange-600",
       statuses: [
