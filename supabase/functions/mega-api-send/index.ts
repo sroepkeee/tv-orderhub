@@ -99,6 +99,10 @@ function getPhoneVariantsForSending(
   return variants;
 }
 
+// Rate limit constants for interactive chat
+const RATE_LIMIT_PER_MINUTE = 10; // Max messages per user per minute
+const RATE_LIMIT_PER_HOUR = 60;   // Max messages per user per hour
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -141,6 +145,52 @@ Deno.serve(async (req) => {
     if (!authData && !adminRole) {
       throw new Error('User not authorized to send WhatsApp messages');
     }
+
+    // === RATE LIMITING ===
+    const oneMinuteAgo = new Date(Date.now() - 60 * 1000).toISOString();
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+
+    // Check messages sent in last minute
+    const { count: minuteCount } = await supabase
+      .from('carrier_conversations')
+      .select('*', { count: 'exact', head: true })
+      .eq('created_by', user.id)
+      .eq('message_direction', 'outbound')
+      .gte('created_at', oneMinuteAgo);
+
+    if ((minuteCount || 0) >= RATE_LIMIT_PER_MINUTE) {
+      console.log(`⚠️ Rate limit exceeded for user ${user.id}: ${minuteCount}/${RATE_LIMIT_PER_MINUTE} msg/min`);
+      return new Response(
+        JSON.stringify({ 
+          error: `Rate limit: máximo ${RATE_LIMIT_PER_MINUTE} mensagens por minuto`,
+          rate_limited: true,
+          retry_after_seconds: 60
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 429 }
+      );
+    }
+
+    // Check messages sent in last hour
+    const { count: hourCount } = await supabase
+      .from('carrier_conversations')
+      .select('*', { count: 'exact', head: true })
+      .eq('created_by', user.id)
+      .eq('message_direction', 'outbound')
+      .gte('created_at', oneHourAgo);
+
+    if ((hourCount || 0) >= RATE_LIMIT_PER_HOUR) {
+      console.log(`⚠️ Rate limit exceeded for user ${user.id}: ${hourCount}/${RATE_LIMIT_PER_HOUR} msg/hour`);
+      return new Response(
+        JSON.stringify({ 
+          error: `Rate limit: máximo ${RATE_LIMIT_PER_HOUR} mensagens por hora`,
+          rate_limited: true,
+          retry_after_seconds: 3600
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 429 }
+      );
+    }
+
+    console.log(`✅ Rate check passed for user ${user.id}: ${minuteCount}/${RATE_LIMIT_PER_MINUTE}/min, ${hourCount}/${RATE_LIMIT_PER_HOUR}/hour`);
 
     const { carrierId, orderId, message, conversationType, contactType }: SendMessageRequest = await req.json();
 

@@ -27,7 +27,8 @@ import {
   Frown,
   Meh,
   Smile,
-  CircleDot
+  CircleDot,
+  ShieldAlert
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { format, formatDistanceToNow } from "date-fns";
@@ -35,6 +36,7 @@ import { ptBR } from "date-fns/locale";
 import { toast } from "sonner";
 import { useWhatsAppStatus } from "@/hooks/useWhatsAppStatus";
 import { ConversationSummaryPanel } from "./ConversationSummaryPanel";
+import { useChatRateLimit } from "@/hooks/useChatRateLimit";
 
 interface SentimentCache {
   carrier_id: string;
@@ -353,9 +355,25 @@ export function AIAgentMessagesTab({ selectedAgentType = 'carrier' }: Props) {
     };
   }, [handleRealtimeUpdate, loadSentimentCache]);
 
-  // Send message
+  // Rate limiting hook
+  const { 
+    canSend: rateLimitCanSend, 
+    messagesThisMinute, 
+    isBlocked, 
+    blockedSeconds,
+    recordSend,
+    handleRateLimitError 
+  } = useChatRateLimit();
+
+  // Send message with rate limiting
   const handleSendMessage = async () => {
     if (!newMessage.trim() || !selectedConversation || !whatsappConnected) return;
+    
+    // Check rate limit
+    if (!rateLimitCanSend) {
+      toast.error(`Rate limit atingido. Aguarde ${blockedSeconds > 0 ? blockedSeconds + 's' : 'um momento'}.`);
+      return;
+    }
 
     setSending(true);
     try {
@@ -368,7 +386,16 @@ export function AIAgentMessagesTab({ selectedAgentType = 'carrier' }: Props) {
       });
 
       if (error) throw error;
+      
+      // Check for rate limit error from server
+      if (data?.rate_limited) {
+        handleRateLimitError(data.retry_after_seconds || 60);
+        toast.error(data.error || 'Rate limit atingido');
+        return;
+      }
+      
       if (data?.success) {
+        recordSend(); // Track the send locally
         setNewMessage('');
         await loadMessages(selectedConversation.carrier_id);
         await loadConversations();
