@@ -72,103 +72,84 @@ function formatQuoteMessage(quoteData: any): string {
   return message;
 }
 
-// Função para enviar via Mega API com múltiplas tentativas
-async function sendViaMegaApi(
-  carrierWhatsApp: string, 
+// Normalizar telefone no padrão canônico (55 + DDD + 8 dígitos)
+function normalizePhoneCanonical(phone: string): string {
+  if (!phone) return phone;
+  
+  let digits = phone.replace(/\D/g, '');
+  
+  if (digits.length > 13) {
+    digits = digits.slice(-13);
+  }
+  
+  if (!digits.startsWith('55')) {
+    digits = '55' + digits;
+  }
+  
+  // Remover o 9 se presente
+  if (digits.length === 13 && digits.startsWith('55') && digits.charAt(4) === '9') {
+    const ddd = digits.substring(2, 4);
+    const numero = digits.substring(5);
+    digits = '55' + ddd + numero;
+  }
+  
+  return digits;
+}
+
+// Enfileirar mensagem de cotação (ao invés de enviar diretamente)
+async function queueFreightQuoteMessage(
+  supabase: any,
+  carrierId: string,
+  carrierName: string,
+  carrierWhatsApp: string,
   message: string,
-  megaApiUrl: string,
-  megaApiToken: string,
-  megaApiInstance: string
-): Promise<{ success: boolean; messageId?: string; error?: string }> {
+  orderId: string,
+  quoteId: string
+): Promise<{ success: boolean; queueId?: string; error?: string }> {
   try {
-    // Normalizar URL
-    let baseUrl = megaApiUrl.trim();
-    if (!baseUrl.startsWith('http://') && !baseUrl.startsWith('https://')) {
-      baseUrl = `https://${baseUrl}`;
-    }
-    baseUrl = baseUrl.replace(/\/+$/, '');
+    const normalizedPhone = normalizePhoneCanonical(carrierWhatsApp);
     
-    // NOVO PADRÃO: 55 + DDD + 8 dígitos (SEM o 9)
-    let cleanNumber = carrierWhatsApp.replace(/\D/g, '');
-    if (!cleanNumber.startsWith('55')) {
-      cleanNumber = `55${cleanNumber}`;
+    if (!normalizedPhone || normalizedPhone.length < 10) {
+      console.error('❌ Invalid phone number:', carrierWhatsApp);
+      return { success: false, error: 'Invalid phone number' };
     }
-    // Remover o 9 se presente (formato antigo)
-    if (cleanNumber.length === 13 && cleanNumber.startsWith('55') && cleanNumber.charAt(4) === '9') {
-      const ddd = cleanNumber.substring(2, 4);
-      const numero = cleanNumber.substring(5);
-      cleanNumber = '55' + ddd + numero;
-    }
-    const formattedNumber = cleanNumber;
     
-    console.log('Sending via Mega API to:', formattedNumber);
-
-    // Mega API START usa /rest/sendMessage/{instance}/text
-    const endpoint = `/rest/sendMessage/${megaApiInstance}/text`;
-    const fullUrl = `${baseUrl}${endpoint}`;
-
-    console.log(`Sending to: ${fullUrl}`);
-
-    // Body formato Mega API: { messageData: { to, text, linkPreview } }
-    const body = {
-      messageData: {
-        to: formattedNumber,
-        text: message,
-        linkPreview: false,
-      }
-    };
-
-    console.log('Request body:', JSON.stringify(body));
-
-    // Multi-header fallback para compatibilidade
-    const authFormats: Record<string, string>[] = [
-      { 'apikey': megaApiToken },
-      { 'Authorization': `Bearer ${megaApiToken}` },
-      { 'Apikey': megaApiToken },
-    ];
-
-    for (const authHeader of authFormats) {
-      try {
-        const headers: Record<string, string> = {
-          'Content-Type': 'application/json',
-          ...authHeader,
-        };
-
-        const response = await fetch(fullUrl, {
-          method: 'POST',
-          headers,
-          body: JSON.stringify(body),
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-          console.log(`✅ Success`);
-          return { 
-            success: true, 
-            messageId: data.key?.id || data.message_id || data.id 
-          };
-        } else if (response.status === 401 || response.status === 403) {
-          console.log(`❌ Auth failed (${Object.keys(authHeader)[0]}): ${response.status} - trying next...`);
-          continue;
-        } else {
-          const errorText = await response.text();
-          console.log(`❌ Failed (${response.status}): ${errorText.substring(0, 150)}`);
-          return { success: false, error: `Mega API error: ${response.status}` };
+    console.log(`📤 Queueing freight quote to: ${normalizedPhone} (carrier: ${carrierName})`);
+    
+    const { data: queueEntry, error: queueError } = await supabase
+      .from('message_queue')
+      .insert({
+        recipient_whatsapp: normalizedPhone,
+        recipient_name: carrierName,
+        message_type: 'freight_quote_request',
+        message_content: message,
+        priority: 2, // Alta prioridade para cotações
+        status: 'pending',
+        scheduled_for: null,
+        attempts: 0,
+        max_attempts: 3,
+        metadata: {
+          source: 'send-freight-quote',
+          order_id: orderId,
+          carrier_id: carrierId,
+          quote_id: quoteId,
+          queued_at: new Date().toISOString(),
         }
-      } catch (err) {
-        const errMsg = err instanceof Error ? err.message : String(err);
-        console.error('Fetch error:', errMsg);
-        continue;
-      }
+      })
+      .select('id')
+      .single();
+    
+    if (queueError) {
+      console.error('❌ Error queueing freight quote:', queueError);
+      return { success: false, error: queueError.message };
     }
     
-    return { success: false, error: 'All auth methods failed' }
+    console.log('✅ Freight quote queued. Queue ID:', queueEntry?.id);
+    return { success: true, queueId: queueEntry?.id };
   } catch (error) {
-    console.error('Error sending via Mega API:', error);
-    return { 
-      success: false, 
-      error: error instanceof Error ? error.message : 'Unknown error' 
-    };
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error('❌ Exception queueing freight quote:', errorMessage);
+    return { success: false, error: errorMessage };
   }
 }
 
@@ -188,24 +169,8 @@ serve(async (req) => {
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const megaApiUrl = Deno.env.get('MEGA_API_URL')!;
-    const megaApiToken = Deno.env.get('MEGA_API_TOKEN')!;
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
-    // Buscar instância conectada do banco de dados
-    const { data: activeInstance } = await supabase
-      .from('whatsapp_instances')
-      .select('instance_key')
-      .eq('status', 'connected')
-      .maybeSingle();
-
-    if (!activeInstance) {
-      console.warn('⚠️ No connected WhatsApp instance found. Messages will be saved locally only.');
-    }
-
-    const megaApiInstance = activeInstance?.instance_key || '';
-    console.log('✅ Using WhatsApp instance from DB:', megaApiInstance || 'none');
 
     // Get user ID from authorization header
     const authHeader = req.headers.get('authorization');
@@ -263,28 +228,29 @@ serve(async (req) => {
       }
 
       const formattedMessage = formatQuoteMessage(quoteData);
-      let sendSuccess = false;
-      let sentVia = 'none';
-      let megaMessageId: string | undefined;
+      let queueSuccess = false;
+      let queueId: string | undefined;
 
-      // PRIORIDADE 1: Tentar enviar via Mega API se tiver WhatsApp
+      // ENFILEIRAR mensagem ao invés de enviar diretamente
       if (carrier.whatsapp) {
-        console.log(`Attempting to send via Mega API to ${carrier.name}`);
-        const megaResult = await sendViaMegaApi(
+        console.log(`📤 Queueing freight quote for ${carrier.name}`);
+        const queueResult = await queueFreightQuoteMessage(
+          supabase,
+          carrierId,
+          carrier.name,
           carrier.whatsapp,
           formattedMessage,
-          megaApiUrl,
-          megaApiToken,
-          megaApiInstance
+          orderId,
+          quote.id
         );
 
-        if (megaResult.success) {
-          sendSuccess = true;
-          sentVia = 'mega_api';
-          megaMessageId = megaResult.messageId;
-          console.log(`✅ Mega API send successful for ${carrier.name}`);
+        queueSuccess = queueResult.success;
+        queueId = queueResult.queueId;
+        
+        if (queueSuccess) {
+          console.log(`✅ Quote queued for ${carrier.name}`);
         } else {
-          console.warn(`⚠️ Mega API failed for ${carrier.name}:`, megaResult.error);
+          console.warn(`⚠️ Failed to queue quote for ${carrier.name}:`, queueResult.error);
         }
       } else {
         console.log(`📧 Carrier ${carrier.name} has no WhatsApp - will save locally`);
@@ -303,12 +269,12 @@ serve(async (req) => {
           message_metadata: {
             channel: carrier.whatsapp ? 'whatsapp' : 'no_whatsapp',
             recipient: carrier.whatsapp || carrier.quote_email || carrier.email,
-            sent_via: sentVia,
-            mega_message_id: megaMessageId || null,
+            sent_via: queueSuccess ? 'queued' : 'none',
+            queue_id: queueId || null,
             has_whatsapp: !!carrier.whatsapp
           },
-          sent_at: sendSuccess ? new Date().toISOString() : null,
-          delivered_at: sendSuccess ? new Date().toISOString() : null,
+          sent_at: null, // Será preenchido quando process-message-queue enviar
+          delivered_at: null,
           created_by: userId
         })
         .select()
@@ -318,30 +284,20 @@ serve(async (req) => {
         console.error('Error creating conversation:', convError);
       }
 
-      // Atualizar status da cotação
+      // Atualizar status da cotação para 'queued' ao invés de 'sent'
       await supabase
         .from('freight_quotes')
         .update({ 
-          status: sendSuccess ? 'sent' : 'pending',
-          sent_at: sendSuccess ? new Date().toISOString() : null
+          status: queueSuccess ? 'queued' : 'pending',
         })
         .eq('id', quote.id);
-
-      // Log de mensagem WhatsApp
-      if (conversation && megaMessageId) {
-        await supabase.from('whatsapp_message_log').insert({
-          conversation_id: conversation.id,
-          mega_message_id: megaMessageId,
-          status: 'sent',
-        });
-      }
 
       results.push({ 
         quote_id: quote.id,
         carrier_id: carrierId,
         carrier_name: carrier.name,
-        status: sendSuccess ? 'sent' : 'pending',
-        sent_via: sentVia,
+        status: queueSuccess ? 'queued' : 'pending',
+        queue_id: queueId,
         has_whatsapp: !!carrier.whatsapp
       });
     }
@@ -352,7 +308,7 @@ serve(async (req) => {
       success: true, 
       results,
       total: carrierIds.length,
-      sent: results.filter(r => r.status === 'sent').length,
+      queued: results.filter(r => r.status === 'queued').length,
       pending: results.filter(r => r.status === 'pending').length
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
