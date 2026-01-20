@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { 
   RefreshCw, 
   Send, 
@@ -17,12 +18,19 @@ import {
   Trash2,
   MessageSquare,
   TrendingUp,
-  Shield
+  Shield,
+  Bot,
+  FileText,
+  Truck,
+  Bell,
+  Users
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format, formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { MessageQueueSourceChart } from "./MessageQueueSourceChart";
+import { MessageQueueRateLimitCard } from "./MessageQueueRateLimitCard";
 
 interface QueueMessage {
   id: string;
@@ -38,6 +46,7 @@ interface QueueMessage {
   sent_at: string | null;
   error_message: string | null;
   created_at: string;
+  metadata: Record<string, any> | null;
 }
 
 interface QueueStats {
@@ -71,6 +80,28 @@ const typeLabels: Record<string, string> = {
   large_order: "Grande Pedido",
   manual: "Manual",
   general: "Geral",
+  ai_auto_reply: "Auto-resposta IA",
+  ai_handoff: "Handoff Humano",
+  delivery_confirmation: "Confirm. Entrega",
+  delivery_confirmation_followup: "Followup Entrega",
+  freight_quote_request: "Cotação Frete",
+  notification: "Notificação",
+  customer_notification: "Notif. Cliente",
+  status_change: "Mudança Status",
+  scheduled_report: "Relatório Agendado",
+  scheduled_report_image: "Relatório Imagem",
+};
+
+const sourceLabels: Record<string, { label: string; icon: any; color: string }> = {
+  'ai-agent-notify': { label: 'Cliente', icon: Bell, color: 'text-blue-500' },
+  'ai-agent-auto-reply': { label: 'Auto-IA', icon: Bot, color: 'text-purple-500' },
+  'ai-agent-auto-reply-handoff': { label: 'Handoff', icon: Users, color: 'text-orange-500' },
+  'daily-management-report': { label: 'Relatório', icon: FileText, color: 'text-green-500' },
+  'send-freight-quote': { label: 'Cotação', icon: Truck, color: 'text-cyan-500' },
+  'check-delivery-confirmations': { label: 'Entrega', icon: CheckCircle, color: 'text-emerald-500' },
+  'manager-smart-alerts': { label: 'Alertas', icon: AlertTriangle, color: 'text-yellow-500' },
+  'notify-phase-manager': { label: 'Fase', icon: Send, color: 'text-indigo-500' },
+  'send-scheduled-reports': { label: 'Agendado', icon: Clock, color: 'text-pink-500' },
 };
 
 export function MessageQueueDashboard() {
@@ -79,29 +110,28 @@ export function MessageQueueDashboard() {
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
   const [activeTab, setActiveTab] = useState("pending");
+  const [sourceFilter, setSourceFilter] = useState<string>("all");
 
   const fetchData = async () => {
     setLoading(true);
     try {
-      // Fetch messages
       const { data: messagesData, error: messagesError } = await supabase
         .from('message_queue')
         .select('*')
         .order('created_at', { ascending: false })
-        .limit(100);
+        .limit(200);
 
       if (messagesError) throw messagesError;
-      setMessages(messagesData || []);
+      setMessages((messagesData || []) as QueueMessage[]);
 
-      // Calculate stats
       const pending = messagesData?.filter(m => m.status === 'pending').length || 0;
-      const processing = messagesData?.filter(m => m.status === 'processing').length || 0;
+      const processingCount = messagesData?.filter(m => m.status === 'processing').length || 0;
       const sent = messagesData?.filter(m => m.status === 'sent').length || 0;
       const failed = messagesData?.filter(m => m.status === 'failed').length || 0;
 
       setStats({
         pending,
-        processing,
+        processing: processingCount,
         sent,
         failed,
         total: messagesData?.length || 0,
@@ -117,8 +147,6 @@ export function MessageQueueDashboard() {
 
   useEffect(() => {
     fetchData();
-
-    // Auto-refresh every 30 seconds
     const interval = setInterval(fetchData, 30000);
     return () => clearInterval(interval);
   }, []);
@@ -199,9 +227,15 @@ export function MessageQueueDashboard() {
     }
   };
 
+  // Get unique sources for filter
+  const uniqueSources = Array.from(new Set(
+    messages.map(m => (m.metadata as any)?.source).filter(Boolean)
+  )).sort();
+
   const filteredMessages = messages.filter(m => {
-    if (activeTab === "all") return true;
-    return m.status === activeTab;
+    const statusMatch = activeTab === "all" || m.status === activeTab;
+    const sourceMatch = sourceFilter === "all" || (m.metadata as any)?.source === sourceFilter;
+    return statusMatch && sourceMatch;
   });
 
   const formatPhone = (phone: string) => {
@@ -212,10 +246,18 @@ export function MessageQueueDashboard() {
     return phone;
   };
 
+  const getSourceInfo = (source: string | undefined) => {
+    if (!source) return { label: 'Legado', icon: MessageSquare, color: 'text-muted-foreground' };
+    return sourceLabels[source] || { label: source, icon: MessageSquare, color: 'text-muted-foreground' };
+  };
+
   return (
     <div className="space-y-4">
-      {/* Stats Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+      {/* Rate Limit Monitor */}
+      <MessageQueueRateLimitCard messages={messages} />
+
+      {/* Stats Cards Row */}
+      <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
@@ -279,23 +321,26 @@ export function MessageQueueDashboard() {
                 <Shield className="h-5 w-5 text-primary" />
               </div>
               <div>
-                <p className="text-2xl font-bold">3-5s</p>
-                <p className="text-xs text-muted-foreground">Delay/msg</p>
+                <p className="text-2xl font-bold">{uniqueSources.length}</p>
+                <p className="text-xs text-muted-foreground">Origens</p>
               </div>
             </div>
           </CardContent>
         </Card>
+
+        {/* Source Distribution Chart */}
+        <MessageQueueSourceChart messages={messages} />
       </div>
 
-      {/* Rate Limit Info */}
+      {/* Actions Bar */}
       <Card className="border-dashed">
         <CardContent className="p-4">
           <div className="flex flex-col gap-3">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between flex-wrap gap-2">
               <div className="flex items-center gap-2">
                 <AlertTriangle className="h-4 w-4 text-yellow-500" />
                 <span className="text-sm text-muted-foreground">
-                  <strong>Proteção anti-bloqueio:</strong> Máximo 15 msg/min, 200 msg/hora, delay de 3-5 seg entre mensagens
+                  <strong>Proteção anti-bloqueio ativa</strong> • Delay 3-5s entre mensagens
                 </span>
               </div>
               <div className="flex gap-2">
@@ -352,7 +397,7 @@ export function MessageQueueDashboard() {
       {/* Messages Table */}
       <Card>
         <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between flex-wrap gap-2">
             <div>
               <CardTitle className="flex items-center gap-2">
                 <MessageSquare className="h-5 w-5" />
@@ -362,15 +407,33 @@ export function MessageQueueDashboard() {
                 Mensagens WhatsApp aguardando envio ou já processadas
               </CardDescription>
             </div>
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              onClick={handleClearSent}
-              className="text-muted-foreground"
-            >
-              <Trash2 className="h-4 w-4 mr-1" />
-              Limpar Antigas
-            </Button>
+            <div className="flex items-center gap-2">
+              <Select value={sourceFilter} onValueChange={setSourceFilter}>
+                <SelectTrigger className="w-[150px] h-8">
+                  <SelectValue placeholder="Todas origens" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas origens</SelectItem>
+                  {uniqueSources.map(source => {
+                    const info = getSourceInfo(source);
+                    return (
+                      <SelectItem key={source} value={source}>
+                        {info.label}
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={handleClearSent}
+                className="text-muted-foreground"
+              >
+                <Trash2 className="h-4 w-4 mr-1" />
+                Limpar Antigas
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent>
@@ -398,19 +461,21 @@ export function MessageQueueDashboard() {
                 <TableHeader>
                   <TableRow>
                     <TableHead className="w-[140px]">Destinatário</TableHead>
+                    <TableHead className="w-[90px]">Origem</TableHead>
                     <TableHead className="w-[100px]">Tipo</TableHead>
                     <TableHead className="w-[80px]">Prioridade</TableHead>
                     <TableHead>Mensagem</TableHead>
                     <TableHead className="w-[80px]">Status</TableHead>
-                    <TableHead className="w-[120px]">Agendado</TableHead>
-                    <TableHead className="w-[80px]">Ações</TableHead>
+                    <TableHead className="w-[100px]">Agendado</TableHead>
+                    <TableHead className="w-[70px]">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filteredMessages.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                         Nenhuma mensagem {activeTab !== 'all' ? `com status "${statusLabels[activeTab]?.label}"` : ''}
+                        {sourceFilter !== 'all' ? ` da origem "${getSourceInfo(sourceFilter).label}"` : ''}
                       </TableCell>
                     </TableRow>
                   ) : (
@@ -418,18 +483,27 @@ export function MessageQueueDashboard() {
                       const statusInfo = statusLabels[message.status] || statusLabels.pending;
                       const StatusIcon = statusInfo.icon;
                       const priorityInfo = priorityLabels[message.priority] || priorityLabels[3];
+                      const source = (message.metadata as any)?.source;
+                      const sourceInfo = getSourceInfo(source);
+                      const SourceIcon = sourceInfo.icon;
 
                       return (
                         <TableRow key={message.id}>
                           <TableCell>
                             <div className="flex flex-col">
-                              <span className="font-medium text-sm">
+                              <span className="font-medium text-sm truncate max-w-[120px]">
                                 {message.recipient_name || 'Desconhecido'}
                               </span>
                               <span className="text-xs text-muted-foreground">
                                 {formatPhone(message.recipient_whatsapp)}
                               </span>
                             </div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className="text-xs gap-1">
+                              <SourceIcon className={`h-3 w-3 ${sourceInfo.color}`} />
+                              {sourceInfo.label}
+                            </Badge>
                           </TableCell>
                           <TableCell>
                             <Badge variant="outline" className="text-xs">
@@ -442,11 +516,11 @@ export function MessageQueueDashboard() {
                             </Badge>
                           </TableCell>
                           <TableCell>
-                            <p className="text-sm text-muted-foreground line-clamp-2 max-w-[300px]">
-                              {message.message_content.substring(0, 100)}...
+                            <p className="text-sm text-muted-foreground line-clamp-2 max-w-[250px]">
+                              {message.message_content.substring(0, 80)}...
                             </p>
                             {message.error_message && (
-                              <p className="text-xs text-red-500 mt-1">
+                              <p className="text-xs text-red-500 mt-1 truncate max-w-[250px]">
                                 ⚠️ {message.error_message}
                               </p>
                             )}
