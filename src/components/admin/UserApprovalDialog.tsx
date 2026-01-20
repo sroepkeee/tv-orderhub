@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
+import { useOrganization } from "@/hooks/useOrganization";
 
 interface UserApprovalDialogProps {
   open: boolean;
@@ -24,6 +25,7 @@ export const UserApprovalDialog = ({ open, onOpenChange, user, onSuccess }: User
   const [reason, setReason] = useState("");
   const { toast } = useToast();
   const { user: currentUser } = useAuth();
+  const { organization } = useOrganization();
 
   const handleSubmit = async () => {
     if (action === 'reject' && !reason.trim()) {
@@ -51,7 +53,7 @@ export const UserApprovalDialog = ({ open, onOpenChange, user, onSuccess }: User
 
       if (updateError) throw updateError;
 
-      // Se aprovar, ativar perfil
+      // Se aprovar, ativar perfil e vincular à organização
       if (action === 'approve') {
         const { error: profileError } = await supabase
           .from('profiles')
@@ -59,6 +61,34 @@ export const UserApprovalDialog = ({ open, onOpenChange, user, onSuccess }: User
           .eq('id', user.id);
 
         if (profileError) throw profileError;
+
+        // Verificar se usuário já está em alguma organização
+        const { data: existingMembership } = await supabase
+          .from('organization_members')
+          .select('id')
+          .eq('user_id', user.id)
+          .eq('is_active', true)
+          .maybeSingle();
+
+        // Se não está em nenhuma organização, adicionar à do admin
+        if (!existingMembership && organization?.id) {
+          const { error: memberError } = await supabase
+            .from('organization_members')
+            .insert({
+              organization_id: organization.id,
+              user_id: user.id,
+              role: 'member',
+              is_active: true,
+            });
+
+          if (memberError) {
+            console.error('Error adding to organization:', memberError);
+            toast({
+              title: "Atenção",
+              description: "Usuário aprovado, mas houve erro ao vincular à organização",
+            });
+          }
+        }
       }
 
       // Registrar no audit log
