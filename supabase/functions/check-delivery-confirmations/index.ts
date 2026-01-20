@@ -5,8 +5,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const delayMs = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
-
 interface DeliveryConfig {
   id: string;
   organization_id: string;
@@ -23,13 +21,43 @@ interface DeliveryConfig {
   auto_create_analysis_on_not_received: boolean;
 }
 
+interface ExistingConfirmation {
+  order_id: string;
+  response_received: boolean;
+  attempts_count: number;
+  last_attempt_at: string;
+}
+
+/**
+ * Normaliza telefone para formato canônico brasileiro
+ */
+function normalizePhoneCanonical(phone: string): string {
+  if (!phone) return phone;
+  
+  let digits = phone.replace(/\D/g, '');
+  
+  if (digits.length > 13) {
+    digits = digits.slice(-13);
+  }
+  
+  if (!digits.startsWith('55')) {
+    digits = '55' + digits;
+  }
+  
+  if (digits.length === 13 && digits.startsWith('55') && digits.charAt(4) === '9') {
+    const ddd = digits.substring(2, 4);
+    const numero = digits.substring(5);
+    digits = '55' + ddd + numero;
+  }
+  
+  return digits;
+}
+
 /**
  * Edge Function: check-delivery-confirmations
  * 
- * Esta função é executada via cron para:
- * 1. Encontrar pedidos em trânsito há X horas que ainda não receberam confirmação
- * 2. Enviar mensagem de confirmação de entrega via WhatsApp
- * 3. Rastrear respostas pendentes
+ * Agora ENFILEIRA mensagens ao invés de enviar diretamente.
+ * O envio real é feito pelo process-message-queue.
  */
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -41,7 +69,7 @@ Deno.serve(async (req) => {
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-  console.log('📦 Check Delivery Confirmations - Starting');
+  console.log('📦 Check Delivery Confirmations - QUEUE MODE');
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
   try {
@@ -70,7 +98,7 @@ Deno.serve(async (req) => {
     console.log(`📋 Found ${configs.length} active configs`);
 
     let totalProcessed = 0;
-    let totalSent = 0;
+    let totalQueued = 0;
 
     // 2. Processar cada organização
     for (const config of configs as DeliveryConfig[]) {
@@ -78,15 +106,15 @@ Deno.serve(async (req) => {
       
       const result = await processOrganization(supabase, config);
       totalProcessed += result.processed;
-      totalSent += result.sent;
+      totalQueued += result.queued;
     }
 
-    console.log(`\n✅ Completed: ${totalProcessed} orders processed, ${totalSent} messages sent`);
+    console.log(`\n✅ Completed: ${totalProcessed} orders processed, ${totalQueued} messages queued`);
 
     return new Response(JSON.stringify({ 
       success: true, 
       orders_processed: totalProcessed,
-      messages_sent: totalSent
+      messages_queued: totalQueued
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
@@ -103,30 +131,18 @@ Deno.serve(async (req) => {
   }
 });
 
-interface ExistingConfirmation {
-  order_id: string;
-  response_received: boolean;
-  attempts_count: number;
-  last_attempt_at: string;
-}
-
 async function processOrganization(supabase: any, config: DeliveryConfig) {
   const { organization_id, trigger_after_hours, trigger_status, max_attempts, retry_interval_hours } = config;
   
   let processed = 0;
-  let sent = 0;
+  let queued = 0;
 
-  // Calcular data limite (pedidos que entraram no status há X horas)
   const triggerDate = new Date();
   triggerDate.setHours(triggerDate.getHours() - trigger_after_hours);
 
   console.log(`⏰ Looking for orders in transit since before: ${triggerDate.toISOString()}`);
   console.log(`📍 Trigger statuses: ${trigger_status.join(', ')}`);
 
-  // Buscar pedidos elegíveis
-  // - Status em trigger_status
-  // - Sem confirmação pendente OU com confirmação pendente para retry
-  // - Com customer_whatsapp preenchido
   const { data: orders, error: ordersError } = await supabase
     .from('orders')
     .select(`
@@ -145,17 +161,16 @@ async function processOrganization(supabase: any, config: DeliveryConfig) {
 
   if (ordersError) {
     console.error('❌ Error fetching orders:', ordersError);
-    return { processed: 0, sent: 0 };
+    return { processed: 0, queued: 0 };
   }
 
   if (!orders || orders.length === 0) {
     console.log('ℹ️ No eligible orders found');
-    return { processed: 0, sent: 0 };
+    return { processed: 0, queued: 0 };
   }
 
   console.log(`📦 Found ${orders.length} potential orders`);
 
-  // Buscar confirmações existentes para estes pedidos
   const orderIds = orders.map((o: any) => o.id);
   const { data: existingConfirmations } = await supabase
     .from('delivery_confirmations')
@@ -166,21 +181,7 @@ async function processOrganization(supabase: any, config: DeliveryConfig) {
     (existingConfirmations || []).map((c: ExistingConfirmation) => [c.order_id, c])
   );
 
-  // Buscar instância WhatsApp conectada
-  const { data: instance } = await supabase
-    .from('whatsapp_instances')
-    .select('instance_key, api_token, status')
-    .eq('status', 'connected')
-    .eq('is_active', true)
-    .limit(1)
-    .maybeSingle();
-
-  if (!instance) {
-    console.log('⚠️ No connected WhatsApp instance');
-    return { processed: 0, sent: 0 };
-  }
-
-  // Buscar nome da empresa para a mensagem
+  // Buscar nome da empresa
   const { data: org } = await supabase
     .from('organizations')
     .select('name')
@@ -189,26 +190,24 @@ async function processOrganization(supabase: any, config: DeliveryConfig) {
 
   const companyName = org?.name || 'Nossa Empresa';
 
-  // Processar cada pedido
+  // Base delay para escalonamento
+  let baseDelay = 0;
+
   for (const order of orders) {
     processed++;
     const existing = confirmationMap.get(order.id);
 
-    // Verificar se já existe confirmação
     if (existing) {
-      // Já respondeu? Pular
       if (existing.response_received) {
         console.log(`⏭️ Order ${order.order_number}: Already confirmed`);
         continue;
       }
 
-      // Verificar se já atingiu máximo de tentativas
       if (existing.attempts_count >= max_attempts) {
         console.log(`⏭️ Order ${order.order_number}: Max attempts reached (${existing.attempts_count})`);
         continue;
       }
 
-      // Verificar intervalo entre tentativas
       const lastAttempt = new Date(existing.last_attempt_at);
       const retryDate = new Date();
       retryDate.setHours(retryDate.getHours() - retry_interval_hours);
@@ -218,20 +217,19 @@ async function processOrganization(supabase: any, config: DeliveryConfig) {
         continue;
       }
 
-      // Enviar follow-up
       if (config.followup_enabled) {
-        console.log(`🔄 Order ${order.order_number}: Sending follow-up (attempt ${existing.attempts_count + 1})`);
-        const success = await sendConfirmationMessage(
+        console.log(`🔄 Order ${order.order_number}: Queuing follow-up (attempt ${existing.attempts_count + 1})`);
+        
+        const success = await queueConfirmationMessage(
           supabase, 
           order, 
           config.followup_message_template,
           companyName,
-          instance,
-          true // is follow-up
+          true,
+          baseDelay
         );
         
         if (success) {
-          // Atualizar tentativas
           await supabase
             .from('delivery_confirmations')
             .update({
@@ -240,23 +238,23 @@ async function processOrganization(supabase: any, config: DeliveryConfig) {
             })
             .eq('order_id', order.id);
           
-          sent++;
+          queued++;
+          baseDelay += 8000 + Math.random() * 4000; // 8-12s entre mensagens
         }
       }
     } else {
-      // Primeira mensagem de confirmação
-      console.log(`📤 Order ${order.order_number}: Sending first confirmation request`);
-      const success = await sendConfirmationMessage(
+      console.log(`📤 Order ${order.order_number}: Queuing first confirmation request`);
+      
+      const success = await queueConfirmationMessage(
         supabase,
         order,
         config.message_template,
         companyName,
-        instance,
-        false
+        false,
+        baseDelay
       );
 
       if (success) {
-        // Criar registro de confirmação
         await supabase
           .from('delivery_confirmations')
           .insert({
@@ -271,135 +269,115 @@ async function processOrganization(supabase: any, config: DeliveryConfig) {
             max_attempts: max_attempts
           });
 
-        sent++;
+        queued++;
+        baseDelay += 8000 + Math.random() * 4000;
       }
     }
-
-    // Delay entre envios para não bloquear
-    await delayMs(3000);
   }
 
-  return { processed, sent };
+  return { processed, queued };
 }
 
-async function sendConfirmationMessage(
+async function queueConfirmationMessage(
   supabase: any,
   order: any,
   template: string,
   companyName: string,
-  instance: any,
-  isFollowup: boolean
+  isFollowup: boolean,
+  delayMs: number
 ): Promise<boolean> {
-  const megaApiUrl = Deno.env.get('MEGA_API_URL');
-  const megaApiToken = instance.api_token || Deno.env.get('MEGA_API_TOKEN');
+  try {
+    // Substituir variáveis no template
+    const message = template
+      .replace(/\{\{empresa\}\}/g, companyName)
+      .replace(/\{\{numero_pedido\}\}/g, order.order_number || order.id.substring(0, 8))
+      .replace(/\{\{cliente\}\}/g, order.customer_name || 'Cliente');
 
-  if (!megaApiUrl || !megaApiToken) {
-    console.error('❌ Mega API not configured');
+    const normalizedPhone = normalizePhoneCanonical(order.customer_whatsapp);
+    
+    const scheduledFor = delayMs > 0 
+      ? new Date(Date.now() + delayMs).toISOString() 
+      : null;
+
+    // 1. Registrar no log de notificações
+    const { data: logEntry, error: logError } = await supabase
+      .from('ai_notification_log')
+      .insert({
+        order_id: order.id,
+        channel: 'whatsapp',
+        recipient: normalizedPhone,
+        message_content: message,
+        status: 'queued',
+        metadata: {
+          type: 'delivery_confirmation',
+          is_followup: isFollowup,
+          order_number: order.order_number,
+          source: 'check-delivery-confirmations',
+        }
+      })
+      .select('id')
+      .single();
+
+    if (logError) {
+      console.error('❌ Error creating log:', logError);
+      return false;
+    }
+
+    // 2. Enfileirar mensagem
+    const { data: queueEntry, error: queueError } = await supabase
+      .from('message_queue')
+      .insert({
+        recipient_whatsapp: normalizedPhone,
+        recipient_name: order.customer_name,
+        message_type: isFollowup ? 'delivery_confirmation_followup' : 'delivery_confirmation',
+        message_content: message,
+        priority: 2, // Prioridade alta
+        status: 'pending',
+        scheduled_for: scheduledFor,
+        attempts: 0,
+        max_attempts: 3,
+        metadata: {
+          source: 'check-delivery-confirmations',
+          notification_log_id: logEntry.id,
+          order_id: order.id,
+          order_number: order.order_number,
+          is_followup: isFollowup,
+          queued_at: new Date().toISOString(),
+        },
+      })
+      .select('id')
+      .single();
+
+    if (queueError) {
+      console.error('❌ Error queuing message:', queueError);
+      
+      await supabase
+        .from('ai_notification_log')
+        .update({ status: 'failed', error_message: queueError.message })
+        .eq('id', logEntry.id);
+      
+      return false;
+    }
+
+    // 3. Atualizar log com referência à fila
+    await supabase
+      .from('ai_notification_log')
+      .update({ 
+        metadata: {
+          type: 'delivery_confirmation',
+          is_followup: isFollowup,
+          order_number: order.order_number,
+          source: 'check-delivery-confirmations',
+          queue_id: queueEntry.id,
+        }
+      })
+      .eq('id', logEntry.id);
+
+    console.log(`✅ Message queued for order ${order.order_number} (queue: ${queueEntry.id})`);
+    return true;
+
+  } catch (error) {
+    console.error('❌ Error in queueConfirmationMessage:', error);
     return false;
   }
-
-  // Substituir variáveis no template
-  const message = template
-    .replace(/\{\{empresa\}\}/g, companyName)
-    .replace(/\{\{numero_pedido\}\}/g, order.order_number || order.id.substring(0, 8))
-    .replace(/\{\{cliente\}\}/g, order.customer_name || 'Cliente');
-
-  // Normalizar telefone
-  let phone = order.customer_whatsapp.replace(/\D/g, '');
-  if (!phone.startsWith('55')) {
-    phone = '55' + phone;
-  }
-  // Garantir formato correto (sem 9 extra para landlines, com 9 para mobile)
-  if (phone.length === 12) {
-    // Pode ser fixo ou mobile sem 9
-    const ddd = parseInt(phone.substring(2, 4));
-    // DDDs que precisam do 9: todos os móveis
-    if (ddd <= 28) {
-      // Adicionar 9 para DDDs de celular
-      phone = phone.substring(0, 4) + '9' + phone.substring(4);
-    }
-  }
-
-  // Construir URL e body
-  let baseUrl = megaApiUrl.trim();
-  if (!baseUrl.startsWith('http://') && !baseUrl.startsWith('https://')) {
-    baseUrl = 'https://' + baseUrl;
-  }
-  baseUrl = baseUrl.replace(/\/$/, '');
-
-  const endpoint = `/rest/sendMessage/${instance.instance_key}/text`;
-  const sendUrl = `${baseUrl}${endpoint}`;
-
-  const body = {
-    messageData: {
-      to: phone,
-      text: message,
-      linkPreview: false
-    }
-  };
-
-  console.log(`📤 Sending to ${phone}: ${message.substring(0, 50)}...`);
-
-  // Tentar múltiplos headers de autenticação
-  const authFormats = [
-    { 'apikey': megaApiToken },
-    { 'Authorization': `Bearer ${megaApiToken}` },
-    { 'Apikey': megaApiToken },
-  ];
-
-  for (const authHeader of authFormats) {
-    try {
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-      };
-      Object.entries(authHeader).forEach(([key, value]) => {
-        if (value) headers[key] = value;
-      });
-
-      const response = await fetch(sendUrl, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(body),
-        signal: AbortSignal.timeout(15000),
-      });
-
-      if (response.ok) {
-        console.log(`✅ Message sent successfully to order ${order.order_number}`);
-        
-        // Registrar no log de notificações
-        await supabase
-          .from('ai_notification_log')
-          .insert({
-            order_id: order.id,
-            channel: 'whatsapp',
-            recipient: phone,
-            message_content: message,
-            status: 'sent',
-            sent_at: new Date().toISOString(),
-            metadata: {
-              type: 'delivery_confirmation',
-              is_followup: isFollowup,
-              order_number: order.order_number
-            }
-          });
-
-        return true;
-      }
-
-      if (response.status === 401 || response.status === 403) {
-        continue; // Tentar próximo header
-      }
-
-      const errorText = await response.text();
-      console.error(`❌ Failed: ${response.status} - ${errorText.substring(0, 100)}`);
-      return false;
-
-    } catch (err) {
-      console.error('❌ Fetch error:', err);
-      continue;
-    }
-  }
-
-  console.error('❌ All auth methods failed');
-  return false;
 }

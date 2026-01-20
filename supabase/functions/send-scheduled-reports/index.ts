@@ -280,64 +280,66 @@ async function generateChart(supabase: any, chartType: string, dataSource: strin
   }
 }
 
-async function sendWhatsAppMessage(supabase: any, phone: string, message: string): Promise<boolean> {
+async function queueWhatsAppMessage(supabase: any, phone: string, message: string, scheduleId: string, recipientName: string): Promise<boolean> {
   try {
-    const { data: instance, error } = await supabase
-      .from('whatsapp_instances')
-      .select('id, instance_id, is_active, status')
-      .eq('is_active', true)
-      .eq('status', 'connected')
-      .limit(1)
-      .single();
-
-    if (error || !instance) {
-      console.error('No connected WhatsApp instance found');
-      return false;
-    }
-
-    const typedInstance = instance as WhatsAppInstance;
-
-    const MEGA_API_TOKEN = Deno.env.get('MEGA_API_TOKEN');
-    if (!MEGA_API_TOKEN) {
-      console.error('MEGA_API_TOKEN not configured');
-      return false;
-    }
-
     const cleanPhone = phone.replace(/\D/g, '');
-    const formattedPhone = cleanPhone.startsWith('55') ? cleanPhone : `55${cleanPhone}`;
+    const normalizedPhone = cleanPhone.startsWith('55') ? cleanPhone : `55${cleanPhone}`;
 
-    const response = await fetch(`https://api.megaapi.com.br/rest/sendMessage/${typedInstance.instance_id}/${MEGA_API_TOKEN}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        messageData: {
-          to: `${formattedPhone}@s.whatsapp.net`,
-          text: message
-        }
-      })
-    });
+    const { error } = await supabase
+      .from('message_queue')
+      .insert({
+        recipient_whatsapp: normalizedPhone,
+        recipient_name: recipientName,
+        message_type: 'scheduled_report',
+        message_content: message,
+        priority: 3, // Normal priority for reports
+        status: 'pending',
+        scheduled_for: null,
+        attempts: 0,
+        max_attempts: 3,
+        metadata: {
+          source: 'send-scheduled-reports',
+          schedule_id: scheduleId,
+          queued_at: new Date().toISOString(),
+        },
+      });
 
-    return response.ok;
+    return !error;
   } catch (error) {
-    console.error('Error sending WhatsApp message:', error);
+    console.error('Error queuing WhatsApp message:', error);
     return false;
   }
 }
 
-async function sendWhatsAppImage(supabase: any, phone: string, imageBase64: string, caption?: string): Promise<boolean> {
+async function queueWhatsAppImage(supabase: any, phone: string, imageBase64: string, scheduleId: string, recipientName: string, caption?: string): Promise<boolean> {
   try {
-    const response = await supabase.functions.invoke('mega-api-send-media', {
-      body: {
-        phone,
-        mediaType: 'image',
-        mediaBase64: imageBase64.replace(/^data:image\/\w+;base64,/, ''),
-        caption: caption || ''
-      }
-    });
+    const cleanPhone = phone.replace(/\D/g, '');
+    const normalizedPhone = cleanPhone.startsWith('55') ? cleanPhone : `55${cleanPhone}`;
 
-    return !response.error;
+    const { error } = await supabase
+      .from('message_queue')
+      .insert({
+        recipient_whatsapp: normalizedPhone,
+        recipient_name: recipientName,
+        message_type: 'scheduled_report_image',
+        message_content: caption || 'Relatório',
+        media_base64: imageBase64.replace(/^data:image\/\w+;base64,/, ''),
+        media_caption: caption || '',
+        priority: 3,
+        status: 'pending',
+        scheduled_for: null,
+        attempts: 0,
+        max_attempts: 3,
+        metadata: {
+          source: 'send-scheduled-reports',
+          schedule_id: scheduleId,
+          queued_at: new Date().toISOString(),
+        },
+      });
+
+    return !error;
   } catch (error) {
-    console.error('Error sending WhatsApp image:', error);
+    console.error('Error queuing WhatsApp image:', error);
     return false;
   }
 }
@@ -539,12 +541,12 @@ serve(async (req) => {
         let failed = 0;
 
         for (const recipient of recipients) {
-          const success = await sendWhatsAppMessage(supabase, recipient.whatsapp, message);
+          const success = await queueWhatsAppMessage(supabase, recipient.whatsapp, message, schedule.id, recipient.name);
           
           if (success) {
-            // Send charts
+            // Queue charts
             for (const chart of charts) {
-              await sendWhatsAppImage(supabase, recipient.whatsapp, chart);
+              await queueWhatsAppImage(supabase, recipient.whatsapp, chart, schedule.id, recipient.name, 'Gráfico do Relatório');
             }
             sent++;
           } else {
