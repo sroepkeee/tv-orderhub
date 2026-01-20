@@ -8,6 +8,65 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { useOrganization } from "@/hooks/useOrganization";
 
+// Mapeamento de role para permissões de fase padrão
+const ROLE_DEFAULT_PHASES: Record<string, { phase_key: string; can_view: boolean; can_edit: boolean; can_advance: boolean }[]> = {
+  purchases: [
+    { phase_key: 'almox_ssm', can_view: true, can_edit: false, can_advance: false },
+    { phase_key: 'order_generation', can_view: true, can_edit: false, can_advance: false },
+    { phase_key: 'purchases', can_view: true, can_edit: true, can_advance: true },
+    { phase_key: 'almox_general', can_view: true, can_edit: false, can_advance: false },
+    { phase_key: 'production_client', can_view: true, can_edit: false, can_advance: false },
+    { phase_key: 'production_stock', can_view: true, can_edit: false, can_advance: false },
+  ],
+  almox_ssm: [
+    { phase_key: 'almox_ssm', can_view: true, can_edit: true, can_advance: true },
+    { phase_key: 'order_generation', can_view: true, can_edit: false, can_advance: false },
+  ],
+  order_generation: [
+    { phase_key: 'almox_ssm', can_view: true, can_edit: false, can_advance: false },
+    { phase_key: 'order_generation', can_view: true, can_edit: true, can_advance: true },
+    { phase_key: 'purchases', can_view: true, can_edit: false, can_advance: false },
+  ],
+  production_client: [
+    { phase_key: 'purchases', can_view: true, can_edit: false, can_advance: false },
+    { phase_key: 'almox_general', can_view: true, can_edit: false, can_advance: false },
+    { phase_key: 'production_client', can_view: true, can_edit: true, can_advance: true },
+    { phase_key: 'production_stock', can_view: true, can_edit: false, can_advance: false },
+  ],
+  production_stock: [
+    { phase_key: 'almox_general', can_view: true, can_edit: false, can_advance: false },
+    { phase_key: 'production_client', can_view: true, can_edit: false, can_advance: false },
+    { phase_key: 'production_stock', can_view: true, can_edit: true, can_advance: true },
+    { phase_key: 'balance_generation', can_view: true, can_edit: false, can_advance: false },
+  ],
+  laboratory: [
+    { phase_key: 'balance_generation', can_view: true, can_edit: false, can_advance: false },
+    { phase_key: 'laboratory', can_view: true, can_edit: true, can_advance: true },
+    { phase_key: 'packaging', can_view: true, can_edit: false, can_advance: false },
+  ],
+  packaging: [
+    { phase_key: 'laboratory', can_view: true, can_edit: false, can_advance: false },
+    { phase_key: 'packaging', can_view: true, can_edit: true, can_advance: true },
+    { phase_key: 'freight_quote', can_view: true, can_edit: false, can_advance: false },
+  ],
+  freight_quote: [
+    { phase_key: 'packaging', can_view: true, can_edit: false, can_advance: false },
+    { phase_key: 'freight_quote', can_view: true, can_edit: true, can_advance: true },
+    { phase_key: 'invoicing', can_view: true, can_edit: false, can_advance: false },
+  ],
+  invoicing: [
+    { phase_key: 'freight_quote', can_view: true, can_edit: false, can_advance: false },
+    { phase_key: 'invoicing', can_view: true, can_edit: true, can_advance: true },
+    { phase_key: 'logistics', can_view: true, can_edit: false, can_advance: false },
+  ],
+  logistics: [
+    { phase_key: 'invoicing', can_view: true, can_edit: false, can_advance: false },
+    { phase_key: 'logistics', can_view: true, can_edit: true, can_advance: true },
+    { phase_key: 'in_transit', can_view: true, can_edit: true, can_advance: true },
+    { phase_key: 'completion', can_view: true, can_edit: false, can_advance: false },
+  ],
+};
+
 interface UserApprovalDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -87,6 +146,63 @@ export const UserApprovalDialog = ({ open, onOpenChange, user, onSuccess }: User
               title: "Atenção",
               description: "Usuário aprovado, mas houve erro ao vincular à organização",
             });
+          }
+        }
+
+        // Buscar roles do usuário para aplicar permissões de fase padrão
+        const { data: userRoles } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', user.id);
+
+        if (userRoles && userRoles.length > 0 && organization?.id) {
+          const phasePermissions: {
+            user_id: string;
+            phase_key: string;
+            can_view: boolean;
+            can_edit: boolean;
+            can_advance: boolean;
+            can_delete: boolean;
+            organization_id: string;
+          }[] = [];
+
+          // Coletar permissões de todas as roles
+          for (const { role } of userRoles) {
+            const defaultPhases = ROLE_DEFAULT_PHASES[role];
+            if (defaultPhases) {
+              for (const phase of defaultPhases) {
+                // Verificar se já existe essa fase na lista
+                const existing = phasePermissions.find(p => p.phase_key === phase.phase_key);
+                if (existing) {
+                  // Merge: manter o mais permissivo
+                  existing.can_view = existing.can_view || phase.can_view;
+                  existing.can_edit = existing.can_edit || phase.can_edit;
+                  existing.can_advance = existing.can_advance || phase.can_advance;
+                } else {
+                  phasePermissions.push({
+                    user_id: user.id,
+                    phase_key: phase.phase_key,
+                    can_view: phase.can_view,
+                    can_edit: phase.can_edit,
+                    can_advance: phase.can_advance,
+                    can_delete: false,
+                    organization_id: organization.id,
+                  });
+                }
+              }
+            }
+          }
+
+          // Inserir permissões de fase
+          if (phasePermissions.length > 0) {
+            const { error: phaseError } = await supabase
+              .from('user_phase_permissions')
+              .insert(phasePermissions);
+
+            if (phaseError) {
+              console.error('Error adding phase permissions:', phaseError);
+              // Não falhar a aprovação por causa disso
+            }
           }
         }
       }
