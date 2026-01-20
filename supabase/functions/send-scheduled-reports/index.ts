@@ -452,7 +452,7 @@ serve(async (req) => {
           if (!phone) continue;
 
           const message = formatCustomerNotificationMessage(order, phase);
-          const success = await sendWhatsAppMessage(supabase, phone, message);
+          const success = await queueWhatsAppMessage(supabase, phone, message, schedule.id, order.customer_name || 'Cliente');
 
           if (success) {
             sent++;
