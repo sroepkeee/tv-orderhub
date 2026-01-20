@@ -79,7 +79,8 @@ interface ExtendedMetrics {
 }
 
 // ==================== CONSTANTES ====================
-const DELAY_BETWEEN_SENDS_MS = 3000;
+// NOTA: Delay entre mensagens agora é controlado pela fila centralizada (process-message-queue)
+// const DELAY_BETWEEN_SENDS_MS = 3000; // Não mais necessário
 const delayMs = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 const statusToPhase: Record<string, string> = {
@@ -718,172 +719,81 @@ function formatReport(
   }
 }
 
-// ==================== WHATSAPP ====================
-async function getActiveInstance(supabase: any) {
-  let { data: instance } = await supabase
-    .from('whatsapp_instances')
-    .select('instance_key, api_token, status, connected_at')
-    .eq('status', 'connected')
-    .eq('is_active', true)
-    .maybeSingle();
-
-  if (!instance) {
-    const { data: fallback } = await supabase
-      .from('whatsapp_instances')
-      .select('instance_key, api_token, status, connected_at')
-      .eq('is_active', true)
-      .order('connected_at', { ascending: false, nullsFirst: false })
-      .maybeSingle();
-    instance = fallback;
-  }
-  return instance;
-}
-
-function isPlaceholderToken(token: string | null | undefined): boolean {
-  if (!token || token.trim() === '') return true;
-  const placeholders = ['SEU_TOKEN', 'API_KEY', 'YOUR_TOKEN', 'TOKEN_AQUI', 'PLACEHOLDER'];
-  return placeholders.some(p => token.toUpperCase().includes(p));
-}
-
-function getPhoneVariants(phone: string): string[] {
-  let canonical = phone.replace(/\D/g, '');
-  if (!canonical.startsWith('55')) canonical = `55${canonical}`;
+// ==================== WHATSAPP VIA QUEUE ====================
+// Normalizar telefone no padrão canônico (55 + DDD + 8 dígitos)
+function normalizePhoneCanonical(phone: string): string {
+  if (!phone) return phone;
   
-  if (canonical.length === 13 && canonical[4] === '9') {
-    canonical = canonical.slice(0, 4) + canonical.slice(5);
+  let digits = phone.replace(/\D/g, '');
+  
+  if (digits.length > 13) {
+    digits = digits.slice(-13);
   }
   
-  const without9 = canonical;
-  const with9 = canonical.slice(0, 4) + '9' + canonical.slice(4);
-  
-  return [without9, with9];
-}
-
-async function tryMultiHeaderFetch(
-  url: string,
-  token: string,
-  body: any
-): Promise<Response | null> {
-  const headerTypes = ['apikey', 'Bearer', 'Apikey'];
-  
-  for (const headerType of headerTypes) {
-    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-    
-    if (headerType === 'apikey') {
-      headers['apikey'] = token;
-    } else if (headerType === 'Bearer') {
-      headers['Authorization'] = `Bearer ${token}`;
-    } else {
-      headers['Apikey'] = token;
-    }
-    
-    try {
-      const response = await fetch(url, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(body),
-      });
-      
-      if (response.ok) {
-        console.log(`✅ Success with header format: ${headerType}`);
-        return response;
-      }
-      
-      if (response.status === 401 || response.status === 403) {
-        console.log(`🔄 Auth failed with ${headerType} (${response.status}), trying next...`);
-        continue;
-      }
-      
-      return response;
-    } catch (err) {
-      console.error(`❌ Fetch error with ${headerType}:`, err);
-      continue;
-    }
+  if (!digits.startsWith('55')) {
+    digits = '55' + digits;
   }
   
-  return null;
-}
-
-function getEffectiveToken(dbToken: string | null | undefined): string {
-  if (dbToken && !isPlaceholderToken(dbToken)) {
-    console.log('🔑 Using database token');
-    return dbToken;
+  // Remover o 9 se presente
+  if (digits.length === 13 && digits.startsWith('55') && digits.charAt(4) === '9') {
+    const ddd = digits.substring(2, 4);
+    const numero = digits.substring(5);
+    digits = '55' + ddd + numero;
   }
   
-  const envToken = Deno.env.get('MEGA_API_TOKEN') || '';
-  if (envToken && !isPlaceholderToken(envToken)) {
-    console.log('🔑 Database token invalid, using MEGA_API_TOKEN from env');
-    return envToken;
-  }
-  
-  console.error('❌ No valid token available (db or env)');
-  return '';
+  return digits;
 }
 
-async function sendWhatsApp(supabase: any, phone: string, message: string): Promise<boolean> {
+// Enfileirar mensagem ao invés de enviar diretamente
+async function queueWhatsAppReport(
+  supabase: any, 
+  phone: string, 
+  message: string,
+  reportType: string,
+  recipientId?: string,
+  recipientName?: string
+): Promise<boolean> {
   try {
-    const instance = await getActiveInstance(supabase);
-    if (!instance) {
-      console.error('❌ No WhatsApp instance');
-      return false;
-    }
-
-    const token = getEffectiveToken(instance.api_token);
-    if (!token) {
-      console.error('❌ No valid API token available');
-      return false;
-    }
-
-    let megaApiUrl = (Deno.env.get('MEGA_API_URL') ?? '').trim();
-    if (!megaApiUrl.startsWith('http')) megaApiUrl = `https://${megaApiUrl}`;
-    megaApiUrl = megaApiUrl.replace(/\/+$/, '');
+    const normalizedPhone = normalizePhoneCanonical(phone);
     
-    const url = `${megaApiUrl}/rest/sendMessage/${instance.instance_key}/text`;
-    const phoneVariants = getPhoneVariants(phone);
-
-    console.log(`📤 Attempting to send to variants: ${phoneVariants.join(', ')} via ${instance.instance_key}`);
-
-    for (let i = 0; i < phoneVariants.length; i++) {
-      const phoneNumber = phoneVariants[i];
-      const isLastVariant = i === phoneVariants.length - 1;
-      
-      console.log(`📲 Trying ${phoneNumber}...`);
-      
-      const body = { messageData: { to: phoneNumber, text: message, linkPreview: false } };
-      
-      const res = await tryMultiHeaderFetch(url, token, body);
-
-      if (res?.ok) {
-        console.log('✅ WhatsApp sent to:', phoneNumber);
-        return true;
-      }
-
-      if (res) {
-        const err = await res.text();
-        console.warn(`⚠️ Failed for ${phoneNumber}: ${res.status} - ${err.substring(0, 100)}`);
-        
-        if ((res.status === 400 || res.status === 404) && !isLastVariant) {
-          await delayMs(500);
-          continue;
-        }
-        
-        if (res.status === 401 || res.status === 403) {
-          console.error('❌ Authentication failed with all header formats');
-          return false;
-        }
-      } else {
-        console.error(`❌ All header formats failed for ${phoneNumber}`);
-      }
-      
-      if (isLastVariant) {
-        return false;
-      }
+    if (!normalizedPhone || normalizedPhone.length < 10) {
+      console.error('❌ Invalid phone number:', phone);
+      return false;
     }
-
-    console.error('❌ All phone variants failed');
-    return false;
+    
+    console.log(`📤 Queueing daily report to: ${normalizedPhone}`);
+    
+    const { data: queueEntry, error: queueError } = await supabase
+      .from('message_queue')
+      .insert({
+        recipient_whatsapp: normalizedPhone,
+        recipient_name: recipientName || 'Gestor',
+        message_type: 'daily_report',
+        message_content: message,
+        priority: 3, // Normal - relatórios não são urgentes
+        status: 'pending',
+        scheduled_for: null,
+        attempts: 0,
+        max_attempts: 3,
+        metadata: {
+          source: 'daily-management-report',
+          report_type: reportType,
+          recipient_id: recipientId,
+          queued_at: new Date().toISOString(),
+        }
+      })
+      .select('id')
+      .single();
+    
+    if (queueError) {
+      console.error('❌ Error queueing report:', queueError);
+      return false;
+    }
+    
+    console.log('✅ Report queued. Queue ID:', queueEntry?.id);
+    return true;
   } catch (error) {
-    console.error('❌ WhatsApp error:', error);
+    console.error('❌ Exception queueing report:', error);
     return false;
   }
 }
@@ -998,23 +908,26 @@ serve(async (req) => {
       topOrders: extendedMetrics.topOrdersDetailed.length
     });
 
-    // Verificar conexão
-    const instance = await getActiveInstance(supabase);
-    if (!instance) {
-      console.error('❌ No WhatsApp connected');
-      return new Response(JSON.stringify({ success: false, error: 'WhatsApp não conectado' }), 
-        { status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-    }
+    // Nota: Não precisamos mais verificar instância ativa aqui
+    // A fila centralizada (process-message-queue) fará isso no momento do envio
 
-    // Enviar
-    let sentCount = 0, emailCount = 0, errorCount = 0;
+    // Enfileirar mensagens
+    let queuedCount = 0, emailCount = 0, errorCount = 0;
 
     for (let i = 0; i < recipients.length; i++) {
       const r = recipients[i];
       
       if (r.whatsapp) {
-        const sent = await sendWhatsApp(supabase, r.whatsapp, message);
-        if (sent) sentCount++;
+        const queued = await queueWhatsAppReport(
+          supabase, 
+          r.whatsapp, 
+          message, 
+          reportType,
+          r.id,
+          r.full_name
+        );
+        
+        if (queued) queuedCount++;
         else errorCount++;
         
         // Log
@@ -1022,7 +935,7 @@ serve(async (req) => {
           recipient_id: r.id,
           recipient_whatsapp: r.whatsapp,
           report_type: reportType,
-          status: sent ? 'sent' : 'failed',
+          status: queued ? 'queued' : 'failed',
           message_content: message.substring(0, 500),
           metrics_snapshot: { 
             totalActive: metrics.totalActive, 
@@ -1038,18 +951,16 @@ serve(async (req) => {
         const sent = await sendEmail(r.email, r.full_name, `📊 Relatório Gerencial - ${dateStr}`, message);
         if (sent) emailCount++;
       }
-
-      if (i < recipients.length - 1 && r.whatsapp) {
-        await delayMs(DELAY_BETWEEN_SENDS_MS);
-      }
+      
+      // Não precisamos mais de delay aqui - a fila controla o rate limit
     }
 
-    console.log(`📊 Done: ${sentCount} WhatsApp, ${emailCount} emails, ${errorCount} errors`);
+    console.log(`📊 Done: ${queuedCount} queued for WhatsApp, ${emailCount} emails, ${errorCount} errors`);
 
     return new Response(
       JSON.stringify({ 
         success: true, 
-        sentCount, 
+        queuedCount, // Renomeado de sentCount para queuedCount
         emailCount, 
         errorCount, 
         reportType,

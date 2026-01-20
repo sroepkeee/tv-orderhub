@@ -245,65 +245,64 @@ serve(async (req) => {
         }
       });
 
-      // Send confirmation message to customer that we're transferring
+      // QUEUE handoff confirmation message (instead of direct sending)
       const handoffMessage = "Entendi que você prefere falar com uma pessoa. Estou transferindo para nosso time agora mesmo! 🧑‍💼 Alguém vai te atender em breve.";
       
-      // Get connected WhatsApp instance
-      const { data: instanceData } = await supabase
-        .from('whatsapp_instances')
-        .select('instance_key')
-        .eq('status', 'connected')
-        .limit(1)
-        .single();
-
-      if (instanceData?.instance_key) {
-        const megaApiUrl = Deno.env.get('MEGA_API_URL') || '';
-        const megaApiToken = Deno.env.get('MEGA_API_TOKEN') || '';
-        
-        // Normalize URL
-        let baseUrl = megaApiUrl.trim();
-        if (!baseUrl.startsWith('http://') && !baseUrl.startsWith('https://')) {
-          baseUrl = 'https://' + baseUrl;
-        }
-        baseUrl = baseUrl.replace(/\/$/, '');
-        
-        // Format phone number
-        const phoneNumber = sender_phone.replace(/\D/g, '');
-        const formattedPhone = phoneNumber.startsWith('55') ? phoneNumber : `55${phoneNumber}`;
-        
-        try {
-          const sendResponse = await fetch(`${baseUrl}/message/sendText/${instanceData.instance_key}`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'apikey': megaApiToken
-            },
-            body: JSON.stringify({
-              number: formattedPhone,
-              textMessage: { text: handoffMessage }
-            })
-          });
-
-          if (sendResponse.ok) {
-            console.log('✅ Handoff confirmation message sent');
-            
-            // Save outbound message to database
-            await supabase.from('carrier_conversations').insert({
-              carrier_id,
-              message_content: handoffMessage,
-              message_direction: 'outbound',
-              conversation_type: 'general',
-              contact_type,
-              sent_at: new Date().toISOString(),
-              message_metadata: {
-                is_ai_generated: true,
-                sent_via: 'ai-agent-handoff',
-                handoff_keywords: triggerKeywords
-              }
-            });
+      // Normalizar telefone
+      let normalizedPhone = sender_phone.replace(/\D/g, '');
+      if (!normalizedPhone.startsWith('55')) {
+        normalizedPhone = '55' + normalizedPhone;
+      }
+      if (normalizedPhone.length === 13 && normalizedPhone.charAt(4) === '9') {
+        const ddd = normalizedPhone.substring(2, 4);
+        const numero = normalizedPhone.substring(5);
+        normalizedPhone = '55' + ddd + numero;
+      }
+      
+      // Enfileirar mensagem de handoff com prioridade crítica
+      const { data: queueEntry, error: queueError } = await supabase
+        .from('message_queue')
+        .insert({
+          recipient_whatsapp: normalizedPhone,
+          recipient_name: carrier_name || 'Contato',
+          message_type: 'handoff_confirmation',
+          message_content: handoffMessage,
+          priority: 1, // Crítico - enviar imediatamente
+          status: 'pending',
+          scheduled_for: null,
+          attempts: 0,
+          max_attempts: 3,
+          metadata: {
+            source: 'ai-agent-auto-reply-handoff',
+            conversation_id,
+            carrier_id,
+            handoff_keywords: triggerKeywords,
+            queued_at: new Date().toISOString(),
           }
-        } catch (sendError) {
-          console.error('❌ Error sending handoff message:', sendError);
+        })
+        .select('id')
+        .single();
+      
+      if (queueError) {
+        console.error('❌ Error queueing handoff message:', queueError);
+      } else {
+        console.log('✅ Handoff message queued. Queue ID:', queueEntry?.id);
+        
+        // Save outbound message to database
+        if (carrier_id) {
+          await supabase.from('carrier_conversations').insert({
+            carrier_id,
+            message_content: handoffMessage,
+            message_direction: 'outbound',
+            conversation_type: 'general',
+            contact_type,
+            message_metadata: {
+              is_ai_generated: true,
+              sent_via: 'ai-agent-handoff-queued',
+              handoff_keywords: triggerKeywords,
+              queue_id: queueEntry?.id
+            }
+          });
         }
       }
 
@@ -311,7 +310,8 @@ serve(async (req) => {
         success: false, 
         reason: 'human_handoff_required',
         handoff_keywords: triggerKeywords,
-        handoff_message_sent: true
+        handoff_message_queued: !queueError,
+        queue_id: queueEntry?.id
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -896,189 +896,100 @@ Use este contexto para:
 
     console.log('✅ Generated response:', generatedMessage.substring(0, 100) + '...');
 
-    // 8. Send WhatsApp message via Mega API
-    const megaApiUrl = Deno.env.get('MEGA_API_URL');
-    const megaApiToken = Deno.env.get('MEGA_API_TOKEN');
-
-    if (!megaApiUrl || !megaApiToken) {
-      console.error('❌ Mega API credentials not configured');
-      // Save the response anyway for manual sending
-      await supabase.from('ai_notification_log').insert({
-        channel: 'whatsapp',
-        recipient: sender_phone,
+    // 7. ENQUEUE MESSAGE VIA CENTRALIZED QUEUE (instead of direct sending)
+    // ✅ Isso protege contra bloqueio do WhatsApp usando rate limits centralizados
+    
+    // Função para normalizar telefone no padrão canônico (55 + DDD + 8 dígitos)
+    function normalizePhoneCanonical(phone: string): string {
+      if (!phone) return phone;
+      
+      let digits = phone.replace(/\D/g, '');
+      
+      // Truncar se muito longo
+      if (digits.length > 13) {
+        digits = digits.slice(-13);
+      }
+      
+      // Adicionar 55 se não tem
+      if (!digits.startsWith('55')) {
+        digits = '55' + digits;
+      }
+      
+      // Se tem 13 dígitos (55 + DDD + 9 + 8), REMOVER o 9
+      if (digits.length === 13 && digits.startsWith('55') && digits.charAt(4) === '9') {
+        const ddd = digits.substring(2, 4);
+        const numero = digits.substring(5);
+        digits = '55' + ddd + numero;
+      }
+      
+      return digits;
+    }
+    
+    const normalizedPhone = normalizePhoneCanonical(sender_phone);
+    console.log(`📤 Queueing message to: ${normalizedPhone} (original: ${sender_phone})`);
+    
+    // Enfileirar na message_queue ao invés de enviar diretamente
+    const { data: queueEntry, error: queueError } = await supabase
+      .from('message_queue')
+      .insert({
+        recipient_whatsapp: normalizedPhone,
+        recipient_name: carrier_name || 'Contato',
+        message_type: 'ai_auto_reply',
         message_content: generatedMessage,
-        status: 'pending_manual_send',
+        priority: 2, // Alta prioridade para respostas automáticas
+        status: 'pending',
+        scheduled_for: null, // Envio imediato (respeitará limites do processor)
+        attempts: 0,
+        max_attempts: 3,
         metadata: {
+          source: 'ai-agent-auto-reply',
           conversation_id,
           carrier_id,
-          carrier_name,
-          generated_by: 'ai_agent',
+          order_id,
+          contact_type,
           model: effectiveConfig.llm_model,
           processing_time_ms: Date.now() - startTime,
+          queued_at: new Date().toISOString(),
         }
-      });
-
-      return new Response(JSON.stringify({ 
-        success: true,
-        message: generatedMessage,
-        sent: false,
-        reason: 'mega_api_not_configured'
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
-    // Get connected instance
-    const { data: instance } = await supabase
-      .from('whatsapp_instances')
-      .select('instance_key')
-      .eq('status', 'connected')
-      .limit(1)
+      })
+      .select('id')
       .single();
-
-    if (!instance) {
-      console.warn('⚠️ No connected WhatsApp instance');
-      return new Response(JSON.stringify({ 
-        success: true,
-        message: generatedMessage,
-        sent: false,
-        reason: 'no_connected_instance'
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
-    // Add delay before sending (more natural)
-    if (effectiveConfig.auto_reply_delay_ms > 0) {
-      await new Promise(resolve => setTimeout(resolve, effectiveConfig.auto_reply_delay_ms));
-    }
-
-    // Normalize URL
-    let baseUrl = megaApiUrl.trim();
-    if (!baseUrl.startsWith('http://') && !baseUrl.startsWith('https://')) {
-      baseUrl = 'https://' + baseUrl;
-    }
-    baseUrl = baseUrl.replace(/\/+$/, '');
-
-    // NOVO PADRÃO: 55 + DDD + 8 dígitos (SEM o 9)
-    let formattedPhone = sender_phone.replace(/\D/g, '');
-    if (!formattedPhone.startsWith('55') && formattedPhone.length <= 11) {
-      formattedPhone = '55' + formattedPhone;
-    }
-    // Remover o 9 se presente (formato antigo)
-    if (formattedPhone.length === 13 && formattedPhone.startsWith('55') && formattedPhone.charAt(4) === '9') {
-      const ddd = formattedPhone.substring(2, 4);
-      const numero = formattedPhone.substring(5);
-      formattedPhone = '55' + ddd + numero;
-    }
-
-    const megaApiInstance = instance.instance_key;
-
-    console.log('📤 Using instance:', megaApiInstance);
-
-    // Mega API START usa /rest/sendMessage/{instance}/text
-    const endpoint = `/rest/sendMessage/${megaApiInstance}/text`;
-    const sendUrl = `${baseUrl}${endpoint}`;
-
-    // Body formato Mega API: { messageData: { to, text, linkPreview } }
-    const body = {
-      messageData: {
-        to: formattedPhone,
-        text: generatedMessage,
-        linkPreview: false,
-      }
-    };
-
-    console.log(`📤 Sending to: ${sendUrl}`);
-    console.log('📤 Body:', JSON.stringify(body));
-
-    // Multi-header fallback para compatibilidade
-    const authFormats: Record<string, string>[] = [
-      { 'apikey': megaApiToken },
-      { 'Authorization': `Bearer ${megaApiToken}` },
-      { 'Apikey': megaApiToken },
-    ];
-
-    let megaResponse: Response | null = null;
-    let megaResponseBody: any = null;
-    let lastError = '';
-
-    for (const authHeader of authFormats) {
-      try {
-        const headers: Record<string, string> = {
-          'Content-Type': 'application/json',
-          ...authHeader,
-        };
-
-        const response = await fetch(sendUrl, {
-          method: 'POST',
-          headers,
-          body: JSON.stringify(body),
-        });
-
-        const responseText = await response.text();
-        console.log(`📤 Response (${Object.keys(authHeader)[0]}): ${response.status} - ${responseText.substring(0, 200)}`);
-
-        if (response.ok) {
-          megaResponse = response;
-          try {
-            megaResponseBody = JSON.parse(responseText);
-          } catch {
-            megaResponseBody = { raw: responseText };
-          }
-          console.log('✅ Message sent successfully');
-          break; // Sucesso, sair do loop
-        } else if (response.status === 401 || response.status === 403) {
-          lastError = `${response.status}: ${responseText.substring(0, 200)}`;
-          continue; // Tentar próximo header
-        } else {
-          lastError = `${response.status}: ${responseText.substring(0, 200)}`;
-          break; // Outro erro, não tentar mais
-        }
-      } catch (fetchError) {
-        lastError = fetchError instanceof Error ? fetchError.message : 'Unknown fetch error';
-        console.error(`❌ Fetch error:`, lastError);
-        continue;
-      }
-    }
-
-    const messageSent = megaResponse !== null && megaResponse.ok;
-    const sendResult = megaResponseBody || { error: lastError };
     
-    if (!messageSent) {
-      console.error('❌ Failed to send message after trying all endpoints:', lastError);
+    if (queueError) {
+      console.error('❌ Error queueing message:', queueError);
+    } else {
+      console.log('✅ Message queued for sending. Queue ID:', queueEntry?.id);
     }
 
-    // 9. Save outbound message to carrier_conversations
+    // 8. Save outbound message to carrier_conversations (marcado como queued)
     console.log('💾 [Save] Salvando resposta do agente em carrier_conversations...');
-    console.log('💾 [Save] Dados:', { carrier_id, order_id, contact_type, messageSent });
+    console.log('💾 [Save] Dados:', { carrier_id, order_id, contact_type, queued: !queueError });
     
     if (carrier_id) {
       const { data: insertData, error: insertError } = await supabase
         .from('carrier_conversations')
         .insert({
           carrier_id,
-          order_id: order_id || null, // Garantir null explícito se undefined
-          conversation_type: 'general', // Usar 'general' para consistência com outras mensagens
+          order_id: order_id || null,
+          conversation_type: 'general',
           message_direction: 'outbound',
           message_content: generatedMessage,
-          contact_type: contact_type || 'carrier', // Usar contact_type do request
+          contact_type: contact_type || 'carrier',
           message_metadata: {
-            sent_via: 'ai_agent_auto_reply',
+            sent_via: 'ai_agent_auto_reply_queued',
             model: effectiveConfig.llm_model,
             processing_time_ms: Date.now() - startTime,
-            mega_response: sendResult,
+            queue_id: queueEntry?.id,
             is_ai_generated: true,
           },
-          sent_at: new Date().toISOString(),
-          delivered_at: messageSent ? new Date().toISOString() : null,
+          sent_at: null, // Será atualizado quando process-message-queue enviar
+          delivered_at: null,
         })
         .select('id')
         .single();
 
       if (insertError) {
         console.error('❌ [Save] Erro ao salvar resposta em carrier_conversations:', insertError);
-        console.error('❌ [Save] Detalhes:', JSON.stringify(insertError, null, 2));
       } else {
         console.log('✅ [Save] Resposta salva com sucesso! ID:', insertData?.id);
       }
@@ -1086,16 +997,15 @@ Use este contexto para:
       console.warn('⚠️ [Save] Sem carrier_id, não salvando em carrier_conversations');
     }
 
-    // 10. Log to ai_notification_log (sempre salvar para rastreabilidade)
+    // 9. Log to ai_notification_log (status = queued)
     console.log('📝 [Log] Salvando em ai_notification_log...');
     const { data: logData, error: logError } = await supabase
       .from('ai_notification_log')
       .insert({
         channel: 'whatsapp',
-        recipient: sender_phone,
+        recipient: normalizedPhone,
         message_content: generatedMessage,
-        status: messageSent ? 'sent' : 'failed',
-        sent_at: new Date().toISOString(),
+        status: queueError ? 'failed' : 'queued',
         order_id: order_id || null,
         metadata: {
           conversation_id,
@@ -1109,7 +1019,8 @@ Use este contexto para:
           knowledge_used: relevantKnowledge.map(k => k.title),
           conversation_history_count: conversationHistory.length,
           openai_usage: openaiData.usage,
-          message_sent: messageSent,
+          queue_id: queueEntry?.id,
+          queued: !queueError,
         }
       })
       .select('id')
@@ -1122,13 +1033,15 @@ Use este contexto para:
     }
 
     const processingTime = Date.now() - startTime;
-    console.log(`✅ Auto-reply completed in ${processingTime}ms, sent: ${messageSent}`);
+    console.log(`✅ Auto-reply completed in ${processingTime}ms, queued: ${!queueError}`);
 
     return new Response(JSON.stringify({ 
       success: true,
       message: generatedMessage,
-      notificationLogId: logData?.id, // ID do log para referência
-      sent: messageSent,
+      notificationLogId: logData?.id,
+      queueId: queueEntry?.id,
+      queued: !queueError,
+      sent: false, // Agora sempre false aqui - será enviado pelo processor
       processing_time_ms: processingTime,
       model: effectiveConfig.llm_model,
     }), {

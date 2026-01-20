@@ -260,21 +260,72 @@ serve(async (req) => {
         let success = false;
         let errorMessage = '';
 
-        // Enviar mensagem de texto
+        // Enviar mensagem de texto usando endpoint direto
         if (message.message_content) {
-          const { data: sendResult, error: sendError } = await supabase.functions.invoke('mega-api-send', {
-            body: { 
-              phoneNumber: message.recipient_whatsapp, 
-              message: message.message_content 
-            },
-          });
-
-          if (sendError) {
-            errorMessage = `Text send error: ${sendError.message}`;
-            console.error(`   ❌ ${errorMessage}`);
-          } else {
+          // Usar mega-api-send-media diretamente ao invés de invocar outra edge function
+          // Isso evita problemas de parâmetros e autenticação
+          const megaApiUrl = (Deno.env.get('MEGA_API_URL') ?? '').trim().replace(/\/+$/, '');
+          const megaApiToken = Deno.env.get('MEGA_API_TOKEN') ?? '';
+          
+          // Buscar instância conectada
+          const { data: instance } = await supabase
+            .from('whatsapp_instances')
+            .select('instance_key, api_token')
+            .eq('status', 'connected')
+            .maybeSingle();
+          
+          if (!instance) {
+            throw new Error('No connected WhatsApp instance');
+          }
+          
+          const effectiveToken = instance.api_token || megaApiToken;
+          const url = `${megaApiUrl.startsWith('http') ? megaApiUrl : 'https://' + megaApiUrl}/rest/sendMessage/${instance.instance_key}/text`;
+          
+          const body = {
+            messageData: {
+              to: message.recipient_whatsapp,
+              text: message.message_content,
+              linkPreview: false,
+            }
+          };
+          
+          // Multi-header fallback
+          const authFormats: Record<string, string>[] = [
+            { 'apikey': effectiveToken },
+            { 'Authorization': `Bearer ${effectiveToken}` },
+            { 'Apikey': effectiveToken },
+          ];
+          
+          let sendSuccess = false;
+          for (const authHeader of authFormats) {
+            const headers: Record<string, string> = { 
+              'Content-Type': 'application/json', 
+              ...authHeader 
+            };
+            
+            const res = await fetch(url, {
+              method: 'POST',
+              headers,
+              body: JSON.stringify(body),
+            });
+            
+            if (res.ok) {
+              sendSuccess = true;
+              console.log('   ✅ Text message sent');
+              break;
+            } else if (res.status === 401 || res.status === 403) {
+              continue;
+            } else {
+              const errText = await res.text();
+              errorMessage = `Send error: ${res.status} - ${errText.substring(0, 100)}`;
+              break;
+            }
+          }
+          
+          if (sendSuccess) {
             success = true;
-            console.log('   ✅ Text message sent');
+          } else if (!errorMessage) {
+            errorMessage = 'All auth methods failed';
           }
         }
 
