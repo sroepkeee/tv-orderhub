@@ -190,13 +190,22 @@ export const useCarrierConversations = () => {
     orderId?: string; // Optional for general conversations
     message: string;
     conversationType: string;
-  }) => {
+  }): Promise<{ success?: boolean; rate_limited?: boolean; error?: string; retry_after_seconds?: number }> => {
     try {
       const { data, error } = await supabase.functions.invoke('mega-api-send', {
         body: messageData,
       });
 
       if (error) throw error;
+      
+      // Return rate limit info if present
+      if (data?.rate_limited) {
+        return {
+          rate_limited: true,
+          error: data.error,
+          retry_after_seconds: data.retry_after_seconds
+        };
+      }
 
       console.log('Message sent via Mega API:', data);
       return data;
