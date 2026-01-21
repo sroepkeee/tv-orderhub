@@ -1554,8 +1554,8 @@ export const Dashboard = () => {
         const existingItemIds = new Set((existingItems || []).map(item => item.id));
         const currentItemIds = new Set(updatedOrder.items.filter(item => item.id).map(item => item.id as string));
 
-        // Delete only items owned by current user and removed from the list
-        const itemsToDelete = (existingItems || []).filter(row => !currentItemIds.has(row.id) && row.user_id === user.id).map(row => row.id);
+        // Delete items removed from list - RLS policies handle security for collaborative editing
+        const itemsToDelete = (existingItems || []).filter(row => !currentItemIds.has(row.id)).map(row => row.id);
         if (itemsToDelete.length > 0) {
           const {
             error: deleteError
