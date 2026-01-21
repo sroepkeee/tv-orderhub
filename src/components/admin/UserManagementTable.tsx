@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { UserCheck, UserX, Shield, Search, CheckCircle, XCircle, Clock, Crown, UserPlus, Pencil, Layers } from "lucide-react";
+import { UserCheck, UserX, Shield, Search, CheckCircle, XCircle, Clock, Crown, UserPlus, Pencil, Layers, Eye, AlertTriangle } from "lucide-react";
 import { UserApprovalDialog } from "./UserApprovalDialog";
 import { UserRolesDialog } from "./UserRolesDialog";
 import { DepartmentSelect } from "./DepartmentSelect";
@@ -27,6 +27,13 @@ interface ManagedPhase {
   is_active: boolean;
 }
 
+interface PhasePermission {
+  phase_key: string;
+  can_view: boolean;
+  can_edit: boolean;
+  can_advance: boolean;
+}
+
 interface UserData {
   id: string;
   email: string;
@@ -40,6 +47,7 @@ interface UserData {
   whatsapp: string | null;
   is_manager: boolean;
   managed_phases: ManagedPhase[];
+  phase_permissions: PhasePermission[];
 }
 
 export const UserManagementTable = () => {
@@ -130,10 +138,18 @@ export const UserManagementTable = () => {
         .select('phase_key, display_name, manager_user_id');
       
       if (pcError) throw pcError;
+
+      // Buscar permissões de fase (Kanban) - fonte única da verdade para acesso ao Kanban
+      const { data: phasePerms, error: ppError } = await supabase
+        .from('user_phase_permissions')
+        .select('user_id, phase_key, can_view, can_edit, can_advance');
+      
+      if (ppError) throw ppError;
       
       // Tipos inline para evitar erros de tipo
       type PhaseManagerRow = { user_id: string; phase_key: string; is_active: boolean };
       type PhaseConfigRow = { phase_key: string; display_name: string; manager_user_id: string | null };
+      type PhasePermRow = { user_id: string; phase_key: string; can_view: boolean; can_edit: boolean; can_advance: boolean };
       
       // Combinar dados
       const usersData: UserData[] = profiles.map(profile => {
@@ -151,6 +167,15 @@ export const UserManagementTable = () => {
             is_active: pm.is_active,
           };
         });
+
+        // Montar lista de permissões de fase (Kanban)
+        const userPhasePerms = (phasePerms as PhasePermRow[] || []).filter(pp => pp.user_id === profile.id);
+        const phasePermissions: PhasePermission[] = userPhasePerms.map(pp => ({
+          phase_key: pp.phase_key,
+          can_view: pp.can_view,
+          can_edit: pp.can_edit,
+          can_advance: pp.can_advance,
+        }));
         
         return {
           id: profile.id,
@@ -165,6 +190,7 @@ export const UserManagementTable = () => {
           whatsapp: profile.whatsapp || null,
           is_manager: profile.is_manager ?? false,
           managed_phases: managedPhases,
+          phase_permissions: phasePermissions,
         };
       });
       
@@ -391,12 +417,17 @@ export const UserManagementTable = () => {
                   <TableHead>Email</TableHead>
                   <TableHead>WhatsApp</TableHead>
                   <TableHead>Gestor</TableHead>
-                  <TableHead>Fases</TableHead>
+                  <TableHead title="Permissões de acesso ao Kanban (user_phase_permissions)">
+                    <div className="flex items-center gap-1">
+                      <Eye className="h-3.5 w-3.5" />
+                      Kanban
+                    </div>
+                  </TableHead>
+                  <TableHead title="Fases que o usuário gerencia (phase_managers)">Fases Gerenciadas</TableHead>
                   <TableHead>Departamento</TableHead>
                   <TableHead>Localização</TableHead>
-                  <TableHead>Status Ativo</TableHead>
                   <TableHead>Roles</TableHead>
-                  <TableHead>Status Aprovação</TableHead>
+                  <TableHead>Status</TableHead>
                   <TableHead>Cadastro</TableHead>
                   <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
@@ -404,13 +435,13 @@ export const UserManagementTable = () => {
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={12} className="text-center py-8">
+                    <TableCell colSpan={13} className="text-center py-8">
                       Carregando usuários...
                     </TableCell>
                   </TableRow>
                 ) : filteredUsers.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={12} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={13} className="text-center py-8 text-muted-foreground">
                       Nenhum usuário encontrado
                     </TableCell>
                   </TableRow>
@@ -457,10 +488,37 @@ export const UserManagementTable = () => {
                           )}
                         </div>
                       </TableCell>
+                      {/* NOVA COLUNA: Permissões Kanban (user_phase_permissions) */}
+                      <TableCell>
+                        {user.roles.includes('admin') ? (
+                          <Badge className="bg-primary/10 text-primary text-xs">
+                            <Shield className="h-3 w-3 mr-1" />
+                            Admin (Full)
+                          </Badge>
+                        ) : user.phase_permissions.length > 0 ? (
+                          <div className="flex items-center gap-1">
+                            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-900 text-xs">
+                              <Eye className="h-3 w-3 mr-1" />
+                              {user.phase_permissions.filter(p => p.can_view).length} fases
+                            </Badge>
+                            {user.phase_permissions.some(p => p.can_edit) && (
+                              <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/20 dark:text-blue-400 dark:border-blue-900 text-xs">
+                                ✎ {user.phase_permissions.filter(p => p.can_edit).length}
+                              </Badge>
+                            )}
+                          </div>
+                        ) : (
+                          <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-900 text-xs">
+                            <AlertTriangle className="h-3 w-3 mr-1" />
+                            Sem acesso
+                          </Badge>
+                        )}
+                      </TableCell>
+                      {/* Fases Gerenciadas (phase_managers) */}
                       <TableCell>
                         {user.managed_phases.length > 0 ? (
-                          <div className="flex gap-1 flex-wrap max-w-[200px]">
-                            {user.managed_phases.slice(0, 3).map(phase => (
+                          <div className="flex gap-1 flex-wrap max-w-[150px]">
+                            {user.managed_phases.slice(0, 2).map(phase => (
                               <Badge 
                                 key={phase.phase_key} 
                                 variant="outline" 
@@ -470,9 +528,9 @@ export const UserManagementTable = () => {
                                 {phase.display_name}
                               </Badge>
                             ))}
-                            {user.managed_phases.length > 3 && (
+                            {user.managed_phases.length > 2 && (
                               <Badge variant="secondary" className="text-xs">
-                                +{user.managed_phases.length - 3}
+                                +{user.managed_phases.length - 2}
                               </Badge>
                             )}
                           </div>
@@ -502,17 +560,6 @@ export const UserManagementTable = () => {
                         </Select>
                       </TableCell>
                       <TableCell>
-                        {user.is_active ? (
-                          <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-900">
-                            Ativo
-                          </Badge>
-                        ) : (
-                          <Badge variant="outline" className="bg-gray-50 text-gray-600 border-gray-200 dark:bg-gray-900/20 dark:text-gray-400 dark:border-gray-800">
-                            Inativo
-                          </Badge>
-                        )}
-                      </TableCell>
-                      <TableCell>
                         <div className="flex gap-1 flex-wrap">
                           {user.roles.length > 0 ? (
                             user.roles.map(role => (
@@ -525,7 +572,20 @@ export const UserManagementTable = () => {
                           )}
                         </div>
                       </TableCell>
-                      <TableCell>{getStatusBadge(user.approval_status)}</TableCell>
+                      <TableCell>
+                        <div className="flex flex-col gap-1">
+                          {user.is_active ? (
+                            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-900 text-xs">
+                              Ativo
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="bg-gray-50 text-gray-600 border-gray-200 dark:bg-gray-900/20 dark:text-gray-400 dark:border-gray-800 text-xs">
+                              Inativo
+                            </Badge>
+                          )}
+                          {getStatusBadge(user.approval_status)}
+                        </div>
+                      </TableCell>
                       <TableCell className="text-sm text-muted-foreground">
                         {formatDistanceToNow(new Date(user.created_at), { addSuffix: true, locale: ptBR })}
                       </TableCell>
