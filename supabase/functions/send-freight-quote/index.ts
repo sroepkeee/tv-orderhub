@@ -125,7 +125,7 @@ async function queueFreightQuoteMessage(
         message_content: message,
         priority: 2, // Alta prioridade para cotações
         status: 'pending',
-        scheduled_for: null,
+        scheduled_for: new Date().toISOString(),
         attempts: 0,
         max_attempts: 3,
         metadata: {

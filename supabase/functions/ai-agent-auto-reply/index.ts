@@ -269,7 +269,7 @@ serve(async (req) => {
           message_content: handoffMessage,
           priority: 1, // Crítico - enviar imediatamente
           status: 'pending',
-          scheduled_for: null,
+          scheduled_for: new Date().toISOString(),
           attempts: 0,
           max_attempts: 3,
           metadata: {
@@ -938,7 +938,7 @@ Use este contexto para:
         message_content: generatedMessage,
         priority: 2, // Alta prioridade para respostas automáticas
         status: 'pending',
-        scheduled_for: null, // Envio imediato (respeitará limites do processor)
+        scheduled_for: new Date().toISOString(), // Envio imediato (respeitará limites do processor)
         attempts: 0,
         max_attempts: 3,
         metadata: {

@@ -109,7 +109,7 @@ export async function enqueueMessage(
         media_filename: input.mediaFilename || null,
         priority,
         status: 'pending',
-        scheduled_for: input.scheduledFor || null,
+        scheduled_for: input.scheduledFor || new Date().toISOString(),
         attempts: 0,
         max_attempts: input.maxAttempts ?? 3,
         organization_id: input.organizationId || null,

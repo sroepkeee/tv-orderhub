@@ -294,7 +294,7 @@ async function queueWhatsAppMessage(supabase: any, phone: string, message: strin
         message_content: message,
         priority: 3, // Normal priority for reports
         status: 'pending',
-        scheduled_for: null,
+        scheduled_for: new Date().toISOString(),
         attempts: 0,
         max_attempts: 3,
         metadata: {
@@ -327,7 +327,7 @@ async function queueWhatsAppImage(supabase: any, phone: string, imageBase64: str
         media_caption: caption || '',
         priority: 3,
         status: 'pending',
-        scheduled_for: null,
+        scheduled_for: new Date().toISOString(),
         attempts: 0,
         max_attempts: 3,
         metadata: {
