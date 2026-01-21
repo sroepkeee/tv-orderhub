@@ -670,6 +670,28 @@ serve(async (req) => {
       }
     }
 
+    // Enviar também para Discord (em paralelo, não bloqueia WhatsApp)
+    if (notifications.length > 0) {
+      try {
+        await supabase.functions.invoke('discord-notify', {
+          body: {
+            notificationType: 'phase_notification',
+            priority: trigger?.priority || 2,
+            title: trigger?.trigger_name || `Fase: ${phaseToQuery}`,
+            message: messageContent,
+            orderId,
+            orderNumber: order.order_number,
+            phase: phaseToQuery,
+            organizationId: order.organization_id,
+          }
+        });
+        console.log(`[notify-phase-manager] Discord notification sent`);
+      } catch (discordErr) {
+        console.error(`[notify-phase-manager] Discord error:`, discordErr);
+        // Não falhar a função se Discord falhar
+      }
+    }
+
     return new Response(JSON.stringify({ 
       success: true,
       phase: phaseToQuery,
