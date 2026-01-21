@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { UserCheck, UserX, Shield, Search, CheckCircle, XCircle, Clock, Crown, UserPlus, Pencil, Layers, Eye, AlertTriangle } from "lucide-react";
+import { UserCheck, UserX, Shield, Search, CheckCircle, XCircle, Clock, Crown, UserPlus, Pencil, Eye, AlertTriangle, Bell } from "lucide-react";
 import { UserApprovalDialog } from "./UserApprovalDialog";
 import { UserRolesDialog } from "./UserRolesDialog";
 import { DepartmentSelect } from "./DepartmentSelect";
@@ -423,7 +423,7 @@ export const UserManagementTable = () => {
                       Kanban
                     </div>
                   </TableHead>
-                  <TableHead title="Fases que o usuário gerencia (phase_managers)">Fases Gerenciadas</TableHead>
+                  
                   <TableHead>Departamento</TableHead>
                   <TableHead>Localização</TableHead>
                   <TableHead>Roles</TableHead>
@@ -435,13 +435,13 @@ export const UserManagementTable = () => {
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={13} className="text-center py-8">
+                    <TableCell colSpan={11} className="text-center py-8">
                       Carregando usuários...
                     </TableCell>
                   </TableRow>
                 ) : filteredUsers.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={13} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={11} className="text-center py-8 text-muted-foreground">
                       Nenhum usuário encontrado
                     </TableCell>
                   </TableRow>
@@ -512,30 +512,6 @@ export const UserManagementTable = () => {
                             <AlertTriangle className="h-3 w-3 mr-1" />
                             Sem acesso
                           </Badge>
-                        )}
-                      </TableCell>
-                      {/* Fases Gerenciadas (phase_managers) */}
-                      <TableCell>
-                        {user.managed_phases.length > 0 ? (
-                          <div className="flex gap-1 flex-wrap max-w-[150px]">
-                            {user.managed_phases.slice(0, 2).map(phase => (
-                              <Badge 
-                                key={phase.phase_key} 
-                                variant="outline" 
-                                className={`text-xs ${!phase.is_active ? 'opacity-50' : ''}`}
-                              >
-                                {phase.is_primary && <Crown className="h-3 w-3 mr-0.5 text-amber-500" />}
-                                {phase.display_name}
-                              </Badge>
-                            ))}
-                            {user.managed_phases.length > 2 && (
-                              <Badge variant="secondary" className="text-xs">
-                                +{user.managed_phases.length - 2}
-                              </Badge>
-                            )}
-                          </div>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">-</span>
                         )}
                       </TableCell>
                       <TableCell>
@@ -647,10 +623,10 @@ export const UserManagementTable = () => {
                               setSelectedUser(user);
                               setShowPhasesDialog(true);
                             }}
-                            title="Gerenciar fases"
+                            title="Configurar notificações por fase"
                           >
-                            <Layers className="h-4 w-4 mr-1" />
-                            Fases
+                            <Bell className="h-4 w-4 mr-1" />
+                            Notificações
                           </Button>
                           <Button
                             size="sm"

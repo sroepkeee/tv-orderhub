@@ -5,9 +5,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2 } from "lucide-react";
+import { Loader2, Tag } from "lucide-react";
+import { ROLE_LABELS } from "@/lib/roleLabels";
 
 interface UserData {
   id: string;
@@ -18,6 +22,7 @@ interface UserData {
   whatsapp: string | null;
   is_manager: boolean;
   is_active: boolean;
+  roles?: string[];
 }
 
 interface EditUserDialogProps {
@@ -40,9 +45,19 @@ const DEPARTMENTS = [
   "Diretoria",
 ];
 
+// Roles disponíveis para atribuição (exceto admin que é gerenciado separadamente)
+const AVAILABLE_ROLES = Object.entries(ROLE_LABELS)
+  .filter(([key]) => key !== 'admin')
+  .map(([key, info]) => ({
+    key,
+    label: info.name,
+    area: info.area,
+  }));
+
 export const EditUserDialog = ({ open, onOpenChange, user, onSuccess }: EditUserDialogProps) => {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
+  const [loadingRoles, setLoadingRoles] = useState(false);
   const [formData, setFormData] = useState({
     full_name: "",
     department: "",
@@ -51,9 +66,11 @@ export const EditUserDialog = ({ open, onOpenChange, user, onSuccess }: EditUser
     is_manager: false,
     is_active: true,
   });
+  const [userRoles, setUserRoles] = useState<string[]>([]);
+  const [originalRoles, setOriginalRoles] = useState<string[]>([]);
 
   useEffect(() => {
-    if (user) {
+    if (user && open) {
       setFormData({
         full_name: user.full_name || "",
         department: user.department || "",
@@ -62,15 +79,45 @@ export const EditUserDialog = ({ open, onOpenChange, user, onSuccess }: EditUser
         is_manager: user.is_manager || false,
         is_active: user.is_active ?? true,
       });
+      loadUserRoles(user.id);
     }
-  }, [user]);
+  }, [user, open]);
+
+  const loadUserRoles = async (userId: string) => {
+    setLoadingRoles(true);
+    try {
+      const { data, error } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', userId);
+      
+      if (error) throw error;
+      
+      const roles = data?.map(r => r.role).filter(r => r !== 'admin') || [];
+      setUserRoles(roles);
+      setOriginalRoles(roles);
+    } catch (error) {
+      console.error('Error loading user roles:', error);
+    } finally {
+      setLoadingRoles(false);
+    }
+  };
+
+  const toggleRole = (roleKey: string) => {
+    setUserRoles(prev => 
+      prev.includes(roleKey)
+        ? prev.filter(r => r !== roleKey)
+        : [...prev, roleKey]
+    );
+  };
 
   const handleSave = async () => {
     if (!user) return;
 
     setLoading(true);
     try {
-      const { error } = await supabase
+      // 1. Atualizar profile
+      const { error: profileError } = await supabase
         .from("profiles")
         .update({
           full_name: formData.full_name,
@@ -82,7 +129,29 @@ export const EditUserDialog = ({ open, onOpenChange, user, onSuccess }: EditUser
         })
         .eq("id", user.id);
 
-      if (error) throw error;
+      if (profileError) throw profileError;
+
+      // 2. Atualizar roles (apenas se houve mudança)
+      const rolesToAdd = userRoles.filter(r => !originalRoles.includes(r));
+      const rolesToRemove = originalRoles.filter(r => !userRoles.includes(r));
+
+      if (rolesToRemove.length > 0) {
+        const { error: removeError } = await supabase
+          .from('user_roles')
+          .delete()
+          .eq('user_id', user.id)
+          .in('role', rolesToRemove as any);
+        
+        if (removeError) throw removeError;
+      }
+
+      if (rolesToAdd.length > 0) {
+        const { error: addError } = await supabase
+          .from('user_roles')
+          .insert(rolesToAdd.map(role => ({ user_id: user.id, role: role as any })));
+        
+        if (addError) throw addError;
+      }
 
       toast({
         title: "Sucesso",
@@ -104,9 +173,18 @@ export const EditUserDialog = ({ open, onOpenChange, user, onSuccess }: EditUser
 
   if (!user) return null;
 
+  // Agrupar roles por área
+  const rolesByArea = AVAILABLE_ROLES.reduce((acc, role) => {
+    if (!acc[role.area]) {
+      acc[role.area] = [];
+    }
+    acc[role.area].push(role);
+    return acc;
+  }, {} as Record<string, typeof AVAILABLE_ROLES>);
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-[550px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Editar Usuário</DialogTitle>
         </DialogHeader>
@@ -188,6 +266,64 @@ export const EditUserDialog = ({ open, onOpenChange, user, onSuccess }: EditUser
               checked={formData.is_active}
               onCheckedChange={(checked) => setFormData({ ...formData, is_active: checked })}
             />
+          </div>
+
+          <Separator className="my-2" />
+
+          {/* Seção de Roles */}
+          <div className="grid gap-3">
+            <div className="flex items-center gap-2">
+              <Tag className="h-4 w-4" />
+              <Label className="text-base font-semibold">Roles (Funções)</Label>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Define a função do usuário no sistema. Roles diferentes de Admin não concedem acesso ao Kanban automaticamente.
+            </p>
+            
+            {loadingRoles ? (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Carregando roles...
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {Object.entries(rolesByArea).map(([area, roles]) => (
+                  <div key={area} className="space-y-2">
+                    <Label className="text-xs text-muted-foreground uppercase tracking-wide">{area}</Label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {roles.map((role) => (
+                        <div
+                          key={role.key}
+                          className="flex items-center space-x-2"
+                        >
+                          <Checkbox
+                            id={`role-${role.key}`}
+                            checked={userRoles.includes(role.key)}
+                            onCheckedChange={() => toggleRole(role.key)}
+                          />
+                          <label
+                            htmlFor={`role-${role.key}`}
+                            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                          >
+                            {role.label}
+                          </label>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {userRoles.length > 0 && (
+              <div className="flex gap-1 flex-wrap mt-2">
+                {userRoles.map(role => (
+                  <Badge key={role} variant="secondary" className="text-xs">
+                    {ROLE_LABELS[role]?.name || role}
+                  </Badge>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
