@@ -271,7 +271,7 @@ serve(async (req) => {
             message_content: notification.message_content,
             priority: 1, // Alta prioridade para reenvio manual
             status: 'pending',
-            scheduled_for: null, // Imediato
+            scheduled_for: new Date().toISOString(), // Imediato
             attempts: 0,
             max_attempts: 3,
             metadata: {
@@ -562,9 +562,7 @@ serve(async (req) => {
       }
 
       // 2. Enfileirar mensagem com escalonamento de tempo
-      const scheduledFor = baseDelay > 0 
-        ? new Date(Date.now() + baseDelay).toISOString() 
-        : null;
+      const scheduledFor = new Date(Date.now() + baseDelay).toISOString();
 
       const { data: queueEntry, error: queueError } = await supabase
         .from('message_queue')

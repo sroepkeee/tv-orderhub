@@ -772,7 +772,7 @@ async function queueWhatsAppReport(
         message_content: message,
         priority: 3, // Normal - relatórios não são urgentes
         status: 'pending',
-        scheduled_for: null,
+        scheduled_for: new Date().toISOString(),
         attempts: 0,
         max_attempts: 3,
         metadata: {
