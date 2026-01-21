@@ -13,6 +13,15 @@ interface UserPhasePermission {
   can_delete: boolean;
 }
 
+interface RolePhasePermission {
+  role: string;
+  phase_key: string;
+  can_view: boolean;
+  can_edit: boolean;
+  can_advance: boolean;
+  can_delete: boolean;
+}
+
 interface MenuPermission {
   menu_key: string;
   can_view: boolean;
@@ -87,6 +96,7 @@ export function PermissionsProvider({ children }: { children: ReactNode }) {
   const [userRoles, setUserRoles] = useState<string[]>([]);
   const [isApproved, setIsApproved] = useState<boolean | null>(null);
   const [userPhasePermissions, setUserPhasePermissions] = useState<UserPhasePermission[]>([]);
+  const [rolePhasePermissions, setRolePhasePermissions] = useState<RolePhasePermission[]>([]);
   const [menuPermissions, setMenuPermissions] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
 
@@ -99,6 +109,7 @@ export function PermissionsProvider({ children }: { children: ReactNode }) {
       setUserRoles([]);
       setIsApproved(null);
       setUserPhasePermissions([]);
+      setRolePhasePermissions([]);
       setMenuPermissions({});
       setLoading(false);
       return;
@@ -131,7 +142,9 @@ export function PermissionsProvider({ children }: { children: ReactNode }) {
       if (hasFullAccessRole) {
         console.log('✅ [PermissionsContext] User has full access role');
         setUserPhasePermissions([]);
+        setRolePhasePermissions([]);
       } else {
+        // Load user-specific phase permissions
         const phasePerms: UserPhasePermission[] = (phasePermsResult.data || []).map(p => ({
           phase_key: p.phase_key,
           can_view: p.can_view ?? false,
@@ -140,7 +153,28 @@ export function PermissionsProvider({ children }: { children: ReactNode }) {
           can_delete: p.can_delete ?? false,
         }));
         setUserPhasePermissions(phasePerms);
-        console.log('👤 [PermissionsContext] Phase permissions loaded:', phasePerms.length);
+        console.log('👤 [PermissionsContext] User phase permissions loaded:', phasePerms.length);
+
+        // Load role-based phase permissions (fallback)
+        if (roles.length > 0) {
+          const { data: rolePermsData } = await supabase
+            .from('phase_permissions')
+            .select('role, phase_key, can_view, can_edit, can_advance, can_delete')
+            .in('role', roles as any);
+          
+          const rolePerms: RolePhasePermission[] = (rolePermsData || []).map((p: any) => ({
+            role: p.role,
+            phase_key: p.phase_key,
+            can_view: p.can_view ?? false,
+            can_edit: p.can_edit ?? false,
+            can_advance: p.can_advance ?? false,
+            can_delete: p.can_delete ?? false,
+          }));
+          setRolePhasePermissions(rolePerms);
+          console.log('🔑 [PermissionsContext] Role phase permissions loaded:', rolePerms.length);
+        } else {
+          setRolePhasePermissions([]);
+        }
       }
 
       // Process menu permissions
@@ -258,29 +292,65 @@ export function PermissionsProvider({ children }: { children: ReactNode }) {
     return userPhasePermissions.find(p => p.phase_key === phase) || null;
   }, [userPhasePermissions]);
 
+  const getRolePermissionForPhase = useCallback((phase: string): RolePhasePermission | null => {
+    // Find the best role permission (prioritize can_edit over can_view only)
+    const perms = rolePhasePermissions.filter(p => p.phase_key === phase);
+    if (perms.length === 0) return null;
+    // Return the one with most permissions
+    return perms.reduce((best, current) => {
+      const bestScore = (best.can_edit ? 2 : 0) + (best.can_view ? 1 : 0);
+      const currentScore = (current.can_edit ? 2 : 0) + (current.can_view ? 1 : 0);
+      return currentScore > bestScore ? current : best;
+    });
+  }, [rolePhasePermissions]);
+
   const canViewPhase = useCallback((phase: string): boolean => {
     if (hasFullAccess()) return true;
-    const effective = getEffectivePermission(phase);
-    return effective?.can_view ?? false;
-  }, [hasFullAccess, getEffectivePermission]);
+    
+    // 1. Check user-specific permission first
+    const userPerm = getEffectivePermission(phase);
+    if (userPerm?.can_view) return true;
+    
+    // 2. Fallback to role-based permission
+    const rolePerm = getRolePermissionForPhase(phase);
+    return rolePerm?.can_view ?? false;
+  }, [hasFullAccess, getEffectivePermission, getRolePermissionForPhase]);
 
   const canEditPhase = useCallback((phase: string): boolean => {
     if (hasFullAccess()) return true;
-    const effective = getEffectivePermission(phase);
-    return effective?.can_edit ?? false;
-  }, [hasFullAccess, getEffectivePermission]);
+    
+    // 1. Check user-specific permission first
+    const userPerm = getEffectivePermission(phase);
+    if (userPerm?.can_edit) return true;
+    
+    // 2. Fallback to role-based permission
+    const rolePerm = getRolePermissionForPhase(phase);
+    return rolePerm?.can_edit ?? false;
+  }, [hasFullAccess, getEffectivePermission, getRolePermissionForPhase]);
 
   const canAdvancePhase = useCallback((phase: string): boolean => {
     if (hasFullAccess()) return true;
-    const effective = getEffectivePermission(phase);
-    return effective?.can_advance ?? false;
-  }, [hasFullAccess, getEffectivePermission]);
+    
+    // 1. Check user-specific permission first
+    const userPerm = getEffectivePermission(phase);
+    if (userPerm?.can_advance) return true;
+    
+    // 2. Fallback to role-based permission
+    const rolePerm = getRolePermissionForPhase(phase);
+    return rolePerm?.can_advance ?? false;
+  }, [hasFullAccess, getEffectivePermission, getRolePermissionForPhase]);
 
   const canDeleteFromPhase = useCallback((phase: string): boolean => {
     if (hasFullAccess()) return true;
-    const effective = getEffectivePermission(phase);
-    return effective?.can_delete ?? false;
-  }, [hasFullAccess, getEffectivePermission]);
+    
+    // 1. Check user-specific permission first
+    const userPerm = getEffectivePermission(phase);
+    if (userPerm?.can_delete) return true;
+    
+    // 2. Fallback to role-based permission
+    const rolePerm = getRolePermissionForPhase(phase);
+    return rolePerm?.can_delete ?? false;
+  }, [hasFullAccess, getEffectivePermission, getRolePermissionForPhase]);
 
   const canViewMenu = useCallback((key: string): boolean => {
     if (isAdmin) return true;
