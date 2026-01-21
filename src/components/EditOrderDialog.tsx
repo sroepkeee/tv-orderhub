@@ -989,7 +989,12 @@ export const EditOrderDialog = ({
     return type ? badges[type] : badges.in_stock;
   };
   const removeItem = (index: number) => {
+    const itemToRemove = items[index];
     setItems(items.filter((_, i) => i !== index));
+    toast({
+      title: "Item removido",
+      description: `${itemToRemove?.itemCode || 'Item'} removido. Clique em Salvar para confirmar.`,
+    });
   };
 
   // NOVO: Registrar mudança de item no histórico
