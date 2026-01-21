@@ -405,6 +405,25 @@ ${stuckOrders.slice(0, 5).map(o => `• #${o.order_number}`).join('\n')}
       }
     }
 
+    // Enviar alertas também para Discord (em paralelo, não bloqueia WhatsApp)
+    for (const alert of alerts) {
+      try {
+        await supabase.functions.invoke('discord-notify', {
+          body: {
+            notificationType: 'smart_alert',
+            priority: alert.priority,
+            title: alert.type.replace(/_/g, ' ').toUpperCase(),
+            message: alert.message,
+            metadata: alert.metadata,
+          }
+        });
+        console.log(`📤 Discord: Sent ${alert.type} alert`);
+      } catch (discordErr) {
+        console.error(`❌ Discord error for ${alert.type}:`, discordErr);
+        // Não falhar a função se Discord falhar
+      }
+    }
+
     console.log(`✅ Queued ${queuedCount} alert messages for ${managers.length} manager(s)`);
 
     return new Response(

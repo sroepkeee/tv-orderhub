@@ -1866,6 +1866,133 @@ export type Database = {
         }
         Relationships: []
       }
+      discord_notification_log: {
+        Row: {
+          created_at: string | null
+          error_message: string | null
+          id: string
+          message_content: Json | null
+          notification_type: string
+          order_id: string | null
+          organization_id: string | null
+          sent_at: string | null
+          status: string | null
+          webhook_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          error_message?: string | null
+          id?: string
+          message_content?: Json | null
+          notification_type: string
+          order_id?: string | null
+          organization_id?: string | null
+          sent_at?: string | null
+          status?: string | null
+          webhook_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          error_message?: string | null
+          id?: string
+          message_content?: Json | null
+          notification_type?: string
+          order_id?: string | null
+          organization_id?: string | null
+          sent_at?: string | null
+          status?: string | null
+          webhook_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "discord_notification_log_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "discord_notification_log_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "discord_notification_log_webhook_id_fkey"
+            columns: ["webhook_id"]
+            isOneToOne: false
+            referencedRelation: "discord_webhooks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      discord_webhooks: {
+        Row: {
+          channel_name: string
+          created_at: string | null
+          created_by: string | null
+          id: string
+          is_active: boolean | null
+          min_priority: number | null
+          organization_id: string | null
+          phase_filter: string[] | null
+          receive_phase_notifications: boolean | null
+          receive_purchase_alerts: boolean | null
+          receive_smart_alerts: boolean | null
+          receive_status_changes: boolean | null
+          updated_at: string | null
+          webhook_url: string
+        }
+        Insert: {
+          channel_name: string
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          is_active?: boolean | null
+          min_priority?: number | null
+          organization_id?: string | null
+          phase_filter?: string[] | null
+          receive_phase_notifications?: boolean | null
+          receive_purchase_alerts?: boolean | null
+          receive_smart_alerts?: boolean | null
+          receive_status_changes?: boolean | null
+          updated_at?: string | null
+          webhook_url: string
+        }
+        Update: {
+          channel_name?: string
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          is_active?: boolean | null
+          min_priority?: number | null
+          organization_id?: string | null
+          phase_filter?: string[] | null
+          receive_phase_notifications?: boolean | null
+          receive_purchase_alerts?: boolean | null
+          receive_smart_alerts?: boolean | null
+          receive_status_changes?: boolean | null
+          updated_at?: string | null
+          webhook_url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "discord_webhooks_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "discord_webhooks_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       divergencias: {
         Row: {
           actual_value: string | null
