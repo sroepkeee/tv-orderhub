@@ -14,7 +14,8 @@ import { ChangeRequestsQueue } from "@/components/admin/ChangeRequestsQueue";
 import { PhaseConfigSection } from "@/components/phases/PhaseConfigSection";
 import { UserPhasePermissionsMatrix } from "@/components/admin/UserPhasePermissionsMatrix";
 import { DiscordWebhooksConfig } from "@/components/admin/DiscordWebhooksConfig";
-import { Shield, ArrowLeft, BarChart3, MessageSquare, Settings2, UserCog, Menu, ClipboardEdit, Users } from "lucide-react";
+import { CronJobsDashboard } from "@/components/admin/CronJobsDashboard";
+import { Shield, ArrowLeft, BarChart3, MessageSquare, Settings2, UserCog, Menu, ClipboardEdit, Users, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 const Admin = () => {
@@ -75,6 +76,10 @@ const Admin = () => {
             <TabsTrigger value="phases" className="flex items-center gap-1">
               <Settings2 className="h-3 w-3" />
               Fases
+            </TabsTrigger>
+            <TabsTrigger value="cron-jobs" className="flex items-center gap-1">
+              <Clock className="h-3 w-3" />
+              Cron Jobs
             </TabsTrigger>
           </TabsList>
 
@@ -141,6 +146,10 @@ const Admin = () => {
                 <UserPhasePermissionsMatrix />
               </TabsContent>
             </Tabs>
+          </TabsContent>
+
+          <TabsContent value="cron-jobs" className="space-y-4">
+            <CronJobsDashboard />
           </TabsContent>
         </Tabs>
       </div>
