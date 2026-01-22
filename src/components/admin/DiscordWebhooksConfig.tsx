@@ -19,7 +19,7 @@ import { toast } from "sonner";
 import { 
   Plus, Trash2, TestTube2, Hash, Bell, AlertTriangle, Package, Loader2, RefreshCw, 
   Bot, Truck, FileText, Users, ChevronDown, AtSign, Clock, Filter, Palette, 
-  MessageSquare, BarChart3, Settings2
+  MessageSquare, BarChart3, Settings2, Send, PieChart
 } from "lucide-react";
 
 interface DiscordWebhook {
@@ -86,6 +86,29 @@ export function DiscordWebhooksConfig() {
   const [newWebhookUrl, setNewWebhookUrl] = useState("");
   const [testingId, setTestingId] = useState<string | null>(null);
   const [expandedWebhook, setExpandedWebhook] = useState<string | null>(null);
+  const [sendingVisualReport, setSendingVisualReport] = useState(false);
+
+  // Send visual report to Discord
+  const sendVisualReport = async () => {
+    setSendingVisualReport(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("discord-send-chart-report", {
+        body: { organizationId },
+      });
+      if (error) throw error;
+      if (data?.sent > 0) {
+        toast.success(`Relatório visual enviado para ${data.sent} canal(is)!`, {
+          description: `${data.embedCount} embeds com gráficos de SLA e métricas`,
+        });
+      } else {
+        toast.warning("Nenhum webhook configurado para relatórios visuais");
+      }
+    } catch (err: any) {
+      toast.error("Erro ao enviar relatório visual", { description: err.message });
+    } finally {
+      setSendingVisualReport(false);
+    }
+  };
 
   // Fetch webhooks
   const { data: webhooks, isLoading, refetch } = useQuery({
