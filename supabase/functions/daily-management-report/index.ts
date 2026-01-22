@@ -842,6 +842,7 @@ serve(async (req) => {
     // Parâmetros do request
     let testMode = false, testPhone = null, testEmail = null, sendEmailFlag = true;
     let reportType = 'full';
+    let sendToDiscord = false;
     
     try {
       const body = await req.json();
@@ -850,6 +851,7 @@ serve(async (req) => {
       testEmail = body.testEmail;
       sendEmailFlag = body.sendEmail !== false;
       reportType = body.reportType || 'full';
+      sendToDiscord = body.sendToDiscord === true;
     } catch { /* No body */ }
 
     console.log(`📋 Report type: ${reportType}`);
@@ -955,15 +957,15 @@ serve(async (req) => {
       // Não precisamos mais de delay aqui - a fila controla o rate limit
     }
 
-    // 📢 NOTIFICAR DISCORD sobre envio de relatório
+    // 📢 NOTIFICAR DISCORD sobre envio de relatório (log secundário)
     if (queuedCount > 0) {
       try {
         await supabase.functions.invoke('discord-notify', {
           body: {
             notificationType: 'daily_report',
             priority: 3,
-            title: '📊 Relatório Diário Enviado',
-            message: `**Destinatários:** ${queuedCount} WhatsApp, ${emailCount} Email\n**Tipo:** ${reportType}\n**Data:** ${getBrazilDateTime().dateStr}\n**Pedidos Ativos:** ${metrics.totalActive}\n**SLA:** ${metrics.sla.onTimeRate.toFixed(1)}%`,
+            title: '📤 WhatsApp: Relatórios Enfileirados',
+            message: `**Gestores:** ${queuedCount} mensagens na fila\n**Email:** ${emailCount}\n**Tipo:** ${reportType}\n**Data:** ${getBrazilDateTime().dateStr}`,
             metadata: {
               report_type: reportType,
               recipients: queuedCount + emailCount,
@@ -974,9 +976,23 @@ serve(async (req) => {
             }
           }
         });
-        console.log('📢 Discord notified about daily report');
+        console.log('📢 Discord notified about WhatsApp queue');
       } catch (discordErr) {
         console.warn('⚠️ Failed to notify Discord (non-blocking):', discordErr);
+      }
+    }
+
+    // 📊 ENVIAR RELATÓRIO VISUAL PARA DISCORD (se solicitado)
+    if (sendToDiscord) {
+    if (sendToDiscord) {
+      try {
+        console.log('📊 Sending visual report to Discord...');
+        const discordResult = await supabase.functions.invoke('discord-send-chart-report', {
+          body: {}
+        });
+        console.log('📊 Discord visual report sent:', discordResult.data);
+      } catch (discordErr) {
+        console.warn('⚠️ Failed to send Discord visual report:', discordErr);
       }
     }
 
