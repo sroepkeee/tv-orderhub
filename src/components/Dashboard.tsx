@@ -259,6 +259,7 @@ export const Dashboard = () => {
   const pendingRefreshRef = useRef(false);
   const isBatchImportingRef = useRef(false);
   const lastToastTimeRef = useRef(0);
+  const isDialogEditingRef = useRef(false);
 
   // Column visibility state with user-specific localStorage persistence
   const [columnVisibility, setColumnVisibility] = useState<ColumnVisibility>(() => {
@@ -463,61 +464,68 @@ export const Dashboard = () => {
         `).eq('id', orderId).single();
       if (error) throw error;
       if (data) {
+        // 🔒 Ignorar update realtime se o dialog está editando ativamente
+        if (isDialogEditingRef.current) {
+          console.log('🔒 [Realtime] Ignorando update - dialog em modo de edição');
+          return;
+        }
+
+        const items = (data.order_items || []).map((item: any) => ({
+          id: item.id,
+          itemCode: item.item_code,
+          itemDescription: item.item_description,
+          unit: item.unit,
+          requestedQuantity: item.requested_quantity,
+          warehouse: item.warehouse,
+          deliveryDate: item.delivery_date,
+          deliveredQuantity: item.delivered_quantity,
+          item_source_type: item.item_source_type,
+          item_status: item.item_status,
+          received_status: item.received_status,
+          production_estimated_date: item.production_estimated_date,
+          sla_days: item.sla_days,
+          is_imported: item.is_imported,
+          import_lead_time_days: item.import_lead_time_days,
+          sla_deadline: item.sla_deadline,
+          current_phase: item.current_phase,
+          phase_started_at: item.phase_started_at,
+          userId: item.user_id,
+          production_order_number: item.production_order_number
+        }));
+        const firstItem = items[0];
+        const totalRequested = items.reduce((sum, item) => sum + item.requestedQuantity, 0);
+        const transformedOrder = {
+          id: data.id,
+          type: data.order_type,
+          priority: data.priority,
+          orderNumber: data.order_number,
+          item: firstItem ? `${firstItem.itemCode} (+${items.length - 1})` : data.customer_name,
+          description: firstItem?.itemDescription || data.notes || "",
+          quantity: totalRequested,
+          createdDate: new Date(data.created_at).toISOString().split('T')[0],
+          issueDate: data.issue_date || undefined,
+          status: data.status,
+          client: data.customer_name,
+          deliveryDeadline: data.delivery_date,
+          delivery_address: data.delivery_address || data.customer_name,
+          deskTicket: data.notes || data.order_number,
+          totvsOrderNumber: data.totvs_order_number || undefined,
+          items,
+          userId: data.user_id,
+          notes: data.notes,
+          createdAt: data.created_at,
+          // Campos RATEIO
+          cost_center: data.cost_center || null,
+          account_item: data.account_item || null,
+          business_unit: data.business_unit || null,
+          business_area: data.business_area || null,
+          rateio_project_code: data.rateio_project_code || null,
+          // Campo empresa emissora
+          sender_company: data.sender_company || null
+        } as Order;
+
         setOrders(prev => {
           const index = prev.findIndex(o => o.id === orderId);
-          const items = (data.order_items || []).map((item: any) => ({
-            id: item.id,
-            itemCode: item.item_code,
-            itemDescription: item.item_description,
-            unit: item.unit,
-            requestedQuantity: item.requested_quantity,
-            warehouse: item.warehouse,
-            deliveryDate: item.delivery_date,
-            deliveredQuantity: item.delivered_quantity,
-            item_source_type: item.item_source_type,
-            item_status: item.item_status,
-            received_status: item.received_status,
-            production_estimated_date: item.production_estimated_date,
-            sla_days: item.sla_days,
-            is_imported: item.is_imported,
-            import_lead_time_days: item.import_lead_time_days,
-            sla_deadline: item.sla_deadline,
-            current_phase: item.current_phase,
-            phase_started_at: item.phase_started_at,
-            userId: item.user_id,
-            production_order_number: item.production_order_number
-          }));
-          const firstItem = items[0];
-          const totalRequested = items.reduce((sum, item) => sum + item.requestedQuantity, 0);
-          const transformedOrder = {
-            id: data.id,
-            type: data.order_type,
-            priority: data.priority,
-            orderNumber: data.order_number,
-            item: firstItem ? `${firstItem.itemCode} (+${items.length - 1})` : data.customer_name,
-            description: firstItem?.itemDescription || data.notes || "",
-            quantity: totalRequested,
-            createdDate: new Date(data.created_at).toISOString().split('T')[0],
-            issueDate: data.issue_date || undefined,
-            status: data.status,
-            client: data.customer_name,
-            deliveryDeadline: data.delivery_date,
-            delivery_address: data.delivery_address || data.customer_name,
-            deskTicket: data.notes || data.order_number,
-            totvsOrderNumber: data.totvs_order_number || undefined,
-            items,
-            userId: data.user_id,
-            notes: data.notes,
-            createdAt: data.created_at,
-            // Campos RATEIO
-            cost_center: data.cost_center || null,
-            account_item: data.account_item || null,
-            business_unit: data.business_unit || null,
-            business_area: data.business_area || null,
-            rateio_project_code: data.rateio_project_code || null,
-            // Campo empresa emissora
-            sender_company: data.sender_company || null
-          } as Order;
           if (index === -1) {
             return [...prev, transformedOrder];
           }
@@ -525,6 +533,16 @@ export const Dashboard = () => {
           updated[index] = transformedOrder;
           return updated;
         });
+
+        // ✨ Sincronizar selectedOrder se for o mesmo pedido
+        setSelectedOrder(current => {
+          if (current && current.id === orderId) {
+            console.log('🔄 [Sync] Atualizando selectedOrder com dados do realtime');
+            return transformedOrder;
+          }
+          return current;
+        });
+
         setRealtimeStatus('synced');
         setLastUpdateTime(new Date());
       }
@@ -1504,6 +1522,8 @@ export const Dashboard = () => {
   const handleEditOrder = async (updatedOrder: Order) => {
     if (!user) return;
 
+    // 🔒 Marcar que estamos editando para bloquear realtime
+    isDialogEditingRef.current = true;
     // Marcar que estamos atualizando localmente
     isUpdatingRef.current = true;
     try {
@@ -1631,10 +1651,11 @@ export const Dashboard = () => {
       });
     } finally {
       setSelectedOrder(null);
-      // Resetar flag após 1 segundo
+      // Resetar flags após 2 segundos para permitir sincronização
       setTimeout(() => {
         isUpdatingRef.current = false;
-      }, 1000);
+        isDialogEditingRef.current = false;
+      }, 2000);
     }
   };
   const handleDuplicateOrder = async (originalOrder: Order) => {
