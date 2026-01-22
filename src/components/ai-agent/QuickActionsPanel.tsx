@@ -6,6 +6,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Separator } from "@/components/ui/separator";
 import { 
   Send, 
   Loader2, 
@@ -15,7 +16,10 @@ import {
   Layers, 
   BarChart3,
   Users,
-  CheckCircle2
+  CheckCircle2,
+  PieChart,
+  MessageSquare,
+  Clock
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
@@ -87,6 +91,35 @@ export function QuickActionsPanel({ className }: QuickActionsPanelProps) {
     testMode: false,
   });
   const [lastSentReports, setLastSentReports] = useState<Record<string, boolean>>({});
+  const [sendingDiscord, setSendingDiscord] = useState(false);
+  const [discordSent, setDiscordSent] = useState(false);
+
+  const sendDiscordVisualReport = async () => {
+    setSendingDiscord(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('discord-send-chart-report', {
+        body: {}
+      });
+      
+      if (error) throw error;
+      
+      setDiscordSent(true);
+      
+      toast({
+        title: "Relatório Discord Enviado!",
+        description: `Enviado para ${data?.sent || 0} canal(is) com ${data?.embedCount || 8} embeds e gráficos.`,
+      });
+    } catch (error: any) {
+      console.error('Error sending Discord report:', error);
+      toast({
+        title: "Erro ao Enviar para Discord",
+        description: error.message || "Erro desconhecido",
+        variant: "destructive",
+      });
+    } finally {
+      setSendingDiscord(false);
+    }
+  };
 
   const openReportOptions = (reportType: ReportType) => {
     setSelectedReportType(reportType);
@@ -219,6 +252,62 @@ export function QuickActionsPanel({ className }: QuickActionsPanelProps) {
               <Users className="h-3 w-3 mr-1" />
               Gestores ativos
             </Badge>
+          </div>
+
+          <Separator className="my-4" />
+
+          {/* Discord Visual Reports Section */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 bg-[#5865F2] rounded">
+                  <MessageSquare className="h-4 w-4 text-white" />
+                </div>
+                <div>
+                  <span className="font-medium text-sm">Relatórios Discord</span>
+                  <p className="text-xs text-muted-foreground">
+                    Relatório visual com gráficos de SLA
+                  </p>
+                </div>
+              </div>
+              <Badge variant="secondary" className="text-xs bg-[#5865F2]/10 text-[#5865F2]">
+                <Clock className="h-3 w-3 mr-1" />
+                8h diário
+              </Badge>
+            </div>
+            
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={sendDiscordVisualReport}
+                disabled={sendingDiscord || sendingReport !== null}
+                className="flex-1 border-[#5865F2]/30 hover:border-[#5865F2]/50 hover:bg-[#5865F2]/5"
+              >
+                {sendingDiscord ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : discordSent ? (
+                  <CheckCircle2 className="h-4 w-4 mr-2 text-green-500" />
+                ) : (
+                  <PieChart className="h-4 w-4 mr-2" />
+                )}
+                Relatório Visual Completo
+              </Button>
+              
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={sendDiscordVisualReport}
+                disabled={sendingDiscord || sendingReport !== null}
+                className="hover:bg-[#5865F2]/10"
+              >
+                <Send className="h-4 w-4" />
+              </Button>
+            </div>
+
+            <p className="text-xs text-muted-foreground">
+              💡 Inclui 8 embeds: Resumo, Alertas, Saúde, Fases, Top Pedidos, Tendências e gráficos visuais.
+            </p>
           </div>
         </CardContent>
       </Card>
