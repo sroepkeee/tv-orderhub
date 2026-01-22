@@ -6442,6 +6442,20 @@ export type Database = {
       }
       generate_purchase_order_number: { Args: never; Returns: string }
       generate_return_ticket_number: { Args: never; Returns: string }
+      get_all_cron_jobs: {
+        Args: never
+        Returns: {
+          fail_count: number
+          is_active: boolean
+          job_id: number
+          job_name: string
+          last_run: string
+          last_status: string
+          run_count: number
+          schedule: string
+          success_count: number
+        }[]
+      }
       get_app_roles: {
         Args: never
         Returns: {
