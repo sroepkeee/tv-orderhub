@@ -630,6 +630,32 @@ serve(async (req) => {
       baseDelay += 5000 + Math.random() * 5000;
     }
 
+    // 📢 NOTIFICAR DISCORD sobre envio de notificações ao cliente
+    try {
+      const successfulQueued = results.filter(r => r.status === 'queued').length;
+      if (successfulQueued > 0) {
+        await supabase.functions.invoke('discord-notify', {
+          body: {
+            notificationType: 'ai_customer_notification',
+            priority: 3,
+            title: `📱 Notificação Enviada: #${order.order_number}`,
+            message: `**Cliente:** ${order.customer_name}\n**Status:** ${translateStatus(rawStatus)}\n**Modo:** ${testModeEnabled ? '🧪 Teste' : '🚀 Produção'}\n**Destinatários:** ${successfulQueued}`,
+            orderId: order.id,
+            orderNumber: order.order_number,
+            organizationId: order.organization_id,
+            metadata: {
+              trigger_type: payload.trigger_type,
+              new_status: payload.new_status,
+              is_test: testModeEnabled,
+            }
+          }
+        });
+        console.log('📢 Discord notified about customer notification');
+      }
+    } catch (discordErr) {
+      console.warn('⚠️ Failed to notify Discord (non-blocking):', discordErr);
+    }
+
     console.log('📊 Queue results:', results);
 
     return new Response(JSON.stringify({ 

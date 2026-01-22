@@ -16,7 +16,17 @@ interface DiscordEmbed {
 }
 
 interface NotifyRequest {
-  notificationType: 'smart_alert' | 'status_change' | 'phase_notification' | 'purchase_alert';
+  notificationType: 
+    | 'smart_alert' 
+    | 'status_change' 
+    | 'phase_notification' 
+    | 'purchase_alert'
+    // Novos tipos para IA
+    | 'ai_customer_notification'  // Notificação enviada ao cliente
+    | 'ai_handoff'                // Handoff para humano
+    | 'freight_quote'             // Cotação de frete enviada
+    | 'delivery_confirmation'     // Confirmação de entrega
+    | 'daily_report';             // Relatório diário enviado
   priority: 1 | 2 | 3;
   title: string;
   message: string;
@@ -40,6 +50,12 @@ const TYPE_EMOJIS: Record<string, string> = {
   status_change: '📋',
   phase_notification: '📍',
   purchase_alert: '🛒',
+  // Novos tipos IA
+  ai_customer_notification: '📱',
+  ai_handoff: '🙋',
+  freight_quote: '🚚',
+  delivery_confirmation: '📦',
+  daily_report: '📊',
 };
 
 // Converter markdown WhatsApp para Discord
@@ -72,6 +88,12 @@ serve(async (req) => {
       status_change: 'receive_status_changes',
       phase_notification: 'receive_phase_notifications',
       purchase_alert: 'receive_purchase_alerts',
+      // Novos tipos IA
+      ai_customer_notification: 'receive_ai_customer_notifications',
+      ai_handoff: 'receive_ai_handoff_alerts',
+      freight_quote: 'receive_freight_quotes',
+      delivery_confirmation: 'receive_delivery_confirmations',
+      daily_report: 'receive_daily_reports',
     };
 
     // Buscar webhooks ativos

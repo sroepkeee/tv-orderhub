@@ -1937,6 +1937,11 @@ export type Database = {
           min_priority: number | null
           organization_id: string | null
           phase_filter: string[] | null
+          receive_ai_customer_notifications: boolean | null
+          receive_ai_handoff_alerts: boolean | null
+          receive_daily_reports: boolean | null
+          receive_delivery_confirmations: boolean | null
+          receive_freight_quotes: boolean | null
           receive_phase_notifications: boolean | null
           receive_purchase_alerts: boolean | null
           receive_smart_alerts: boolean | null
@@ -1953,6 +1958,11 @@ export type Database = {
           min_priority?: number | null
           organization_id?: string | null
           phase_filter?: string[] | null
+          receive_ai_customer_notifications?: boolean | null
+          receive_ai_handoff_alerts?: boolean | null
+          receive_daily_reports?: boolean | null
+          receive_delivery_confirmations?: boolean | null
+          receive_freight_quotes?: boolean | null
           receive_phase_notifications?: boolean | null
           receive_purchase_alerts?: boolean | null
           receive_smart_alerts?: boolean | null
@@ -1969,6 +1979,11 @@ export type Database = {
           min_priority?: number | null
           organization_id?: string | null
           phase_filter?: string[] | null
+          receive_ai_customer_notifications?: boolean | null
+          receive_ai_handoff_alerts?: boolean | null
+          receive_daily_reports?: boolean | null
+          receive_delivery_confirmations?: boolean | null
+          receive_freight_quotes?: boolean | null
           receive_phase_notifications?: boolean | null
           receive_purchase_alerts?: boolean | null
           receive_smart_alerts?: boolean | null

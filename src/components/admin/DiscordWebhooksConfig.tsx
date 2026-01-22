@@ -13,17 +13,24 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { Plus, Trash2, TestTube2, Hash, Bell, AlertTriangle, Package, Loader2, ExternalLink, RefreshCw } from "lucide-react";
+import { Plus, Trash2, TestTube2, Hash, Bell, AlertTriangle, Package, Loader2, RefreshCw, Bot, Truck, FileText, Users } from "lucide-react";
 
 interface DiscordWebhook {
   id: string;
   channel_name: string;
   webhook_url: string;
   is_active: boolean;
+  // Operacional
   receive_smart_alerts: boolean;
   receive_status_changes: boolean;
   receive_phase_notifications: boolean;
   receive_purchase_alerts: boolean;
+  // IA
+  receive_ai_customer_notifications: boolean;
+  receive_ai_handoff_alerts: boolean;
+  receive_freight_quotes: boolean;
+  receive_delivery_confirmations: boolean;
+  receive_daily_reports: boolean;
   min_priority: number;
   created_at: string;
 }
@@ -145,10 +152,19 @@ export function DiscordWebhooksConfig() {
     }
   };
 
-  const priorityLabels: Record<number, string> = {
-    1: "Crítico",
-    2: "Alto",
-    3: "Normal",
+  // Count enabled notification types for badge
+  const countEnabledTypes = (webhook: DiscordWebhook): number => {
+    return [
+      webhook.receive_smart_alerts,
+      webhook.receive_status_changes,
+      webhook.receive_phase_notifications,
+      webhook.receive_purchase_alerts,
+      webhook.receive_ai_customer_notifications,
+      webhook.receive_ai_handoff_alerts,
+      webhook.receive_freight_quotes,
+      webhook.receive_delivery_confirmations,
+      webhook.receive_daily_reports,
+    ].filter(Boolean).length;
   };
 
   return (
@@ -262,31 +278,9 @@ export function DiscordWebhooksConfig() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <div className="flex flex-wrap gap-1">
-                        {webhook.receive_smart_alerts && (
-                          <Badge variant="outline" className="text-xs">
-                            <AlertTriangle className="h-3 w-3 mr-1" />
-                            Alertas
-                          </Badge>
-                        )}
-                        {webhook.receive_phase_notifications && (
-                          <Badge variant="outline" className="text-xs">
-                            <Bell className="h-3 w-3 mr-1" />
-                            Fases
-                          </Badge>
-                        )}
-                        {webhook.receive_purchase_alerts && (
-                          <Badge variant="outline" className="text-xs">
-                            <Package className="h-3 w-3 mr-1" />
-                            Compras
-                          </Badge>
-                        )}
-                        {webhook.receive_status_changes && (
-                          <Badge variant="outline" className="text-xs">
-                            Status
-                          </Badge>
-                        )}
-                      </div>
+                      <Badge variant="outline" className="text-xs">
+                        {countEnabledTypes(webhook)} tipos ativos
+                      </Badge>
                     </TableCell>
                     <TableCell>
                       <Select
@@ -347,61 +341,161 @@ export function DiscordWebhooksConfig() {
               </TableBody>
             </Table>
 
-            {/* Notification Type Toggles */}
-            <div className="border rounded-lg p-4 space-y-3">
-              <h4 className="font-medium text-sm">Configurar Tipos de Notificação por Canal</h4>
+            {/* Notification Type Toggles - Organized by Category */}
+            <div className="space-y-4">
               {webhooks.map((webhook) => (
-                <div key={webhook.id} className="flex items-center justify-between p-2 bg-muted/50 rounded">
-                  <span className="text-sm font-medium">#{webhook.channel_name}</span>
-                  <div className="flex gap-4">
-                    <label className="flex items-center gap-2 text-xs">
-                      <Switch
-                        checked={webhook.receive_smart_alerts}
-                        onCheckedChange={(checked) =>
-                          updateMutation.mutate({
-                            id: webhook.id,
-                            updates: { receive_smart_alerts: checked },
-                          })
-                        }
-                      />
-                      Alertas
-                    </label>
-                    <label className="flex items-center gap-2 text-xs">
-                      <Switch
-                        checked={webhook.receive_phase_notifications}
-                        onCheckedChange={(checked) =>
-                          updateMutation.mutate({
-                            id: webhook.id,
-                            updates: { receive_phase_notifications: checked },
-                          })
-                        }
-                      />
-                      Fases
-                    </label>
-                    <label className="flex items-center gap-2 text-xs">
-                      <Switch
-                        checked={webhook.receive_purchase_alerts}
-                        onCheckedChange={(checked) =>
-                          updateMutation.mutate({
-                            id: webhook.id,
-                            updates: { receive_purchase_alerts: checked },
-                          })
-                        }
-                      />
-                      Compras
-                    </label>
-                    <label className="flex items-center gap-2 text-xs">
-                      <Switch
-                        checked={webhook.receive_status_changes}
-                        onCheckedChange={(checked) =>
-                          updateMutation.mutate({
-                            id: webhook.id,
-                            updates: { receive_status_changes: checked },
-                          })
-                        }
-                      />
-                      Status
-                    </label>
+                <div key={webhook.id} className="border rounded-lg p-4 space-y-4">
+                  <div className="flex items-center gap-2">
+                    <Hash className="h-4 w-4 text-muted-foreground" />
+                    <span className="font-medium">#{webhook.channel_name}</span>
+                  </div>
+
+                  {/* Operacional */}
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                      <AlertTriangle className="h-4 w-4" />
+                      Operacional
+                    </div>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pl-6">
+                      <label className="flex items-center gap-2 text-xs">
+                        <Switch
+                          checked={webhook.receive_smart_alerts}
+                          onCheckedChange={(checked) =>
+                            updateMutation.mutate({
+                              id: webhook.id,
+                              updates: { receive_smart_alerts: checked },
+                            })
+                          }
+                        />
+                        Alertas Inteligentes
+                      </label>
+                      <label className="flex items-center gap-2 text-xs">
+                        <Switch
+                          checked={webhook.receive_phase_notifications}
+                          onCheckedChange={(checked) =>
+                            updateMutation.mutate({
+                              id: webhook.id,
+                              updates: { receive_phase_notifications: checked },
+                            })
+                          }
+                        />
+                        Mudança de Fase
+                      </label>
+                      <label className="flex items-center gap-2 text-xs">
+                        <Switch
+                          checked={webhook.receive_purchase_alerts}
+                          onCheckedChange={(checked) =>
+                            updateMutation.mutate({
+                              id: webhook.id,
+                              updates: { receive_purchase_alerts: checked },
+                            })
+                          }
+                        />
+                        Compras
+                      </label>
+                      <label className="flex items-center gap-2 text-xs">
+                        <Switch
+                          checked={webhook.receive_status_changes}
+                          onCheckedChange={(checked) =>
+                            updateMutation.mutate({
+                              id: webhook.id,
+                              updates: { receive_status_changes: checked },
+                            })
+                          }
+                        />
+                        Status
+                      </label>
+                    </div>
+                  </div>
+
+                  {/* IA - Clientes */}
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                      <Users className="h-4 w-4" />
+                      IA - Clientes
+                    </div>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pl-6">
+                      <label className="flex items-center gap-2 text-xs">
+                        <Switch
+                          checked={webhook.receive_ai_customer_notifications}
+                          onCheckedChange={(checked) =>
+                            updateMutation.mutate({
+                              id: webhook.id,
+                              updates: { receive_ai_customer_notifications: checked },
+                            })
+                          }
+                        />
+                        Notificações
+                      </label>
+                      <label className="flex items-center gap-2 text-xs">
+                        <Switch
+                          checked={webhook.receive_delivery_confirmations}
+                          onCheckedChange={(checked) =>
+                            updateMutation.mutate({
+                              id: webhook.id,
+                              updates: { receive_delivery_confirmations: checked },
+                            })
+                          }
+                        />
+                        Confirmação Entrega
+                      </label>
+                      <label className="flex items-center gap-2 text-xs">
+                        <Switch
+                          checked={webhook.receive_ai_handoff_alerts}
+                          onCheckedChange={(checked) =>
+                            updateMutation.mutate({
+                              id: webhook.id,
+                              updates: { receive_ai_handoff_alerts: checked },
+                            })
+                          }
+                        />
+                        Handoff Humano
+                      </label>
+                    </div>
+                  </div>
+
+                  {/* IA - Logística */}
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                      <Truck className="h-4 w-4" />
+                      IA - Logística
+                    </div>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pl-6">
+                      <label className="flex items-center gap-2 text-xs">
+                        <Switch
+                          checked={webhook.receive_freight_quotes}
+                          onCheckedChange={(checked) =>
+                            updateMutation.mutate({
+                              id: webhook.id,
+                              updates: { receive_freight_quotes: checked },
+                            })
+                          }
+                        />
+                        Cotações de Frete
+                      </label>
+                    </div>
+                  </div>
+
+                  {/* Relatórios */}
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                      <FileText className="h-4 w-4" />
+                      Relatórios
+                    </div>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pl-6">
+                      <label className="flex items-center gap-2 text-xs">
+                        <Switch
+                          checked={webhook.receive_daily_reports}
+                          onCheckedChange={(checked) =>
+                            updateMutation.mutate({
+                              id: webhook.id,
+                              updates: { receive_daily_reports: checked },
+                            })
+                          }
+                        />
+                        Relatório Diário
+                      </label>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -413,20 +507,20 @@ export function DiscordWebhooksConfig() {
         <div className="mt-6 p-4 bg-muted/30 rounded-lg">
           <h4 className="font-medium text-sm mb-2">Como configurar um Webhook no Discord</h4>
           <ol className="text-xs text-muted-foreground space-y-1 list-decimal list-inside">
-            <li>Abra as Configurações do Canal no Discord</li>
-            <li>Vá em Integrações → Webhooks</li>
+            <li>Abra as configurações do canal no Discord</li>
+            <li>Vá em "Integrações" → "Webhooks"</li>
             <li>Clique em "Novo Webhook" e dê um nome</li>
-            <li>Copie a URL do Webhook e cole aqui</li>
+            <li>Copie a URL do Webhook e cole acima</li>
           </ol>
-          <a
-            href="https://support.discord.com/hc/pt-br/articles/228383668-Usando-Webhooks"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1 text-xs text-primary mt-2 hover:underline"
-          >
-            <ExternalLink className="h-3 w-3" />
-            Ver documentação do Discord
-          </a>
+          <div className="mt-3 text-xs text-muted-foreground">
+            <strong>Categorias de Notificação:</strong>
+            <ul className="mt-1 space-y-1 list-disc list-inside">
+              <li><strong>Operacional:</strong> Alertas internos, mudanças de fase e status</li>
+              <li><strong>IA - Clientes:</strong> Mensagens enviadas a clientes, confirmações de entrega</li>
+              <li><strong>IA - Logística:</strong> Cotações de frete enviadas</li>
+              <li><strong>Relatórios:</strong> Relatórios gerenciais diários</li>
+            </ul>
+          </div>
         </div>
       </CardContent>
     </Card>
