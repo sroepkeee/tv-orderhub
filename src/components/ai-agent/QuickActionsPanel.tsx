@@ -90,6 +90,7 @@ export function QuickActionsPanel({ className }: QuickActionsPanelProps) {
     includeChart: true,
     includeAllCharts: false,
     testMode: false,
+    sendToDiscord: false,
   });
   const [lastSentReports, setLastSentReports] = useState<Record<string, boolean>>({});
   const [sendingDiscord, setSendingDiscord] = useState(false);
@@ -138,6 +139,7 @@ export function QuickActionsPanel({ className }: QuickActionsPanelProps) {
           includeChart: reportOptions.includeChart,
           includeAllCharts: reportOptions.includeAllCharts,
           testMode: reportOptions.testMode,
+          sendToDiscord: reportOptions.sendToDiscord,
         }
       });
       
@@ -145,9 +147,12 @@ export function QuickActionsPanel({ className }: QuickActionsPanelProps) {
       
       setLastSentReports(prev => ({ ...prev, [selectedReportType.id]: true }));
       
+      const channels = ['WhatsApp'];
+      if (reportOptions.sendToDiscord) channels.push('Discord');
+      
       toast({
         title: "Relatório Enviado!",
-        description: `${selectedReportType.label} enviado para ${data?.sentCount || 0} gestor(es). ${data?.errorCount > 0 ? `${data.errorCount} erro(s).` : ''}`,
+        description: `${selectedReportType.label} enviado para ${data?.queuedCount || data?.sentCount || 0} gestor(es) via ${channels.join(' + ')}. ${data?.errorCount > 0 ? `${data.errorCount} erro(s).` : ''}`,
       });
     } catch (error: any) {
       console.error('Error sending report:', error);
@@ -372,6 +377,28 @@ export function QuickActionsPanel({ className }: QuickActionsPanelProps) {
                 onCheckedChange={(v) => setReportOptions({...reportOptions, testMode: v})}
               />
             </div>
+
+            <Separator />
+            
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="p-1 bg-[#5865F2] rounded">
+                  <MessageSquare className="h-3 w-3 text-white" />
+                </div>
+                <Label htmlFor="sendToDiscord">Enviar também para Discord</Label>
+              </div>
+              <Switch 
+                id="sendToDiscord" 
+                checked={reportOptions.sendToDiscord}
+                onCheckedChange={(v) => setReportOptions({...reportOptions, sendToDiscord: v})}
+              />
+            </div>
+            
+            {reportOptions.sendToDiscord && (
+              <p className="text-xs text-muted-foreground pl-6">
+                📊 Envia relatório visual com 8 embeds e gráficos para o Discord
+              </p>
+            )}
             
             <Alert>
               <Users className="h-4 w-4" />
