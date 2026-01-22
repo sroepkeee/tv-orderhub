@@ -30,9 +30,9 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
+  { id: 'manager-triggers', label: 'Gatilhos Gerenciais', icon: <Bell className="h-5 w-5" />, description: 'Ações rápidas e notificações' },
   { id: 'dashboard', label: 'Dashboard', icon: <BarChart3 className="h-5 w-5" />, description: 'Visão geral e métricas' },
   { id: 'instances', label: 'Agentes', icon: <Bot className="h-5 w-5" />, description: 'Gerenciar agentes de IA' },
-  { id: 'manager-triggers', label: 'Gatilhos Gerenciais', icon: <Bell className="h-5 w-5" />, description: 'Notificações para gestores' },
   { id: 'config', label: 'Config. Globais', icon: <Settings className="h-5 w-5" />, description: 'Configurações compartilhadas' },
   { id: 'learning', label: 'Aprendizado', icon: <Brain className="h-5 w-5" />, description: 'Evolução e retroalimentação' },
   { id: 'knowledge', label: 'Base de Conhecimento', icon: <Book className="h-5 w-5" />, description: 'RAG e documentos' },
@@ -63,7 +63,7 @@ export default function AIAgent() {
     loadLogs,
   } = useAIAgentAdmin();
 
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const [activeTab, setActiveTab] = useState('manager-triggers');
   const [internalSidebarCollapsed, setInternalSidebarCollapsed] = useState(false);
 
   // Listen for navigation events from child components

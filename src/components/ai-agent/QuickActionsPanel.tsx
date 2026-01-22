@@ -19,7 +19,8 @@ import {
   CheckCircle2,
   PieChart,
   MessageSquare,
-  Clock
+  Clock,
+  Phone
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
@@ -204,6 +205,19 @@ export function QuickActionsPanel({ className }: QuickActionsPanelProps) {
           <CardDescription>Dispare relatórios e notificações manualmente para os gestores</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          {/* WhatsApp Section Header */}
+          <div className="flex items-center gap-2 mb-2">
+            <div className="p-1.5 bg-green-500 rounded">
+              <Phone className="h-4 w-4 text-white" />
+            </div>
+            <div>
+              <span className="font-medium text-sm">WhatsApp - Relatórios para Gestores</span>
+              <p className="text-xs text-muted-foreground">
+                Envia relatórios para gestores cadastrados via WhatsApp
+              </p>
+            </div>
+          </div>
+
           {/* Report Type Buttons Grid */}
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
             {REPORT_TYPES.map((reportType) => {
