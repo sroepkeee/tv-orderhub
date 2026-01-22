@@ -8,18 +8,107 @@ const corsHeaders = {
 
 const COLORS = { success: 0x22c55e, warning: 0xeab308, error: 0xef4444, info: 0x3b82f6, purple: 0x8b5cf6, discord: 0x5865f2 };
 
+// Mapeamento completo de status para labels amigáveis com emojis
 const statusToPhase: Record<string, string> = {
-  pending: "📥 Pendente", awaiting_lab: "🔬 Laboratório", awaiting_parts: "🛒 Compras", waiting_purchase: "🛒 Compras",
-  in_production: "🔧 Produção", production_client: "🔧 Produção", production_stock: "📦 Prod. Estoque",
-  packaging: "📦 Embalagem", almox_ssm: "📥 Almox SSM", freight_quote: "💰 Cotação", logistics: "🚛 Expedição",
-  in_transit: "🚚 Em Trânsito", invoicing: "🧾 Faturamento", awaiting_invoicing: "💳 À Faturar", completed: "✅ Conclusão",
+  // Preparação/Planejamento
+  pending: "📥 Pendente",
+  almox_ssm_pending: "📥 Almox SSM",
+  in_analysis: "🔍 Em Análise",
+  awaiting_approval: "⏳ Aguardando Aprovação",
+  planned: "📋 Planejado",
+  
+  // Gerar Ordem
+  order_generation_pending: "📋 Pendente Ordem",
+  order_in_creation: "📋 Criando Ordem",
+  order_generated: "📋 Ordem Gerada",
+  
+  // Almox Geral
+  almox_general_separating: "📦 Separando",
+  almox_general_ready: "📦 Pronto Almox",
+  
+  // Compras
+  purchase_pending: "🛒 Compras",
+  purchase_quoted: "🛒 Cotação Recebida",
+  purchase_ordered: "🛒 Pedido Emitido",
+  purchase_received: "📦 Material Recebido",
+  awaiting_parts: "🛒 Compras",
+  waiting_purchase: "🛒 Compras",
+  purchase_required: "🛒 Solicitar Compra",
+  purchase_requested: "🛒 Solicitado Compra",
+  
+  // Separação/Produção
+  separation_started: "🔧 Separação",
+  in_production: "🔧 Produção",
+  production_client: "🔧 Produção",
+  production_stock: "📦 Prod. Estoque",
+  awaiting_material: "⏳ Aguardando Material",
+  separation_completed: "✅ Separação Concluída",
+  production_completed: "✅ Produção Concluída",
+  awaiting_production: "⏳ Aguardando Produção",
+  
+  // Laboratório
+  awaiting_lab: "🔬 Laboratório",
+  in_lab_analysis: "🔬 Laboratório",
+  lab_completed: "✅ Lab Concluído",
+  
+  // Embalagem/Conferência
+  in_quality_check: "📦 Conferência",
+  in_packaging: "📦 Embalagem",
+  packaging: "📦 Embalagem",
+  ready_for_shipping: "📦 Pronto Envio",
+  
+  // Cotação de Frete
+  freight_quote: "💰 Cotação",
+  freight_quote_requested: "💰 Cotação Frete",
+  freight_quote_received: "💰 Cotação Recebida",
+  freight_approved: "💰 Frete Aprovado",
+  
+  // Expedição/Logística
+  logistics: "🚛 Expedição",
+  released_for_shipping: "🚛 Liberado Envio",
+  in_expedition: "🚛 Expedição",
+  in_transit: "🚚 Em Trânsito",
+  pickup_scheduled: "🚚 Retirada Agendada",
+  awaiting_pickup: "🚚 Aguardando Retirada",
+  collected: "🚚 Coletado",
+  
+  // À Faturar (Nova Fase)
+  ready_to_invoice: "💳 À Faturar",
+  pending_invoice_request: "💳 Aguardando Solicitação",
+  awaiting_invoicing: "💳 À Faturar",
+  
+  // Faturamento
+  invoicing: "🧾 Faturamento",
+  invoice_requested: "🧾 Faturamento",
+  awaiting_invoice: "🧾 Processando NF",
+  invoice_issued: "🧾 NF Emitida",
+  invoice_sent: "🧾 NF Enviada",
+  
+  // Conclusão
+  delivered: "✅ Entregue",
+  completed: "✅ Concluído",
+  
+  // Exceções
+  cancelled: "❌ Cancelado",
+  on_hold: "⏸️ Em Espera",
+  delayed: "⚠️ Atrasado",
+  returned: "↩️ Devolvido",
+  
+  // Itens/Estoque
+  in_stock: "📦 Em Estoque",
+  almox_ssm_received: "📦 Recebido SSM",
+  almox_general_received: "📦 Recebido Almox",
+  
+  // Saldo
+  balance_calculation: "🧮 Calculando Saldo",
+  balance_review: "🧮 Revisando Saldo",
+  balance_approved: "🧮 Saldo Aprovado",
 };
 
 const getSlaEmoji = (r: number) => r >= 85 ? "🟢" : r >= 70 ? "🟡" : "🔴";
 const getSlaColor = (r: number) => r >= 85 ? COLORS.success : r >= 70 ? COLORS.warning : COLORS.error;
-const formatCurrency = (v: number) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(v || 0);
+const formatCurrency = (v: number) => v > 0 ? new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(v) : "Valor N/D";
 const pct = (p: number, t: number) => t === 0 ? 0 : Math.round((p / t) * 100);
-const formatTrend = (c: number) => c > 0 ? `+${c}% ↑` : c < 0 ? `${c}% ↓` : "0%";
 const getStatusLabel = (s: string) => statusToPhase[s] || s;
 
 function getBrazilDateTime() {
@@ -30,9 +119,39 @@ function getBrazilDateTime() {
   };
 }
 
+// Calcula valor total de um pedido a partir dos itens
+function calculateOrderValue(order: any): number {
+  if (!order.order_items || order.order_items.length === 0) return 0;
+  return order.order_items.reduce((sum: number, item: any) => {
+    const price = Number(item.unit_price) || 0;
+    const qty = Number(item.requested_quantity) || 0;
+    return sum + (price * qty);
+  }, 0);
+}
+
 async function calculateMetrics(supabase: any) {
-  const { data: orders } = await supabase.from("orders").select("*").not("status", "in", "(completed,delivered,cancelled)");
-  const activeOrders = orders || [];
+  // Query com JOIN em order_items para calcular valores
+  const { data: orders, error } = await supabase
+    .from("orders")
+    .select(`
+      *,
+      order_items (
+        unit_price,
+        requested_quantity
+      )
+    `)
+    .not("status", "in", "(completed,delivered,cancelled)");
+
+  if (error) {
+    console.error("[discord-send-chart-report] Error fetching orders:", error);
+  }
+
+  // Processar orders e calcular valores
+  const activeOrders = (orders || []).map((o: any) => ({
+    ...o,
+    total_value: calculateOrderValue(o)
+  }));
+
   const now = new Date();
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
@@ -57,7 +176,7 @@ async function calculateMetrics(supabase: any) {
     totalValue: activeOrders.reduce((s: number, o: any) => s + (o.total_value || 0), 0),
     newToday: activeOrders.filter((o: any) => new Date(o.created_at) >= todayStart).length,
     sla: { onTimeRate: activeOrders.length > 0 ? Math.round((onTime / activeOrders.length) * 100) : 100, lateCount: late, lateValue },
-    alerts: { critical, delayed: late, pendingLab: activeOrders.filter((o: any) => o.status === "awaiting_lab").length, pendingPurchase: activeOrders.filter((o: any) => ["awaiting_parts", "waiting_purchase"].includes(o.status)).length },
+    alerts: { critical, delayed: late, pendingLab: activeOrders.filter((o: any) => ["awaiting_lab", "in_lab_analysis"].includes(o.status)).length, pendingPurchase: activeOrders.filter((o: any) => ["awaiting_parts", "waiting_purchase", "purchase_pending", "purchase_required", "purchase_requested"].includes(o.status)).length },
     phaseDetails: Object.entries(phaseCount).map(([phase, d]) => ({ phase, ...d })).sort((a, b) => b.count - a.count),
     orders: activeOrders,
   };
@@ -84,8 +203,8 @@ async function calculateExtended(supabase: any, orders: any[]) {
     statusLabel: getStatusLabel(o.status), daysLate: o.delivery_date ? Math.max(0, Math.ceil((now.getTime() - new Date(o.delivery_date).getTime()) / 86400000)) : 0,
   }));
 
-  const purchaseOrders = orders.filter((o: any) => ["awaiting_parts", "waiting_purchase"].includes(o.status));
-  const prodClient = orders.filter((o: any) => ["in_production", "production_client"].includes(o.status));
+  const purchaseOrders = orders.filter((o: any) => ["awaiting_parts", "waiting_purchase", "purchase_pending", "purchase_required", "purchase_requested", "purchase_quoted", "purchase_ordered"].includes(o.status));
+  const prodClient = orders.filter((o: any) => ["in_production", "production_client", "separation_started", "awaiting_material"].includes(o.status));
   const prodStock = orders.filter((o: any) => o.status === "production_stock");
 
   const calcAvg = (arr: any[]) => arr.length === 0 ? 0 : Math.round(arr.map((o: any) => Math.ceil((now.getTime() - new Date(o.created_at).getTime()) / 86400000)).reduce((s, d) => s + d, 0) / arr.length * 10) / 10;
@@ -112,7 +231,7 @@ async function calculateExtended(supabase: any, orders: any[]) {
   };
 }
 
-const genPhaseChart = (phases: any[]) => `https://quickchart.io/chart?c=${encodeURIComponent(JSON.stringify({ type: "doughnut", data: { labels: phases.slice(0, 8).map(p => p.phase.replace(/[🔧🛒🚚📦🔬💰🧾💳📥✅❌🚛]/g, "").trim()), datasets: [{ data: phases.slice(0, 8).map(p => p.count), backgroundColor: ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899", "#06b6d4", "#84cc16"] }] }, options: { plugins: { legend: { position: "right" }, title: { display: true, text: "Distribuição por Fase" } } } }))}&w=500&h=300&bkg=white`;
+const genPhaseChart = (phases: any[]) => `https://quickchart.io/chart?c=${encodeURIComponent(JSON.stringify({ type: "doughnut", data: { labels: phases.slice(0, 8).map(p => p.phase.replace(/[🔧🛒🚚📦🔬💰🧾💳📥✅❌🚛⚠️⏸️↩️⏳📋🔍🧮]/g, "").trim()), datasets: [{ data: phases.slice(0, 8).map(p => p.count), backgroundColor: ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899", "#06b6d4", "#84cc16"] }] }, options: { plugins: { legend: { position: "right" }, title: { display: true, text: "Distribuição por Fase" } } } }))}&w=500&h=300&bkg=white`;
 const genHealthChart = (h: any) => `https://quickchart.io/chart?c=${encodeURIComponent(JSON.stringify({ type: "doughnut", data: { labels: ["No Prazo", "1-7d", "8-30d", ">30d"], datasets: [{ data: [h.onTime, h.d1to7, h.d8to30, h.dOver30], backgroundColor: ["#22c55e", "#eab308", "#f97316", "#ef4444"] }] }, options: { plugins: { legend: { position: "right" }, title: { display: true, text: "Saúde do Portfólio" } } } }))}&w=500&h=300&bkg=white`;
 const genSlaGauge = (r: number) => `https://quickchart.io/chart?c=${encodeURIComponent(JSON.stringify({ type: "radialGauge", data: { datasets: [{ data: [r], backgroundColor: r >= 85 ? "#22c55e" : r >= 70 ? "#eab308" : "#ef4444" }] }, options: { domain: [0, 100], trackColor: "#e5e7eb" } }))}&w=200&h=200&bkg=white`;
 
@@ -144,7 +263,7 @@ function buildEmbeds(m: any, e: any) {
     { name: "📦 Prod. Estoque", value: `${e.prodStock.count} | ${e.prodStock.avgDays}d | ${formatCurrency(e.prodStock.value)}`, inline: false },
   ] });
 
-  embeds.push({ title: "📦 DISTRIBUIÇÃO POR FASE", color: COLORS.info, description: m.phaseDetails.slice(0, 10).map((p: any) => `• ${p.phase}: **${p.count}**`).join("\n"), image: { url: genPhaseChart(m.phaseDetails) } });
+  embeds.push({ title: "📦 DISTRIBUIÇÃO POR FASE", color: COLORS.info, description: m.phaseDetails.slice(0, 10).map((p: any) => `• ${p.phase}: **${p.count}** (${formatCurrency(p.value)})`).join("\n"), image: { url: genPhaseChart(m.phaseDetails) } });
 
   embeds.push({ title: "💰 TOP 5 PEDIDOS", color: COLORS.warning, description: e.topOrders.map((o: any, i: number) => `**${i + 1}.** #${o.order_number} - ${o.customer_name.substring(0, 25)}\n    ${formatCurrency(o.value)} | ${o.statusLabel}${o.daysLate > 0 ? ` | ⚠️ ${o.daysLate}d` : ""}`).join("\n") });
 
@@ -175,6 +294,8 @@ serve(async (req) => {
     const extended = await calculateExtended(supabase, metrics.orders);
     const embeds = buildEmbeds(metrics, extended);
 
+    console.log(`[discord-send-chart-report] Metrics: ${metrics.totalActive} orders, value: ${metrics.totalValue}`);
+
     let sent = 0;
     for (const wh of webhooks) {
       try {
@@ -185,7 +306,7 @@ serve(async (req) => {
     }
 
     console.log(`[discord-send-chart-report] Complete. Sent: ${sent}/${webhooks.length}`);
-    return new Response(JSON.stringify({ success: true, sent, total: webhooks.length, embedCount: embeds.length, metrics: { totalActive: metrics.totalActive, slaRate: metrics.sla.onTimeRate } }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    return new Response(JSON.stringify({ success: true, sent, total: webhooks.length, embedCount: embeds.length, metrics: { totalActive: metrics.totalActive, totalValue: metrics.totalValue, slaRate: metrics.sla.onTimeRate } }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (error: unknown) {
     const errMsg = error instanceof Error ? error.message : String(error);
     console.error("[discord-send-chart-report] Error:", errMsg);
