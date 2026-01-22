@@ -45,6 +45,7 @@ import {
 } from "lucide-react";
 import { ReportScheduleManager } from "./ReportScheduleManager";
 import { DeliveryConfirmationConfig } from "./DeliveryConfirmationConfig";
+import { QuickActionsPanel } from "./QuickActionsPanel";
 
 // Types
 interface ManagerTriggerConfig {
@@ -446,6 +447,11 @@ export function AIAgentManagerTriggersTab() {
 
   return (
     <div className="space-y-6">
+      {/* Ações Rápidas - No topo */}
+      <QuickActionsPanel />
+
+      <Separator className="my-6" />
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>

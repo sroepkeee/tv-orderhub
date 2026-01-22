@@ -717,9 +717,6 @@ ${formData.custom_closing ?? 'Me avisa se precisar! ✨'}`}
         </CardContent>
       </Card>
 
-      {/* Ações Rápidas */}
-      <QuickActionsPanel />
-
       {/* Botão Salvar */}
       <div className="flex justify-end">
         <Button onClick={handleSave} disabled={saving} size="lg">
