@@ -107,6 +107,28 @@ Deno.serve(async (req) => {
       const result = await processOrganization(supabase, config);
       totalProcessed += result.processed;
       totalQueued += result.queued;
+
+      // 📢 NOTIFICAR DISCORD sobre confirmações de entrega
+      if (result.queued > 0) {
+        try {
+          await supabase.functions.invoke('discord-notify', {
+            body: {
+              notificationType: 'delivery_confirmation',
+              priority: 3,
+              title: '📦 Confirmações de Entrega',
+              message: `**Pedidos processados:** ${result.processed}\n**Mensagens enfileiradas:** ${result.queued}\n**Organização:** ${config.organization_id.substring(0, 8)}...`,
+              organizationId: config.organization_id,
+              metadata: {
+                processed: result.processed,
+                queued: result.queued,
+              }
+            }
+          });
+          console.log('📢 Discord notified about delivery confirmations');
+        } catch (discordErr) {
+          console.warn('⚠️ Failed to notify Discord (non-blocking):', discordErr);
+        }
+      }
     }
 
     console.log(`\n✅ Completed: ${totalProcessed} orders processed, ${totalQueued} messages queued`);

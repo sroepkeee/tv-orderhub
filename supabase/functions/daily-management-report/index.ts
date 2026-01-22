@@ -955,6 +955,31 @@ serve(async (req) => {
       // Não precisamos mais de delay aqui - a fila controla o rate limit
     }
 
+    // 📢 NOTIFICAR DISCORD sobre envio de relatório
+    if (queuedCount > 0) {
+      try {
+        await supabase.functions.invoke('discord-notify', {
+          body: {
+            notificationType: 'daily_report',
+            priority: 3,
+            title: '📊 Relatório Diário Enviado',
+            message: `**Destinatários:** ${queuedCount} WhatsApp, ${emailCount} Email\n**Tipo:** ${reportType}\n**Data:** ${getBrazilDateTime().dateStr}\n**Pedidos Ativos:** ${metrics.totalActive}\n**SLA:** ${metrics.sla.onTimeRate.toFixed(1)}%`,
+            metadata: {
+              report_type: reportType,
+              recipients: queuedCount + emailCount,
+              whatsapp_count: queuedCount,
+              email_count: emailCount,
+              total_active: metrics.totalActive,
+              sla_rate: metrics.sla.onTimeRate,
+            }
+          }
+        });
+        console.log('📢 Discord notified about daily report');
+      } catch (discordErr) {
+        console.warn('⚠️ Failed to notify Discord (non-blocking):', discordErr);
+      }
+    }
+
     console.log(`📊 Done: ${queuedCount} queued for WhatsApp, ${emailCount} emails, ${errorCount} errors`);
 
     return new Response(

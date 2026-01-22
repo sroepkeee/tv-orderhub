@@ -302,9 +302,43 @@ serve(async (req) => {
       });
     }
 
+    // 📢 NOTIFICAR DISCORD sobre cotações enviadas
+    const queuedQuotes = results.filter(r => r.status === 'queued');
+    if (queuedQuotes.length > 0) {
+      try {
+        // Buscar info do pedido para a notificação
+        const { data: orderInfo } = await supabase
+          .from('orders')
+          .select('order_number, customer_name, organization_id')
+          .eq('id', orderId)
+          .single();
+
+        if (orderInfo) {
+          await supabase.functions.invoke('discord-notify', {
+            body: {
+              notificationType: 'freight_quote',
+              priority: 3,
+              title: `🚚 Cotação Enviada: #${orderInfo.order_number}`,
+              message: `**Cliente:** ${orderInfo.customer_name}\n**Transportadoras:** ${queuedQuotes.map(q => q.carrier_name).join(', ')}\n**Total:** ${queuedQuotes.length} cotações`,
+              orderId,
+              orderNumber: orderInfo.order_number,
+              organizationId: orderInfo.organization_id,
+              metadata: {
+                carriers: queuedQuotes.map(q => ({ id: q.carrier_id, name: q.carrier_name })),
+                total_quotes: queuedQuotes.length,
+              }
+            }
+          });
+          console.log('📢 Discord notified about freight quotes');
+        }
+      } catch (discordErr) {
+        console.warn('⚠️ Failed to notify Discord (non-blocking):', discordErr);
+      }
+    }
+
     console.log('send-freight-quote: Completed. Results:', results);
 
-    return new Response(JSON.stringify({ 
+    return new Response(JSON.stringify({
       success: true, 
       results,
       total: carrierIds.length,

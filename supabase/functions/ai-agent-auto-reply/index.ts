@@ -304,6 +304,27 @@ serve(async (req) => {
             }
           });
         }
+
+        // 📢 NOTIFICAR DISCORD sobre handoff (prioridade crítica)
+        try {
+          await supabase.functions.invoke('discord-notify', {
+            body: {
+              notificationType: 'ai_handoff',
+              priority: 1, // Crítico
+              title: '🙋 Handoff Solicitado',
+              message: `**Contato:** ${carrier_name || sender_phone}\n**Motivo:** ${triggerKeywords.join(', ')}\n**Conversa:** ${conversation_id}\n\n⚠️ *Cliente solicitou atendimento humano*`,
+              metadata: {
+                conversation_id,
+                carrier_id,
+                sender_phone,
+                trigger_keywords: triggerKeywords,
+              }
+            }
+          });
+          console.log('📢 Discord notified about handoff (priority 1)');
+        } catch (discordErr) {
+          console.warn('⚠️ Failed to notify Discord (non-blocking):', discordErr);
+        }
       }
 
       return new Response(JSON.stringify({ 
