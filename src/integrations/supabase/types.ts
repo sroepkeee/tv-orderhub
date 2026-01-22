@@ -1866,6 +1866,110 @@ export type Database = {
         }
         Relationships: []
       }
+      discord_digest_queue: {
+        Row: {
+          created_at: string | null
+          id: string
+          notification_type: string
+          notifications: Json[] | null
+          organization_id: string | null
+          processed_at: string | null
+          scheduled_for: string
+          webhook_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          notification_type: string
+          notifications?: Json[] | null
+          organization_id?: string | null
+          processed_at?: string | null
+          scheduled_for: string
+          webhook_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          notification_type?: string
+          notifications?: Json[] | null
+          organization_id?: string | null
+          processed_at?: string | null
+          scheduled_for?: string
+          webhook_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "discord_digest_queue_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "discord_digest_queue_webhook_id_fkey"
+            columns: ["webhook_id"]
+            isOneToOne: false
+            referencedRelation: "discord_webhooks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      discord_message_templates: {
+        Row: {
+          created_at: string | null
+          custom_fields: Json | null
+          embed_color: string | null
+          footer_text: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          notification_types: string[] | null
+          organization_id: string | null
+          show_order_link: boolean | null
+          show_timestamp: boolean | null
+          title_prefix: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          custom_fields?: Json | null
+          embed_color?: string | null
+          footer_text?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          notification_types?: string[] | null
+          organization_id?: string | null
+          show_order_link?: boolean | null
+          show_timestamp?: boolean | null
+          title_prefix?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          custom_fields?: Json | null
+          embed_color?: string | null
+          footer_text?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          notification_types?: string[] | null
+          organization_id?: string | null
+          show_order_link?: boolean | null
+          show_timestamp?: boolean | null
+          title_prefix?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "discord_message_templates_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       discord_notification_log: {
         Row: {
           created_at: string | null
@@ -1927,11 +2031,78 @@ export type Database = {
           },
         ]
       }
+      discord_order_threads: {
+        Row: {
+          created_at: string | null
+          id: string
+          last_message_at: string | null
+          order_id: string | null
+          order_number: string | null
+          organization_id: string | null
+          thread_id: string
+          thread_name: string | null
+          webhook_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          last_message_at?: string | null
+          order_id?: string | null
+          order_number?: string | null
+          organization_id?: string | null
+          thread_id: string
+          thread_name?: string | null
+          webhook_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          last_message_at?: string | null
+          order_id?: string | null
+          order_number?: string | null
+          organization_id?: string | null
+          thread_id?: string
+          thread_name?: string | null
+          webhook_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "discord_order_threads_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "discord_order_threads_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "discord_order_threads_webhook_id_fkey"
+            columns: ["webhook_id"]
+            isOneToOne: false
+            referencedRelation: "discord_webhooks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       discord_webhooks: {
         Row: {
           channel_name: string
           created_at: string | null
           created_by: string | null
+          digest_interval_minutes: number | null
+          discord_bot_token: string | null
+          enable_auto_threads: boolean | null
+          enable_digest: boolean | null
+          enable_role_mentions: boolean | null
+          filter_customers: string[] | null
+          filter_min_order_value: number | null
+          filter_order_types: string[] | null
+          filter_phases: string[] | null
           id: string
           is_active: boolean | null
           min_priority: number | null
@@ -1946,13 +2117,27 @@ export type Database = {
           receive_purchase_alerts: boolean | null
           receive_smart_alerts: boolean | null
           receive_status_changes: boolean | null
+          receive_visual_reports: boolean | null
+          role_mention_critical: string | null
+          role_mention_high: string | null
+          template_id: string | null
           updated_at: string | null
+          visual_report_schedule: string | null
           webhook_url: string
         }
         Insert: {
           channel_name: string
           created_at?: string | null
           created_by?: string | null
+          digest_interval_minutes?: number | null
+          discord_bot_token?: string | null
+          enable_auto_threads?: boolean | null
+          enable_digest?: boolean | null
+          enable_role_mentions?: boolean | null
+          filter_customers?: string[] | null
+          filter_min_order_value?: number | null
+          filter_order_types?: string[] | null
+          filter_phases?: string[] | null
           id?: string
           is_active?: boolean | null
           min_priority?: number | null
@@ -1967,13 +2152,27 @@ export type Database = {
           receive_purchase_alerts?: boolean | null
           receive_smart_alerts?: boolean | null
           receive_status_changes?: boolean | null
+          receive_visual_reports?: boolean | null
+          role_mention_critical?: string | null
+          role_mention_high?: string | null
+          template_id?: string | null
           updated_at?: string | null
+          visual_report_schedule?: string | null
           webhook_url: string
         }
         Update: {
           channel_name?: string
           created_at?: string | null
           created_by?: string | null
+          digest_interval_minutes?: number | null
+          discord_bot_token?: string | null
+          enable_auto_threads?: boolean | null
+          enable_digest?: boolean | null
+          enable_role_mentions?: boolean | null
+          filter_customers?: string[] | null
+          filter_min_order_value?: number | null
+          filter_order_types?: string[] | null
+          filter_phases?: string[] | null
           id?: string
           is_active?: boolean | null
           min_priority?: number | null
@@ -1988,7 +2187,12 @@ export type Database = {
           receive_purchase_alerts?: boolean | null
           receive_smart_alerts?: boolean | null
           receive_status_changes?: boolean | null
+          receive_visual_reports?: boolean | null
+          role_mention_critical?: string | null
+          role_mention_high?: string | null
+          template_id?: string | null
           updated_at?: string | null
+          visual_report_schedule?: string | null
           webhook_url?: string
         }
         Relationships: [
@@ -2004,6 +2208,13 @@ export type Database = {
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "discord_webhooks_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "discord_message_templates"
             referencedColumns: ["id"]
           },
         ]

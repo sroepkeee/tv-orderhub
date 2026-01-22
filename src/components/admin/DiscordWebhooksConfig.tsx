@@ -12,8 +12,15 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
-import { Plus, Trash2, TestTube2, Hash, Bell, AlertTriangle, Package, Loader2, RefreshCw, Bot, Truck, FileText, Users } from "lucide-react";
+import { 
+  Plus, Trash2, TestTube2, Hash, Bell, AlertTriangle, Package, Loader2, RefreshCw, 
+  Bot, Truck, FileText, Users, ChevronDown, AtSign, Clock, Filter, Palette, 
+  MessageSquare, BarChart3, Settings2
+} from "lucide-react";
 
 interface DiscordWebhook {
   id: string;
@@ -31,9 +38,43 @@ interface DiscordWebhook {
   receive_freight_quotes: boolean;
   receive_delivery_confirmations: boolean;
   receive_daily_reports: boolean;
+  receive_visual_reports: boolean;
   min_priority: number;
+  // Menções
+  enable_role_mentions: boolean;
+  role_mention_critical: string | null;
+  role_mention_high: string | null;
+  // Digest
+  enable_digest: boolean;
+  digest_interval_minutes: number;
+  // Filtros
+  filter_customers: string[] | null;
+  filter_phases: string[] | null;
+  filter_min_order_value: number | null;
+  filter_order_types: string[] | null;
+  // Threads
+  enable_auto_threads: boolean;
+  discord_bot_token: string | null;
+  // Visual Reports
+  visual_report_schedule: string | null;
   created_at: string;
 }
+
+const PHASE_OPTIONS = [
+  { value: 'purchases', label: 'Compras' },
+  { value: 'production_client', label: 'Produção Cliente' },
+  { value: 'production_stock', label: 'Produção Estoque' },
+  { value: 'laboratory', label: 'Laboratório' },
+  { value: 'freight_quote', label: 'Cotação Frete' },
+  { value: 'logistics', label: 'Expedição' },
+  { value: 'invoicing', label: 'Faturamento' },
+];
+
+const ORDER_TYPE_OPTIONS = [
+  { value: 'cliente', label: 'Cliente' },
+  { value: 'estoque', label: 'Estoque' },
+  { value: 'ecommerce', label: 'E-commerce' },
+];
 
 export function DiscordWebhooksConfig() {
   const { organizationId } = useOrganizationId();
@@ -44,6 +85,7 @@ export function DiscordWebhooksConfig() {
   const [newChannelName, setNewChannelName] = useState("");
   const [newWebhookUrl, setNewWebhookUrl] = useState("");
   const [testingId, setTestingId] = useState<string | null>(null);
+  const [expandedWebhook, setExpandedWebhook] = useState<string | null>(null);
 
   // Fetch webhooks
   const { data: webhooks, isLoading, refetch } = useQuery({
@@ -164,6 +206,19 @@ export function DiscordWebhooksConfig() {
       webhook.receive_freight_quotes,
       webhook.receive_delivery_confirmations,
       webhook.receive_daily_reports,
+      webhook.receive_visual_reports,
+    ].filter(Boolean).length;
+  };
+
+  // Count advanced features
+  const countAdvancedFeatures = (webhook: DiscordWebhook): number => {
+    return [
+      webhook.enable_role_mentions,
+      webhook.enable_digest,
+      webhook.enable_auto_threads,
+      (webhook.filter_phases?.length || 0) > 0,
+      (webhook.filter_customers?.length || 0) > 0,
+      webhook.filter_min_order_value,
     ].filter(Boolean).length;
   };
 
@@ -178,9 +233,9 @@ export function DiscordWebhooksConfig() {
               </svg>
             </div>
             <div>
-              <CardTitle>Integração Discord</CardTitle>
+              <CardTitle>Integração Discord Avançada</CardTitle>
               <CardDescription>
-                Configure webhooks para receber notificações em canais do Discord
+                Configure webhooks com menções, filtros, digest e relatórios visuais
               </CardDescription>
             </div>
           </div>
@@ -262,8 +317,9 @@ export function DiscordWebhooksConfig() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Canal</TableHead>
-                  <TableHead>Tipos de Notificação</TableHead>
-                  <TableHead>Prioridade Mín.</TableHead>
+                  <TableHead>Notificações</TableHead>
+                  <TableHead>Recursos</TableHead>
+                  <TableHead>Prioridade</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
@@ -279,7 +335,12 @@ export function DiscordWebhooksConfig() {
                     </TableCell>
                     <TableCell>
                       <Badge variant="outline" className="text-xs">
-                        {countEnabledTypes(webhook)} tipos ativos
+                        {countEnabledTypes(webhook)} tipos
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="secondary" className="text-xs">
+                        {countAdvancedFeatures(webhook)} recursos
                       </Badge>
                     </TableCell>
                     <TableCell>
@@ -341,163 +402,503 @@ export function DiscordWebhooksConfig() {
               </TableBody>
             </Table>
 
-            {/* Notification Type Toggles - Organized by Category */}
+            {/* Expanded Configuration per Webhook */}
             <div className="space-y-4">
               {webhooks.map((webhook) => (
-                <div key={webhook.id} className="border rounded-lg p-4 space-y-4">
-                  <div className="flex items-center gap-2">
-                    <Hash className="h-4 w-4 text-muted-foreground" />
-                    <span className="font-medium">#{webhook.channel_name}</span>
-                  </div>
+                <Collapsible
+                  key={webhook.id}
+                  open={expandedWebhook === webhook.id}
+                  onOpenChange={(open) => setExpandedWebhook(open ? webhook.id : null)}
+                >
+                  <CollapsibleTrigger asChild>
+                    <Button variant="outline" className="w-full justify-between">
+                      <div className="flex items-center gap-2">
+                        <Settings2 className="h-4 w-4" />
+                        <span>Configurar #{webhook.channel_name}</span>
+                      </div>
+                      <ChevronDown className={`h-4 w-4 transition-transform ${expandedWebhook === webhook.id ? 'rotate-180' : ''}`} />
+                    </Button>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="mt-2">
+                    <div className="border rounded-lg p-4">
+                      <Tabs defaultValue="notifications" className="w-full">
+                        <TabsList className="grid w-full grid-cols-5">
+                          <TabsTrigger value="notifications" className="text-xs">
+                            <Bell className="h-3 w-3 mr-1" />
+                            Tipos
+                          </TabsTrigger>
+                          <TabsTrigger value="mentions" className="text-xs">
+                            <AtSign className="h-3 w-3 mr-1" />
+                            Menções
+                          </TabsTrigger>
+                          <TabsTrigger value="digest" className="text-xs">
+                            <Clock className="h-3 w-3 mr-1" />
+                            Digest
+                          </TabsTrigger>
+                          <TabsTrigger value="filters" className="text-xs">
+                            <Filter className="h-3 w-3 mr-1" />
+                            Filtros
+                          </TabsTrigger>
+                          <TabsTrigger value="advanced" className="text-xs">
+                            <Bot className="h-3 w-3 mr-1" />
+                            Avançado
+                          </TabsTrigger>
+                        </TabsList>
 
-                  {/* Operacional */}
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                      <AlertTriangle className="h-4 w-4" />
-                      Operacional
-                    </div>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pl-6">
-                      <label className="flex items-center gap-2 text-xs">
-                        <Switch
-                          checked={webhook.receive_smart_alerts}
-                          onCheckedChange={(checked) =>
-                            updateMutation.mutate({
-                              id: webhook.id,
-                              updates: { receive_smart_alerts: checked },
-                            })
-                          }
-                        />
-                        Alertas Inteligentes
-                      </label>
-                      <label className="flex items-center gap-2 text-xs">
-                        <Switch
-                          checked={webhook.receive_phase_notifications}
-                          onCheckedChange={(checked) =>
-                            updateMutation.mutate({
-                              id: webhook.id,
-                              updates: { receive_phase_notifications: checked },
-                            })
-                          }
-                        />
-                        Mudança de Fase
-                      </label>
-                      <label className="flex items-center gap-2 text-xs">
-                        <Switch
-                          checked={webhook.receive_purchase_alerts}
-                          onCheckedChange={(checked) =>
-                            updateMutation.mutate({
-                              id: webhook.id,
-                              updates: { receive_purchase_alerts: checked },
-                            })
-                          }
-                        />
-                        Compras
-                      </label>
-                      <label className="flex items-center gap-2 text-xs">
-                        <Switch
-                          checked={webhook.receive_status_changes}
-                          onCheckedChange={(checked) =>
-                            updateMutation.mutate({
-                              id: webhook.id,
-                              updates: { receive_status_changes: checked },
-                            })
-                          }
-                        />
-                        Status
-                      </label>
-                    </div>
-                  </div>
+                        {/* Tab: Notification Types */}
+                        <TabsContent value="notifications" className="space-y-4 mt-4">
+                          {/* Operacional */}
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-2 text-sm font-medium">
+                              <AlertTriangle className="h-4 w-4 text-orange-500" />
+                              Operacional
+                            </div>
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pl-6">
+                              <label className="flex items-center gap-2 text-xs">
+                                <Switch
+                                  checked={webhook.receive_smart_alerts}
+                                  onCheckedChange={(checked) =>
+                                    updateMutation.mutate({
+                                      id: webhook.id,
+                                      updates: { receive_smart_alerts: checked },
+                                    })
+                                  }
+                                />
+                                Alertas Inteligentes
+                              </label>
+                              <label className="flex items-center gap-2 text-xs">
+                                <Switch
+                                  checked={webhook.receive_phase_notifications}
+                                  onCheckedChange={(checked) =>
+                                    updateMutation.mutate({
+                                      id: webhook.id,
+                                      updates: { receive_phase_notifications: checked },
+                                    })
+                                  }
+                                />
+                                Mudança de Fase
+                              </label>
+                              <label className="flex items-center gap-2 text-xs">
+                                <Switch
+                                  checked={webhook.receive_purchase_alerts}
+                                  onCheckedChange={(checked) =>
+                                    updateMutation.mutate({
+                                      id: webhook.id,
+                                      updates: { receive_purchase_alerts: checked },
+                                    })
+                                  }
+                                />
+                                Compras
+                              </label>
+                              <label className="flex items-center gap-2 text-xs">
+                                <Switch
+                                  checked={webhook.receive_status_changes}
+                                  onCheckedChange={(checked) =>
+                                    updateMutation.mutate({
+                                      id: webhook.id,
+                                      updates: { receive_status_changes: checked },
+                                    })
+                                  }
+                                />
+                                Status
+                              </label>
+                            </div>
+                          </div>
 
-                  {/* IA - Clientes */}
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                      <Users className="h-4 w-4" />
-                      IA - Clientes
-                    </div>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pl-6">
-                      <label className="flex items-center gap-2 text-xs">
-                        <Switch
-                          checked={webhook.receive_ai_customer_notifications}
-                          onCheckedChange={(checked) =>
-                            updateMutation.mutate({
-                              id: webhook.id,
-                              updates: { receive_ai_customer_notifications: checked },
-                            })
-                          }
-                        />
-                        Notificações
-                      </label>
-                      <label className="flex items-center gap-2 text-xs">
-                        <Switch
-                          checked={webhook.receive_delivery_confirmations}
-                          onCheckedChange={(checked) =>
-                            updateMutation.mutate({
-                              id: webhook.id,
-                              updates: { receive_delivery_confirmations: checked },
-                            })
-                          }
-                        />
-                        Confirmação Entrega
-                      </label>
-                      <label className="flex items-center gap-2 text-xs">
-                        <Switch
-                          checked={webhook.receive_ai_handoff_alerts}
-                          onCheckedChange={(checked) =>
-                            updateMutation.mutate({
-                              id: webhook.id,
-                              updates: { receive_ai_handoff_alerts: checked },
-                            })
-                          }
-                        />
-                        Handoff Humano
-                      </label>
-                    </div>
-                  </div>
+                          <Separator />
 
-                  {/* IA - Logística */}
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                      <Truck className="h-4 w-4" />
-                      IA - Logística
-                    </div>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pl-6">
-                      <label className="flex items-center gap-2 text-xs">
-                        <Switch
-                          checked={webhook.receive_freight_quotes}
-                          onCheckedChange={(checked) =>
-                            updateMutation.mutate({
-                              id: webhook.id,
-                              updates: { receive_freight_quotes: checked },
-                            })
-                          }
-                        />
-                        Cotações de Frete
-                      </label>
-                    </div>
-                  </div>
+                          {/* IA - Clientes */}
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-2 text-sm font-medium">
+                              <Users className="h-4 w-4 text-blue-500" />
+                              IA - Clientes
+                            </div>
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pl-6">
+                              <label className="flex items-center gap-2 text-xs">
+                                <Switch
+                                  checked={webhook.receive_ai_customer_notifications}
+                                  onCheckedChange={(checked) =>
+                                    updateMutation.mutate({
+                                      id: webhook.id,
+                                      updates: { receive_ai_customer_notifications: checked },
+                                    })
+                                  }
+                                />
+                                Notificações
+                              </label>
+                              <label className="flex items-center gap-2 text-xs">
+                                <Switch
+                                  checked={webhook.receive_delivery_confirmations}
+                                  onCheckedChange={(checked) =>
+                                    updateMutation.mutate({
+                                      id: webhook.id,
+                                      updates: { receive_delivery_confirmations: checked },
+                                    })
+                                  }
+                                />
+                                Confirmação Entrega
+                              </label>
+                              <label className="flex items-center gap-2 text-xs">
+                                <Switch
+                                  checked={webhook.receive_ai_handoff_alerts}
+                                  onCheckedChange={(checked) =>
+                                    updateMutation.mutate({
+                                      id: webhook.id,
+                                      updates: { receive_ai_handoff_alerts: checked },
+                                    })
+                                  }
+                                />
+                                Handoff Humano
+                              </label>
+                            </div>
+                          </div>
 
-                  {/* Relatórios */}
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                      <FileText className="h-4 w-4" />
-                      Relatórios
+                          <Separator />
+
+                          {/* IA - Logística */}
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-2 text-sm font-medium">
+                              <Truck className="h-4 w-4 text-green-500" />
+                              IA - Logística
+                            </div>
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pl-6">
+                              <label className="flex items-center gap-2 text-xs">
+                                <Switch
+                                  checked={webhook.receive_freight_quotes}
+                                  onCheckedChange={(checked) =>
+                                    updateMutation.mutate({
+                                      id: webhook.id,
+                                      updates: { receive_freight_quotes: checked },
+                                    })
+                                  }
+                                />
+                                Cotações de Frete
+                              </label>
+                            </div>
+                          </div>
+
+                          <Separator />
+
+                          {/* Relatórios */}
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-2 text-sm font-medium">
+                              <FileText className="h-4 w-4 text-purple-500" />
+                              Relatórios
+                            </div>
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pl-6">
+                              <label className="flex items-center gap-2 text-xs">
+                                <Switch
+                                  checked={webhook.receive_daily_reports}
+                                  onCheckedChange={(checked) =>
+                                    updateMutation.mutate({
+                                      id: webhook.id,
+                                      updates: { receive_daily_reports: checked },
+                                    })
+                                  }
+                                />
+                                Relatório Diário
+                              </label>
+                              <label className="flex items-center gap-2 text-xs">
+                                <Switch
+                                  checked={webhook.receive_visual_reports}
+                                  onCheckedChange={(checked) =>
+                                    updateMutation.mutate({
+                                      id: webhook.id,
+                                      updates: { receive_visual_reports: checked },
+                                    })
+                                  }
+                                />
+                                <BarChart3 className="h-3 w-3" />
+                                Relatórios Visuais
+                              </label>
+                            </div>
+                          </div>
+                        </TabsContent>
+
+                        {/* Tab: Role Mentions */}
+                        <TabsContent value="mentions" className="space-y-4 mt-4">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <h4 className="font-medium text-sm">Menções de Roles</h4>
+                              <p className="text-xs text-muted-foreground">
+                                Mencione roles específicos (@operações) para alertas críticos
+                              </p>
+                            </div>
+                            <Switch
+                              checked={webhook.enable_role_mentions}
+                              onCheckedChange={(checked) =>
+                                updateMutation.mutate({
+                                  id: webhook.id,
+                                  updates: { enable_role_mentions: checked },
+                                })
+                              }
+                            />
+                          </div>
+
+                          {webhook.enable_role_mentions && (
+                            <div className="space-y-3 pl-4 border-l-2 border-primary/20">
+                              <div className="space-y-2">
+                                <Label className="text-xs">Role ID para Prioridade Crítica (1)</Label>
+                                <Input
+                                  placeholder="123456789012345678"
+                                  value={webhook.role_mention_critical || ""}
+                                  onChange={(e) =>
+                                    updateMutation.mutate({
+                                      id: webhook.id,
+                                      updates: { role_mention_critical: e.target.value || null },
+                                    })
+                                  }
+                                  className="h-8 text-sm"
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label className="text-xs">Role ID para Prioridade Alta (2)</Label>
+                                <Input
+                                  placeholder="123456789012345678"
+                                  value={webhook.role_mention_high || ""}
+                                  onChange={(e) =>
+                                    updateMutation.mutate({
+                                      id: webhook.id,
+                                      updates: { role_mention_high: e.target.value || null },
+                                    })
+                                  }
+                                  className="h-8 text-sm"
+                                />
+                              </div>
+                              <p className="text-xs text-muted-foreground">
+                                💡 Para obter o Role ID: Discord → Configurações → App → Avançado → Modo Desenvolvedor → Clique direito no Role → Copiar ID
+                              </p>
+                            </div>
+                          )}
+                        </TabsContent>
+
+                        {/* Tab: Digest/Batching */}
+                        <TabsContent value="digest" className="space-y-4 mt-4">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <h4 className="font-medium text-sm">Sistema de Digest</h4>
+                              <p className="text-xs text-muted-foreground">
+                                Agrupe notificações em resumos periódicos para evitar spam
+                              </p>
+                            </div>
+                            <Switch
+                              checked={webhook.enable_digest}
+                              onCheckedChange={(checked) =>
+                                updateMutation.mutate({
+                                  id: webhook.id,
+                                  updates: { enable_digest: checked },
+                                })
+                              }
+                            />
+                          </div>
+
+                          {webhook.enable_digest && (
+                            <div className="space-y-3 pl-4 border-l-2 border-primary/20">
+                              <div className="space-y-2">
+                                <Label className="text-xs">Intervalo do Digest (minutos)</Label>
+                                <Select
+                                  value={String(webhook.digest_interval_minutes || 15)}
+                                  onValueChange={(v) =>
+                                    updateMutation.mutate({
+                                      id: webhook.id,
+                                      updates: { digest_interval_minutes: Number(v) },
+                                    })
+                                  }
+                                >
+                                  <SelectTrigger className="h-8">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="5">5 minutos</SelectItem>
+                                    <SelectItem value="15">15 minutos</SelectItem>
+                                    <SelectItem value="30">30 minutos</SelectItem>
+                                    <SelectItem value="60">1 hora</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              <p className="text-xs text-muted-foreground">
+                                ⚡ Alertas de prioridade Crítica (1) sempre são enviados imediatamente, ignorando o digest.
+                              </p>
+                            </div>
+                          )}
+                        </TabsContent>
+
+                        {/* Tab: Advanced Filters */}
+                        <TabsContent value="filters" className="space-y-4 mt-4">
+                          <div className="space-y-4">
+                            <div className="space-y-2">
+                              <Label className="text-xs">Filtrar por Fases</Label>
+                              <div className="flex flex-wrap gap-2">
+                                {PHASE_OPTIONS.map((phase) => (
+                                  <Badge
+                                    key={phase.value}
+                                    variant={webhook.filter_phases?.includes(phase.value) ? "default" : "outline"}
+                                    className="cursor-pointer"
+                                    onClick={() => {
+                                      const current = webhook.filter_phases || [];
+                                      const updated = current.includes(phase.value)
+                                        ? current.filter(p => p !== phase.value)
+                                        : [...current, phase.value];
+                                      updateMutation.mutate({
+                                        id: webhook.id,
+                                        updates: { filter_phases: updated.length > 0 ? updated : null },
+                                      });
+                                    }}
+                                  >
+                                    {phase.label}
+                                  </Badge>
+                                ))}
+                              </div>
+                              <p className="text-xs text-muted-foreground">
+                                Deixe vazio para receber todas as fases
+                              </p>
+                            </div>
+
+                            <Separator />
+
+                            <div className="space-y-2">
+                              <Label className="text-xs">Filtrar por Tipos de Pedido</Label>
+                              <div className="flex flex-wrap gap-2">
+                                {ORDER_TYPE_OPTIONS.map((type) => (
+                                  <Badge
+                                    key={type.value}
+                                    variant={webhook.filter_order_types?.includes(type.value) ? "default" : "outline"}
+                                    className="cursor-pointer"
+                                    onClick={() => {
+                                      const current = webhook.filter_order_types || [];
+                                      const updated = current.includes(type.value)
+                                        ? current.filter(t => t !== type.value)
+                                        : [...current, type.value];
+                                      updateMutation.mutate({
+                                        id: webhook.id,
+                                        updates: { filter_order_types: updated.length > 0 ? updated : null },
+                                      });
+                                    }}
+                                  >
+                                    {type.label}
+                                  </Badge>
+                                ))}
+                              </div>
+                            </div>
+
+                            <Separator />
+
+                            <div className="space-y-2">
+                              <Label className="text-xs">Valor Mínimo do Pedido (R$)</Label>
+                              <Input
+                                type="number"
+                                placeholder="0"
+                                value={webhook.filter_min_order_value || ""}
+                                onChange={(e) =>
+                                  updateMutation.mutate({
+                                    id: webhook.id,
+                                    updates: { filter_min_order_value: e.target.value ? Number(e.target.value) : null },
+                                  })
+                                }
+                                className="h-8 text-sm"
+                              />
+                              <p className="text-xs text-muted-foreground">
+                                Só enviar notificações para pedidos acima deste valor
+                              </p>
+                            </div>
+
+                            <Separator />
+
+                            <div className="space-y-2">
+                              <Label className="text-xs">Filtrar por Clientes (nomes, separados por vírgula)</Label>
+                              <Input
+                                placeholder="Cliente A, Cliente B"
+                                value={webhook.filter_customers?.join(", ") || ""}
+                                onChange={(e) => {
+                                  const customers = e.target.value
+                                    .split(",")
+                                    .map(c => c.trim())
+                                    .filter(Boolean);
+                                  updateMutation.mutate({
+                                    id: webhook.id,
+                                    updates: { filter_customers: customers.length > 0 ? customers : null },
+                                  });
+                                }}
+                                className="h-8 text-sm"
+                              />
+                            </div>
+                          </div>
+                        </TabsContent>
+
+                        {/* Tab: Advanced (Threads, Bot) */}
+                        <TabsContent value="advanced" className="space-y-4 mt-4">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <h4 className="font-medium text-sm">Threads Automáticas</h4>
+                              <p className="text-xs text-muted-foreground">
+                                Agrupe notificações do mesmo pedido em threads
+                              </p>
+                            </div>
+                            <Switch
+                              checked={webhook.enable_auto_threads}
+                              onCheckedChange={(checked) =>
+                                updateMutation.mutate({
+                                  id: webhook.id,
+                                  updates: { enable_auto_threads: checked },
+                                })
+                              }
+                            />
+                          </div>
+
+                          {webhook.enable_auto_threads && (
+                            <div className="space-y-3 pl-4 border-l-2 border-primary/20">
+                              <div className="space-y-2">
+                                <Label className="text-xs">Discord Bot Token</Label>
+                                <Input
+                                  type="password"
+                                  placeholder="Bot token necessário para criar threads"
+                                  value={webhook.discord_bot_token || ""}
+                                  onChange={(e) =>
+                                    updateMutation.mutate({
+                                      id: webhook.id,
+                                      updates: { discord_bot_token: e.target.value || null },
+                                    })
+                                  }
+                                  className="h-8 text-sm"
+                                />
+                              </div>
+                              <p className="text-xs text-muted-foreground">
+                                ⚠️ Threads requerem um Discord Bot configurado. 
+                                <a href="https://discord.com/developers/applications" target="_blank" rel="noopener noreferrer" className="text-primary ml-1">
+                                  Criar Bot no Discord Developer Portal →
+                                </a>
+                              </p>
+                            </div>
+                          )}
+
+                          <Separator />
+
+                          <div className="p-3 bg-muted/30 rounded-lg">
+                            <h4 className="font-medium text-sm mb-2 flex items-center gap-2">
+                              <MessageSquare className="h-4 w-4" />
+                              Slash Commands
+                            </h4>
+                            <p className="text-xs text-muted-foreground mb-2">
+                              Consulte pedidos diretamente no Discord com comandos como <code>/pedido 140327</code>
+                            </p>
+                            <div className="text-xs space-y-1">
+                              <p>Comandos disponíveis:</p>
+                              <ul className="list-disc list-inside space-y-0.5 text-muted-foreground">
+                                <li><code>/pedido [numero]</code> - Status do pedido</li>
+                                <li><code>/ativos</code> - Pedidos ativos</li>
+                                <li><code>/sla</code> - Métricas de SLA</li>
+                                <li><code>/fase [nome]</code> - Pedidos em uma fase</li>
+                              </ul>
+                            </div>
+                            <p className="text-xs text-muted-foreground mt-2">
+                              Para configurar, você precisa registrar uma Discord Application.
+                            </p>
+                          </div>
+                        </TabsContent>
+                      </Tabs>
                     </div>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pl-6">
-                      <label className="flex items-center gap-2 text-xs">
-                        <Switch
-                          checked={webhook.receive_daily_reports}
-                          onCheckedChange={(checked) =>
-                            updateMutation.mutate({
-                              id: webhook.id,
-                              updates: { receive_daily_reports: checked },
-                            })
-                          }
-                        />
-                        Relatório Diário
-                      </label>
-                    </div>
-                  </div>
-                </div>
+                  </CollapsibleContent>
+                </Collapsible>
               ))}
             </div>
           </div>
@@ -505,21 +906,44 @@ export function DiscordWebhooksConfig() {
 
         {/* Help Section */}
         <div className="mt-6 p-4 bg-muted/30 rounded-lg">
-          <h4 className="font-medium text-sm mb-2">Como configurar um Webhook no Discord</h4>
-          <ol className="text-xs text-muted-foreground space-y-1 list-decimal list-inside">
-            <li>Abra as configurações do canal no Discord</li>
-            <li>Vá em "Integrações" → "Webhooks"</li>
-            <li>Clique em "Novo Webhook" e dê um nome</li>
-            <li>Copie a URL do Webhook e cole acima</li>
-          </ol>
-          <div className="mt-3 text-xs text-muted-foreground">
-            <strong>Categorias de Notificação:</strong>
-            <ul className="mt-1 space-y-1 list-disc list-inside">
-              <li><strong>Operacional:</strong> Alertas internos, mudanças de fase e status</li>
-              <li><strong>IA - Clientes:</strong> Mensagens enviadas a clientes, confirmações de entrega</li>
-              <li><strong>IA - Logística:</strong> Cotações de frete enviadas</li>
-              <li><strong>Relatórios:</strong> Relatórios gerenciais diários</li>
-            </ul>
+          <h4 className="font-medium text-sm mb-2">Recursos Avançados Disponíveis</h4>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs text-muted-foreground">
+            <div className="flex items-start gap-2">
+              <AtSign className="h-4 w-4 text-primary mt-0.5" />
+              <div>
+                <strong>Menções de Roles:</strong> Notifique equipes específicas (@operações) para alertas críticos
+              </div>
+            </div>
+            <div className="flex items-start gap-2">
+              <Clock className="h-4 w-4 text-primary mt-0.5" />
+              <div>
+                <strong>Digest/Batching:</strong> Agrupe notificações em resumos periódicos para evitar spam
+              </div>
+            </div>
+            <div className="flex items-start gap-2">
+              <Filter className="h-4 w-4 text-primary mt-0.5" />
+              <div>
+                <strong>Filtros Avançados:</strong> Filtre por fase, cliente, valor ou tipo de pedido
+              </div>
+            </div>
+            <div className="flex items-start gap-2">
+              <BarChart3 className="h-4 w-4 text-primary mt-0.5" />
+              <div>
+                <strong>Relatórios Visuais:</strong> Receba gráficos de SLA e distribuição por fase
+              </div>
+            </div>
+            <div className="flex items-start gap-2">
+              <MessageSquare className="h-4 w-4 text-primary mt-0.5" />
+              <div>
+                <strong>Threads:</strong> Agrupe mensagens do mesmo pedido em threads automáticas
+              </div>
+            </div>
+            <div className="flex items-start gap-2">
+              <Bot className="h-4 w-4 text-primary mt-0.5" />
+              <div>
+                <strong>Slash Commands:</strong> Consulte pedidos com <code>/pedido 140327</code> no Discord
+              </div>
+            </div>
           </div>
         </div>
       </CardContent>
