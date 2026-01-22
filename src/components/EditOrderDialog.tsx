@@ -1451,7 +1451,13 @@ export const EditOrderDialog = ({
       return;
     }
     setIsChangingStatus(true);
-    console.log('🔄 Mudando status para:', newStatus);
+    console.log('🔄 [STATUS] Iniciando mudança:', { 
+      orderId: order.id, 
+      orderNumber: order.orderNumber,
+      de: order.status, 
+      para: newStatus,
+      timestamp: new Date().toISOString()
+    });
 
     // Check if it's exception status
     if (newStatus === 'exception') {
@@ -1560,9 +1566,14 @@ export const EditOrderDialog = ({
       const description = isMovingToOrderGeneration && updateData.delivery_date ? `Pedido agora está: ${getStatusLabel(newStatus)} - Prazo calculado automaticamente` : `Pedido agora está: ${getStatusLabel(newStatus)}`;
       toast({
         title: "✅ Status atualizado",
-        description
+        description,
+        duration: 4000
       });
-      console.log('✅ Status salvo no banco:', newStatus);
+      console.log('✅ [STATUS] Salvo com sucesso:', { 
+        orderId: order.id, 
+        novoStatus: newStatus,
+        timestamp: new Date().toISOString()
+      });
 
       // Recarregar histórico
       loadHistory();
