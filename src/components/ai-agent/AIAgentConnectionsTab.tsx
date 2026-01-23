@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
 import { 
   Link2, 
   KeyRound, 
@@ -37,6 +38,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useWhatsAppStatus } from "@/hooks/useWhatsAppStatus";
 import { WhatsAppQRCodeDialog } from "@/components/carriers/WhatsAppQRCodeDialog";
+import { DiscordWebhooksPanel } from "./DiscordWebhooksPanel";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
@@ -1508,6 +1510,10 @@ export function AIAgentConnectionsTab() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Discord Webhooks Section */}
+      <Separator className="my-6" />
+      <DiscordWebhooksPanel />
     </div>
   );
 }
