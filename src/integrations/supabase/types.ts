@@ -4930,6 +4930,7 @@ export type Database = {
           report_type: string | null
           send_days: number[] | null
           send_time: string
+          send_to_discord: boolean | null
           template_id: string | null
           timezone: string
           updated_at: string
@@ -4952,6 +4953,7 @@ export type Database = {
           report_type?: string | null
           send_days?: number[] | null
           send_time?: string
+          send_to_discord?: boolean | null
           template_id?: string | null
           timezone?: string
           updated_at?: string
@@ -4974,6 +4976,7 @@ export type Database = {
           report_type?: string | null
           send_days?: number[] | null
           send_time?: string
+          send_to_discord?: boolean | null
           template_id?: string | null
           timezone?: string
           updated_at?: string
