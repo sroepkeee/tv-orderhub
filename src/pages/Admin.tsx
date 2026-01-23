@@ -17,9 +17,11 @@ import { DiscordWebhooksConfig } from "@/components/admin/DiscordWebhooksConfig"
 import { CronJobsDashboard } from "@/components/admin/CronJobsDashboard";
 import { Shield, ArrowLeft, BarChart3, MessageSquare, Settings2, UserCog, Menu, ClipboardEdit, Users, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 const Admin = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const initialTab = searchParams.get('tab') || 'users';
 
   return (
     <div className="min-h-screen bg-background">
@@ -42,7 +44,7 @@ const Admin = () => {
           </p>
         </div>
 
-        <Tabs defaultValue="users" className="w-full">
+        <Tabs defaultValue={initialTab} className="w-full">
           <TabsList className="flex flex-wrap w-full gap-1 mb-4 h-auto p-1">
             <TabsTrigger value="users">Usuários</TabsTrigger>
             <TabsTrigger value="managers" className="flex items-center gap-1">
