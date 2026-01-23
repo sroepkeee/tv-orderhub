@@ -457,7 +457,7 @@ export function DiscordWebhooksPanel() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => window.open('/admin', '_blank')}
+                      onClick={() => window.open('/admin/users?tab=discord', '_blank')}
                             title="Configurações avançadas"
                           >
                             <Settings2 className="h-4 w-4" />
@@ -540,7 +540,7 @@ export function DiscordWebhooksPanel() {
               <Button 
                 variant="outline" 
                 size="sm" 
-                onClick={() => window.open('/admin', '_blank')}
+                onClick={() => window.open('/admin/users?tab=discord', '_blank')}
               >
                 <ExternalLink className="h-4 w-4 mr-1" />
                 Gerenciamento Avançado
