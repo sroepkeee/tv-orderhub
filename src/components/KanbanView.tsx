@@ -48,6 +48,7 @@ interface KanbanViewProps {
   onStatusChange: (orderId: string, newStatus: Order["status"]) => void;
   cardViewMode?: CardViewMode;
   density?: KanbanDensity;
+  searchQuery?: string;
 }
 
 // 🔍 Debug flag - ativar via: localStorage.setItem('DEBUG_KANBAN', 'true')
@@ -58,7 +59,8 @@ export const KanbanView = ({
   onEdit, 
   onStatusChange, 
   cardViewMode = "full",
-  density = "comfortable"
+  density = "comfortable",
+  searchQuery = ""
 }: KanbanViewProps) => {
   const [activeId, setActiveId] = React.useState<string | null>(null);
   const [optimisticOrders, setOptimisticOrders] = React.useState<Order[]>(orders);
@@ -686,6 +688,7 @@ export const KanbanView = ({
                 getDaysInPhase={getDaysInPhase}
                 getPhaseEnteredAt={getPhaseEnteredAt}
                 daysLoading={daysInPhaseLoading}
+                searchQuery={searchQuery}
               />
             );
           })}

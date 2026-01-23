@@ -48,6 +48,7 @@ interface KanbanCardProps {
   daysInPhase?: number | null;
   phaseEnteredAt?: Date | null;
   daysLoading?: boolean;
+  searchQuery?: string;
 }
 const KanbanCardComponent = ({
   order,
@@ -58,13 +59,27 @@ const KanbanCardComponent = ({
   viewMode = "full",
   daysInPhase,
   phaseEnteredAt,
-  daysLoading = false
+  daysLoading = false,
+  searchQuery = ""
 }: KanbanCardProps) => {
   const [clickStart, setClickStart] = useState<number>(0);
   const { getPhaseInfo } = usePhaseInfo();
   const { isMinimal } = useVisualMode();
   const { maskText } = usePrivacyMode();
   const phaseInfo = getPhaseInfo(order.status);
+  
+  // Função para encontrar itens correspondentes à busca
+  const getMatchingItems = (items: OrderItem[] | undefined, query: string): OrderItem[] => {
+    if (!query.trim() || !items) return [];
+    const term = query.toLowerCase().trim();
+    return items.filter(item => 
+      item.itemCode?.toLowerCase().includes(term) ||
+      item.itemDescription?.toLowerCase().includes(term)
+    );
+  };
+  
+  const matchingItems = getMatchingItems(order.items, searchQuery);
+  const hasSearchMatch = matchingItems.length > 0 && searchQuery?.trim();
   
   const {
     attributes,
