@@ -34,6 +34,7 @@ interface KanbanColumnProps {
   getDaysInPhase?: (orderId: string) => number | null;
   getPhaseEnteredAt?: (orderId: string) => Date | null;
   daysLoading?: boolean;
+  searchQuery?: string;
 }
 const KanbanColumnComponent = ({
   id,
@@ -54,7 +55,8 @@ const KanbanColumnComponent = ({
   density = "comfortable",
   getDaysInPhase,
   getPhaseEnteredAt,
-  daysLoading = false
+  daysLoading = false,
+  searchQuery = ""
 }: KanbanColumnProps) => {
   const navigate = useNavigate();
   const highCount = orders.filter(o => o.priority === "high").length;
@@ -218,6 +220,7 @@ const KanbanColumnComponent = ({
                 daysInPhase={getDaysInPhase?.(order.id)}
                 phaseEnteredAt={getPhaseEnteredAt?.(order.id)}
                 daysLoading={daysLoading}
+                searchQuery={searchQuery}
               />
             ))}
             {linkTo && !isTV && (
@@ -249,7 +252,8 @@ const areColumnsEqual = (prev: KanbanColumnProps, next: KanbanColumnProps): bool
     prev.density !== next.density ||
     prev.linkTo !== next.linkTo ||
     prev.area !== next.area ||
-    prev.responsibleRole !== next.responsibleRole
+    prev.responsibleRole !== next.responsibleRole ||
+    prev.searchQuery !== next.searchQuery
   ) {
     return false;
   }
