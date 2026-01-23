@@ -43,6 +43,7 @@ interface ReportSchedule {
   send_days: number[];
   is_active: boolean;
   include_charts: boolean;
+  send_to_discord: boolean;
   last_sent_at: string | null;
   template_id: string | null;
   recipient_type: string;
@@ -124,6 +125,7 @@ export function ReportScheduleManager() {
     send_time: '08:00',
     send_days: [1, 2, 3, 4, 5, 6] as number[],
     include_charts: true,
+    send_to_discord: false,
     recipient_type: 'managers',
     customer_notification_phases: [] as string[],
     report_type: 'full',
@@ -144,6 +146,7 @@ export function ReportScheduleManager() {
         recipient_type: s.recipient_type || 'managers',
         customer_notification_phases: s.customer_notification_phases || [],
         report_type: s.report_type || 'full',
+        send_to_discord: s.send_to_discord || false,
       }));
       
       setSchedules(mappedData);
@@ -312,6 +315,7 @@ export function ReportScheduleManager() {
           send_time: newSchedule.send_time,
           send_days: newSchedule.send_days,
           include_charts: newSchedule.include_charts,
+          send_to_discord: newSchedule.send_to_discord,
           is_active: true,
           recipient_type: 'managers', // Always managers now
           customer_notification_phases: [], // Not used for managers
@@ -332,6 +336,7 @@ export function ReportScheduleManager() {
         send_time: '08:00',
         send_days: [1, 2, 3, 4, 5, 6],
         include_charts: true,
+        send_to_discord: false,
         recipient_type: 'managers',
         customer_notification_phases: [],
         report_type: 'full',
@@ -490,6 +495,14 @@ export function ReportScheduleManager() {
                             </Badge>
                           </>
                         )}
+                        {schedule.send_to_discord && (
+                          <>
+                            <span>•</span>
+                            <Badge variant="outline" className="text-xs bg-indigo-500/10 text-indigo-600 border-indigo-500/30">
+                              Discord
+                            </Badge>
+                          </>
+                        )}
                       </div>
                       {schedule.last_sent_at && (
                         <p className="text-xs text-muted-foreground mt-1">
@@ -607,6 +620,22 @@ export function ReportScheduleManager() {
                   id="include_charts"
                   checked={newSchedule.include_charts}
                   onCheckedChange={(v) => setNewSchedule({ ...newSchedule, include_charts: v })}
+                />
+              </div>
+
+              <div className="flex items-center justify-between pt-2 border-t">
+                <div>
+                  <Label htmlFor="send_to_discord" className="flex items-center gap-2">
+                    Enviar também para Discord
+                  </Label>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Envia notificação + relatório visual para o webhook pedidos-ssm
+                  </p>
+                </div>
+                <Switch
+                  id="send_to_discord"
+                  checked={newSchedule.send_to_discord}
+                  onCheckedChange={(v) => setNewSchedule({ ...newSchedule, send_to_discord: v })}
                 />
               </div>
             </div>

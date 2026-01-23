@@ -96,6 +96,19 @@ const NOTIFICATION_PHASE_LABELS: Record<string, string> = {
   'invoicing': 'Faturamento',
 };
 
+// Report type labels for Discord
+const REPORT_TYPE_LABELS: Record<string, string> = {
+  'full': 'Relatório Completo',
+  'summary': 'Resumo Rápido',
+  'urgent': 'Pedidos Urgentes',
+  'delayed': 'Pedidos Atrasados',
+  'phase_summary': 'Resumo por Fase',
+};
+
+function getReportTypeLabel(type: string): string {
+  return REPORT_TYPE_LABELS[type] || type;
+}
+
 async function calculateMetrics(supabase: any, organizationId?: string): Promise<OrderMetrics> {
   let query = supabase
     .from('orders')
@@ -569,6 +582,46 @@ serve(async (req) => {
         }
 
         results.push({ scheduleId: schedule.id, sent, failed, recipientType: 'managers' });
+
+        // Send to Discord if enabled
+        if (schedule.send_to_discord) {
+          console.log(`📤 Sending Discord notification for schedule ${schedule.id}`);
+          
+          try {
+            // Send text notification to Discord
+            await supabase.functions.invoke('discord-notify', {
+              body: {
+                notificationType: 'daily_report',
+                priority: 3,
+                title: `📊 Relatório Agendado: ${schedule.name}`,
+                message: `**Horário:** ${schedule.send_time}\n**Gestores:** ${sent} mensagem(s) na fila\n**Tipo:** ${getReportTypeLabel(schedule.report_type)}\n**Métricas:**\n• Total de pedidos: ${metrics.totalOrders}\n• Valor total: ${formatCurrency(metrics.totalValue)}\n• SLA no prazo: ${metrics.slaOntime}`,
+                metadata: {
+                  schedule_id: schedule.id,
+                  schedule_name: schedule.name,
+                  recipients: sent,
+                  report_type: schedule.report_type,
+                  organization_id: schedule.organization_id
+                },
+                organizationId: schedule.organization_id
+              }
+            });
+            console.log('✅ Discord text notification sent');
+
+            // If charts are enabled, also send visual report
+            if (schedule.include_charts) {
+              try {
+                await supabase.functions.invoke('discord-send-chart-report', {
+                  body: { organizationId: schedule.organization_id }
+                });
+                console.log('✅ Discord visual report sent');
+              } catch (chartErr) {
+                console.warn('⚠️ Discord chart report failed (non-blocking):', chartErr);
+              }
+            }
+          } catch (discordErr) {
+            console.warn('⚠️ Discord notify failed (non-blocking):', discordErr);
+          }
+        }
       }
 
       // Update schedule last_sent_at
