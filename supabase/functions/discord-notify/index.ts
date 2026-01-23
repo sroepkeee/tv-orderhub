@@ -18,6 +18,7 @@ interface DiscordEmbed {
 interface NotifyRequest {
   notificationType: 
     | 'smart_alert' 
+    | 'emergency_alert'    // Alertas críticos de prioridade 1
     | 'status_change' 
     | 'phase_notification' 
     | 'purchase_alert'
@@ -32,6 +33,7 @@ interface NotifyRequest {
   orderId?: string;
   orderNumber?: string;
   phase?: string;
+  alertType?: string;  // Tipo específico do alerta (delayed_orders, critical_sla, etc.)
   metadata?: Record<string, any>;
   organizationId?: string;
 }
@@ -46,6 +48,7 @@ const PRIORITY_COLORS: Record<number, number> = {
 // Emojis por tipo de notificação
 const TYPE_EMOJIS: Record<string, string> = {
   smart_alert: '🚨',
+  emergency_alert: '🆘',
   status_change: '📋',
   phase_notification: '📍',
   purchase_alert: '🛒',
@@ -54,6 +57,18 @@ const TYPE_EMOJIS: Record<string, string> = {
   freight_quote: '🚚',
   delivery_confirmation: '📦',
   daily_report: '📊',
+};
+
+// Emojis específicos por tipo de alerta
+const ALERT_TYPE_EMOJIS: Record<string, string> = {
+  delayed_orders: '⏰',
+  critical_sla: '⚠️',
+  overdue_items: '📦',
+  bottleneck: '🔧',
+  pending_material: '📦',
+  stuck_items: '⏳',
+  expired_quote: '💰',
+  negative_trend: '📉',
 };
 
 // Converter markdown WhatsApp para Discord
@@ -81,6 +96,7 @@ serve(async (req) => {
     // Mapear tipo de notificação para coluna de filtro
     const typeFilter: Record<string, string> = {
       smart_alert: 'receive_smart_alerts',
+      emergency_alert: 'receive_smart_alerts',  // Emergenciais usam mesmo campo
       status_change: 'receive_status_changes',
       phase_notification: 'receive_phase_notifications',
       purchase_alert: 'receive_purchase_alerts',
@@ -227,9 +243,17 @@ serve(async (req) => {
 
     console.log(`Found ${immediateWebhooks.length} immediate webhook(s)`);
 
+    // Determinar emoji apropriado
+    const alertEmoji = body.alertType && ALERT_TYPE_EMOJIS[body.alertType] 
+      ? ALERT_TYPE_EMOJIS[body.alertType] 
+      : TYPE_EMOJIS[body.notificationType] || '📢';
+    
+    // Adicionar prefixo EMERGENCIAL para alertas críticos
+    const titlePrefix = body.notificationType === 'emergency_alert' ? '🆘 EMERGENCIAL: ' : '';
+
     // Construir embed do Discord
     const embed: DiscordEmbed = {
-      title: `${TYPE_EMOJIS[body.notificationType] || '📢'} ${body.title}`,
+      title: `${alertEmoji} ${titlePrefix}${body.title}`,
       description: convertMarkdown(body.message),
       color: PRIORITY_COLORS[body.priority] || PRIORITY_COLORS[3],
       fields: [],
