@@ -654,7 +654,7 @@ export function DiscordWebhooksPanel() {
 
       {/* Edit Webhook Dialog */}
       <Dialog open={!!editingWebhook} onOpenChange={(open) => !open && setEditingWebhook(null)}>
-        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-lg max-h-[90vh] flex flex-col">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Hash className="h-5 w-5" />
@@ -666,154 +666,170 @@ export function DiscordWebhooksPanel() {
           </DialogHeader>
           
           {editingWebhook && (
-            <div className="space-y-4 py-4">
-              {/* Channel Name */}
-              <div className="space-y-2">
-                <Label>Nome do Canal</Label>
-                <div className="relative">
-                  <Hash className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    value={editingWebhook.channel_name}
-                    onChange={(e) => setEditingWebhook({ ...editingWebhook, channel_name: e.target.value })}
-                    className="pl-9"
-                  />
+            <ScrollArea className="flex-1 max-h-[60vh] pr-4">
+              <div className="space-y-4 py-4">
+                {/* Channel Name */}
+                <div className="space-y-2">
+                  <Label>Nome do Canal</Label>
+                  <div className="relative">
+                    <Hash className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      value={editingWebhook.channel_name}
+                      onChange={(e) => setEditingWebhook({ ...editingWebhook, channel_name: e.target.value })}
+                      className="pl-9"
+                    />
+                  </div>
                 </div>
-              </div>
 
-              {/* Priority */}
-              <div className="space-y-2">
-                <Label>Prioridade Mínima</Label>
-                <div className="flex gap-2">
-                  {[
-                    { value: 1, label: 'Crítico', color: 'bg-red-500' },
-                    { value: 2, label: 'Alto', color: 'bg-orange-500' },
-                    { value: 3, label: 'Normal', color: 'bg-blue-500' },
-                  ].map((p) => (
-                    <button
-                      key={p.value}
-                      type="button"
-                      onClick={() => setEditingWebhook({ ...editingWebhook, min_priority: p.value })}
-                      className={cn(
-                        "flex-1 py-2 px-3 rounded-md border-2 text-sm font-medium transition-all",
-                        editingWebhook.min_priority === p.value
-                          ? "border-primary bg-primary/10"
-                          : "border-border hover:border-primary/50"
-                      )}
-                    >
-                      <div className={cn("w-3 h-3 rounded-full mx-auto mb-1", p.color)} />
-                      {p.label}
-                    </button>
-                  ))}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Recebe apenas notificações com prioridade igual ou menor.
-                </p>
-              </div>
-
-              <Separator />
-
-              {/* Triggers Section */}
-              <div className="space-y-3">
-                <Label className="flex items-center gap-2">
-                  <Bell className="h-4 w-4" />
-                  Gatilhos Automáticos
-                </Label>
-                
-                <div className="grid gap-2">
-                  {[
-                    { key: 'receive_smart_alerts', label: 'Smart Alerts', description: 'Alertas automáticos de SLA e atrasos', icon: AlertTriangle },
-                    { key: 'receive_status_changes', label: 'Mudanças de Status', description: 'Quando pedidos mudam de status', icon: MessageSquare },
-                    { key: 'receive_phase_notifications', label: 'Notificações de Fase', description: 'Quando pedidos entram em nova fase', icon: Bell },
-                    { key: 'receive_purchase_alerts', label: 'Alertas de Compras', description: 'Itens aguardando compra', icon: Zap },
-                    { key: 'receive_ai_handoff_alerts', label: 'Handoff IA', description: 'Quando agente passa para humano', icon: Zap },
-                    { key: 'receive_daily_reports', label: 'Relatórios Diários', description: 'Resumo diário de texto', icon: FileBarChart },
-                    { key: 'receive_visual_reports', label: 'Relatórios Visuais', description: 'Gráficos e dashboards visuais', icon: TrendingUp },
-                    { key: 'receive_freight_quotes', label: 'Cotações de Frete', description: 'Notificações de cotações', icon: Bell },
-                    { key: 'receive_delivery_confirmations', label: 'Confirmações de Entrega', description: 'Respostas de confirmação', icon: CheckCircle2 },
-                  ].map((trigger) => {
-                    const Icon = trigger.icon;
-                    const isEnabled = (editingWebhook as any)[trigger.key];
-                    return (
-                      <div
-                        key={trigger.key}
+                {/* Priority */}
+                <div className="space-y-2">
+                  <Label>Prioridade Mínima</Label>
+                  <div className="flex gap-2">
+                    {[
+                      { value: 1, label: 'Crítico', color: 'bg-red-500' },
+                      { value: 2, label: 'Alto', color: 'bg-orange-500' },
+                      { value: 3, label: 'Normal', color: 'bg-blue-500' },
+                    ].map((p) => (
+                      <button
+                        key={p.value}
+                        type="button"
+                        onClick={() => setEditingWebhook({ ...editingWebhook, min_priority: p.value })}
                         className={cn(
-                          "flex items-center justify-between p-3 rounded-lg border transition-all",
-                          isEnabled ? "bg-primary/5 border-primary/30" : "bg-muted/30 border-border"
+                          "flex-1 py-2 px-3 rounded-md border-2 text-sm font-medium transition-all",
+                          editingWebhook.min_priority === p.value
+                            ? "border-primary bg-primary/10"
+                            : "border-border hover:border-primary/50"
                         )}
                       >
-                        <div className="flex items-center gap-3">
-                          <Icon className={cn("h-4 w-4", isEnabled ? "text-primary" : "text-muted-foreground")} />
-                          <div>
-                            <p className="text-sm font-medium">{trigger.label}</p>
-                            <p className="text-xs text-muted-foreground">{trigger.description}</p>
+                        <div className={cn("w-3 h-3 rounded-full mx-auto mb-1", p.color)} />
+                        {p.label}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Recebe apenas notificações com prioridade igual ou menor.
+                  </p>
+                </div>
+
+                <Separator />
+
+                {/* Triggers Section */}
+                <div className="space-y-3">
+                  <Label className="flex items-center gap-2">
+                    <Bell className="h-4 w-4" />
+                    Gatilhos Automáticos
+                  </Label>
+                  
+                  <div className="grid gap-2">
+                    {[
+                      { key: 'receive_smart_alerts', label: 'Smart Alerts', description: 'Alertas automáticos de SLA e atrasos', icon: AlertTriangle },
+                      { key: 'receive_status_changes', label: 'Mudanças de Status', description: 'Quando pedidos mudam de status', icon: MessageSquare },
+                      { key: 'receive_phase_notifications', label: 'Notificações de Fase', description: 'Quando pedidos entram em nova fase', icon: Bell },
+                      { key: 'receive_purchase_alerts', label: 'Alertas de Compras', description: 'Itens aguardando compra', icon: Zap },
+                      { key: 'receive_ai_handoff_alerts', label: 'Handoff IA', description: 'Quando agente passa para humano', icon: Zap },
+                      { key: 'receive_daily_reports', label: 'Relatórios Diários', description: 'Resumo diário de texto', icon: FileBarChart },
+                      { key: 'receive_visual_reports', label: 'Relatórios Visuais', description: 'Gráficos e dashboards visuais', icon: TrendingUp },
+                      { key: 'receive_freight_quotes', label: 'Cotações de Frete', description: 'Notificações de cotações', icon: Bell },
+                      { key: 'receive_delivery_confirmations', label: 'Confirmações de Entrega', description: 'Respostas de confirmação', icon: CheckCircle2 },
+                    ].map((trigger) => {
+                      const Icon = trigger.icon;
+                      const isEnabled = (editingWebhook as any)[trigger.key];
+                      return (
+                        <div
+                          key={trigger.key}
+                          className={cn(
+                            "flex items-center justify-between p-3 rounded-lg border transition-all",
+                            isEnabled ? "bg-primary/5 border-primary/30" : "bg-muted/30 border-border"
+                          )}
+                        >
+                          <div className="flex items-center gap-3">
+                            <Icon className={cn("h-4 w-4", isEnabled ? "text-primary" : "text-muted-foreground")} />
+                            <div>
+                              <p className="text-sm font-medium">{trigger.label}</p>
+                              <p className="text-xs text-muted-foreground">{trigger.description}</p>
+                            </div>
                           </div>
+                          <Switch
+                            checked={isEnabled}
+                            onCheckedChange={(checked) =>
+                              setEditingWebhook({ ...editingWebhook, [trigger.key]: checked })
+                            }
+                          />
                         </div>
-                        <Switch
-                          checked={isEnabled}
-                          onCheckedChange={(checked) =>
-                            setEditingWebhook({ ...editingWebhook, [trigger.key]: checked })
-                          }
-                        />
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <Separator />
+
+                {/* Advanced Options */}
+                <div className="space-y-3">
+                  <Label className="flex items-center gap-2">
+                    <Settings2 className="h-4 w-4" />
+                    Opções Avançadas
+                  </Label>
+                  
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between p-3 rounded-lg border">
+                      <div>
+                        <p className="text-sm font-medium">Menções de Roles</p>
+                        <p className="text-xs text-muted-foreground">Mencionar roles do Discord para prioridade alta</p>
                       </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <Separator />
-
-              {/* Advanced Options */}
-              <div className="space-y-3">
-                <Label className="flex items-center gap-2">
-                  <Settings2 className="h-4 w-4" />
-                  Opções Avançadas
-                </Label>
-                
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between p-3 rounded-lg border">
-                    <div>
-                      <p className="text-sm font-medium">Menções de Roles</p>
-                      <p className="text-xs text-muted-foreground">Mencionar roles do Discord para prioridade alta</p>
+                      <Switch
+                        checked={editingWebhook.enable_role_mentions}
+                        onCheckedChange={(checked) =>
+                          setEditingWebhook({ ...editingWebhook, enable_role_mentions: checked })
+                        }
+                      />
                     </div>
-                    <Switch
-                      checked={editingWebhook.enable_role_mentions}
-                      onCheckedChange={(checked) =>
-                        setEditingWebhook({ ...editingWebhook, enable_role_mentions: checked })
-                      }
-                    />
-                  </div>
-                  
-                  <div className="flex items-center justify-between p-3 rounded-lg border">
-                    <div>
-                      <p className="text-sm font-medium">Modo Digest</p>
-                      <p className="text-xs text-muted-foreground">Agrupar notificações não-críticas em resumos</p>
+                    
+                    <div className="flex items-center justify-between p-3 rounded-lg border">
+                      <div>
+                        <p className="text-sm font-medium">Modo Digest</p>
+                        <p className="text-xs text-muted-foreground">Agrupar notificações não-críticas em resumos</p>
+                      </div>
+                      <Switch
+                        checked={editingWebhook.enable_digest}
+                        onCheckedChange={(checked) =>
+                          setEditingWebhook({ ...editingWebhook, enable_digest: checked })
+                        }
+                      />
                     </div>
-                    <Switch
-                      checked={editingWebhook.enable_digest}
-                      onCheckedChange={(checked) =>
-                        setEditingWebhook({ ...editingWebhook, enable_digest: checked })
-                      }
-                    />
-                  </div>
-                  
-                  <div className="flex items-center justify-between p-3 rounded-lg border">
-                    <div>
-                      <p className="text-sm font-medium">Threads Automáticas</p>
-                      <p className="text-xs text-muted-foreground">Agrupar notificações por pedido em threads</p>
+                    
+                    <div className="flex items-center justify-between p-3 rounded-lg border">
+                      <div>
+                        <p className="text-sm font-medium">Threads Automáticas</p>
+                        <p className="text-xs text-muted-foreground">Agrupar notificações por pedido em threads</p>
+                      </div>
+                      <Switch
+                        checked={editingWebhook.enable_auto_threads}
+                        onCheckedChange={(checked) =>
+                          setEditingWebhook({ ...editingWebhook, enable_auto_threads: checked })
+                        }
+                      />
                     </div>
-                    <Switch
-                      checked={editingWebhook.enable_auto_threads}
-                      onCheckedChange={(checked) =>
-                        setEditingWebhook({ ...editingWebhook, enable_auto_threads: checked })
-                      }
-                    />
                   </div>
                 </div>
               </div>
-            </div>
+            </ScrollArea>
           )}
 
-          <DialogFooter>
+          <DialogFooter className="pt-4 border-t mt-4 flex-shrink-0">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => editingWebhook && testWebhook(editingWebhook)}
+              disabled={testingId === editingWebhook?.id || !editingWebhook?.is_active}
+            >
+              {testingId === editingWebhook?.id ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <TestTube2 className="h-4 w-4 mr-2" />
+              )}
+              Testar
+            </Button>
+            <div className="flex-1" />
             <Button variant="outline" onClick={() => setEditingWebhook(null)}>
               Cancelar
             </Button>
