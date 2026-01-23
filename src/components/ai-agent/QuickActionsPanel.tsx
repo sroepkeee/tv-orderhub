@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -7,6 +8,13 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Separator } from "@/components/ui/separator";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { 
   Send, 
   Loader2, 
@@ -20,11 +28,13 @@ import {
   PieChart,
   MessageSquare,
   Clock,
-  Phone
+  Phone,
+  Hash
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { useOrganizationId } from "@/hooks/useOrganizationId";
 
 interface ReportType {
   id: string;
@@ -33,6 +43,13 @@ interface ReportType {
   description: string;
   color: string;
   borderColor: string;
+}
+
+interface DiscordWebhook {
+  id: string;
+  channel_name: string;
+  is_active: boolean;
+  receive_visual_reports: boolean;
 }
 
 const REPORT_TYPES: ReportType[] = [
@@ -83,6 +100,7 @@ interface QuickActionsPanelProps {
 }
 
 export function QuickActionsPanel({ className }: QuickActionsPanelProps) {
+  const { organizationId } = useOrganizationId();
   const [sendingReport, setSendingReport] = useState<string | null>(null);
   const [showReportOptions, setShowReportOptions] = useState(false);
   const [selectedReportType, setSelectedReportType] = useState<ReportType | null>(null);
@@ -95,21 +113,54 @@ export function QuickActionsPanel({ className }: QuickActionsPanelProps) {
   const [lastSentReports, setLastSentReports] = useState<Record<string, boolean>>({});
   const [sendingDiscord, setSendingDiscord] = useState(false);
   const [discordSent, setDiscordSent] = useState(false);
+  const [selectedWebhookId, setSelectedWebhookId] = useState<string>("all");
+
+  // Fetch Discord webhooks for the select
+  const { data: discordWebhooks } = useQuery({
+    queryKey: ["discord-webhooks-quick", organizationId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("discord_webhooks")
+        .select("id, channel_name, is_active, receive_visual_reports")
+        .eq("organization_id", organizationId)
+        .eq("is_active", true)
+        .order("channel_name");
+
+      if (error) throw error;
+      return data as DiscordWebhook[];
+    },
+    enabled: !!organizationId,
+  });
 
   const sendDiscordVisualReport = async () => {
     setSendingDiscord(true);
     try {
+      const body: Record<string, string> = {};
+      
+      // Se selecionou um webhook específico, passa o ID
+      if (selectedWebhookId && selectedWebhookId !== "all") {
+        body.targetWebhookId = selectedWebhookId;
+      }
+      
+      if (organizationId) {
+        body.organizationId = organizationId;
+      }
+      
       const { data, error } = await supabase.functions.invoke('discord-send-chart-report', {
-        body: {}
+        body
       });
       
       if (error) throw error;
       
       setDiscordSent(true);
       
+      const targetName = selectedWebhookId === "all" 
+        ? `${data?.sent || 0} canal(is)` 
+        : `#${discordWebhooks?.find(w => w.id === selectedWebhookId)?.channel_name || 'canal'}`;
+      
       toast({
         title: "Relatório Discord Enviado!",
-        description: `Enviado para ${data?.sent || 0} canal(is) com ${data?.embedCount || 8} embeds e gráficos.`,
+        description: `Enviado para ${targetName} com ${data?.embedCount || 8} embeds e gráficos.`,
       });
     } catch (error: any) {
       console.error('Error sending Discord report:', error);
@@ -293,6 +344,47 @@ export function QuickActionsPanel({ className }: QuickActionsPanelProps) {
                 <Clock className="h-3 w-3 mr-1" />
                 8h diário
               </Badge>
+            </div>
+
+            {/* Webhook Selector */}
+            <div className="space-y-2">
+              <Label className="text-xs text-muted-foreground">Enviar para:</Label>
+              <Select value={selectedWebhookId} onValueChange={setSelectedWebhookId}>
+                <SelectTrigger className="h-9 border-[#5865F2]/30">
+                  <SelectValue placeholder="Selecione o canal" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">
+                    <div className="flex items-center gap-2">
+                      <MessageSquare className="h-4 w-4" />
+                      <span>Todos os webhooks ativos</span>
+                    </div>
+                  </SelectItem>
+                  {discordWebhooks?.filter(w => w.receive_visual_reports).map((webhook) => (
+                    <SelectItem key={webhook.id} value={webhook.id}>
+                      <div className="flex items-center gap-2">
+                        <Hash className="h-4 w-4 text-muted-foreground" />
+                        <span>{webhook.channel_name}</span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                  {discordWebhooks?.filter(w => !w.receive_visual_reports).length ? (
+                    <>
+                      <div className="px-2 py-1.5 text-xs text-muted-foreground border-t mt-1 pt-1">
+                        Webhooks sem relatórios visuais:
+                      </div>
+                      {discordWebhooks?.filter(w => !w.receive_visual_reports).map((webhook) => (
+                        <SelectItem key={webhook.id} value={webhook.id}>
+                          <div className="flex items-center gap-2">
+                            <Hash className="h-4 w-4 text-muted-foreground opacity-50" />
+                            <span className="opacity-75">{webhook.channel_name}</span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </>
+                  ) : null}
+                </SelectContent>
+              </Select>
             </div>
             
             <div className="flex gap-2">
