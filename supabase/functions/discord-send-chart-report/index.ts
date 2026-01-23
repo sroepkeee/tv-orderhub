@@ -280,12 +280,21 @@ serve(async (req) => {
 
   try {
     const supabase = createClient(Deno.env.get("SUPABASE_URL") ?? "", Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "");
-    const { organizationId } = await req.json().catch(() => ({}));
+    const { organizationId, targetWebhookId } = await req.json().catch(() => ({}));
 
-    console.log(`[discord-send-chart-report] Starting. Org: ${organizationId || "all"}`);
+    console.log(`[discord-send-chart-report] Starting. Org: ${organizationId || "all"}, Target: ${targetWebhookId || "all"}`);
 
-    let q = supabase.from("discord_webhooks").select("*").eq("is_active", true).eq("receive_visual_reports", true);
-    if (organizationId) q = q.eq("organization_id", organizationId);
+    let q = supabase.from("discord_webhooks").select("*").eq("is_active", true);
+    
+    // Se targetWebhookId foi informado, buscar apenas esse webhook específico
+    if (targetWebhookId) {
+      q = q.eq("id", targetWebhookId);
+    } else {
+      // Caso contrário, buscar todos que recebem relatórios visuais
+      q = q.eq("receive_visual_reports", true);
+      if (organizationId) q = q.eq("organization_id", organizationId);
+    }
+    
     const { data: webhooks } = await q;
 
     if (!webhooks?.length) return new Response(JSON.stringify({ success: true, sent: 0, message: "No webhooks" }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
