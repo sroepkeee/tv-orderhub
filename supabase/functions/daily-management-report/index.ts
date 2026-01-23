@@ -984,7 +984,6 @@ serve(async (req) => {
 
     // 📊 ENVIAR RELATÓRIO VISUAL PARA DISCORD (se solicitado)
     if (sendToDiscord) {
-    if (sendToDiscord) {
       try {
         console.log('📊 Sending visual report to Discord...');
         const discordResult = await supabase.functions.invoke('discord-send-chart-report', {
