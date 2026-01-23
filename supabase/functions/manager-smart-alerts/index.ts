@@ -406,18 +406,23 @@ ${stuckOrders.slice(0, 5).map(o => `• #${o.order_number}`).join('\n')}
     }
 
     // Enviar alertas também para Discord (em paralelo, não bloqueia WhatsApp)
+    // Alertas de prioridade 1 são marcados como "emergency_alert" para tratamento especial
     for (const alert of alerts) {
       try {
+        const isEmergency = alert.priority === 1;
+        const notificationType = isEmergency ? 'emergency_alert' : 'smart_alert';
+        
         await supabase.functions.invoke('discord-notify', {
           body: {
-            notificationType: 'smart_alert',
+            notificationType,
             priority: alert.priority,
             title: alert.type.replace(/_/g, ' ').toUpperCase(),
             message: alert.message,
+            alertType: alert.type,  // Tipo específico do alerta
             metadata: alert.metadata,
           }
         });
-        console.log(`📤 Discord: Sent ${alert.type} alert`);
+        console.log(`📤 Discord: Sent ${alert.type} as ${notificationType} (priority ${alert.priority})`);
       } catch (discordErr) {
         console.error(`❌ Discord error for ${alert.type}:`, discordErr);
         // Não falhar a função se Discord falhar
