@@ -1381,9 +1381,34 @@ export const Dashboard = () => {
     } else if (activeTab === "materials") {
       matchesTab = order.type === "materials";
     }
-    // Busca direta por número de pedido (solução 1C)
+    // Busca avançada por número de pedido ou código de item
+    const searchTerm = searchQuery.trim().toLowerCase();
     const isNumericSearch = /^\d+$/.test(searchQuery.trim());
-    const matchesSearch = isNumericSearch ? order.orderNumber.includes(searchQuery.trim()) || order.totvsOrderNumber?.includes(searchQuery.trim()) : order.orderNumber.toLowerCase().includes(searchQuery.toLowerCase()) || order.item.toLowerCase().includes(searchQuery.toLowerCase()) || order.client.toLowerCase().includes(searchQuery.toLowerCase()) || order.deskTicket.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    // Verificar se algum item do pedido contém o código pesquisado
+    const matchesItemCode = order.items?.some(item => 
+      item.itemCode?.toLowerCase().includes(searchTerm)
+    ) ?? false;
+    
+    const matchesItemDescription = order.items?.some(item => 
+      item.itemDescription?.toLowerCase().includes(searchTerm)
+    ) ?? false;
+    
+    const matchesSearch = searchTerm === '' ? true : (
+      isNumericSearch 
+        ? order.orderNumber.includes(searchQuery.trim()) || 
+          order.totvsOrderNumber?.includes(searchQuery.trim()) ||
+          matchesItemCode
+        : (
+          order.orderNumber.toLowerCase().includes(searchTerm) ||
+          order.totvsOrderNumber?.toLowerCase().includes(searchTerm) ||
+          order.item.toLowerCase().includes(searchTerm) ||
+          order.client.toLowerCase().includes(searchTerm) ||
+          order.deskTicket.toLowerCase().includes(searchTerm) ||
+          matchesItemCode ||
+          matchesItemDescription
+        )
+    );
 
     // Date range filter
     let matchesDate = true;
@@ -2092,7 +2117,7 @@ export const Dashboard = () => {
               <div className="flex items-center gap-1.5 lg:gap-2">
                 <div className="relative hidden sm:block">
                   <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 text-muted-foreground h-3.5 w-3.5" />
-                  <Input placeholder="Buscar..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="pl-8 w-32 lg:w-48 h-8 text-sm" />
+                  <Input placeholder="Pedido ou código..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="pl-8 w-32 lg:w-48 h-8 text-sm" />
                 </div>
                 <DateRangeFilter dateRange={dateRange} onDateRangeChange={setDateRange} />
                 <ViewSettingsPopover viewMode={viewMode} kanbanDensity={kanbanDensity} kanbanAutoDetect={kanbanAutoDetect} onViewModeChange={setViewMode} onKanbanDensityChange={setKanbanDensity} onKanbanAutoDetectChange={setKanbanAutoDetect} />
