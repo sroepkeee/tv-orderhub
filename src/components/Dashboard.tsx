@@ -1544,7 +1544,7 @@ export const Dashboard = () => {
     if (delivered < requested) return 'partial';
     return 'completed';
   };
-  const handleEditOrder = async (updatedOrder: Order) => {
+  const handleEditOrder = async (updatedOrder: Order & { deletedItemIds?: string[] }) => {
     if (!user) return;
 
     // 🔒 Marcar que estamos editando para bloquear realtime
@@ -1599,12 +1599,26 @@ export const Dashboard = () => {
         const existingItemIds = new Set((existingItems || []).map(item => item.id));
         const currentItemIds = new Set(updatedOrder.items.filter(item => item.id).map(item => item.id as string));
 
-        // Delete items removed from list - RLS policies handle security for collaborative editing
-        const itemsToDelete = (existingItems || []).filter(row => !currentItemIds.has(row.id)).map(row => row.id);
-        if (itemsToDelete.length > 0) {
+        // ✨ CORREÇÃO: Usar deletedItemIds explícitos (proteção contra race condition real-time)
+        const explicitDeletes = updatedOrder.deletedItemIds || [];
+        
+        // Também identificar itens removidos da lista (backup para compatibilidade)
+        const implicitDeletes = (existingItems || [])
+          .filter(row => !currentItemIds.has(row.id))
+          .map(row => row.id);
+        
+        // Combinar ambas as listas (explícita + implícita) sem duplicatas
+        const allItemsToDelete = [...new Set([...explicitDeletes, ...implicitDeletes])];
+        
+        if (allItemsToDelete.length > 0) {
+          console.log('🗑️ [handleEditOrder] Deletando itens:', {
+            explicitDeletes,
+            implicitDeletes,
+            allItemsToDelete
+          });
           const {
             error: deleteError
-          } = await supabase.from('order_items').delete().in('id', itemsToDelete);
+          } = await supabase.from('order_items').delete().in('id', allItemsToDelete);
           if (deleteError) throw deleteError;
         }
 

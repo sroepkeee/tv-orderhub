@@ -99,6 +99,8 @@ export const EditOrderDialog = ({
     return "edit";
   });
   const [items, setItems] = useState<OrderItem[]>([]);
+  // ✨ Rastrear IDs de itens marcados para exclusão (proteção contra race condition real-time)
+  const [deletedItemIds, setDeletedItemIds] = useState<Set<string>>(new Set());
   const [historyEvents, setHistoryEvents] = useState<HistoryEvent[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [comments, setComments] = useState<OrderComment[]>([]);
@@ -710,6 +712,9 @@ export const EditOrderDialog = ({
 
       // ✨ Limpar campos modificados ao abrir
       setModifiedFields(new Set());
+      
+      // ✨ Limpar IDs de itens excluídos ao abrir (reset para novo ciclo de edição)
+      setDeletedItemIds(new Set());
 
       // Inicializar ref com valores atuais
       lastShippingRef.current = {
@@ -875,7 +880,19 @@ export const EditOrderDialog = ({
       .eq('order_id', order.id)
       .order('created_at', { ascending: true });
     
-    const mappedItems = (itemsData || []).map(item => ({
+    // ✨ Filtrar itens que foram marcados para exclusão localmente
+    // Isso evita que o real-time "ressuscite" itens excluídos antes de salvar
+    const filteredData = (itemsData || []).filter(item => !deletedItemIds.has(item.id));
+    
+    if (deletedItemIds.size > 0 && itemsData) {
+      console.log('🔒 [loadItems] Filtrando itens marcados para exclusão:', {
+        totalFromDb: itemsData.length,
+        deletedIds: Array.from(deletedItemIds),
+        afterFilter: filteredData.length
+      });
+    }
+    
+    const mappedItems = filteredData.map(item => ({
       id: item.id,
       itemCode: item.item_code,
       itemDescription: cleanItemDescription(item.item_description),
@@ -990,10 +1007,17 @@ export const EditOrderDialog = ({
   };
   const removeItem = (index: number) => {
     const itemToRemove = items[index];
+    
+    // ✨ Se o item tem ID (existe no banco), rastrear para exclusão explícita
+    if (itemToRemove?.id) {
+      console.log('🗑️ [removeItem] Marcando item para exclusão:', itemToRemove.id, itemToRemove.itemCode);
+      setDeletedItemIds(prev => new Set([...prev, itemToRemove.id!]));
+    }
+    
     setItems(items.filter((_, i) => i !== index));
     toast({
       title: "Item removido",
-      description: `${itemToRemove?.itemCode || 'Item'} removido. Clique em Salvar para confirmar.`,
+      description: `${itemToRemove?.itemCode || 'Item'} marcado para exclusão. Clique em Salvar para confirmar.`,
     });
   };
 
@@ -1915,6 +1939,8 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
         ...data,
         id: order.id,
         items,
+        // ✨ Passar IDs excluídos explicitamente para o Dashboard (proteção contra race condition)
+        deletedItemIds: Array.from(deletedItemIds),
         business_unit: watch('business_unit' as any) || (order as any).business_unit,
         business_area: watch('business_area' as any) || (order as any).business_area,
         cost_center: watch('cost_center' as any) || (order as any).cost_center,
@@ -1922,6 +1948,8 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
         sender_company: watch('sender_company' as any) || (order as any).sender_company,
         customer_contact_name: contactName
       };
+      
+      console.log('📋 [onSubmit] deletedItemIds incluídos:', Array.from(deletedItemIds));
 
       // ✨ Track ALL field changes for complete history
       try {
