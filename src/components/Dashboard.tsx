@@ -1616,9 +1616,30 @@ export const Dashboard = () => {
             implicitDeletes,
             allItemsToDelete
           });
-          const {
-            error: deleteError
-          } = await supabase.from('order_items').delete().in('id', allItemsToDelete);
+          
+          // ✨ Limpar referências de foreign keys antes de deletar
+          // SET NULL para preservar histórico de compras/despachos/devoluções
+          await supabase
+            .from('purchase_request_items')
+            .update({ order_item_id: null })
+            .in('order_item_id', allItemsToDelete);
+            
+          await supabase
+            .from('technician_dispatch_items')
+            .update({ order_item_id: null })
+            .in('order_item_id', allItemsToDelete);
+            
+          await supabase
+            .from('return_request_items')
+            .update({ order_item_id: null })
+            .in('order_item_id', allItemsToDelete);
+          
+          // Agora pode deletar os itens com segurança
+          const { error: deleteError } = await supabase
+            .from('order_items')
+            .delete()
+            .in('id', allItemsToDelete);
+            
           if (deleteError) throw deleteError;
         }
 
