@@ -1,78 +1,102 @@
-# ✅ Correção Implementada: Bug na Exclusão de Itens do Pedido
 
-## Status: CONCLUÍDO
+## Plano: Corrigir Erro de Foreign Key na Exclusão de Itens
 
-### Problema Resolvido
+### Problema Identificado
 
-O usuário enfrentava um bug onde ao excluir um item do pedido:
-1. O item desaparecia visualmente
-2. Aparecia toast "Item removido. Clique em Salvar para confirmar."
-3. Após clicar em "Salvar Alterações", o item reaparecia ao reabrir o pedido
+O erro `foreign key constraint "purchase_request_items_order_item_id_fkey"` ocorre porque:
 
-**Causa Raiz:** Race condition entre o real-time subscription e o fluxo de salvamento
+1. Um `order_item` (ex: item 034275) está referenciado na tabela `purchase_request_items`
+2. Quando tentamos deletar o `order_item`, o banco de dados impede porque há registros dependentes
+3. A constraint está configurada como `NO ACTION` - não permite exclusão automática
 
----
+### Tabelas com Foreign Keys para `order_items`
 
-### Solução Implementada
+| Tabela | Constraint | Delete Action |
+|--------|-----------|---------------|
+| `purchase_request_items` | order_item_id_fkey | NO ACTION ❌ |
+| `technician_dispatch_items` | order_item_id_fkey | NO ACTION ❌ |
+| `return_request_items` | order_item_id_fkey | NO ACTION ❌ |
+| `delivery_date_changes` | order_item_id_fkey | CASCADE ✅ |
+| `order_item_history` | order_item_id_fkey | CASCADE ✅ |
+| `stock_movements` | order_item_id_fkey | CASCADE ✅ |
+| `lab_item_work` | order_item_id_fkey | CASCADE ✅ |
 
-Em vez de depender apenas da comparação de listas, agora rastreamos explicitamente os IDs dos itens marcados para exclusão.
+### Solução Proposta
 
-#### Alterações Realizadas
-
-| Arquivo | Alteração |
-|---------|-----------|
-| `src/components/EditOrderDialog.tsx` | ✅ Adicionado state `deletedItemIds` (Set<string>) |
-| `src/components/EditOrderDialog.tsx` | ✅ Modificado `removeItem()` para rastrear IDs |
-| `src/components/EditOrderDialog.tsx` | ✅ Modificado `loadItems()` para filtrar itens excluídos |
-| `src/components/EditOrderDialog.tsx` | ✅ Modificado `onSubmit()` para passar `deletedItemIds` |
-| `src/components/Dashboard.tsx` | ✅ Modificado `handleEditOrder()` para usar IDs explícitos |
-| `src/components/__tests__/EditOrderDialog.removeItem.test.tsx` | ✅ Criado arquivo de testes |
-| `src/components/__tests__/Dashboard.handleEditOrder.test.tsx` | ✅ Criado arquivo de testes |
-
----
-
-### Fluxo Corrigido
+Antes de deletar `order_items`, remover as referências nas tabelas dependentes:
 
 ```text
 ┌─────────────────────────────────────────────────────────────────┐
-│ FLUXO CORRIGIDO                                                 │
+│ ANTES DE DELETAR order_items:                                   │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
-│  1. Usuário clica em excluir item                               │
-│     └─> removeItem() atualiza estado local                      │
-│     └─> ID do item é adicionado ao Set "deletedItemIds"         │
-│     └─> Item some da tela                                       │
-│                                                                 │
-│  2. Se evento real-time chegar...                               │
-│     └─> loadItems() recarrega do banco                          │
-│     └─> MAS filtra itens cujos IDs estão em "deletedItemIds"    │
-│     └─> Item excluído NÃO volta para a lista                    │
-│                                                                 │
-│  3. Usuário clica "Salvar Alterações"                           │
-│     └─> Dashboard.tsx recebe "deletedItemIds" como parâmetro    │
-│     └─> Deleta explicitamente os IDs marcados                   │
-│     └─> Combina com detecção implícita (fallback)               │
-│                                                                 │
-│  4. Pedido é salvo COM exclusão garantida ✅                    │
+│  1. SET NULL em purchase_request_items.order_item_id            │
+│  2. SET NULL em technician_dispatch_items.order_item_id         │
+│  3. SET NULL em return_request_items.order_item_id              │
+│  4. Então deletar order_items (dependências CASCADE são auto)   │
 │                                                                 │
 └─────────────────────────────────────────────────────────────────┘
 ```
+
+> **Nota**: Usamos SET NULL ao invés de DELETE porque os registros de compras/despachos/devoluções ainda têm valor histórico - só removemos o vínculo com o item excluído.
+
+---
+
+### Alteração: `src/components/Dashboard.tsx`
+
+**Arquivo:** `src/components/Dashboard.tsx`  
+**Linhas:** ~1613-1623
+
+Adicionar limpeza de dependências antes da exclusão:
+
+```typescript
+if (allItemsToDelete.length > 0) {
+  console.log('🗑️ [handleEditOrder] Deletando itens:', {
+    explicitDeletes,
+    implicitDeletes,
+    allItemsToDelete
+  });
+  
+  // ✨ NOVO: Limpar referências de foreign keys antes de deletar
+  // SET NULL para preservar histórico de compras/despachos/devoluções
+  await supabase
+    .from('purchase_request_items')
+    .update({ order_item_id: null })
+    .in('order_item_id', allItemsToDelete);
+    
+  await supabase
+    .from('technician_dispatch_items')
+    .update({ order_item_id: null })
+    .in('order_item_id', allItemsToDelete);
+    
+  await supabase
+    .from('return_request_items')
+    .update({ order_item_id: null })
+    .in('order_item_id', allItemsToDelete);
+  
+  // Agora pode deletar os itens com segurança
+  const { error: deleteError } = await supabase
+    .from('order_items')
+    .delete()
+    .in('id', allItemsToDelete);
+    
+  if (deleteError) throw deleteError;
+}
+```
+
+---
+
+### Resumo das Alterações
+
+| Arquivo | Alteração |
+|---------|-----------|
+| `src/components/Dashboard.tsx` | Adicionar 3 operações `UPDATE SET NULL` antes do `DELETE` |
 
 ---
 
 ### Benefícios
 
-1. **Confiabilidade** - IDs explícitos garantem exclusão mesmo com race conditions
-2. **Resiliência ao Real-time** - Itens excluídos não "voltam" mesmo após loadItems()
-3. **Fallback** - Mantém lógica de comparação implícita como backup
-4. **Testável** - Lógica isolada facilita testes unitários
-5. **Logging** - Console.log detalhado para facilitar debug em produção
-
----
-
-### Logs de Diagnóstico Adicionados
-
-- `🗑️ [removeItem] Marcando item para exclusão: {id}, {itemCode}`
-- `🔒 [loadItems] Filtrando itens marcados para exclusão: {...}`
-- `📋 [onSubmit] deletedItemIds incluídos: [...]`
-- `🗑️ [handleEditOrder] Deletando itens: {explicitDeletes, implicitDeletes, allItemsToDelete}`
+1. **Elimina erro de foreign key** - Referências são limpas antes da exclusão
+2. **Preserva histórico** - Registros de compras/despachos/devoluções continuam existindo
+3. **Consistente** - Mesma abordagem usada na exclusão de pedido inteiro
+4. **Sem impacto em performance** - Operações UPDATE são rápidas com índices
