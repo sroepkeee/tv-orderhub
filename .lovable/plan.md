@@ -1,71 +1,80 @@
 
-## Plano: Corrigir Role do Usuário Luis Antonio Sehnem
+## Plano: Corrigir Erro de Coluna Inexistente na Edge Function
 
-### Situação Atual
+### Diagnóstico
 
-| Campo | Valor |
-|-------|-------|
-| **Usuário** | Luis Antonio Sehnem |
-| **Departamento** | Projetos |
-| **is_active** | ❌ false (precisa corrigir) |
-| **Roles atuais** | 16 roles (incluindo `admin` indevidamente) |
-
-### O Que Aconteceu
-
-A migration anterior (`20260202183548`) executou:
-```sql
-DELETE FROM user_roles WHERE user_id = '...';
-INSERT INTO user_roles (user_id, role) VALUES ('...', 'admin');
+O erro identificado nos logs do PostgreSQL:
+```
+column order_items_1.description does not exist
 ```
 
-Porém as roles antigas (15 operacionais) já tinham sido restauradas de alguma forma, e agora ele tem **16 roles** incluindo `admin`.
+**Origem do erro:** Arquivo `supabase/functions/notify-phase-manager/index.ts` (linhas 376-387)
 
-### Correção Necessária
+A query atual tenta buscar uma coluna `description` que não existe na tabela `order_items`:
 
-**Apenas remover a role `admin`** - manter todas as outras 15 roles operacionais que o usuário precisa:
-
-```sql
--- Remover APENAS a role admin
-DELETE FROM user_roles 
-WHERE user_id = 'ea43e80b-cad3-48b3-b2eb-e40649a2d16b'
-AND role = 'admin';
-
--- Reativar o perfil (is_active = false)
-UPDATE profiles 
-SET is_active = true 
-WHERE id = 'ea43e80b-cad3-48b3-b2eb-e40649a2d16b';
+```typescript
+order_items(
+  id, 
+  item_code, 
+  description,         // ❌ ERRO - coluna não existe
+  item_description,    // ✅ coluna correta
+  requested_quantity, 
+  unit, 
+  ...
+)
 ```
 
-### Roles que Permanecerão
+### Impacto
 
-| Role | Área |
-|------|------|
-| almox_ssm | Almoxarifado |
-| order_generation | Planejamento |
-| almox_general | Almoxarifado |
-| production_client | Produção |
-| production_stock | Produção |
-| purchases | Suprimentos |
-| balance_generation | Financeiro |
-| laboratory | Laboratório |
-| packaging | Expedição |
-| freight_quote | Comercial |
-| ready_to_invoice | Financeiro |
-| invoicing | Financeiro |
-| logistics | Expedição |
-| in_transit | Expedição |
-| completion | Finalização |
+- O erro ocorre toda vez que um pedido muda de status
+- A edge function `notify-phase-manager` falha silenciosamente
+- Pode causar comportamentos inesperados no frontend (como o Kanban vazio)
+- Logs indicam falha constante
+
+### Solução
+
+**Arquivo:** `supabase/functions/notify-phase-manager/index.ts`
+
+Remover a referência à coluna `description` inexistente:
+
+| Linha | Antes | Depois |
+|-------|-------|--------|
+| 379 | `description,` | *(remover linha)* |
+
+Código corrigido:
+```typescript
+order_items(
+  id, 
+  item_code, 
+  item_description,    // ✅ apenas esta
+  requested_quantity, 
+  unit, 
+  unit_price, 
+  total_value, 
+  item_status,
+  warehouse
+)
+```
+
+### Verificação Adicional
+
+Há também uma referência no código que tenta usar `item.description` como fallback (linha 210):
+```typescript
+const desc = (item.item_description || item.description || '').substring(0, 25);
+```
+
+Esta linha está segura porque é um fallback opcional em JavaScript, não uma query SQL.
 
 ---
 
-### Resumo da Alteração
+### Resumo das Alterações
 
-| Tipo | Ação |
-|------|------|
-| **SQL** | Remover role `admin` e reativar perfil |
+| Arquivo | Alteração |
+|---------|-----------|
+| `supabase/functions/notify-phase-manager/index.ts` | Remover `description,` da linha 379 |
 
 ### Resultado Esperado
 
-- Luis Sehnem terá acesso às 15 fases conforme suas roles operacionais
-- Não terá mais privilégios de administrador
-- Perfil estará ativo novamente
+1. Edge function parará de falhar com erro de coluna inexistente
+2. Notificações de mudança de status voltarão a funcionar
+3. Dashboard carregará normalmente
