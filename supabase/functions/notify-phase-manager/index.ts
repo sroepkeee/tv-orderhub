@@ -376,7 +376,6 @@ serve(async (req) => {
         order_items(
           id, 
           item_code, 
-          description, 
           item_description,
           requested_quantity, 
           unit, 
