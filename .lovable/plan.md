@@ -1,87 +1,147 @@
 
-## Plano: Corrigir Erro de Foreign Key na Exclusão de Itens
+## Plano: Corrigir Acesso de Usuários Sem Vínculo com Organização
 
-### Problema Identificado
+### Diagnóstico do Problema
 
-O erro `foreign key constraint "purchase_request_items_order_item_id_fkey"` ocorre porque:
+O usuário **Luis Sehnem** foi aprovado no sistema em 29/01/2026, mas o vínculo com a organização falhou:
 
-1. Um `order_item` (ex: item 034275) está referenciado na tabela `purchase_request_items`
-2. Quando tentamos deletar o `order_item`, o banco de dados impede porque há registros dependentes
-3. A constraint está configurada como `NO ACTION` - não permite exclusão automática
+| Verificação | Status |
+|-------------|--------|
+| Perfil existe e está ativo | ✅ is_active = true |
+| Aprovação concluída | ✅ status = approved |
+| Roles atribuídas | ✅ 14 roles (muitas!) |
+| Vínculo com organização | ❌ organization_members VAZIO |
 
-### Tabelas com Foreign Keys para `order_items`
-
-| Tabela | Constraint | Delete Action |
-|--------|-----------|---------------|
-| `purchase_request_items` | order_item_id_fkey | NO ACTION ❌ |
-| `technician_dispatch_items` | order_item_id_fkey | NO ACTION ❌ |
-| `return_request_items` | order_item_id_fkey | NO ACTION ❌ |
-| `delivery_date_changes` | order_item_id_fkey | CASCADE ✅ |
-| `order_item_history` | order_item_id_fkey | CASCADE ✅ |
-| `stock_movements` | order_item_id_fkey | CASCADE ✅ |
-| `lab_item_work` | order_item_id_fkey | CASCADE ✅ |
-
-### Solução Proposta
-
-Antes de deletar `order_items`, remover as referências nas tabelas dependentes:
-
-```text
-┌─────────────────────────────────────────────────────────────────┐
-│ ANTES DE DELETAR order_items:                                   │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  1. SET NULL em purchase_request_items.order_item_id            │
-│  2. SET NULL em technician_dispatch_items.order_item_id         │
-│  3. SET NULL em return_request_items.order_item_id              │
-│  4. Então deletar order_items (dependências CASCADE são auto)   │
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-> **Nota**: Usamos SET NULL ao invés de DELETE porque os registros de compras/despachos/devoluções ainda têm valor histórico - só removemos o vínculo com o item excluído.
+O **OrganizationGuard** bloqueia o acesso porque:
+1. Usuário não está em `organization_members`
+2. Usuário não é admin (então não pode criar organização)
+3. Resultado: mostra tela "Aguardando Convite"
 
 ---
 
-### Alteração: `src/components/Dashboard.tsx`
+### Causa Raiz
 
-**Arquivo:** `src/components/Dashboard.tsx`  
-**Linhas:** ~1613-1623
+O código de aprovação (`UserApprovalDialog`) insere no `organization_members`, mas depende de:
+```typescript
+if (!existingMembership && organization?.id) {
+  // insert...
+}
+```
 
-Adicionar limpeza de dependências antes da exclusão:
+Se o `organization` do admin estivesse `undefined` no momento da aprovação (race condition de loading), o insert não aconteceu silenciosamente.
+
+---
+
+### Solução em 3 Partes
+
+#### Parte 1: Correção Imediata (SQL no Supabase)
+
+Adicionar Luis Sehnem à organização Imply manualmente:
+
+```sql
+INSERT INTO organization_members (organization_id, user_id, role, is_active)
+VALUES (
+  '69aed6aa-5300-4e40-b66a-e71f3706db16', -- Imply org
+  'ea43e80b-cad3-48b3-b2eb-e40649a2d16b', -- Luis Sehnem
+  'member',
+  true
+);
+```
+
+#### Parte 2: Proteção no Código (Fallback)
+
+**Arquivo:** `src/components/onboarding/OrganizationGuard.tsx`
+
+Adicionar um fallback para usuários legados/aprovados que não têm `organization_members`:
 
 ```typescript
-if (allItemsToDelete.length > 0) {
-  console.log('🗑️ [handleEditOrder] Deletando itens:', {
-    explicitDeletes,
-    implicitDeletes,
-    allItemsToDelete
-  });
+// MUDANÇA: Se usuário está aprovado e ativo, mas sem organização,
+// vincular automaticamente à organização padrão (se existir apenas uma)
+
+// Após verificar que não tem organization_members:
+if (!membership?.organization_id) {
+  // Verificar se é usuário aprovado
+  const { data: approval } = await supabase
+    .from('user_approval_status')
+    .select('status')
+    .eq('user_id', user.id)
+    .maybeSingle();
   
-  // ✨ NOVO: Limpar referências de foreign keys antes de deletar
-  // SET NULL para preservar histórico de compras/despachos/devoluções
-  await supabase
-    .from('purchase_request_items')
-    .update({ order_item_id: null })
-    .in('order_item_id', allItemsToDelete);
+  // Se está aprovado, tentar vincular à única organização existente
+  if (approval?.status === 'approved') {
+    const { data: orgs } = await supabase
+      .from('organizations')
+      .select('id')
+      .limit(2);
     
-  await supabase
-    .from('technician_dispatch_items')
-    .update({ order_item_id: null })
-    .in('order_item_id', allItemsToDelete);
-    
-  await supabase
-    .from('return_request_items')
-    .update({ order_item_id: null })
-    .in('order_item_id', allItemsToDelete);
-  
-  // Agora pode deletar os itens com segurança
-  const { error: deleteError } = await supabase
-    .from('order_items')
-    .delete()
-    .in('id', allItemsToDelete);
-    
-  if (deleteError) throw deleteError;
+    // Se existe apenas 1 organização, vincular automaticamente
+    if (orgs?.length === 1) {
+      await supabase.from('organization_members').insert({
+        organization_id: orgs[0].id,
+        user_id: user.id,
+        role: 'member',
+        is_active: true
+      });
+      
+      setHasOrg(true);
+      setChecking(false);
+      return;
+    }
+  }
 }
+```
+
+#### Parte 3: Melhorar Tratamento de Erros na Aprovação
+
+**Arquivo:** `src/components/admin/UserApprovalDialog.tsx`
+
+Tornar o erro de `organization_members` mais visível:
+
+```typescript
+// MUDANÇA: Mostrar erro toast se falhar ao vincular organização
+if (!existingMembership && organization?.id) {
+  const { error: memberError } = await supabase
+    .from('organization_members')
+    .insert({...});
+
+  if (memberError) {
+    console.error('Error adding to organization:', memberError);
+    toast({
+      title: "⚠️ Atenção",
+      description: "Usuário aprovado, mas FALHOU ao vincular à organização. Execute o SQL de correção.",
+      variant: "destructive",
+      duration: 10000, // Manter na tela por mais tempo
+    });
+  }
+} else if (!organization?.id) {
+  // NOVO: Alertar se organization não está carregado
+  console.error('⚠️ Organization not loaded during approval!');
+  toast({
+    title: "⚠️ Erro de Organização",
+    description: "Não foi possível determinar a organização. Recarregue a página.",
+    variant: "destructive",
+  });
+}
+```
+
+---
+
+### Simplificação das Roles do Usuário
+
+O usuário Luis Sehnem tem **14 roles** - isso é excessivo e causa confusão. Conforme a política:
+
+> *"Supervisores devem usar role 'admin' para acesso total ao Kanban"*
+
+**Recomendação:** Remover todas as 14 roles e atribuir apenas `admin`:
+
+```sql
+-- Limpar roles antigas
+DELETE FROM user_roles 
+WHERE user_id = 'ea43e80b-cad3-48b3-b2eb-e40649a2d16b';
+
+-- Atribuir admin
+INSERT INTO user_roles (user_id, role)
+VALUES ('ea43e80b-cad3-48b3-b2eb-e40649a2d16b', 'admin');
 ```
 
 ---
@@ -90,13 +150,16 @@ if (allItemsToDelete.length > 0) {
 
 | Arquivo | Alteração |
 |---------|-----------|
-| `src/components/Dashboard.tsx` | Adicionar 3 operações `UPDATE SET NULL` antes do `DELETE` |
+| **SQL Imediato** | INSERT organization_members para Luis Sehnem |
+| `src/components/onboarding/OrganizationGuard.tsx` | Adicionar fallback auto-vinculação para usuários aprovados |
+| `src/components/admin/UserApprovalDialog.tsx` | Melhorar tratamento de erros e alertas |
+| **SQL Opcional** | Simplificar roles do usuário para `admin` |
 
 ---
 
 ### Benefícios
 
-1. **Elimina erro de foreign key** - Referências são limpas antes da exclusão
-2. **Preserva histórico** - Registros de compras/despachos/devoluções continuam existindo
-3. **Consistente** - Mesma abordagem usada na exclusão de pedido inteiro
-4. **Sem impacto em performance** - Operações UPDATE são rápidas com índices
+1. **Correção imediata** - Luis Sehnem volta a acessar o sistema
+2. **Prevenção futura** - Fallback garante que usuários aprovados não fiquem bloqueados
+3. **Visibilidade de erros** - Admins serão alertados se algo falhar
+4. **Simplificação** - Roles claras evitam confusão
