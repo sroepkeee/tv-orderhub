@@ -68,7 +68,44 @@ export function OrganizationGuard({ children }: OrganizationGuardProps) {
           return;
         }
 
-        // 2. Usuário não tem organização - verificar se é admin
+        // 2. Usuário não tem organização - verificar se é usuário aprovado
+        // Fallback: Se foi aprovado mas não tem org, vincular à org padrão
+        const { data: approval } = await supabase
+          .from('user_approval_status')
+          .select('status')
+          .eq('user_id', user.id)
+          .maybeSingle();
+
+        if (approval?.status === 'approved') {
+          // Buscar organizações existentes (limit 2 para checar se há mais de uma)
+          const { data: orgs } = await supabase
+            .from('organizations')
+            .select('id')
+            .limit(2);
+
+          // Se existe apenas 1 organização, vincular automaticamente
+          if (orgs?.length === 1) {
+            console.log('Auto-linking approved user to organization:', orgs[0].id);
+            const { error: linkError } = await supabase
+              .from('organization_members')
+              .insert({
+                organization_id: orgs[0].id,
+                user_id: user.id,
+                role: 'member',
+                is_active: true
+              });
+
+            if (!linkError) {
+              setHasOrg(true);
+              setChecking(false);
+              return;
+            } else {
+              console.error('Failed to auto-link user to organization:', linkError);
+            }
+          }
+        }
+
+        // 3. Usuário não tem organização - verificar se é admin
         const { data: roles, error: rolesError } = await supabase
           .from('user_roles')
           .select('role')

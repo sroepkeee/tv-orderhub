@@ -121,6 +121,19 @@ export const UserApprovalDialog = ({ open, onOpenChange, user, onSuccess }: User
 
         if (profileError) throw profileError;
 
+        // CRITICAL: Verificar se organização está carregada ANTES de continuar
+        if (!organization?.id) {
+          console.error('⚠️ Organization not loaded during approval!');
+          toast({
+            title: "⚠️ Erro de Organização",
+            description: "Não foi possível determinar a organização. Recarregue a página e tente novamente.",
+            variant: "destructive",
+            duration: 10000,
+          });
+          setLoading(false);
+          return;
+        }
+
         // Verificar se usuário já está em alguma organização
         const { data: existingMembership } = await supabase
           .from('organization_members')
@@ -130,7 +143,7 @@ export const UserApprovalDialog = ({ open, onOpenChange, user, onSuccess }: User
           .maybeSingle();
 
         // Se não está em nenhuma organização, adicionar à do admin
-        if (!existingMembership && organization?.id) {
+        if (!existingMembership) {
           const { error: memberError } = await supabase
             .from('organization_members')
             .insert({
@@ -143,9 +156,14 @@ export const UserApprovalDialog = ({ open, onOpenChange, user, onSuccess }: User
           if (memberError) {
             console.error('Error adding to organization:', memberError);
             toast({
-              title: "Atenção",
-              description: "Usuário aprovado, mas houve erro ao vincular à organização",
+              title: "⚠️ Atenção - Vínculo Falhou",
+              description: "Usuário aprovado, mas FALHOU ao vincular à organização. Contate o suporte.",
+              variant: "destructive",
+              duration: 10000,
             });
+            // NÃO retornar - continuar com aprovação mesmo assim
+          } else {
+            console.log('✅ User successfully linked to organization:', organization.id);
           }
         }
 
