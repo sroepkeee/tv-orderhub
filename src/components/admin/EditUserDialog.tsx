@@ -35,9 +35,10 @@ interface EditUserDialogProps {
 const DEPARTMENTS = [
   "Comercial",
   "Compras",
-  "Financeiro",
   "Expedição",
+  "Financeiro",
   "Produção",
+  "Projetos",
   "Qualidade",
   "Administrativo",
   "TI",
@@ -276,9 +277,16 @@ export const EditUserDialog = ({ open, onOpenChange, user, onSuccess }: EditUser
               <Tag className="h-4 w-4" />
               <Label className="text-base font-semibold">Roles (Funções)</Label>
             </div>
-            <p className="text-sm text-muted-foreground">
-              Define a função do usuário no sistema. Roles diferentes de Admin não concedem acesso ao Kanban automaticamente.
-            </p>
+            <div className="rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 p-3 text-sm">
+              <p className="font-medium text-amber-800 dark:text-amber-200 mb-1">
+                💡 Dica: Simplificando o acesso
+              </p>
+              <ul className="text-amber-700 dark:text-amber-300 space-y-1 text-xs">
+                <li>• <strong>Supervisores/Coordenadores</strong>: Clique em "Admin" nas ações da tabela para dar acesso total ao Kanban</li>
+                <li>• <strong>Operadores</strong>: Selecione apenas a role da área de atuação (ex: Compras, Laboratório)</li>
+                <li>• Após definir a role, configure o acesso ao Kanban via botão "Kanban" na tabela</li>
+              </ul>
+            </div>
             
             {loadingRoles ? (
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
