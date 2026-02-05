@@ -12,6 +12,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Tag } from "lucide-react";
 import { ROLE_LABELS } from "@/lib/roleLabels";
+import { DEPARTMENTS } from "@/lib/departments";
 
 interface UserData {
   id: string;
@@ -32,19 +33,6 @@ interface EditUserDialogProps {
   onSuccess: () => void;
 }
 
-const DEPARTMENTS = [
-  "Comercial",
-  "Compras",
-  "Expedição",
-  "Financeiro",
-  "Produção",
-  "Projetos",
-  "Qualidade",
-  "Administrativo",
-  "TI",
-  "RH",
-  "Diretoria",
-];
 
 // Roles disponíveis para atribuição (exceto admin que é gerenciado separadamente)
 const AVAILABLE_ROLES = Object.entries(ROLE_LABELS)

@@ -2,32 +2,13 @@ import { useState } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { DEPARTMENTS } from "@/lib/departments";
 
 interface DepartmentSelectProps {
   userId: string;
   currentDepartment: string | null;
   onUpdate: () => void;
 }
-
-const DEPARTMENTS = [
-  'Administração',
-  'Almoxarifado Geral',
-  'Almoxarifado SSM',
-  'Comercial',
-  'Compras',
-  'Expedição',
-  'Faturamento',
-  'Financeiro',
-  'Laboratório',
-  'Logística',
-  'Planejamento',
-  'Produção',
-  'Projetos',
-  'SSM',
-  'Suporte',
-  'TI',
-  'Outros'
-];
 
 export const DepartmentSelect = ({ userId, currentDepartment, onUpdate }: DepartmentSelectProps) => {
   const [saving, setSaving] = useState(false);
