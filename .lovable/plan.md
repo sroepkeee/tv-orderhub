@@ -1,69 +1,97 @@
 
-## Plano: Corrigir Erro de Coluna Inexistente na Edge Function
+## Plano: Sincronizar Listas de Departamentos e Corrigir Exibição
 
 ### Diagnóstico
 
-O erro identificado nos logs do PostgreSQL:
-```
-column order_items_1.description does not exist
-```
+Dois problemas identificados:
 
-**Origem do erro:** Arquivo `supabase/functions/notify-phase-manager/index.ts` (linhas 376-387)
+#### Problema 1: Listas de Departamentos Diferentes
 
-A query atual tenta buscar uma coluna `description` que não existe na tabela `order_items`:
+| Arquivo | Lista de Departamentos |
+|---------|------------------------|
+| `DepartmentSelect.tsx` (tabela) | Administração, Almoxarifado Geral, Almoxarifado SSM, Comercial, Compras, Expedição, Faturamento, Financeiro, Laboratório, Logística, Planejamento, Produção, Projetos, **SSM**, Suporte, TI, Outros |
+| `EditUserDialog.tsx` (modal) | Comercial, Compras, Expedição, Financeiro, Produção, Projetos, Qualidade, Administrativo, TI, RH, Diretoria |
 
-```typescript
-order_items(
-  id, 
-  item_code, 
-  description,         // ❌ ERRO - coluna não existe
-  item_description,    // ✅ coluna correta
-  requested_quantity, 
-  unit, 
-  ...
-)
-```
+**O departamento "SSM" do usuário Bryan existe no `DepartmentSelect` mas NÃO existe no `EditUserDialog`**, fazendo com que o Select apareça vazio ao editar.
 
-### Impacto
+#### Problema 2: Dados do Usuário Bryan Lemes
 
-- O erro ocorre toda vez que um pedido muda de status
-- A edge function `notify-phase-manager` falha silenciosamente
-- Pode causar comportamentos inesperados no frontend (como o Kanban vazio)
-- Logs indicam falha constante
+| Campo | Valor no Banco |
+|-------|----------------|
+| Departamento | SSM |
+| Roles | almox_ssm (apenas 1) |
+
+O usuário tem apenas 1 role (`almox_ssm`), então a exibição na tabela está correta. Porém, conforme a política de permissões, pode ser necessário atribuir mais roles se o usuário precisar de acesso a outras fases.
+
+---
 
 ### Solução
 
-**Arquivo:** `supabase/functions/notify-phase-manager/index.ts`
+**Arquivo:** `src/components/admin/EditUserDialog.tsx`
 
-Remover a referência à coluna `description` inexistente:
+Sincronizar a lista de departamentos com a mesma lista do `DepartmentSelect.tsx`:
 
-| Linha | Antes | Depois |
-|-------|-------|--------|
-| 379 | `description,` | *(remover linha)* |
+| Antes (linha 35-47) | Depois |
+|---------------------|--------|
+| Lista incompleta com 11 departamentos | Lista completa com 17 departamentos |
 
-Código corrigido:
 ```typescript
-order_items(
-  id, 
-  item_code, 
-  item_description,    // ✅ apenas esta
-  requested_quantity, 
-  unit, 
-  unit_price, 
-  total_value, 
-  item_status,
-  warehouse
-)
+const DEPARTMENTS = [
+  'Administração',
+  'Almoxarifado Geral',
+  'Almoxarifado SSM',
+  'Comercial',
+  'Compras',
+  'Expedição',
+  'Faturamento',
+  'Financeiro',
+  'Laboratório',
+  'Logística',
+  'Planejamento',
+  'Produção',
+  'Projetos',
+  'SSM',
+  'Suporte',
+  'TI',
+  'Outros'
+];
 ```
 
-### Verificação Adicional
+---
 
-Há também uma referência no código que tenta usar `item.description` como fallback (linha 210):
+### Melhoria Adicional: Centralizar Lista de Departamentos
+
+Para evitar inconsistências futuras, criar um arquivo centralizado:
+
+**Novo arquivo:** `src/lib/departments.ts`
+
 ```typescript
-const desc = (item.item_description || item.description || '').substring(0, 25);
+export const DEPARTMENTS = [
+  'Administração',
+  'Almoxarifado Geral',
+  'Almoxarifado SSM',
+  'Comercial',
+  'Compras',
+  'Expedição',
+  'Faturamento',
+  'Financeiro',
+  'Laboratório',
+  'Logística',
+  'Planejamento',
+  'Produção',
+  'Projetos',
+  'SSM',
+  'Suporte',
+  'TI',
+  'Outros'
+] as const;
+
+export type Department = typeof DEPARTMENTS[number];
 ```
 
-Esta linha está segura porque é um fallback opcional em JavaScript, não uma query SQL.
+Depois, importar nos dois componentes:
+- `EditUserDialog.tsx`: `import { DEPARTMENTS } from "@/lib/departments"`
+- `DepartmentSelect.tsx`: `import { DEPARTMENTS } from "@/lib/departments"`
 
 ---
 
@@ -71,10 +99,14 @@ Esta linha está segura porque é um fallback opcional em JavaScript, não uma q
 
 | Arquivo | Alteração |
 |---------|-----------|
-| `supabase/functions/notify-phase-manager/index.ts` | Remover `description,` da linha 379 |
+| `src/lib/departments.ts` | **Criar** arquivo centralizado com lista de departamentos |
+| `src/components/admin/EditUserDialog.tsx` | Remover DEPARTMENTS local e importar de `@/lib/departments` |
+| `src/components/admin/DepartmentSelect.tsx` | Remover DEPARTMENTS local e importar de `@/lib/departments` |
+
+---
 
 ### Resultado Esperado
 
-1. Edge function parará de falhar com erro de coluna inexistente
-2. Notificações de mudança de status voltarão a funcionar
-3. Dashboard carregará normalmente
+1. Ao editar Bryan Lemes, o campo Departamento mostrará "SSM" corretamente
+2. Ambos os componentes terão a mesma lista de departamentos
+3. Futuras alterações na lista serão feitas em um único lugar
