@@ -14,12 +14,31 @@ interface MessageStatusUpdate {
   error_message?: string;
 }
 
+// Validar API Key para chamadas externas (N8N)
+function validateApiKey(req: Request): boolean {
+  const apiKey = req.headers.get('x-api-key') || req.headers.get('X-API-Key');
+  const expectedKey = Deno.env.get('N8N_API_KEY');
+  return !!expectedKey && apiKey === expectedKey;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
+    // Validar autenticação
+    if (!validateApiKey(req)) {
+      console.error('update-message-status: Unauthorized request - invalid or missing API key');
+      return new Response(JSON.stringify({ 
+        success: false, 
+        error: 'Unauthorized - valid x-api-key header required' 
+      }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
     console.log('update-message-status: Processing status update');
     
     const payload: MessageStatusUpdate = await req.json();

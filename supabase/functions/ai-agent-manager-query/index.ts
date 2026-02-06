@@ -1,9 +1,28 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.58.0';
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-api-key, x-internal-source',
 };
+
+// Validar requisição - aceita API Key ou origem interna
+function validateRequest(req: Request): boolean {
+  // Opção 1: API Key válida
+  const apiKey = req.headers.get('x-api-key') || req.headers.get('X-API-Key');
+  const expectedKey = Deno.env.get('N8N_API_KEY');
+  if (expectedKey && apiKey === expectedKey) {
+    return true;
+  }
+  
+  // Opção 2: Chamada interna do mega-api-webhook
+  const internalSource = req.headers.get('x-internal-source');
+  if (internalSource === 'mega-api-webhook') {
+    return true;
+  }
+  
+  return false;
+}
 
 interface QueryIntent {
   type: 'order_status' | 'daily_summary' | 'delayed_orders' | 'orders_by_phase' | 'top_orders' | 
@@ -3037,6 +3056,18 @@ Deno.serve(async (req) => {
   }
 
   try {
+    // Validar autenticação
+    if (!validateRequest(req)) {
+      console.error('ai-agent-manager-query: Unauthorized request - invalid or missing credentials');
+      return new Response(JSON.stringify({ 
+        success: false, 
+        error: 'Unauthorized - valid x-api-key header or internal source required' 
+      }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''

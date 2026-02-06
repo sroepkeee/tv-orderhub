@@ -1,10 +1,55 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import * as hex from "https://deno.land/std@0.168.0/encoding/hex.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-signature-ed25519, x-signature-timestamp',
 };
+
+// Verificar assinatura do Discord (Ed25519)
+async function verifyDiscordSignature(
+  signature: string | null,
+  timestamp: string | null,
+  body: string,
+  publicKey: string | null
+): Promise<boolean> {
+  if (!signature || !timestamp || !publicKey) {
+    console.log('Missing signature, timestamp, or public key');
+    return false;
+  }
+
+  try {
+    const encoder = new TextEncoder();
+    const message = encoder.encode(timestamp + body);
+    
+    // Importar chave pública
+    const keyData = hex.decode(new TextEncoder().encode(publicKey));
+    const cryptoKey = await crypto.subtle.importKey(
+      'raw',
+      keyData,
+      { name: 'Ed25519', namedCurve: 'Ed25519' },
+      false,
+      ['verify']
+    );
+    
+    // Decodificar assinatura
+    const signatureData = hex.decode(new TextEncoder().encode(signature));
+    
+    // Verificar
+    const isValid = await crypto.subtle.verify(
+      'Ed25519',
+      cryptoKey,
+      signatureData,
+      message
+    );
+    
+    return isValid;
+  } catch (error) {
+    console.error('Signature verification error:', error);
+    return false;
+  }
+}
 
 interface DiscordInteraction {
   type: number;
@@ -56,10 +101,26 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     );
 
+    // Ler body como texto para verificação de assinatura
+    const bodyText = await req.text();
+    
     // Verificar assinatura do Discord (em produção)
     const discordPublicKey = Deno.env.get('DISCORD_PUBLIC_KEY');
+    const signature = req.headers.get('x-signature-ed25519');
+    const timestamp = req.headers.get('x-signature-timestamp');
     
-    const body: DiscordInteraction = await req.json();
+    // Se temos chave pública configurada, verificar assinatura
+    if (discordPublicKey) {
+      const isValid = await verifyDiscordSignature(signature, timestamp, bodyText, discordPublicKey);
+      if (!isValid) {
+        console.error('discord-slash-command: Invalid signature');
+        return new Response('Invalid signature', { status: 401, headers: corsHeaders });
+      }
+    } else {
+      console.warn('discord-slash-command: DISCORD_PUBLIC_KEY not configured - signature verification skipped');
+    }
+    
+    const body: DiscordInteraction = JSON.parse(bodyText);
     console.log(`📨 Discord interaction: type=${body.type}`);
 
     // Tipo 1: PING (verificação do Discord)

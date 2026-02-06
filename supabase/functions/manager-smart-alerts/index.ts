@@ -23,12 +23,31 @@ const DEFAULT_ALERTS: AlertConfig[] = [
   { type: 'negative_trend', enabled: true, threshold: 20, priority: 3 }, // 20% queda
 ];
 
+// Validar API Key para chamadas externas
+function validateApiKey(req: Request): boolean {
+  const apiKey = req.headers.get('x-api-key') || req.headers.get('X-API-Key');
+  const expectedKey = Deno.env.get('N8N_API_KEY');
+  return !!expectedKey && apiKey === expectedKey;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
+    // Validar autenticação
+    if (!validateApiKey(req)) {
+      console.error('manager-smart-alerts: Unauthorized request - invalid or missing API key');
+      return new Response(JSON.stringify({ 
+        success: false, 
+        error: 'Unauthorized - valid x-api-key header required' 
+      }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
