@@ -1,112 +1,148 @@
 
-## Plano: Sincronizar Listas de Departamentos e Corrigir Exibição
+## Plano: Análise e Correção de Edge Functions Expostas
 
-### Diagnóstico
+### Diagnóstico de Segurança
 
-Dois problemas identificados:
-
-#### Problema 1: Listas de Departamentos Diferentes
-
-| Arquivo | Lista de Departamentos |
-|---------|------------------------|
-| `DepartmentSelect.tsx` (tabela) | Administração, Almoxarifado Geral, Almoxarifado SSM, Comercial, Compras, Expedição, Faturamento, Financeiro, Laboratório, Logística, Planejamento, Produção, Projetos, **SSM**, Suporte, TI, Outros |
-| `EditUserDialog.tsx` (modal) | Comercial, Compras, Expedição, Financeiro, Produção, Projetos, Qualidade, Administrativo, TI, RH, Diretoria |
-
-**O departamento "SSM" do usuário Bryan existe no `DepartmentSelect` mas NÃO existe no `EditUserDialog`**, fazendo com que o Select apareça vazio ao editar.
-
-#### Problema 2: Dados do Usuário Bryan Lemes
-
-| Campo | Valor no Banco |
-|-------|----------------|
-| Departamento | SSM |
-| Roles | almox_ssm (apenas 1) |
-
-O usuário tem apenas 1 role (`almox_ssm`), então a exibição na tabela está correta. Porém, conforme a política de permissões, pode ser necessário atribuir mais roles se o usuário precisar de acesso a outras fases.
+Analisei todas as **45 Edge Functions** do projeto e identifiquei as que estão configuradas como públicas (`verify_jwt = false`) no `supabase/config.toml`:
 
 ---
 
-### Solução
+### 📊 Resumo de Funções Públicas (14 no total)
 
-**Arquivo:** `src/components/admin/EditUserDialog.tsx`
+| Função | Status de Proteção | Risco |
+|--------|-------------------|-------|
+| `receive-carrier-response` | ✅ **Protegida** - Valida `x-api-key` contra `N8N_API_KEY` | Baixo |
+| `receive-lab-update` | ✅ **Protegida** - Valida assinatura HMAC com `LAB_WEBHOOK_SECRET` | Baixo |
+| `notify-lab` | ⚠️ **Parcial** - Usa secrets mas não valida chamador | Médio |
+| `update-message-status` | ❌ **EXPOSTA** - Nenhuma validação de origem | **Alto** |
+| `mega-api-webhook` | ✅ **Protegida** - Valida `instance_key` no banco/env | Baixo |
+| `daily-management-report` | ⚠️ **Cron Job** - Sem validação (interno) | Médio |
+| `ai-agent-manager-query` | ❌ **EXPOSTA** - Nenhuma validação de origem | **Alto** |
+| `process-message-queue` | ⚠️ **Cron Job** - Sem validação (interno) | Médio |
+| `queue-alert` | ⚠️ **Cron Job** - Sem validação (interno) | Médio |
+| `send-scheduled-reports` | ⚠️ **Cron Job** - Sem validação (interno) | Médio |
+| `manager-metrics` | ❌ **EXPOSTA** - Nenhuma validação de origem | **Alto** |
+| `manager-smart-alerts` | ❌ **EXPOSTA** - Nenhuma validação de origem | **Alto** |
+| `check-stalled-orders` | ⚠️ **Cron Job** - Sem validação (interno) | Médio |
+| `check-delivery-confirmations` | ⚠️ **Cron Job** - Sem validação (interno) | Médio |
+| `process-delivery-response` | ⚠️ **Webhook interno** - Chamado pelo mega-api-webhook | Médio |
+| `discord-send-digest` | ⚠️ **Cron Job** - Sem validação (interno) | Médio |
+| `discord-slash-command` | ⚠️ **Discord Webhook** - Sem verificação de assinatura Discord | Médio |
 
-Sincronizar a lista de departamentos com a mesma lista do `DepartmentSelect.tsx`:
+---
 
-| Antes (linha 35-47) | Depois |
-|---------------------|--------|
-| Lista incompleta com 11 departamentos | Lista completa com 17 departamentos |
+### 🚨 Funções Críticas para Corrigir
 
+#### 1. `update-message-status` - **RISCO ALTO**
+**Problema:** Aceita qualquer requisição sem validação
+**Impacto:** Qualquer pessoa pode atualizar status de mensagens, manipulando dados de conversas
+
+**Correção:**
 ```typescript
-const DEPARTMENTS = [
-  'Administração',
-  'Almoxarifado Geral',
-  'Almoxarifado SSM',
-  'Comercial',
-  'Compras',
-  'Expedição',
-  'Faturamento',
-  'Financeiro',
-  'Laboratório',
-  'Logística',
-  'Planejamento',
-  'Produção',
-  'Projetos',
-  'SSM',
-  'Suporte',
-  'TI',
-  'Outros'
-];
+// Adicionar validação de API Key (igual receive-carrier-response)
+function validateApiKey(req: Request): boolean {
+  const apiKey = req.headers.get('x-api-key') || req.headers.get('X-API-Key');
+  const expectedKey = Deno.env.get('N8N_API_KEY');
+  return !!expectedKey && apiKey === expectedKey;
+}
 ```
 
 ---
 
-### Melhoria Adicional: Centralizar Lista de Departamentos
+#### 2. `ai-agent-manager-query` - **RISCO ALTO**
+**Problema:** Aceita qualquer requisição e responde com dados sensíveis de pedidos
+**Impacto:** Qualquer pessoa pode consultar dados de pedidos, clientes, valores
 
-Para evitar inconsistências futuras, criar um arquivo centralizado:
-
-**Novo arquivo:** `src/lib/departments.ts`
-
+**Correção:**
 ```typescript
-export const DEPARTMENTS = [
-  'Administração',
-  'Almoxarifado Geral',
-  'Almoxarifado SSM',
-  'Comercial',
-  'Compras',
-  'Expedição',
-  'Faturamento',
-  'Financeiro',
-  'Laboratório',
-  'Logística',
-  'Planejamento',
-  'Produção',
-  'Projetos',
-  'SSM',
-  'Suporte',
-  'TI',
-  'Outros'
-] as const;
-
-export type Department = typeof DEPARTMENTS[number];
+// Adicionar validação de API Key ou origem WhatsApp
+function validateRequest(req: Request, payload: any): boolean {
+  // Opção 1: API Key
+  const apiKey = req.headers.get('x-api-key');
+  if (apiKey === Deno.env.get('N8N_API_KEY')) return true;
+  
+  // Opção 2: Validar que veio do mega-api-webhook (origem interna)
+  const isInternalCall = req.headers.get('x-internal-source') === 'mega-api-webhook';
+  return isInternalCall;
+}
 ```
-
-Depois, importar nos dois componentes:
-- `EditUserDialog.tsx`: `import { DEPARTMENTS } from "@/lib/departments"`
-- `DepartmentSelect.tsx`: `import { DEPARTMENTS } from "@/lib/departments"`
 
 ---
 
-### Resumo das Alterações
+#### 3. `manager-metrics` e `manager-smart-alerts` - **RISCO ALTO**
+**Problema:** Retornam métricas e alertas sem validação
+**Impacto:** Exposição de dados de negócio (pedidos, volumes, SLA)
+
+**Correção:** Adicionar validação de API Key
+
+---
+
+#### 4. `discord-slash-command` - **RISCO MÉDIO**
+**Problema:** Não valida assinatura do Discord
+**Impacto:** Qualquer pessoa pode enviar comandos falsos
+
+**Correção:**
+```typescript
+// Adicionar verificação de assinatura Discord (já tem DISCORD_PUBLIC_KEY no env)
+const isValid = await verifyDiscordSignature(
+  req.headers.get('X-Signature-Ed25519'),
+  req.headers.get('X-Signature-Timestamp'),
+  bodyText,
+  Deno.env.get('DISCORD_PUBLIC_KEY')
+);
+```
+
+---
+
+### 📋 Alterações Propostas
 
 | Arquivo | Alteração |
 |---------|-----------|
-| `src/lib/departments.ts` | **Criar** arquivo centralizado com lista de departamentos |
-| `src/components/admin/EditUserDialog.tsx` | Remover DEPARTMENTS local e importar de `@/lib/departments` |
-| `src/components/admin/DepartmentSelect.tsx` | Remover DEPARTMENTS local e importar de `@/lib/departments` |
+| `supabase/functions/update-message-status/index.ts` | Adicionar validação de API Key `N8N_API_KEY` |
+| `supabase/functions/ai-agent-manager-query/index.ts` | Adicionar validação de API Key ou origem interna |
+| `supabase/functions/manager-metrics/index.ts` | Adicionar validação de API Key |
+| `supabase/functions/manager-smart-alerts/index.ts` | Adicionar validação de API Key |
+| `supabase/functions/discord-slash-command/index.ts` | Implementar verificação de assinatura Discord |
+
+---
+
+### 🔒 Funções que Podem Permanecer Públicas
+
+As seguintes funções são **Cron Jobs** que devem ser chamadas internamente (pelo Supabase scheduler via cron.schedule):
+
+- `daily-management-report`
+- `process-message-queue`
+- `queue-alert`
+- `send-scheduled-reports`
+- `check-stalled-orders`
+- `check-delivery-confirmations`
+- `discord-send-digest`
+
+**Recomendação:** Adicionar validação de origem (verificar header `Authorization` com anon key) ou criar um secret `CRON_SECRET` para validar chamadas.
+
+---
+
+### 🛡️ Funções Já Protegidas (Boas Práticas)
+
+| Função | Método de Proteção |
+|--------|-------------------|
+| `receive-carrier-response` | API Key (`x-api-key` → `N8N_API_KEY`) |
+| `receive-lab-update` | Assinatura HMAC (`X-Webhook-Signature` → `LAB_WEBHOOK_SECRET`) |
+| `mega-api-webhook` | Validação de `instance_key` (env + banco de dados) |
+
+---
+
+### ⚡ Ordem de Prioridade
+
+1. **Alta** - `update-message-status`, `ai-agent-manager-query`, `manager-metrics`, `manager-smart-alerts`
+2. **Média** - `discord-slash-command`, `process-delivery-response`, `notify-lab`
+3. **Baixa** - Cron Jobs (adicionar validação é boa prática)
 
 ---
 
 ### Resultado Esperado
 
-1. Ao editar Bryan Lemes, o campo Departamento mostrará "SSM" corretamente
-2. Ambos os componentes terão a mesma lista de departamentos
-3. Futuras alterações na lista serão feitas em um único lugar
+1. APIs sensíveis protegidas contra acessos não autorizados
+2. Dados de pedidos, clientes e métricas não ficam expostos publicamente
+3. Webhooks externos validam origem antes de processar
+4. Logs de tentativas não autorizadas para auditoria
