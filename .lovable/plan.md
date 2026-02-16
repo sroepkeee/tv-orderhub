@@ -1,82 +1,141 @@
 
-## Plano: Análise e Correção de Edge Functions Expostas
 
-### ✅ Status: IMPLEMENTADO
+## Plano: Corrigir Fluxo de Aprovacao e Convite de Usuarios
 
----
+### Diagnostico
 
-### 📊 Resumo de Funções Públicas (14 no total)
-
-| Função | Status de Proteção | Risco |
-|--------|-------------------|-------|
-| `receive-carrier-response` | ✅ **Protegida** - Valida `x-api-key` contra `N8N_API_KEY` | Baixo |
-| `receive-lab-update` | ✅ **Protegida** - Valida assinatura HMAC com `LAB_WEBHOOK_SECRET` | Baixo |
-| `notify-lab` | ⚠️ **Parcial** - Usa secrets mas não valida chamador | Médio |
-| `update-message-status` | ✅ **CORRIGIDO** - Valida `x-api-key` contra `N8N_API_KEY` | Baixo |
-| `mega-api-webhook` | ✅ **Protegida** - Valida `instance_key` no banco/env | Baixo |
-| `daily-management-report` | ⚠️ **Cron Job** - Sem validação (interno) | Médio |
-| `ai-agent-manager-query` | ✅ **CORRIGIDO** - Valida API Key ou origem interna | Baixo |
-| `process-message-queue` | ⚠️ **Cron Job** - Sem validação (interno) | Médio |
-| `queue-alert` | ⚠️ **Cron Job** - Sem validação (interno) | Médio |
-| `send-scheduled-reports` | ⚠️ **Cron Job** - Sem validação (interno) | Médio |
-| `manager-metrics` | ✅ **CORRIGIDO** - Valida `x-api-key` contra `N8N_API_KEY` | Baixo |
-| `manager-smart-alerts` | ✅ **CORRIGIDO** - Valida `x-api-key` contra `N8N_API_KEY` | Baixo |
-| `check-stalled-orders` | ⚠️ **Cron Job** - Sem validação (interno) | Médio |
-| `check-delivery-confirmations` | ⚠️ **Cron Job** - Sem validação (interno) | Médio |
-| `process-delivery-response` | ⚠️ **Webhook interno** - Chamado pelo mega-api-webhook | Médio |
-| `discord-send-digest` | ⚠️ **Cron Job** - Sem validação (interno) | Médio |
-| `discord-slash-command` | ✅ **CORRIGIDO** - Verifica assinatura Ed25519 do Discord | Baixo |
+Foram encontrados **2 problemas distintos** que afetam usuarios novos:
 
 ---
 
-### ✅ Correções Implementadas
+### Problema 1: Usuarios aprovados ficam presos na tela "Aguardando Convite"
 
-#### 1. `update-message-status`
-**Correção:** Adicionada validação de API Key (`x-api-key` → `N8N_API_KEY`)
-- Retorna `401 Unauthorized` para requisições sem chave válida
-- Logs de tentativas não autorizadas
+**Usuarios afetados:**
+| Nome | Email | Status | Org Membership |
+|------|-------|--------|----------------|
+| Julia Farsen | jfarsen@imply.com | approved, is_active=true | **NENHUMA** |
+| Carlos Ricardo Bencke | cbencke@imply.com | approved, is_active=true | **NENHUMA** |
+| Bryan Lemes | blemes@imply.com | approved, is_active=true | **NENHUMA** |
 
-#### 2. `ai-agent-manager-query`
-**Correção:** Validação dupla
-- Aceita `x-api-key` válido contra `N8N_API_KEY`
-- Aceita header `x-internal-source: mega-api-webhook` para chamadas internas
-- Retorna `401 Unauthorized` para outras requisições
+**Causa raiz:** O `OrganizationGuard` tem um fallback que tenta auto-vincular usuarios aprovados a organizacao unica. Porem, a RLS da tabela `organizations` exige `user_belongs_to_org(id)` para SELECT. Como o usuario **nao tem org**, ele nao consegue ler a tabela `organizations`, o query retorna vazio, e o fallback falha silenciosamente.
 
-#### 3. `manager-metrics`
-**Correção:** Adicionada validação de API Key
-- Retorna `401 Unauthorized` para requisições sem chave válida
+```text
+Fluxo atual (com falha):
 
-#### 4. `manager-smart-alerts`
-**Correção:** Adicionada validação de API Key
-- Retorna `401 Unauthorized` para requisições sem chave válida
+1. Usuario aprovado sem org -> OrganizationGuard
+2. Guard checa organization_members -> vazio (correto)
+3. Guard checa user_approval_status -> "approved" (correto)
+4. Guard tenta SELECT organizations -> VAZIO (RLS bloqueia!)
+5. orgs.length !== 1 -> fallback NAO executa
+6. Guard mostra tela "Aguardando Convite" -> ERRO
+```
 
-#### 5. `discord-slash-command`
-**Correção:** Implementada verificação de assinatura Ed25519 do Discord
-- Usa `DISCORD_PUBLIC_KEY` do ambiente
-- Verifica headers `x-signature-ed25519` e `x-signature-timestamp`
-- Se a chave não estiver configurada, loga warning mas permite (para facilitar setup inicial)
+**Tambem no UserApprovalDialog:** O INSERT em `organization_members` (linha 147-154) usa o cliente autenticado do admin. Esse insert funciona (admin tem permissao). Porem, possivelmente esta falhando por alguma condicao de `organization` nao carregado no momento da aprovacao.
 
 ---
 
-### 🔒 Funções que Podem Permanecer Públicas
+### Problema 2: Erro ao gerar convite
 
-As seguintes funções são **Cron Jobs** chamados internamente pelo Supabase scheduler:
-
-- `daily-management-report`
-- `process-message-queue`
-- `queue-alert`
-- `send-scheduled-reports`
-- `check-stalled-orders`
-- `check-delivery-confirmations`
-- `discord-send-digest`
-
-**Recomendação futura:** Adicionar validação de origem ou `CRON_SECRET` para maior segurança.
+A edge function `send-organization-invite` depende de `RESEND_API_KEY` para envio de email. O secret existe, mas pode haver erro de dominio (usa `noreply@resend.dev` que e restrito). Este e um problema secundario.
 
 ---
 
-### 📋 Resultado
+### Solucao
 
-1. ✅ APIs sensíveis protegidas contra acessos não autorizados
-2. ✅ Dados de pedidos, clientes e métricas não ficam expostos publicamente
-3. ✅ Webhooks externos validam origem antes de processar
-4. ✅ Logs de tentativas não autorizadas para auditoria
+#### Correcao 1: OrganizationGuard - Usar service role key para auto-link
+
+**Arquivo:** `src/components/onboarding/OrganizationGuard.tsx`
+
+O problema e que o guard usa o cliente Supabase do usuario (com RLS). Para o fallback funcionar, precisamos usar uma abordagem diferente: em vez de tentar ler `organizations` (bloqueada por RLS), chamar uma **edge function** que faz o auto-link com service role.
+
+**Alternativa mais simples:** Criar uma RLS policy que permita usuarios autenticados lerem a tabela `organizations` (apenas id e name). Isso e seguro pois so existe 1 org.
+
+```sql
+CREATE POLICY "Authenticated users can view organizations"
+ON public.organizations
+FOR SELECT
+TO authenticated
+USING (true);
+```
+
+Depois, remover a policy restritiva antiga (`Users can view their organization`).
+
+---
+
+#### Correcao 2: Correcao imediata dos 3 usuarios
+
+Executar via SQL (admin) para vincular os 3 usuarios a organizacao Imply:
+
+```sql
+INSERT INTO organization_members (organization_id, user_id, role, is_active)
+VALUES 
+  ('69aed6aa-5300-4e40-b66a-e71f3706db16', '75f07913-9f53-408f-b884-1cf57bffd724', 'member', true),
+  ('69aed6aa-5300-4e40-b66a-e71f3706db16', 'a87891a2-e16b-425c-a728-ac9e519f66b5', 'member', true),
+  ('69aed6aa-5300-4e40-b66a-e71f3706db16', 'f0a07056-c670-4929-924d-55a911f9d030', 'member', true)
+ON CONFLICT DO NOTHING;
+```
+
+---
+
+#### Correcao 3: Tornar o UserApprovalDialog mais resiliente
+
+**Arquivo:** `src/components/admin/UserApprovalDialog.tsx`
+
+Adicionar fallback: se `organization.id` nao estiver carregado, buscar diretamente do banco antes de inserir.
+
+```typescript
+// Linha 124-135: Melhorar fallback
+let orgId = organization?.id;
+if (!orgId) {
+  // Fallback: buscar org do admin diretamente
+  const { data: adminMembership } = await supabase
+    .from('organization_members')
+    .select('organization_id')
+    .eq('user_id', currentUser?.id)
+    .eq('is_active', true)
+    .single();
+  orgId = adminMembership?.organization_id;
+}
+
+if (!orgId) {
+  // Erro real - nao tem como continuar
+  toast({ title: "Erro", description: "Organizacao nao encontrada", variant: "destructive" });
+  return;
+}
+```
+
+---
+
+#### Correcao 4: Invite URL incorreta
+
+**Arquivo:** `supabase/functions/send-organization-invite/index.ts` (linha 151)
+
+A URL hardcoded esta errada (`vivo.lovable.app`). Deve usar a URL correta do projeto:
+
+```typescript
+// Antes
+const inviteUrl = `${req.headers.get('origin') || 'https://vivo.lovable.app'}/auth?...`;
+
+// Depois  
+const inviteUrl = `${req.headers.get('origin') || 'https://tv-orderhub.lovable.app'}/auth?...`;
+```
+
+---
+
+### Resumo das Alteracoes
+
+| Prioridade | Arquivo/Acao | Descricao |
+|------------|-------------|-----------|
+| **URGENTE** | Migration SQL | Adicionar RLS policy para `organizations` SELECT |
+| **URGENTE** | Migration SQL | Vincular 3 usuarios orfaos a organizacao Imply |
+| Alta | `OrganizationGuard.tsx` | Nenhuma mudanca necessaria (RLS fix resolve) |
+| Alta | `UserApprovalDialog.tsx` | Adicionar fallback para buscar org do admin diretamente |
+| Media | `send-organization-invite/index.ts` | Corrigir URL fallback do convite |
+
+### Resultado Esperado
+
+1. Julia Farsen, Carlos e Bryan acessarao o sistema imediatamente
+2. Futuros usuarios aprovados serao auto-vinculados corretamente pelo OrganizationGuard
+3. O UserApprovalDialog nao falhara mais se o contexto de organizacao nao estiver carregado
+4. Links de convite apontarao para a URL correta
+
