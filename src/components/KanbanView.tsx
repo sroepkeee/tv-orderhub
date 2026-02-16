@@ -1,4 +1,5 @@
 import React from "react";
+import { useQuery } from "@tanstack/react-query";
 import { KanbanColumn } from "./KanbanColumn";
 import { Order } from "@/components/Dashboard";
 import {
@@ -39,6 +40,25 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { KanbanDensity } from "@/hooks/useKanbanDensity";
 import { cn } from "@/lib/utils";
 import { useDaysInPhase } from "@/hooks/useDaysInPhase";
+
+// Hook para cachear phase order_index (evita query duplicada)
+const __usePhaseOrderQuery = () => {
+  return useQuery({
+    queryKey: ['phase-order-index'],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('phase_config')
+        .select('phase_key, order_index');
+      if (!data) return new Map<Phase, number>();
+      const orderMap = new Map<Phase, number>();
+      data.forEach(p => orderMap.set(p.phase_key as Phase, p.order_index || 0));
+      return orderMap;
+    },
+    staleTime: 5 * 60_000,
+    gcTime: 10 * 60_000,
+    refetchOnWindowFocus: false,
+  });
+};
 
 export type Phase = "almox_ssm" | "order_generation" | "purchases" | "almox_general" | "production_client" | "production_stock" | "balance_generation" | "laboratory" | "packaging" | "freight_quote" | "ready_to_invoice" | "invoicing" | "logistics" | "in_transit" | "completion";
 
@@ -102,21 +122,13 @@ export const KanbanView = ({
     setOptimisticOrders(orders);
   }, [orders]);
 
-  // Carregar order_index das fases
+  // Carregar order_index das fases (com cache React Query)
+  const { data: phaseOrderData } = __usePhaseOrderQuery();
   React.useEffect(() => {
-    const loadPhaseOrder = async () => {
-      const { data } = await supabase
-        .from('phase_config')
-        .select('phase_key, order_index');
-      
-      if (data) {
-        const orderMap = new Map<Phase, number>();
-        data.forEach(p => orderMap.set(p.phase_key as Phase, p.order_index || 0));
-        setPhaseOrder(orderMap);
-      }
-    };
-    loadPhaseOrder();
-  }, []);
+    if (phaseOrderData) {
+      setPhaseOrder(phaseOrderData);
+    }
+  }, [phaseOrderData]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {

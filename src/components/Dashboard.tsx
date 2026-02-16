@@ -28,6 +28,7 @@ import { usePhaseAuthorization } from "@/hooks/usePhaseAuthorization";
 import { usePhaseManagerNotification } from "@/hooks/usePhaseManagerNotification";
 import { useOrganizationId } from "@/hooks/useOrganizationId";
 import { supabase } from "@/integrations/supabase/client";
+import { useQueryClient } from "@tanstack/react-query";
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
 import AppSidebar from "@/components/sidebar/AppSidebar";
 import { useKanbanDensity, KanbanDensity } from "@/hooks/useKanbanDensity";
@@ -260,6 +261,8 @@ export const Dashboard = () => {
   const isBatchImportingRef = useRef(false);
   const lastToastTimeRef = useRef(0);
   const isDialogEditingRef = useRef(false);
+  const queryClient = useQueryClient();
+  const ORDERS_CACHE_KEY = ['kanban-orders', user?.id];
 
   // Column visibility state with user-specific localStorage persistence
   const [columnVisibility, setColumnVisibility] = useState<ColumnVisibility>(() => {
@@ -294,9 +297,17 @@ export const Dashboard = () => {
     console.log('📦 Dashboard v2.1 - Notificações Proativas ATIVAS (com await + logs diagnóstico)');
   }, []);
 
-  // Load orders from Supabase
+  // Load orders from Supabase (with React Query cache restoration)
   useEffect(() => {
     if (user) {
+      // ⚡ Restaurar do cache React Query instantaneamente ao navegar de volta
+      const cached = queryClient.getQueryData<Order[]>(ORDERS_CACHE_KEY);
+      if (cached && cached.length > 0 && orders.length === 0) {
+        console.log('⚡ [Cache] Restaurando', cached.length, 'pedidos do cache');
+        setOrders(cached);
+        setLoading(false);
+        hasLoadedOnceRef.current = true;
+      }
       loadOrders();
       loadUnreadCount();
     }
@@ -783,19 +794,15 @@ export const Dashboard = () => {
     setRealtimeStatus('updating'); // 🔄 Indicar que está atualizando
     const startTime = performance.now();
 
-    // 🆕 Buscar fases permitidas do usuário
-    const {
-      data: userPhases
-    } = await supabase.rpc('get_user_phases', {
+    // 🚀 Iniciar RPC em paralelo (não bloqueia a query principal)
+    const userPhasesPromise = supabase.rpc('get_user_phases', {
       _user_id: user.id
     });
-    const allowedPhases = userPhases?.map(p => p.phase_key) || [];
     const isAdminUser = userRoles.includes('admin');
-    console.log('🔄 [loadOrders] Iniciando carregamento...', {
+    console.log('🔄 [loadOrders] Iniciando carregamento em paralelo...', {
       userId: user.id,
       requestId: currentRequestId,
-      isAdmin: isAdminUser,
-      allowedPhases
+      isAdmin: isAdminUser
     });
 
     // Loading state bifurcado
@@ -890,9 +897,16 @@ export const Dashboard = () => {
       const {
         data,
         error
-      } = await query.range(0, 499).order('created_at', {
+      } = await query
+        .not('status', 'in', '(delivered,completed,cancelled)')
+        .range(0, 499).order('created_at', {
         ascending: false
       }).abortSignal(abortControllerRef.current.signal).returns<any[]>();
+
+      // Resolver RPC em paralelo (resultado para logs)
+      const { data: userPhases } = await userPhasesPromise;
+      const allowedPhases = userPhases?.map(p => p.phase_key) || [];
+      console.log('📊 [loadOrders] Fases permitidas:', allowedPhases.length);
 
       // Verificar se é a requisição mais recente
       if (currentRequestId !== requestIdRef.current) {
@@ -1051,6 +1065,7 @@ export const Dashboard = () => {
           return;
         }
         setOrders(ordersWithItems);
+        queryClient.setQueryData(ORDERS_CACHE_KEY, ordersWithItems);
         hasLoadedOnceRef.current = true;
         return; // Sair antes de processar dados vazios
       }
@@ -1150,6 +1165,7 @@ export const Dashboard = () => {
         return;
       }
       setOrders(ordersWithItems);
+      queryClient.setQueryData(ORDERS_CACHE_KEY, ordersWithItems);
       hasLoadedOnceRef.current = true;
     } catch (err: any) {
       // Verificar se foi cancelamento
@@ -1269,6 +1285,7 @@ export const Dashboard = () => {
           return;
         }
         setOrders(ordersWithItems);
+        queryClient.setQueryData(ORDERS_CACHE_KEY, ordersWithItems);
         hasLoadedOnceRef.current = true;
       } catch (fallbackError: any) {
         // Verificar se foi cancelamento
