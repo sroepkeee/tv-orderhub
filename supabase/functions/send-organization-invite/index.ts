@@ -148,7 +148,7 @@ Deno.serve(async (req) => {
     }
 
     const orgName = (membership.organizations as any)?.name || 'V.I.V.O.';
-    const inviteUrl = `${req.headers.get('origin') || 'https://vivo.lovable.app'}/auth?type=invite&token=${invite.invite_token}`;
+    const inviteUrl = `${req.headers.get('origin') || 'https://tv-orderhub.lovable.app'}/auth?type=invite&token=${invite.invite_token}`;
 
     // Send email via Resend
     if (sendViaEmail && resendApiKey) {

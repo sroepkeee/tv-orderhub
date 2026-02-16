@@ -121,9 +121,21 @@ export const UserApprovalDialog = ({ open, onOpenChange, user, onSuccess }: User
 
         if (profileError) throw profileError;
 
-        // CRITICAL: Verificar se organização está carregada ANTES de continuar
-        if (!organization?.id) {
-          console.error('⚠️ Organization not loaded during approval!');
+        // Determinar organization_id com fallback
+        let orgId = organization?.id;
+        if (!orgId) {
+          console.warn('⚠️ Organization not in context, fetching from admin membership...');
+          const { data: adminMembership } = await supabase
+            .from('organization_members')
+            .select('organization_id')
+            .eq('user_id', currentUser?.id)
+            .eq('is_active', true)
+            .single();
+          orgId = adminMembership?.organization_id;
+        }
+
+        if (!orgId) {
+          console.error('⚠️ Organization not found for admin!');
           toast({
             title: "⚠️ Erro de Organização",
             description: "Não foi possível determinar a organização. Recarregue a página e tente novamente.",
@@ -147,7 +159,7 @@ export const UserApprovalDialog = ({ open, onOpenChange, user, onSuccess }: User
           const { error: memberError } = await supabase
             .from('organization_members')
             .insert({
-              organization_id: organization.id,
+              organization_id: orgId,
               user_id: user.id,
               role: 'member',
               is_active: true,
@@ -163,7 +175,7 @@ export const UserApprovalDialog = ({ open, onOpenChange, user, onSuccess }: User
             });
             // NÃO retornar - continuar com aprovação mesmo assim
           } else {
-            console.log('✅ User successfully linked to organization:', organization.id);
+            console.log('✅ User successfully linked to organization:', orgId);
           }
         }
 
@@ -173,7 +185,7 @@ export const UserApprovalDialog = ({ open, onOpenChange, user, onSuccess }: User
           .select('role')
           .eq('user_id', user.id);
 
-        if (userRoles && userRoles.length > 0 && organization?.id) {
+        if (userRoles && userRoles.length > 0 && orgId) {
           const phasePermissions: {
             user_id: string;
             phase_key: string;
@@ -204,7 +216,7 @@ export const UserApprovalDialog = ({ open, onOpenChange, user, onSuccess }: User
                     can_edit: phase.can_edit,
                     can_advance: phase.can_advance,
                     can_delete: false,
-                    organization_id: organization.id,
+                    organization_id: orgId,
                   });
                 }
               }
