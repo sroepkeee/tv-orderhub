@@ -1,141 +1,176 @@
 
 
-## Plano: Corrigir Fluxo de Aprovacao e Convite de Usuarios
+## Plano: Otimizacao de Performance do Kanban
 
 ### Diagnostico
 
-Foram encontrados **2 problemas distintos** que afetam usuarios novos:
+Analisei o fluxo completo de carregamento do Kanban e identifiquei **5 gargalos principais** que causam a lentidao ao navegar para a pagina:
 
 ---
 
-### Problema 1: Usuarios aprovados ficam presos na tela "Aguardando Convite"
+### Gargalos Identificados
 
-**Usuarios afetados:**
-| Nome | Email | Status | Org Membership |
-|------|-------|--------|----------------|
-| Julia Farsen | jfarsen@imply.com | approved, is_active=true | **NENHUMA** |
-| Carlos Ricardo Bencke | cbencke@imply.com | approved, is_active=true | **NENHUMA** |
-| Bryan Lemes | blemes@imply.com | approved, is_active=true | **NENHUMA** |
-
-**Causa raiz:** O `OrganizationGuard` tem um fallback que tenta auto-vincular usuarios aprovados a organizacao unica. Porem, a RLS da tabela `organizations` exige `user_belongs_to_org(id)` para SELECT. Como o usuario **nao tem org**, ele nao consegue ler a tabela `organizations`, o query retorna vazio, e o fallback falha silenciosamente.
+| # | Gargalo | Impacto | Dados |
+|---|---------|---------|-------|
+| 1 | **Sem cache entre navegacoes** | Dashboard usa `useState` puro. Toda vez que o usuario sai e volta, refaz TUDO do zero | ~2-4s por navegacao |
+| 2 | **useDaysInPhase carrega todo historico** | Busca 2.508 registros de `order_history` para calcular dias na fase de cada pedido | ~800ms-1.5s |
+| 3 | **Pedidos finalizados carregados** | 326 de 481 pedidos sao `delivered/completed/cancelled` mas sao carregados na query principal | 68% de payload desnecessario |
+| 4 | **Queries sequenciais no mount** | `get_user_phases` RPC -> `orders+items` -> `phase_config` -> `order_history` executam em sequencia | ~1-2s de espera acumulada |
+| 5 | **usePhaseInfo carrega todos profiles** | Busca TODOS os profiles e user_roles a cada mount para mapear responsaveis | ~300-500ms |
 
 ```text
-Fluxo atual (com falha):
+Fluxo atual ao abrir o Kanban:
 
-1. Usuario aprovado sem org -> OrganizationGuard
-2. Guard checa organization_members -> vazio (correto)
-3. Guard checa user_approval_status -> "approved" (correto)
-4. Guard tenta SELECT organizations -> VAZIO (RLS bloqueia!)
-5. orgs.length !== 1 -> fallback NAO executa
-6. Guard mostra tela "Aguardando Convite" -> ERRO
-```
+1. PermissionsContext carrega (roles, phases, menus)     ~500ms
+2. Dashboard monta -> loadOrders()
+   2a. RPC get_user_phases()                              ~200ms
+   2b. SELECT orders + order_items (481+2241 registros)   ~800ms
+   2c. Processar/transformar dados no client               ~100ms
+3. KanbanView monta
+   3a. usePhaseInfo -> 3 queries (phase_config + user_roles + profiles)  ~500ms
+   3b. useDaysInPhase -> 2 queries chunked (orders + order_history)      ~1000ms
+   3c. phase_config (order_index)                          ~200ms
+4. Render das 15 colunas com cards                         ~200ms
 
-**Tambem no UserApprovalDialog:** O INSERT em `organization_members` (linha 147-154) usa o cliente autenticado do admin. Esse insert funciona (admin tem permissao). Porem, possivelmente esta falhando por alguma condicao de `organization` nao carregado no momento da aprovacao.
-
----
-
-### Problema 2: Erro ao gerar convite
-
-A edge function `send-organization-invite` depende de `RESEND_API_KEY` para envio de email. O secret existe, mas pode haver erro de dominio (usa `noreply@resend.dev` que e restrito). Este e um problema secundario.
-
----
-
-### Solucao
-
-#### Correcao 1: OrganizationGuard - Usar service role key para auto-link
-
-**Arquivo:** `src/components/onboarding/OrganizationGuard.tsx`
-
-O problema e que o guard usa o cliente Supabase do usuario (com RLS). Para o fallback funcionar, precisamos usar uma abordagem diferente: em vez de tentar ler `organizations` (bloqueada por RLS), chamar uma **edge function** que faz o auto-link com service role.
-
-**Alternativa mais simples:** Criar uma RLS policy que permita usuarios autenticados lerem a tabela `organizations` (apenas id e name). Isso e seguro pois so existe 1 org.
-
-```sql
-CREATE POLICY "Authenticated users can view organizations"
-ON public.organizations
-FOR SELECT
-TO authenticated
-USING (true);
-```
-
-Depois, remover a policy restritiva antiga (`Users can view their organization`).
-
----
-
-#### Correcao 2: Correcao imediata dos 3 usuarios
-
-Executar via SQL (admin) para vincular os 3 usuarios a organizacao Imply:
-
-```sql
-INSERT INTO organization_members (organization_id, user_id, role, is_active)
-VALUES 
-  ('69aed6aa-5300-4e40-b66a-e71f3706db16', '75f07913-9f53-408f-b884-1cf57bffd724', 'member', true),
-  ('69aed6aa-5300-4e40-b66a-e71f3706db16', 'a87891a2-e16b-425c-a728-ac9e519f66b5', 'member', true),
-  ('69aed6aa-5300-4e40-b66a-e71f3706db16', 'f0a07056-c670-4929-924d-55a911f9d030', 'member', true)
-ON CONFLICT DO NOTHING;
+TOTAL ESTIMADO: ~3.5s na primeira carga, ~3s em navegacoes subsequentes
 ```
 
 ---
 
-#### Correcao 3: Tornar o UserApprovalDialog mais resiliente
+### Solucoes Propostas
 
-**Arquivo:** `src/components/admin/UserApprovalDialog.tsx`
+#### Correcao 1: Migrar loadOrders para React Query (Cache entre paginas)
 
-Adicionar fallback: se `organization.id` nao estiver carregado, buscar diretamente do banco antes de inserir.
+**Problema:** `useState` + `useEffect` perde dados ao desmontar. Cada navegacao recarrega tudo.
+
+**Solucao:** Usar `useQuery` do TanStack React Query (ja instalado) para cachear pedidos. Quando o usuario volta ao Kanban, os dados aparecem instantaneamente do cache enquanto o refetch acontece em background.
+
+**Arquivo:** `src/components/Dashboard.tsx`
 
 ```typescript
-// Linha 124-135: Melhorar fallback
-let orgId = organization?.id;
-if (!orgId) {
-  // Fallback: buscar org do admin diretamente
-  const { data: adminMembership } = await supabase
-    .from('organization_members')
-    .select('organization_id')
-    .eq('user_id', currentUser?.id)
-    .eq('is_active', true)
-    .single();
-  orgId = adminMembership?.organization_id;
-}
+// ANTES: useState puro
+const [orders, setOrders] = useState<Order[]>([]);
+useEffect(() => { loadOrders(); }, [user]);
 
-if (!orgId) {
-  // Erro real - nao tem como continuar
-  toast({ title: "Erro", description: "Organizacao nao encontrada", variant: "destructive" });
-  return;
-}
+// DEPOIS: React Query com cache
+const { data: orders = [], refetch } = useQuery({
+  queryKey: ['kanban-orders', user?.id],
+  queryFn: fetchOrders,
+  staleTime: 30_000,      // 30s antes de considerar stale
+  gcTime: 5 * 60_000,     // 5min no cache apos desmontar
+  refetchOnWindowFocus: false,
+});
 ```
+
+**Resultado:** Navegacao de volta ao Kanban = **instantanea** (dados do cache).
 
 ---
 
-#### Correcao 4: Invite URL incorreta
+#### Correcao 2: Filtrar pedidos finalizados na query
 
-**Arquivo:** `supabase/functions/send-organization-invite/index.ts` (linha 151)
+**Problema:** 326 pedidos finalizados sao carregados mas nao aparecem no Kanban (coluna "Conclusao" raramente e visivel).
 
-A URL hardcoded esta errada (`vivo.lovable.app`). Deve usar a URL correta do projeto:
+**Solucao:** Excluir `delivered`, `completed`, `cancelled` da query principal. Carregar separadamente so quando a aba "Concluidos" for selecionada.
+
+**Arquivo:** `src/components/Dashboard.tsx` (dentro de `fetchOrders`)
 
 ```typescript
-// Antes
-const inviteUrl = `${req.headers.get('origin') || 'https://vivo.lovable.app'}/auth?...`;
-
-// Depois  
-const inviteUrl = `${req.headers.get('origin') || 'https://tv-orderhub.lovable.app'}/auth?...`;
+// Adicionar filtro na query principal
+let query = supabase.from('orders').select(`...`)
+  .not('status', 'in', '(delivered,completed,cancelled)');  // Reduz de 481 para ~155 pedidos
 ```
+
+**Resultado:** Payload reduzido em **68%**, query ~3x mais rapida.
 
 ---
 
-### Resumo das Alteracoes
+#### Correcao 3: Otimizar useDaysInPhase com view materializada ou calculo server-side
 
-| Prioridade | Arquivo/Acao | Descricao |
-|------------|-------------|-----------|
-| **URGENTE** | Migration SQL | Adicionar RLS policy para `organizations` SELECT |
-| **URGENTE** | Migration SQL | Vincular 3 usuarios orfaos a organizacao Imply |
-| Alta | `OrganizationGuard.tsx` | Nenhuma mudanca necessaria (RLS fix resolve) |
-| Alta | `UserApprovalDialog.tsx` | Adicionar fallback para buscar org do admin diretamente |
-| Media | `send-organization-invite/index.ts` | Corrigir URL fallback do convite |
+**Problema:** Busca 2.508 registros de `order_history` no client e processa em JS.
+
+**Solucao:** Criar uma RPC (funcao SQL) que calcula dias na fase diretamente no banco, retornando apenas `{order_id, days_in_phase, phase_entered_at}`.
+
+**Arquivo:** Nova migration SQL + refatorar `src/hooks/useDaysInPhase.tsx`
+
+```sql
+-- Nova RPC que calcula tudo no banco
+CREATE OR REPLACE FUNCTION get_days_in_phase(order_ids uuid[])
+RETURNS TABLE(order_id uuid, days_in_phase int, phase_entered_at timestamptz)
+AS $$
+  -- Logica SQL que substitui o calculo JS
+  -- Retorna apenas 155 linhas em vez de 2508 registros de historico
+$$;
+```
+
+**Resultado:** De ~2.500 registros transferidos para ~155 linhas compactas. Calculo ~10x mais rapido no banco.
+
+---
+
+#### Correcao 4: Paralelizar queries iniciais
+
+**Problema:** Queries executam em sequencia: RPC -> orders -> phase_config -> history.
+
+**Solucao:** Executar em paralelo usando `Promise.all`.
+
+**Arquivo:** `src/components/Dashboard.tsx` e `src/components/KanbanView.tsx`
+
+```typescript
+// ANTES: sequencial
+const userPhases = await supabase.rpc('get_user_phases', ...);
+const orders = await supabase.from('orders').select(...);
+
+// DEPOIS: paralelo
+const [userPhasesResult, ordersResult] = await Promise.all([
+  supabase.rpc('get_user_phases', ...),
+  supabase.from('orders').select(...)
+]);
+```
+
+**Resultado:** Reduz tempo total de ~1.5s para ~800ms (a query mais lenta define o tempo).
+
+---
+
+#### Correcao 5: Cache usePhaseInfo e phase_config
+
+**Problema:** `usePhaseInfo` busca 3 tabelas (phase_config, user_roles, profiles) a cada mount do KanbanView.
+
+**Solucao:** Migrar para `useQuery` com `staleTime` alto (dados mudam raramente).
+
+**Arquivo:** `src/hooks/usePhaseInfo.tsx`
+
+```typescript
+const { data: phaseConfigs } = useQuery({
+  queryKey: ['phase-configs'],
+  queryFn: loadPhaseData,
+  staleTime: 5 * 60_000,  // 5 min - muda muito raramente
+});
+```
+
+**Resultado:** Depois do primeiro load, phase info vem do cache instantaneamente.
+
+---
+
+### Resumo de Alteracoes
+
+| Prioridade | Arquivo | Descricao |
+|------------|---------|-----------|
+| **CRITICA** | `src/components/Dashboard.tsx` | Migrar orders para React Query com cache |
+| **CRITICA** | `src/components/Dashboard.tsx` | Filtrar pedidos finalizados da query principal |
+| **ALTA** | `src/hooks/useDaysInPhase.tsx` | Migrar para React Query + otimizar query |
+| **ALTA** | `src/hooks/usePhaseInfo.tsx` | Migrar para React Query com staleTime alto |
+| **MEDIA** | `src/components/Dashboard.tsx` | Paralelizar get_user_phases + orders query |
+| **MEDIA** | `src/components/KanbanView.tsx` | Remover query duplicada de phase_config |
 
 ### Resultado Esperado
 
-1. Julia Farsen, Carlos e Bryan acessarao o sistema imediatamente
-2. Futuros usuarios aprovados serao auto-vinculados corretamente pelo OrganizationGuard
-3. O UserApprovalDialog nao falhara mais se o contexto de organizacao nao estiver carregado
-4. Links de convite apontarao para a URL correta
+| Metrica | Antes | Depois |
+|---------|-------|--------|
+| Primeiro carregamento | ~3.5s | ~1.2s |
+| Retorno ao Kanban (navegacao) | ~3s | **Instantaneo** (cache) |
+| Payload de rede | ~481 pedidos + 2241 items + 2508 historico | ~155 pedidos + ~600 items |
+| Realtime sync | Reload completo a cada evento | Update seletivo (ja implementado) |
+
+### Manutencao do Realtime
+
+O sistema de realtime existente (broadcast + postgres_changes + updateSingleOrder) sera **mantido intacto**. A unica mudanca e que em vez de `setOrders()`, o realtime atualizara o cache do React Query via `queryClient.setQueryData()`, garantindo que todos os componentes recebam a atualizacao.
 
