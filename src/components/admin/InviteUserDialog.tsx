@@ -7,7 +7,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { UserPlus, Mail, MessageCircle, Loader2, Copy, Check } from "lucide-react";
+import { UserPlus, Mail, MessageCircle, Loader2, Copy, Check, ExternalLink, Share2 } from "lucide-react";
+import { Separator } from "@/components/ui/separator";
 
 interface InviteUserDialogProps {
   open: boolean;
@@ -25,6 +26,8 @@ export function InviteUserDialog({ open, onOpenChange, onSuccess }: InviteUserDi
   const [sendViaWhatsApp, setSendViaWhatsApp] = useState(false);
   const [inviteUrl, setInviteUrl] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [invitedEmail, setInvitedEmail] = useState("");
+  const [invitedName, setInvitedName] = useState("");
 
   const resetForm = () => {
     setEmail("");
@@ -35,6 +38,8 @@ export function InviteUserDialog({ open, onOpenChange, onSuccess }: InviteUserDi
     setSendViaWhatsApp(false);
     setInviteUrl(null);
     setCopied(false);
+    setInvitedEmail("");
+    setInvitedName("");
   };
 
   const handleClose = () => {
@@ -81,13 +86,15 @@ export function InviteUserDialog({ open, onOpenChange, onSuccess }: InviteUserDi
       }
 
       setInviteUrl(data.invite.invite_url);
+      setInvitedEmail(email);
+      setInvitedName(name);
       
       // Check delivery status
       const delivery = data.delivery;
       if (delivery?.email_sent) {
         toast.success(`Convite enviado por email para ${email}`);
       } else if (sendViaEmail && delivery?.email_error) {
-        toast.warning(`Convite criado, mas email falhou. Use o link abaixo.`, {
+        toast.warning(`Convite criado, mas email falhou. Compartilhe o link abaixo.`, {
           description: 'Verifique a configuração do Resend (domínio verificado)',
           duration: 8000,
         });
@@ -97,11 +104,11 @@ export function InviteUserDialog({ open, onOpenChange, onSuccess }: InviteUserDi
       if (delivery?.whatsapp_sent) {
         toast.success('Convite enviado via WhatsApp');
       } else if (sendViaWhatsApp && whatsapp && delivery?.whatsapp_error) {
-        toast.warning('WhatsApp falhou. Use o link abaixo.');
+        toast.warning('WhatsApp falhou. Compartilhe o link abaixo.');
       }
       
       if (!delivery?.email_sent && !delivery?.whatsapp_sent) {
-        toast.success("Convite criado! Copie o link para enviar manualmente.");
+        toast.success("Convite criado! Compartilhe o link com o usuário.");
       }
 
       onSuccess?.();
@@ -122,9 +129,23 @@ export function InviteUserDialog({ open, onOpenChange, onSuccess }: InviteUserDi
     }
   };
 
+  const shareViaWhatsApp = () => {
+    if (inviteUrl) {
+      const message = `Olá${invitedName ? ` ${invitedName}` : ''}! 👋\n\nVocê foi convidado para participar do V.I.V.O.\n\nClique no link abaixo para criar sua conta:\n${inviteUrl}\n\n_Válido por 7 dias._`;
+      const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(message)}`;
+      window.open(whatsappUrl, '_blank');
+    }
+  };
+
+  const openInviteLink = () => {
+    if (inviteUrl) {
+      window.open(inviteUrl, '_blank');
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-[480px]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <UserPlus className="h-5 w-5" />
@@ -138,28 +159,63 @@ export function InviteUserDialog({ open, onOpenChange, onSuccess }: InviteUserDi
         {inviteUrl ? (
           <div className="space-y-4">
             <div className="p-4 rounded-lg bg-primary/10 border border-primary/20">
-              <p className="text-sm font-medium text-primary mb-2">Convite criado com sucesso!</p>
+              <p className="text-sm font-medium text-primary mb-1">✅ Convite criado com sucesso!</p>
               <p className="text-xs text-muted-foreground">
-                O usuário pode acessar o link abaixo para criar a conta:
+                Convite para <strong>{invitedEmail}</strong>
               </p>
             </div>
-            
-            <div className="flex gap-2">
-              <Input 
-                value={inviteUrl} 
-                readOnly 
-                className="text-xs"
-              />
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={copyToClipboard}
-              >
-                {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-              </Button>
+
+            {/* Link do convite */}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Link de acesso:</Label>
+              <div className="flex gap-2">
+                <Input 
+                  value={inviteUrl} 
+                  readOnly 
+                  className="text-xs font-mono"
+                />
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={copyToClipboard}
+                  title="Copiar link"
+                >
+                  {copied ? <Check className="h-4 w-4 text-primary" /> : <Copy className="h-4 w-4" />}
+                </Button>
+              </div>
             </div>
 
-            <DialogFooter>
+            <Separator />
+
+            {/* Botões de compartilhamento */}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium flex items-center gap-1">
+                <Share2 className="h-3.5 w-3.5" />
+                Compartilhar convite:
+              </Label>
+              <div className="grid grid-cols-2 gap-2">
+                <Button
+                  variant="outline"
+                  className="flex items-center gap-2"
+                  onClick={shareViaWhatsApp}
+                >
+                  <MessageCircle className="h-4 w-4 text-primary" />
+                  Enviar via WhatsApp
+                </Button>
+                <Button
+                  variant="outline"
+                  className="flex items-center gap-2"
+                  onClick={openInviteLink}
+                >
+                  <ExternalLink className="h-4 w-4" />
+                  Abrir Link
+                </Button>
+              </div>
+            </div>
+
+            <Separator />
+
+            <DialogFooter className="flex gap-2">
               <Button variant="outline" onClick={() => { resetForm(); }}>
                 Novo Convite
               </Button>
