@@ -151,6 +151,8 @@ Deno.serve(async (req) => {
     const inviteUrl = `${req.headers.get('origin') || 'https://tv-orderhub.lovable.app'}/auth?type=invite&token=${invite.invite_token}`;
 
     // Send email via Resend
+    let emailSent = false;
+    let emailError: string | null = null;
     if (sendViaEmail && resendApiKey) {
       try {
         const emailResponse = await fetch('https://api.resend.com/emails', {
@@ -160,7 +162,7 @@ Deno.serve(async (req) => {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            from: 'V.I.V.O. <noreply@resend.dev>',
+            from: 'V.I.V.O. <onboarding@resend.dev>',
             to: [email],
             subject: `Convite para participar de ${orgName}`,
             html: `
@@ -182,15 +184,26 @@ Deno.serve(async (req) => {
           }),
         });
 
-        if (!emailResponse.ok) {
-          console.error('Error sending email:', await emailResponse.text());
+        if (emailResponse.ok) {
+          emailSent = true;
+          console.log('Email sent successfully to:', email);
+        } else {
+          const errorBody = await emailResponse.text();
+          emailError = `Resend API error (${emailResponse.status}): ${errorBody}`;
+          console.error('Error sending email:', emailError);
         }
-      } catch (emailError) {
-        console.error('Error sending email:', emailError);
+      } catch (err) {
+        emailError = `Email send exception: ${err.message}`;
+        console.error('Error sending email:', err);
       }
+    } else if (sendViaEmail && !resendApiKey) {
+      emailError = 'RESEND_API_KEY não configurada';
+      console.error(emailError);
     }
 
     // Send WhatsApp via Mega API
+    let whatsappSent = false;
+    let whatsappErrorMsg: string | null = null;
     if (sendViaWhatsApp && whatsapp && megaApiUrl && megaApiToken && megaApiInstance) {
       try {
         const normalizedPhone = whatsapp.replace(/\D/g, '');
@@ -208,11 +221,16 @@ Deno.serve(async (req) => {
           }),
         });
 
-        if (!whatsappResponse.ok) {
-          console.error('Error sending WhatsApp:', await whatsappResponse.text());
+        if (whatsappResponse.ok) {
+          whatsappSent = true;
+          console.log('WhatsApp sent successfully to:', normalizedPhone);
+        } else {
+          whatsappErrorMsg = await whatsappResponse.text();
+          console.error('Error sending WhatsApp:', whatsappErrorMsg);
         }
-      } catch (whatsappError) {
-        console.error('Error sending WhatsApp:', whatsappError);
+      } catch (err) {
+        whatsappErrorMsg = err.message;
+        console.error('Error sending WhatsApp:', err);
       }
     }
 
@@ -222,7 +240,13 @@ Deno.serve(async (req) => {
         id: invite.id, 
         email: invite.email,
         invite_url: inviteUrl 
-      } 
+      },
+      delivery: {
+        email_sent: emailSent,
+        email_error: emailError,
+        whatsapp_sent: whatsappSent,
+        whatsapp_error: whatsappErrorMsg,
+      }
     }), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

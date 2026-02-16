@@ -82,13 +82,25 @@ export function InviteUserDialog({ open, onOpenChange, onSuccess }: InviteUserDi
 
       setInviteUrl(data.invite.invite_url);
       
-      const channels = [];
-      if (sendViaEmail) channels.push('email');
-      if (sendViaWhatsApp && whatsapp) channels.push('WhatsApp');
+      // Check delivery status
+      const delivery = data.delivery;
+      if (delivery?.email_sent) {
+        toast.success(`Convite enviado por email para ${email}`);
+      } else if (sendViaEmail && delivery?.email_error) {
+        toast.warning(`Convite criado, mas email falhou. Use o link abaixo.`, {
+          description: 'Verifique a configuração do Resend (domínio verificado)',
+          duration: 8000,
+        });
+        console.warn('Email delivery error:', delivery.email_error);
+      }
       
-      if (channels.length > 0) {
-        toast.success(`Convite enviado via ${channels.join(' e ')}`);
-      } else {
+      if (delivery?.whatsapp_sent) {
+        toast.success('Convite enviado via WhatsApp');
+      } else if (sendViaWhatsApp && whatsapp && delivery?.whatsapp_error) {
+        toast.warning('WhatsApp falhou. Use o link abaixo.');
+      }
+      
+      if (!delivery?.email_sent && !delivery?.whatsapp_sent) {
         toast.success("Convite criado! Copie o link para enviar manualmente.");
       }
 
