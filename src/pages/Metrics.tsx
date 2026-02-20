@@ -11,6 +11,7 @@ import { EditOrderDialog } from "@/components/EditOrderDialog";
 import { ComparativeMetrics } from "@/components/metrics/ComparativeMetrics";
 import { TrendCard } from "@/components/metrics/TrendCard";
 import { CategorySLAMetrics } from "@/components/metrics/CategorySLAMetrics";
+import { CompletedOrdersTable } from "@/components/metrics/CompletedOrdersTable";
 import type { Order } from "@/components/Dashboard";
 import { cleanItemDescription } from "@/lib/utils";
 import { 
@@ -40,6 +41,7 @@ export default function Metrics() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [orders, setOrders] = useState<Order[]>([]);
+  const [completedOrders, setCompletedOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [weeklyChanges, setWeeklyChanges] = useState(0);
   const [problematicCount, setProblematicCount] = useState(0);
@@ -125,6 +127,66 @@ export default function Metrics() {
       });
       
       setOrders(transformedOrders);
+
+      // Query separada para pedidos concluídos
+      const { data: completedData, error: completedError } = await supabase
+        .from('orders')
+        .select('*, order_items (*)')
+        .in('status', ['completed', 'delivered'])
+        .order('updated_at', { ascending: false })
+        .range(0, 499);
+
+      if (!completedError && completedData) {
+        const transformedCompleted: Order[] = completedData.map(dbOrder => {
+          const createdDate = new Date(dbOrder.created_at);
+          const now = new Date();
+          const daysOpen = Math.floor((now.getTime() - createdDate.getTime()) / (1000 * 60 * 60 * 24));
+          return {
+            id: dbOrder.id,
+            type: dbOrder.order_type as any,
+            priority: dbOrder.priority as any,
+            orderNumber: dbOrder.order_number,
+            item: dbOrder.customer_name,
+            description: dbOrder.notes || "",
+            quantity: 0,
+            createdDate: createdDate.toISOString().split('T')[0],
+            issueDate: dbOrder.issue_date ? new Date(dbOrder.issue_date).toISOString().split('T')[0] : undefined,
+            status: dbOrder.status as any,
+            client: dbOrder.customer_name,
+            deliveryDeadline: dbOrder.delivery_date,
+            deskTicket: dbOrder.order_number,
+            order_category: dbOrder.order_category,
+            daysOpen,
+            items: (dbOrder.order_items || []).map((item: any) => ({
+              id: item.id,
+              itemCode: item.item_code,
+              itemDescription: cleanItemDescription(item.item_description),
+              requestedQuantity: item.requested_quantity,
+              deliveredQuantity: item.delivered_quantity,
+              unit: item.unit,
+              warehouse: item.warehouse,
+              deliveryDate: item.delivery_date,
+              userId: item.user_id,
+              item_source_type: item.item_source_type,
+              item_status: item.item_status,
+              sla_days: item.sla_days,
+              is_imported: item.is_imported,
+              import_lead_time_days: item.import_lead_time_days,
+              sla_deadline: item.sla_deadline,
+              current_phase: item.current_phase,
+              phase_started_at: item.phase_started_at,
+              production_estimated_date: item.production_estimated_date,
+              received_status: item.received_status,
+              unit_price: item.unit_price,
+              discount_percent: item.discount_percent,
+              total_value: item.total_value,
+              ipi_percent: item.ipi_percent,
+              icms_percent: item.icms_percent,
+            }))
+          };
+        });
+        setCompletedOrders(transformedCompleted);
+      }
       
       // Carregar mudanças semanais
       const changes = await countDateChanges(7);
@@ -302,6 +364,18 @@ export default function Metrics() {
       {/* Performance de SLA por Categoria */}
       <div className="mb-6">
         <CategorySLAMetrics orders={orders} />
+      </div>
+
+      {/* Pedidos Concluídos */}
+      <div className="mb-6">
+        <h2 className="text-xl font-semibold mb-4">✅ Pedidos Concluídos ({completedOrders.length})</h2>
+        <CompletedOrdersTable 
+          orders={completedOrders}
+          onOrderClick={(order) => {
+            setSelectedOrder(order);
+            setShowEditDialog(true);
+          }}
+        />
       </div>
 
       {/* Dialog de Edição */}
