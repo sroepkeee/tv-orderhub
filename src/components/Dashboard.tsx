@@ -894,11 +894,13 @@ export const Dashboard = () => {
             user_id
           )
         `);
+      // Filtro inteligente: manter pedidos finalizados dos últimos 7 dias (coluna Conclusão)
+      const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
       const {
         data,
         error
       } = await query
-        .not('status', 'in', '(delivered,completed,cancelled)')
+        .or(`status.not.in.(delivered,completed,cancelled),and(status.in.(delivered,completed,cancelled),updated_at.gte.${sevenDaysAgo})`)
         .range(0, 499).order('created_at', {
         ascending: false
       }).abortSignal(abortControllerRef.current.signal).returns<any[]>();
