@@ -1,152 +1,62 @@
 
 
-## Plano: Otimizacao de Performance do Kanban
+## Plano: Restaurar Pedidos da Fase "Conclusao" e Corrigir Filtro
 
-### Diagnostico
+### Causa Raiz Confirmada
 
-Analisei o fluxo completo de carregamento do Kanban e identifiquei **5 gargalos principais** que causam a lentidao ao navegar para a pagina:
-
----
-
-### Gargalos Identificados
-
-| # | Gargalo | Impacto | Dados |
-|---|---------|---------|-------|
-| 1 | **Sem cache entre navegacoes** | Dashboard usa `useState` puro. Toda vez que o usuario sai e volta, refaz TUDO do zero | ~2-4s por navegacao |
-| 2 | **useDaysInPhase carrega todo historico** | Busca 2.508 registros de `order_history` para calcular dias na fase de cada pedido | ~800ms-1.5s |
-| 3 | **Pedidos finalizados carregados** | 326 de 481 pedidos sao `delivered/completed/cancelled` mas sao carregados na query principal | 68% de payload desnecessario |
-| 4 | **Queries sequenciais no mount** | `get_user_phases` RPC -> `orders+items` -> `phase_config` -> `order_history` executam em sequencia | ~1-2s de espera acumulada |
-| 5 | **usePhaseInfo carrega todos profiles** | Busca TODOS os profiles e user_roles a cada mount para mapear responsaveis | ~300-500ms |
+A otimizacao de performance implementada recentemente adicionou este filtro na query principal do Dashboard (linha 901):
 
 ```text
-Fluxo atual ao abrir o Kanban:
+.not('status', 'in', '(delivered,completed,cancelled)')
+```
 
-1. PermissionsContext carrega (roles, phases, menus)     ~500ms
-2. Dashboard monta -> loadOrders()
-   2a. RPC get_user_phases()                              ~200ms
-   2b. SELECT orders + order_items (481+2241 registros)   ~800ms
-   2c. Processar/transformar dados no client               ~100ms
-3. KanbanView monta
-   3a. usePhaseInfo -> 3 queries (phase_config + user_roles + profiles)  ~500ms
-   3b. useDaysInPhase -> 2 queries chunked (orders + order_history)      ~1000ms
-   3c. phase_config (order_index)                          ~200ms
-4. Render das 15 colunas com cards                         ~200ms
+Isso **removeu 363 pedidos** (325 completed + 38 delivered) que pertenciam a fase "Conclusao" do Kanban. A coluna "Conclusao" ainda existe no KanbanView, mas como os pedidos com esses status nao sao mais carregados, ela aparece **vazia para todos os usuarios**.
 
-TOTAL ESTIMADO: ~3.5s na primeira carga, ~3s em navegacoes subsequentes
+```text
+Fluxo do problema:
+
+1. Dashboard.fetchOrders() -> exclui delivered/completed/cancelled
+2. KanbanView.getOrdersByPhase("completion") -> filtra pedidos com status de conclusao
+3. kanbanPhase.ts mapeia delivered/completed/cancelled -> "completion"
+4. RESULTADO: 0 pedidos na coluna Conclusao (deveria ter 363)
 ```
 
 ---
 
-### Solucoes Propostas
+### Solucao
 
-#### Correcao 1: Migrar loadOrders para React Query (Cache entre paginas)
+#### Correcao 1: Remover filtro agressivo e substituir por filtro inteligente
 
-**Problema:** `useState` + `useEffect` perde dados ao desmontar. Cada navegacao recarrega tudo.
+**Arquivo:** `src/components/Dashboard.tsx` (linha 901)
 
-**Solucao:** Usar `useQuery` do TanStack React Query (ja instalado) para cachear pedidos. Quando o usuario volta ao Kanban, os dados aparecem instantaneamente do cache enquanto o refetch acontece em background.
+O filtro atual exclui TODOS os pedidos finalizados. A correcao correta e:
+- Manter pedidos `delivered` e `completed` dos **ultimos 7 dias** (para que aparecam na coluna Conclusao)
+- Excluir apenas pedidos finalizados ha mais de 7 dias (que ja nao sao relevantes)
+- Manter `cancelled` visivel tambem (pode ter pedidos cancelados recentes que precisam de atencao)
 
-**Arquivo:** `src/components/Dashboard.tsx`
+```text
+ANTES (linha 901):
+  .not('status', 'in', '(delivered,completed,cancelled)')
 
-```typescript
-// ANTES: useState puro
-const [orders, setOrders] = useState<Order[]>([]);
-useEffect(() => { loadOrders(); }, [user]);
-
-// DEPOIS: React Query com cache
-const { data: orders = [], refetch } = useQuery({
-  queryKey: ['kanban-orders', user?.id],
-  queryFn: fetchOrders,
-  staleTime: 30_000,      // 30s antes de considerar stale
-  gcTime: 5 * 60_000,     // 5min no cache apos desmontar
-  refetchOnWindowFocus: false,
-});
+DEPOIS:
+  .or(
+    'status.not.in.(delivered,completed,cancelled),' +
+    'and(status.in.(delivered,completed,cancelled),updated_at.gte.' + sevenDaysAgo + ')'
+  )
 ```
 
-**Resultado:** Navegacao de volta ao Kanban = **instantanea** (dados do cache).
+Isso garante:
+- Pedidos ativos: sempre carregados (sem filtro)
+- Pedidos finalizados recentes (7 dias): carregados na coluna Conclusao
+- Pedidos finalizados antigos (mais de 7 dias): excluidos para manter performance
 
 ---
 
-#### Correcao 2: Filtrar pedidos finalizados na query
+#### Correcao 2: Adicionar contador visivel na coluna Conclusao
 
-**Problema:** 326 pedidos finalizados sao carregados mas nao aparecem no Kanban (coluna "Conclusao" raramente e visivel).
+**Arquivo:** `src/components/KanbanView.tsx`
 
-**Solucao:** Excluir `delivered`, `completed`, `cancelled` da query principal. Carregar separadamente so quando a aba "Concluidos" for selecionada.
-
-**Arquivo:** `src/components/Dashboard.tsx` (dentro de `fetchOrders`)
-
-```typescript
-// Adicionar filtro na query principal
-let query = supabase.from('orders').select(`...`)
-  .not('status', 'in', '(delivered,completed,cancelled)');  // Reduz de 481 para ~155 pedidos
-```
-
-**Resultado:** Payload reduzido em **68%**, query ~3x mais rapida.
-
----
-
-#### Correcao 3: Otimizar useDaysInPhase com view materializada ou calculo server-side
-
-**Problema:** Busca 2.508 registros de `order_history` no client e processa em JS.
-
-**Solucao:** Criar uma RPC (funcao SQL) que calcula dias na fase diretamente no banco, retornando apenas `{order_id, days_in_phase, phase_entered_at}`.
-
-**Arquivo:** Nova migration SQL + refatorar `src/hooks/useDaysInPhase.tsx`
-
-```sql
--- Nova RPC que calcula tudo no banco
-CREATE OR REPLACE FUNCTION get_days_in_phase(order_ids uuid[])
-RETURNS TABLE(order_id uuid, days_in_phase int, phase_entered_at timestamptz)
-AS $$
-  -- Logica SQL que substitui o calculo JS
-  -- Retorna apenas 155 linhas em vez de 2508 registros de historico
-$$;
-```
-
-**Resultado:** De ~2.500 registros transferidos para ~155 linhas compactas. Calculo ~10x mais rapido no banco.
-
----
-
-#### Correcao 4: Paralelizar queries iniciais
-
-**Problema:** Queries executam em sequencia: RPC -> orders -> phase_config -> history.
-
-**Solucao:** Executar em paralelo usando `Promise.all`.
-
-**Arquivo:** `src/components/Dashboard.tsx` e `src/components/KanbanView.tsx`
-
-```typescript
-// ANTES: sequencial
-const userPhases = await supabase.rpc('get_user_phases', ...);
-const orders = await supabase.from('orders').select(...);
-
-// DEPOIS: paralelo
-const [userPhasesResult, ordersResult] = await Promise.all([
-  supabase.rpc('get_user_phases', ...),
-  supabase.from('orders').select(...)
-]);
-```
-
-**Resultado:** Reduz tempo total de ~1.5s para ~800ms (a query mais lenta define o tempo).
-
----
-
-#### Correcao 5: Cache usePhaseInfo e phase_config
-
-**Problema:** `usePhaseInfo` busca 3 tabelas (phase_config, user_roles, profiles) a cada mount do KanbanView.
-
-**Solucao:** Migrar para `useQuery` com `staleTime` alto (dados mudam raramente).
-
-**Arquivo:** `src/hooks/usePhaseInfo.tsx`
-
-```typescript
-const { data: phaseConfigs } = useQuery({
-  queryKey: ['phase-configs'],
-  queryFn: loadPhaseData,
-  staleTime: 5 * 60_000,  // 5 min - muda muito raramente
-});
-```
-
-**Resultado:** Depois do primeiro load, phase info vem do cache instantaneamente.
+Adicionar indicador na coluna Conclusao mostrando que existem mais pedidos antigos que nao estao sendo exibidos, com opcao de "ver todos" se necessario.
 
 ---
 
@@ -154,23 +64,18 @@ const { data: phaseConfigs } = useQuery({
 
 | Prioridade | Arquivo | Descricao |
 |------------|---------|-----------|
-| **CRITICA** | `src/components/Dashboard.tsx` | Migrar orders para React Query com cache |
-| **CRITICA** | `src/components/Dashboard.tsx` | Filtrar pedidos finalizados da query principal |
-| **ALTA** | `src/hooks/useDaysInPhase.tsx` | Migrar para React Query + otimizar query |
-| **ALTA** | `src/hooks/usePhaseInfo.tsx` | Migrar para React Query com staleTime alto |
-| **MEDIA** | `src/components/Dashboard.tsx` | Paralelizar get_user_phases + orders query |
-| **MEDIA** | `src/components/KanbanView.tsx` | Remover query duplicada de phase_config |
+| **URGENTE** | `src/components/Dashboard.tsx` | Substituir filtro agressivo por filtro com janela de 7 dias |
+| Media | `src/components/KanbanView.tsx` | Indicador opcional de pedidos antigos ocultos |
 
 ### Resultado Esperado
 
-| Metrica | Antes | Depois |
-|---------|-------|--------|
-| Primeiro carregamento | ~3.5s | ~1.2s |
-| Retorno ao Kanban (navegacao) | ~3s | **Instantaneo** (cache) |
-| Payload de rede | ~481 pedidos + 2241 items + 2508 historico | ~155 pedidos + ~600 items |
-| Realtime sync | Reload completo a cada evento | Update seletivo (ja implementado) |
+| Metrica | Antes (com bug) | Depois |
+|---------|-----------------|--------|
+| Pedidos na coluna Conclusao | 0 | ~30-50 (ultimos 7 dias) |
+| Pedidos carregados no total | ~140 | ~170-190 |
+| Performance mantida | Sim | Sim (ainda exclui ~320 pedidos antigos) |
 
-### Manutencao do Realtime
+### Nenhum dado foi perdido
 
-O sistema de realtime existente (broadcast + postgres_changes + updateSingleOrder) sera **mantido intacto**. A unica mudanca e que em vez de `setOrders()`, o realtime atualizara o cache do React Query via `queryClient.setQueryData()`, garantindo que todos os componentes recebam a atualizacao.
+Os 363 pedidos continuam intactos no banco de dados. Apenas nao estao sendo carregados pela query do frontend. A correcao e exclusivamente no filtro da query.
 
