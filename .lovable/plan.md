@@ -1,81 +1,70 @@
 
 
-## Plano: Restaurar Pedidos da Fase "Conclusao" e Corrigir Filtro
+## Plano: Corrigir Visualizacao de Pedidos Concluidos na Pagina Metrics
 
-### Causa Raiz Confirmada
+### Diagnostico
 
-A otimizacao de performance implementada recentemente adicionou este filtro na query principal do Dashboard (linha 901):
+Identifiquei **dois problemas** que impedem a exibicao dos pedidos concluidos:
 
-```text
-.not('status', 'in', '(delivered,completed,cancelled)')
-```
+| # | Problema | Local | Impacto |
+|---|----------|-------|---------|
+| 1 | **Query exclui pedidos concluidos** | `src/pages/Metrics.tsx` linha 71 | `.not('status', 'in', '(delivered,completed,cancelled)')` remove todos os 320+ pedidos finalizados |
+| 2 | **CompletedOrdersTable nunca e renderizada** | `src/pages/Metrics.tsx` | O componente existe em `src/components/metrics/CompletedOrdersTable.tsx` mas nao e importado nem usado em nenhuma pagina |
 
-Isso **removeu 363 pedidos** (325 completed + 38 delivered) que pertenciam a fase "Conclusao" do Kanban. A coluna "Conclusao" ainda existe no KanbanView, mas como os pedidos com esses status nao sao mais carregados, ela aparece **vazia para todos os usuarios**.
-
-```text
-Fluxo do problema:
-
-1. Dashboard.fetchOrders() -> exclui delivered/completed/cancelled
-2. KanbanView.getOrdersByPhase("completion") -> filtra pedidos com status de conclusao
-3. kanbanPhase.ts mapeia delivered/completed/cancelled -> "completion"
-4. RESULTADO: 0 pedidos na coluna Conclusao (deveria ter 363)
-```
+Resultado: a pagina Metrics nunca carrega nem exibe pedidos concluidos.
 
 ---
 
 ### Solucao
 
-#### Correcao 1: Remover filtro agressivo e substituir por filtro inteligente
+#### 1. Adicionar query separada para pedidos concluidos
 
-**Arquivo:** `src/components/Dashboard.tsx` (linha 901)
+A query principal da pagina Metrics deve continuar excluindo concluidos (para calcular metricas de pedidos ativos). Porem, uma **segunda query** buscara especificamente pedidos `completed` e `delivered` para alimentar a tabela de concluidos.
 
-O filtro atual exclui TODOS os pedidos finalizados. A correcao correta e:
-- Manter pedidos `delivered` e `completed` dos **ultimos 7 dias** (para que aparecam na coluna Conclusao)
-- Excluir apenas pedidos finalizados ha mais de 7 dias (que ja nao sao relevantes)
-- Manter `cancelled` visivel tambem (pode ter pedidos cancelados recentes que precisam de atencao)
+**Arquivo:** `src/pages/Metrics.tsx`
 
-```text
-ANTES (linha 901):
-  .not('status', 'in', '(delivered,completed,cancelled)')
+- Novo state: `completedOrders`
+- Nova query dentro de `loadData()`:
 
-DEPOIS:
-  .or(
-    'status.not.in.(delivered,completed,cancelled),' +
-    'and(status.in.(delivered,completed,cancelled),updated_at.gte.' + sevenDaysAgo + ')'
-  )
+```typescript
+// Query separada para pedidos concluidos (sem limite de 30 dias)
+const { data: completedData } = await supabase
+  .from('orders')
+  .select('*, order_items (*)')
+  .in('status', ['completed', 'delivered'])
+  .order('updated_at', { ascending: false })
+  .range(0, 499);
 ```
 
-Isso garante:
-- Pedidos ativos: sempre carregados (sem filtro)
-- Pedidos finalizados recentes (7 dias): carregados na coluna Conclusao
-- Pedidos finalizados antigos (mais de 7 dias): excluidos para manter performance
+Isso busca ate 500 pedidos concluidos mais recentes, independente da query principal.
 
----
+#### 2. Importar e renderizar CompletedOrdersTable
 
-#### Correcao 2: Adicionar contador visivel na coluna Conclusao
+**Arquivo:** `src/pages/Metrics.tsx`
 
-**Arquivo:** `src/components/KanbanView.tsx`
+- Importar o componente `CompletedOrdersTable`
+- Adicionar uma secao no final da pagina (antes do dialog de edicao) com a tabela
 
-Adicionar indicador na coluna Conclusao mostrando que existem mais pedidos antigos que nao estao sendo exibidos, com opcao de "ver todos" se necessario.
+#### 3. Remover filtro de 30 dias do CompletedOrdersTable
+
+**Arquivo:** `src/components/metrics/CompletedOrdersTable.tsx`
+
+O componente atualmente filtra internamente apenas pedidos dos ultimos 30 dias (linhas 24-35). Como a query ja traz os dados corretos, esse filtro cliente sera removido ou tornado configuravel, para que todos os pedidos retornados pela query sejam exibidos.
+
+Tambem sera adicionada **paginacao visual** para navegar pelos resultados caso sejam muitos.
 
 ---
 
 ### Resumo de Alteracoes
 
-| Prioridade | Arquivo | Descricao |
-|------------|---------|-----------|
-| **URGENTE** | `src/components/Dashboard.tsx` | Substituir filtro agressivo por filtro com janela de 7 dias |
-| Media | `src/components/KanbanView.tsx` | Indicador opcional de pedidos antigos ocultos |
+| Arquivo | Alteracao |
+|---------|-----------|
+| `src/pages/Metrics.tsx` | Adicionar query separada para concluidos, importar e renderizar CompletedOrdersTable |
+| `src/components/metrics/CompletedOrdersTable.tsx` | Remover filtro fixo de 30 dias, adicionar paginacao simples |
 
 ### Resultado Esperado
 
-| Metrica | Antes (com bug) | Depois |
-|---------|-----------------|--------|
-| Pedidos na coluna Conclusao | 0 | ~30-50 (ultimos 7 dias) |
-| Pedidos carregados no total | ~140 | ~170-190 |
-| Performance mantida | Sim | Sim (ainda exclui ~320 pedidos antigos) |
-
-### Nenhum dado foi perdido
-
-Os 363 pedidos continuam intactos no banco de dados. Apenas nao estao sendo carregados pela query do frontend. A correcao e exclusivamente no filtro da query.
+- Todos os pedidos concluidos (ate 500 mais recentes) serao exibidos na pagina Metrics
+- Tabela com ordenacao, status de prazo e acoes de visualizacao
+- Performance mantida pois usa query separada com `.range(0, 499)`
 
