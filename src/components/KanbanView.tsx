@@ -40,6 +40,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { KanbanDensity } from "@/hooks/useKanbanDensity";
 import { cn } from "@/lib/utils";
 import { useDaysInPhase } from "@/hooks/useDaysInPhase";
+import { useNavigate } from "react-router-dom";
 
 // Hook para cachear phase order_index (evita query duplicada)
 const __usePhaseOrderQuery = () => {
@@ -89,6 +90,7 @@ export const KanbanView = ({
   const { getPhaseInfo, loading: phaseInfoLoading } = usePhaseInfo();
   const { canViewPhase, canEditPhase, userRoles, loading: authLoading } = usePhaseAuthorization();
   const { user } = useAuth();
+  const navigate = useNavigate();
   
   // Hook para calcular dias na fase atual de cada pedido
   const orderIds = React.useMemo(() => optimisticOrders.map(o => o.id), [optimisticOrders]);
@@ -701,6 +703,8 @@ export const KanbanView = ({
                 getPhaseEnteredAt={getPhaseEnteredAt}
                 daysLoading={daysInPhaseLoading}
                 searchQuery={searchQuery}
+                showRecentInfo={column.id === "completion"}
+                onViewAllCompleted={column.id === "completion" ? () => navigate("/metrics") : undefined}
               />
             );
           })}

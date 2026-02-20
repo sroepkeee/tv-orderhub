@@ -1,7 +1,7 @@
 import React from "react";
 import { KanbanCard, CardViewMode } from "./KanbanCard";
 import { Order } from "@/components/Dashboard";
-import { LucideIcon, Info, ExternalLink } from "lucide-react";
+import { LucideIcon, Info, ExternalLink, Clock } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useDroppable } from "@dnd-kit/core";
@@ -35,6 +35,8 @@ interface KanbanColumnProps {
   getPhaseEnteredAt?: (orderId: string) => Date | null;
   daysLoading?: boolean;
   searchQuery?: string;
+  showRecentInfo?: boolean;
+  onViewAllCompleted?: () => void;
 }
 const KanbanColumnComponent = ({
   id,
@@ -56,7 +58,9 @@ const KanbanColumnComponent = ({
   getDaysInPhase,
   getPhaseEnteredAt,
   daysLoading = false,
-  searchQuery = ""
+  searchQuery = "",
+  showRecentInfo = false,
+  onViewAllCompleted
 }: KanbanColumnProps) => {
   const navigate = useNavigate();
   const highCount = orders.filter(o => o.priority === "high").length;
@@ -233,6 +237,24 @@ const KanbanColumnComponent = ({
                 <Icon className="h-4 w-4" />
                 Ver Módulo de Compras
               </Button>
+            )}
+            {showRecentInfo && !isTV && (
+              <div className="mt-2 space-y-1.5 pt-2 border-t border-border/40">
+                <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground/70 px-1">
+                  <Clock className="h-3 w-3 flex-shrink-0" />
+                  <span>Exibindo últimos 7 dias</span>
+                </div>
+                {onViewAllCompleted && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full text-xs h-7"
+                    onClick={onViewAllCompleted}
+                  >
+                    Ver todos concluídos
+                  </Button>
+                )}
+              </div>
             )}
           </>
         )}
