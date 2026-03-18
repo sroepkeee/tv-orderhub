@@ -175,6 +175,7 @@ export function OrderItemsReviewTable({ items, onChange }: OrderItemsReviewTable
               {editingItems.map((item, index) => {
                 const isValid = validateItem(item);
                 const isEmpty = !item.itemCode.trim() || !item.itemDescription.trim();
+                const isMP = isRawMaterialItem(item);
                 
                 return (
                   <TableRow 
@@ -182,6 +183,7 @@ export function OrderItemsReviewTable({ items, onChange }: OrderItemsReviewTable
                     className={`
                       ${index % 2 === 0 ? 'bg-background' : 'bg-muted/30'}
                       ${(!isValid || isEmpty) ? 'bg-destructive/5' : ''}
+                      ${isMP ? 'bg-orange-50/80 dark:bg-orange-950/30 border-l-2 border-l-orange-400' : ''}
                       hover:bg-muted/50
                     `}
                   >
