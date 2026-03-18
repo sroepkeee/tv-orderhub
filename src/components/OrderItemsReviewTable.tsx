@@ -24,13 +24,23 @@ interface OrderItemsReviewTableProps {
   onChange: (items: OrderItem[]) => void;
 }
 
-const getMaterialTypeBadge = (materialType?: string) => {
+const MP_KEYWORDS = ['placa de circuito', 'circuito impresso', 'pcb'];
+
+const isRawMaterialItem = (item: OrderItem) => {
+  if (item.materialType === 'MP') return true;
+  const desc = item.itemDescription?.toLowerCase() || '';
+  return MP_KEYWORDS.some(kw => desc.includes(kw));
+};
+
+const getMaterialTypeBadge = (materialType?: string, itemDescription?: string) => {
   if (!materialType) return null;
+  
+  const isMP = materialType === 'MP' || isRawMaterialItem({ materialType, itemDescription } as OrderItem);
   
   const config: Record<string, { bg: string; text: string }> = {
     'PA': { bg: 'bg-green-100 dark:bg-green-900/50', text: 'text-green-700 dark:text-green-300' },
     'ME': { bg: 'bg-blue-100 dark:bg-blue-900/50', text: 'text-blue-700 dark:text-blue-300' },
-    'MP': { bg: 'bg-orange-100 dark:bg-orange-900/50', text: 'text-orange-700 dark:text-orange-300' },
+    'MP': { bg: 'bg-orange-200 dark:bg-orange-900/70', text: 'text-orange-800 dark:text-orange-200' },
     'MC': { bg: 'bg-purple-100 dark:bg-purple-900/50', text: 'text-purple-700 dark:text-purple-300' },
     'PI': { bg: 'bg-yellow-100 dark:bg-yellow-900/50', text: 'text-yellow-700 dark:text-yellow-300' },
     'BN': { bg: 'bg-gray-100 dark:bg-gray-800', text: 'text-gray-700 dark:text-gray-300' },
@@ -40,9 +50,19 @@ const getMaterialTypeBadge = (materialType?: string) => {
   const style = config[materialType] || config['BN'];
   
   return (
-    <Badge className={`${style.bg} ${style.text} border-0 text-[10px] px-1.5 py-0 font-bold`}>
-      {materialType}
-    </Badge>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Badge className={`${style.bg} ${style.text} border-0 text-[10px] px-1.5 py-0 font-bold ${isMP ? 'ring-1 ring-orange-400 animate-pulse' : ''}`}>
+          {materialType}
+        </Badge>
+      </TooltipTrigger>
+      {isMP && (
+        <TooltipContent side="top" className="max-w-xs text-xs">
+          <p className="font-semibold text-orange-600">⚠️ Matéria-Prima Crua</p>
+          <p>Itens MP como Placas de Circuito não são vendidos/faturados pelo SSM. Verifique a necessidade deste item.</p>
+        </TooltipContent>
+      )}
+    </Tooltip>
   );
 };
 
