@@ -104,20 +104,20 @@ const handler = async (req: Request): Promise<Response> => {
                          daysUntilDelivery <= 7 ? 'color: #f59e0b; font-weight: bold;' : 
                          'color: #22c55e;';
 
-    // Gerar linhas da tabela de itens
+    // Gerar linhas da tabela de itens (com escape HTML)
     const itemsRows = payload.items.map(item => `
       <tr>
         <td style="padding: 12px; border-bottom: 1px solid #e5e7eb; font-family: monospace; font-weight: 600;">
-          ${item.itemCode}
+          ${escapeHtml(item.itemCode)}
         </td>
         <td style="padding: 12px; border-bottom: 1px solid #e5e7eb;">
-          ${item.itemDescription}
+          ${escapeHtml(item.itemDescription)}
         </td>
         <td style="padding: 12px; border-bottom: 1px solid #e5e7eb; text-align: center;">
-          ${item.requestedQuantity} ${item.unit}
+          ${escapeHtml(String(item.requestedQuantity))} ${escapeHtml(item.unit)}
         </td>
         <td style="padding: 12px; border-bottom: 1px solid #e5e7eb; text-align: center;">
-          ${item.warehouse || '-'}
+          ${escapeHtml(item.warehouse || '-')}
         </td>
       </tr>
     `).join('');
