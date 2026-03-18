@@ -38,8 +38,8 @@ const fetchPhaseEntryDates = async (orderIds: string[]): Promise<Record<string, 
       .order('changed_at', { ascending: false })
   );
 
-  let ordersResults: Awaited<ReturnType<typeof supabase.from<'orders'>>['select']>[];
-  let historyResults: Awaited<ReturnType<typeof supabase.from<'order_history'>>['select']>[];
+  let ordersResults: any[];
+  let historyResults: any[];
 
   try {
     [ordersResults, historyResults] = await Promise.all([

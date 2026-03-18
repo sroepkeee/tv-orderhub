@@ -610,9 +610,9 @@ export const ImportOrderDialog = ({
                 )}
                 {parsedData.items.some(item => 
                   item.materialType === 'MP' || 
-                  item.itemDescription?.toLowerCase().includes('placa de circuito') ||
-                  item.itemDescription?.toLowerCase().includes('circuito impresso') ||
-                  item.itemDescription?.toLowerCase().includes('pcb')
+                  item.description?.toLowerCase().includes('placa de circuito') ||
+                  item.description?.toLowerCase().includes('circuito impresso') ||
+                  item.description?.toLowerCase().includes('pcb')
                 ) && (
                   <Badge variant="outline" className="text-xs text-orange-600 border-orange-300 bg-orange-50 dark:bg-orange-950 dark:text-orange-300 dark:border-orange-800">
                     <AlertTriangle className="h-3 w-3 mr-1" />
