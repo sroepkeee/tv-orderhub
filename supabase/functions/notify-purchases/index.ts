@@ -176,23 +176,23 @@ const handler = async (req: Request): Promise<Response> => {
         <table style="width: 100%; border-collapse: collapse;">
           <tr>
             <td style="padding: 8px 0; color: #6b7280; width: 140px;">${payload.purchaseRequestId ? 'Nº da OC:' : 'Nº do Pedido:'}</td>
-            <td style="padding: 8px 0; color: #111827; font-weight: 600; font-size: 16px;">#${payload.orderNumber}</td>
-          </tr>
-          <tr>
-            <td style="padding: 8px 0; color: #6b7280;">${payload.purchaseRequestId ? 'Empresa:' : 'Cliente:'}</td>
-            <td style="padding: 8px 0; color: #111827; font-weight: 500;">${payload.customerName}</td>
-          </tr>
-          <tr>
-            <td style="padding: 8px 0; color: #6b7280;">Data de Entrega:</td>
-            <td style="padding: 8px 0; font-weight: 500; ${urgencyClass}">
-              ${deliveryDateFormatted}
-              ${daysUntilDelivery <= 7 ? `<span style="font-size: 12px;"> (${daysUntilDelivery} dias)</span>` : ''}
-            </td>
-          </tr>
-          <tr>
-            <td style="padding: 8px 0; color: #6b7280;">${payload.purchaseRequestId ? 'Solicitado por:' : 'Movido por:'}</td>
-            <td style="padding: 8px 0; color: #111827;">${payload.movedBy}</td>
-          </tr>
+             <td style="padding: 8px 0; color: #111827; font-weight: 600; font-size: 16px;">#${escapeHtml(payload.orderNumber)}</td>
+           </tr>
+           <tr>
+             <td style="padding: 8px 0; color: #6b7280;">${payload.purchaseRequestId ? 'Empresa:' : 'Cliente:'}</td>
+             <td style="padding: 8px 0; color: #111827; font-weight: 500;">${escapeHtml(payload.customerName)}</td>
+           </tr>
+           <tr>
+             <td style="padding: 8px 0; color: #6b7280;">Data de Entrega:</td>
+             <td style="padding: 8px 0; font-weight: 500; ${urgencyClass}">
+               ${deliveryDateFormatted}
+               ${daysUntilDelivery <= 7 ? `<span style="font-size: 12px;"> (${daysUntilDelivery} dias)</span>` : ''}
+             </td>
+           </tr>
+           <tr>
+             <td style="padding: 8px 0; color: #6b7280;">${payload.purchaseRequestId ? 'Solicitado por:' : 'Movido por:'}</td>
+             <td style="padding: 8px 0; color: #111827;">${escapeHtml(payload.movedBy)}</td>
+           </tr>
         </table>
       </div>
       
