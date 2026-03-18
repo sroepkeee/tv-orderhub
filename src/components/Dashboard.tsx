@@ -697,6 +697,31 @@ export const Dashboard = () => {
     };
   }, [user]);
 
+  // 👁️ Reconexão automática ao retornar à aba (fix desconexões Denise Gassen)
+  useEffect(() => {
+    const handleVisibilityChange = async () => {
+      if (document.visibilityState === 'visible' && user) {
+        console.log('👁️ [Visibility] Tab voltou ao foco, reconectando...');
+        setRealtimeStatus('updating');
+        
+        try {
+          // Renovar token (pode ter expirado em background)
+          await supabase.auth.getSession();
+          
+          // Recarregar dados frescos
+          loadOrders();
+        } catch (err) {
+          console.error('👁️ [Visibility] Erro ao reconectar:', err);
+        }
+        
+        setTimeout(() => setRealtimeStatus('synced'), 2000);
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [user]);
+
   // 📦 Listeners para controle de batch import
   useEffect(() => {
     const handleBatchStart = () => {
