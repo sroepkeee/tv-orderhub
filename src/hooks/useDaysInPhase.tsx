@@ -54,8 +54,16 @@ const fetchPhaseEntryDates = async (orderIds: string[]): Promise<Record<string, 
     return result;
   }
 
-  const ordersData = ordersResults.flatMap(r => r.data || []);
-  const historyData = historyResults.flatMap(r => r.data || []);
+  const ordersData = ordersResults.flatMap(r => {
+    if (r.error) console.warn('⏱️ [useDaysInPhase] Erro orders query:', r.error.message);
+    return r.data || [];
+  });
+  const historyData = historyResults.flatMap(r => {
+    if (r.error) console.warn('⏱️ [useDaysInPhase] Erro history query:', r.error.message);
+    return r.data || [];
+  });
+
+  console.log(`⏱️ [useDaysInPhase] Carregou ${ordersData.length} orders, ${historyData.length} history entries`);
 
   // Criar mapas auxiliares
   const orderInfoMap = new Map<string, { status: string; createdAt: string; category: string }>();
