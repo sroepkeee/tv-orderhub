@@ -300,6 +300,12 @@ const areColumnsEqual = (prev: KanbanColumnProps, next: KanbanColumnProps): bool
   if (prev.animatedCardIds?.size !== next.animatedCardIds?.size) {
     return false;
   }
+
+  // Comparar props de dias na fase (referência muda quando dados carregam)
+  if (prev.daysLoading !== next.daysLoading) return false;
+  if (prev.getDaysInPhase !== next.getDaysInPhase) return false;
+  if (prev.getPhaseEnteredAt !== next.getPhaseEnteredAt) return false;
+  if (prev.showRecentInfo !== next.showRecentInfo) return false;
   
   return true;
 };
