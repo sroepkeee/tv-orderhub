@@ -93,7 +93,7 @@ export const KanbanView = ({
   const navigate = useNavigate();
   
   // Hook para calcular dias na fase atual de cada pedido
-  const orderIds = React.useMemo(() => optimisticOrders.map(o => o.id), [optimisticOrders]);
+  const orderIds = React.useMemo(() => orders.map(o => o.id), [orders]);
   const { getDaysInPhase, getPhaseEnteredAt, loading: daysInPhaseLoading } = useDaysInPhase(orderIds);
   
   // 📊 Debug: Contador de renders
