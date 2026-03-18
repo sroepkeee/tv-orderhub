@@ -644,6 +644,11 @@ export const Dashboard = () => {
         setRealtimeStatus('synced');
       } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
         setRealtimeStatus('disconnected');
+        // Auto-retry após 3s para recuperar de micro-drops de rede
+        setTimeout(() => {
+          console.log('🔄 [Realtime] Tentando reconectar canal após erro...');
+          channel.subscribe();
+        }, 3000);
       }
     });
     return () => {
