@@ -1,70 +1,83 @@
 
 
-## Plano: Corrigir Visualizacao de Pedidos Concluidos na Pagina Metrics
+## Plano: Corrigir Desconexões Frequentes (Caso Denise Gassen)
 
-### Diagnostico
+### Diagnóstico
 
-Identifiquei **dois problemas** que impedem a exibicao dos pedidos concluidos:
+Os console logs confirmam ciclos `CHANNEL_ERROR → SUBSCRIBED` frequentes. A session replay mostra transição `Desconectado → Sincronizado` em poucos segundos. O sistema não tem:
+1. **Listener de visibilidade da aba** — quando o browser suspende a aba, o WebSocket morre silenciosamente e nunca reconecta
+2. **Retry automático em CHANNEL_ERROR** — o canal apenas marca "disconnected" sem tentar reconectar
+3. **Refresh de token ao retornar** — `autoRefreshToken` não funciona com aba em background
 
-| # | Problema | Local | Impacto |
-|---|----------|-------|---------|
-| 1 | **Query exclui pedidos concluidos** | `src/pages/Metrics.tsx` linha 71 | `.not('status', 'in', '(delivered,completed,cancelled)')` remove todos os 320+ pedidos finalizados |
-| 2 | **CompletedOrdersTable nunca e renderizada** | `src/pages/Metrics.tsx` | O componente existe em `src/components/metrics/CompletedOrdersTable.tsx` mas nao e importado nem usado em nenhuma pagina |
+### Alterações
 
-Resultado: a pagina Metrics nunca carrega nem exibe pedidos concluidos.
-
----
-
-### Solucao
-
-#### 1. Adicionar query separada para pedidos concluidos
-
-A query principal da pagina Metrics deve continuar excluindo concluidos (para calcular metricas de pedidos ativos). Porem, uma **segunda query** buscara especificamente pedidos `completed` e `delivered` para alimentar a tabela de concluidos.
-
-**Arquivo:** `src/pages/Metrics.tsx`
-
-- Novo state: `completedOrders`
-- Nova query dentro de `loadData()`:
+#### 1. `src/App.tsx` — Aumentar retry do QueryClient
 
 ```typescript
-// Query separada para pedidos concluidos (sem limite de 30 dias)
-const { data: completedData } = await supabase
-  .from('orders')
-  .select('*, order_items (*)')
-  .in('status', ['completed', 'delivered'])
-  .order('updated_at', { ascending: false })
-  .range(0, 499);
+// ANTES: retry: 1
+// DEPOIS:
+retry: 3,
+retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 15000),
 ```
 
-Isso busca ate 500 pedidos concluidos mais recentes, independente da query principal.
+#### 2. `src/components/Dashboard.tsx` — Adicionar reconexão por visibilidade
 
-#### 2. Importar e renderizar CompletedOrdersTable
+Adicionar um `useEffect` com listener `visibilitychange` que, ao retornar à aba:
+- Força `supabase.auth.getSession()` para renovar token expirado
+- Chama `loadOrders()` para garantir dados frescos
+- Reconecta canais realtime
 
-**Arquivo:** `src/pages/Metrics.tsx`
+```typescript
+useEffect(() => {
+  const handleVisibilityChange = async () => {
+    if (document.visibilityState === 'visible' && user) {
+      console.log('👁️ Tab voltou ao foco, reconectando...');
+      setRealtimeStatus('updating');
+      
+      // Renovar token (pode ter expirado em background)
+      await supabase.auth.getSession();
+      
+      // Recarregar dados
+      loadOrders();
+      
+      setTimeout(() => setRealtimeStatus('synced'), 2000);
+    }
+  };
 
-- Importar o componente `CompletedOrdersTable`
-- Adicionar uma secao no final da pagina (antes do dialog de edicao) com a tabela
+  document.addEventListener('visibilitychange', handleVisibilityChange);
+  return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+}, [user]);
+```
 
-#### 3. Remover filtro de 30 dias do CompletedOrdersTable
+#### 3. `src/components/Dashboard.tsx` — Retry automático em CHANNEL_ERROR
 
-**Arquivo:** `src/components/metrics/CompletedOrdersTable.tsx`
+No subscribe callback do canal `orders-realtime`, ao detectar `CHANNEL_ERROR` ou `TIMED_OUT`, aguardar 3s e tentar resubscribe:
 
-O componente atualmente filtra internamente apenas pedidos dos ultimos 30 dias (linhas 24-35). Como a query ja traz os dados corretos, esse filtro cliente sera removido ou tornado configuravel, para que todos os pedidos retornados pela query sejam exibidos.
+```typescript
+.subscribe(async (status) => {
+  if (status === 'SUBSCRIBED') {
+    setRealtimeStatus('synced');
+  } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+    setRealtimeStatus('disconnected');
+    // Auto-retry após 3s
+    setTimeout(() => {
+      console.log('🔄 Tentando reconectar canal realtime...');
+      channel.subscribe();
+    }, 3000);
+  }
+});
+```
 
-Tambem sera adicionada **paginacao visual** para navegar pelos resultados caso sejam muitos.
+### Resumo
 
----
-
-### Resumo de Alteracoes
-
-| Arquivo | Alteracao |
+| Arquivo | Alteração |
 |---------|-----------|
-| `src/pages/Metrics.tsx` | Adicionar query separada para concluidos, importar e renderizar CompletedOrdersTable |
-| `src/components/metrics/CompletedOrdersTable.tsx` | Remover filtro fixo de 30 dias, adicionar paginacao simples |
+| `src/App.tsx` | `retry: 3` com backoff exponencial |
+| `src/components/Dashboard.tsx` | Listener `visibilitychange` + retry automático em CHANNEL_ERROR |
 
 ### Resultado Esperado
 
-- Todos os pedidos concluidos (ate 500 mais recentes) serao exibidos na pagina Metrics
-- Tabela com ordenacao, status de prazo e acoes de visualizacao
-- Performance mantida pois usa query separada com `.range(0, 499)`
+- Ao voltar para a aba após inatividade, o sistema renova o token e recarrega dados automaticamente
+- Erros de canal são recuperados em ~3s sem intervenção do usuário
+- Queries HTTP retentam 3x com backoff, absorvendo micro-drops de rede
 
