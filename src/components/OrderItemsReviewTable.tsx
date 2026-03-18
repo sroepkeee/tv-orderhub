@@ -199,7 +199,7 @@ export function OrderItemsReviewTable({ items, onChange }: OrderItemsReviewTable
                             className={`h-7 text-xs w-[80px] ${!item.itemCode.trim() ? 'border-destructive' : ''}`}
                             placeholder="Código"
                           />
-                          {getMaterialTypeBadge(item.materialType)}
+                          {getMaterialTypeBadge(item.materialType, item.itemDescription)}
                         </div>
                         {item.ncmCode && item.ncmCode !== '0' && item.ncmCode.length >= 6 && (
                           <span className="text-[10px] text-muted-foreground font-mono ml-0.5">
