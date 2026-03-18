@@ -38,10 +38,21 @@ const fetchPhaseEntryDates = async (orderIds: string[]): Promise<Record<string, 
       .order('changed_at', { ascending: false })
   );
 
-  const [ordersResults, historyResults] = await Promise.all([
-    Promise.all(ordersPromises),
-    Promise.all(historyPromises)
-  ]);
+  let ordersResults: Awaited<ReturnType<typeof supabase.from<'orders'>>['select']>[];
+  let historyResults: Awaited<ReturnType<typeof supabase.from<'order_history'>>['select']>[];
+
+  try {
+    [ordersResults, historyResults] = await Promise.all([
+      Promise.all(ordersPromises),
+      Promise.all(historyPromises)
+    ]);
+  } catch (err) {
+    console.error('⏱️ [useDaysInPhase] Erro ao buscar dados:', err);
+    // Fallback: retornar dados vazios para que o card mostre 0d em vez de "..."
+    const result: Record<string, PhaseEntry> = {};
+    orderIds.forEach(id => { result[id] = { orderId: id, daysInPhase: 0, phaseEnteredAt: null }; });
+    return result;
+  }
 
   const ordersData = ordersResults.flatMap(r => r.data || []);
   const historyData = historyResults.flatMap(r => r.data || []);
