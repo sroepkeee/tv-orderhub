@@ -1,70 +1,81 @@
 
 
-## Plano: Corrigir Visualizacao de Pedidos Concluidos na Pagina Metrics
+## Plano: Corrigir Tela Branca e Lentidao ao Retornar a Aba
 
 ### Diagnostico
 
-Identifiquei **dois problemas** que impedem a exibicao dos pedidos concluidos:
+A tela branca apos a atualizacao foi causada pelo hot-reload do codigo (HMR) — comportamento normal apos deploy de mudancas. Porem, ha um problema real no handler `visibilitychange` que pode causar lentidao e flash de tela branca em uso normal:
 
-| # | Problema | Local | Impacto |
-|---|----------|-------|---------|
-| 1 | **Query exclui pedidos concluidos** | `src/pages/Metrics.tsx` linha 71 | `.not('status', 'in', '(delivered,completed,cancelled)')` remove todos os 320+ pedidos finalizados |
-| 2 | **CompletedOrdersTable nunca e renderizada** | `src/pages/Metrics.tsx` | O componente existe em `src/components/metrics/CompletedOrdersTable.tsx` mas nao e importado nem usado em nenhuma pagina |
+1. **Sem debounce**: Cada troca de aba dispara `loadOrders()` incondicionalmente, mesmo que o usuario tenha saido por 1 segundo
+2. **Loading state agressivo**: `setRealtimeStatus('updating')` e chamado antes de verificar se realmente precisa recarregar
+3. **Sem uso do cache**: O handler ignora o cache do React Query e sempre faz query completa ao banco
 
-Resultado: a pagina Metrics nunca carrega nem exibe pedidos concluidos.
+### Correcao
 
----
+**Arquivo:** `src/components/Dashboard.tsx` (linhas 700-723)
 
-### Solucao
-
-#### 1. Adicionar query separada para pedidos concluidos
-
-A query principal da pagina Metrics deve continuar excluindo concluidos (para calcular metricas de pedidos ativos). Porem, uma **segunda query** buscara especificamente pedidos `completed` e `delivered` para alimentar a tabela de concluidos.
-
-**Arquivo:** `src/pages/Metrics.tsx`
-
-- Novo state: `completedOrders`
-- Nova query dentro de `loadData()`:
+Adicionar logica de **tempo minimo fora da aba** (30 segundos) antes de disparar recarregamento. Se o usuario saiu por menos de 30s, nao faz nada — os dados ainda estao frescos.
 
 ```typescript
-// Query separada para pedidos concluidos (sem limite de 30 dias)
-const { data: completedData } = await supabase
-  .from('orders')
-  .select('*, order_items (*)')
-  .in('status', ['completed', 'delivered'])
-  .order('updated_at', { ascending: false })
-  .range(0, 499);
+// ANTES:
+useEffect(() => {
+  const handleVisibilityChange = async () => {
+    if (document.visibilityState === 'visible' && user) {
+      setRealtimeStatus('updating');
+      await supabase.auth.getSession();
+      loadOrders();
+      setTimeout(() => setRealtimeStatus('synced'), 2000);
+    }
+  };
+  document.addEventListener('visibilitychange', handleVisibilityChange);
+  return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+}, [user]);
+
+// DEPOIS:
+useEffect(() => {
+  let hiddenAt = 0;
+  
+  const handleVisibilityChange = async () => {
+    if (document.visibilityState === 'hidden') {
+      hiddenAt = Date.now();
+      return;
+    }
+    
+    if (document.visibilityState === 'visible' && user) {
+      const awaySeconds = (Date.now() - hiddenAt) / 1000;
+      
+      // Se ficou fora por menos de 30s, nao precisa recarregar
+      if (awaySeconds < 30) {
+        console.log('👁️ [Visibility] Retornou em', awaySeconds.toFixed(0), 's - sem reload');
+        return;
+      }
+      
+      console.log('👁️ [Visibility] Retornou apos', awaySeconds.toFixed(0), 's - reconectando...');
+      
+      // Renovar token apenas se ficou fora por mais de 5 minutos
+      if (awaySeconds > 300) {
+        await supabase.auth.getSession();
+      }
+      
+      // Recarregar dados (usa loading bifurcado - nao mostra tela branca)
+      loadOrders();
+    }
+  };
+
+  document.addEventListener('visibilitychange', handleVisibilityChange);
+  return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+}, [user]);
 ```
-
-Isso busca ate 500 pedidos concluidos mais recentes, independente da query principal.
-
-#### 2. Importar e renderizar CompletedOrdersTable
-
-**Arquivo:** `src/pages/Metrics.tsx`
-
-- Importar o componente `CompletedOrdersTable`
-- Adicionar uma secao no final da pagina (antes do dialog de edicao) com a tabela
-
-#### 3. Remover filtro de 30 dias do CompletedOrdersTable
-
-**Arquivo:** `src/components/metrics/CompletedOrdersTable.tsx`
-
-O componente atualmente filtra internamente apenas pedidos dos ultimos 30 dias (linhas 24-35). Como a query ja traz os dados corretos, esse filtro cliente sera removido ou tornado configuravel, para que todos os pedidos retornados pela query sejam exibidos.
-
-Tambem sera adicionada **paginacao visual** para navegar pelos resultados caso sejam muitos.
-
----
 
 ### Resumo de Alteracoes
 
 | Arquivo | Alteracao |
 |---------|-----------|
-| `src/pages/Metrics.tsx` | Adicionar query separada para concluidos, importar e renderizar CompletedOrdersTable |
-| `src/components/metrics/CompletedOrdersTable.tsx` | Remover filtro fixo de 30 dias, adicionar paginacao simples |
+| `src/components/Dashboard.tsx` | Adicionar threshold de 30s no visibilitychange, renovar token apenas apos 5min |
 
 ### Resultado Esperado
 
-- Todos os pedidos concluidos (ate 500 mais recentes) serao exibidos na pagina Metrics
-- Tabela com ordenacao, status de prazo e acoes de visualizacao
-- Performance mantida pois usa query separada com `.range(0, 499)`
+- Trocas rapidas de aba (< 30s) nao disparam reload — zero impacto visual
+- Ausencias longas (> 30s) recarregam dados sem tela branca (usa `setRefreshing` em vez de `setLoading`)
+- Token so e renovado quando realmente necessario (> 5 min fora)
 
