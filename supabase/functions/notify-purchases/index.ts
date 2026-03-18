@@ -129,7 +129,7 @@ const handler = async (req: Request): Promise<Response> => {
         <h2 style="margin: 0 0 12px 0; color: #92400e; font-size: 16px;">
           📝 Observações Importantes
         </h2>
-        <p style="margin: 0; color: #78350f; white-space: pre-wrap;">${payload.notes}</p>
+        <p style="margin: 0; color: #78350f; white-space: pre-wrap;">${escapeHtml(payload.notes || '')}</p>
       </div>
     ` : '';
 
