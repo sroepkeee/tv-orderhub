@@ -32,6 +32,17 @@ interface PurchaseNotificationRequest {
   senderCompany?: string;
 }
 
+// Simple HTML escaper to prevent XSS in email bodies
+function escapeHtml(str: string): string {
+  if (!str) return str;
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
 const handler = async (req: Request): Promise<Response> => {
   // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
@@ -39,6 +50,28 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
+    // Authenticate the request
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized' }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+    const authClient = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } }
+    });
+    const { data: claimsData, error: claimsError } = await authClient.auth.getClaims(authHeader.replace('Bearer ', ''));
+    if (claimsError || !claimsData?.claims) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized' }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     const payload: PurchaseNotificationRequest = await req.json();
     
     console.log("📧 [notify-purchases] Recebendo requisição:", {
@@ -71,20 +104,20 @@ const handler = async (req: Request): Promise<Response> => {
                          daysUntilDelivery <= 7 ? 'color: #f59e0b; font-weight: bold;' : 
                          'color: #22c55e;';
 
-    // Gerar linhas da tabela de itens
+    // Gerar linhas da tabela de itens (com escape HTML)
     const itemsRows = payload.items.map(item => `
       <tr>
         <td style="padding: 12px; border-bottom: 1px solid #e5e7eb; font-family: monospace; font-weight: 600;">
-          ${item.itemCode}
+          ${escapeHtml(item.itemCode)}
         </td>
         <td style="padding: 12px; border-bottom: 1px solid #e5e7eb;">
-          ${item.itemDescription}
+          ${escapeHtml(item.itemDescription)}
         </td>
         <td style="padding: 12px; border-bottom: 1px solid #e5e7eb; text-align: center;">
-          ${item.requestedQuantity} ${item.unit}
+          ${escapeHtml(String(item.requestedQuantity))} ${escapeHtml(item.unit)}
         </td>
         <td style="padding: 12px; border-bottom: 1px solid #e5e7eb; text-align: center;">
-          ${item.warehouse || '-'}
+          ${escapeHtml(item.warehouse || '-')}
         </td>
       </tr>
     `).join('');
@@ -96,7 +129,7 @@ const handler = async (req: Request): Promise<Response> => {
         <h2 style="margin: 0 0 12px 0; color: #92400e; font-size: 16px;">
           📝 Observações Importantes
         </h2>
-        <p style="margin: 0; color: #78350f; white-space: pre-wrap;">${payload.notes}</p>
+        <p style="margin: 0; color: #78350f; white-space: pre-wrap;">${escapeHtml(payload.notes || '')}</p>
       </div>
     ` : '';
 
@@ -143,23 +176,23 @@ const handler = async (req: Request): Promise<Response> => {
         <table style="width: 100%; border-collapse: collapse;">
           <tr>
             <td style="padding: 8px 0; color: #6b7280; width: 140px;">${payload.purchaseRequestId ? 'Nº da OC:' : 'Nº do Pedido:'}</td>
-            <td style="padding: 8px 0; color: #111827; font-weight: 600; font-size: 16px;">#${payload.orderNumber}</td>
-          </tr>
-          <tr>
-            <td style="padding: 8px 0; color: #6b7280;">${payload.purchaseRequestId ? 'Empresa:' : 'Cliente:'}</td>
-            <td style="padding: 8px 0; color: #111827; font-weight: 500;">${payload.customerName}</td>
-          </tr>
-          <tr>
-            <td style="padding: 8px 0; color: #6b7280;">Data de Entrega:</td>
-            <td style="padding: 8px 0; font-weight: 500; ${urgencyClass}">
-              ${deliveryDateFormatted}
-              ${daysUntilDelivery <= 7 ? `<span style="font-size: 12px;"> (${daysUntilDelivery} dias)</span>` : ''}
-            </td>
-          </tr>
-          <tr>
-            <td style="padding: 8px 0; color: #6b7280;">${payload.purchaseRequestId ? 'Solicitado por:' : 'Movido por:'}</td>
-            <td style="padding: 8px 0; color: #111827;">${payload.movedBy}</td>
-          </tr>
+             <td style="padding: 8px 0; color: #111827; font-weight: 600; font-size: 16px;">#${escapeHtml(payload.orderNumber)}</td>
+           </tr>
+           <tr>
+             <td style="padding: 8px 0; color: #6b7280;">${payload.purchaseRequestId ? 'Empresa:' : 'Cliente:'}</td>
+             <td style="padding: 8px 0; color: #111827; font-weight: 500;">${escapeHtml(payload.customerName)}</td>
+           </tr>
+           <tr>
+             <td style="padding: 8px 0; color: #6b7280;">Data de Entrega:</td>
+             <td style="padding: 8px 0; font-weight: 500; ${urgencyClass}">
+               ${deliveryDateFormatted}
+               ${daysUntilDelivery <= 7 ? `<span style="font-size: 12px;"> (${daysUntilDelivery} dias)</span>` : ''}
+             </td>
+           </tr>
+           <tr>
+             <td style="padding: 8px 0; color: #6b7280;">${payload.purchaseRequestId ? 'Solicitado por:' : 'Movido por:'}</td>
+             <td style="padding: 8px 0; color: #111827;">${escapeHtml(payload.movedBy)}</td>
+           </tr>
         </table>
       </div>
       
