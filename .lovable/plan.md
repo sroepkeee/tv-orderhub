@@ -1,70 +1,68 @@
 
 
-## Plano: Corrigir Visualizacao de Pedidos Concluidos na Pagina Metrics
+## Plano: Corrigir Dias na Fase no Primeiro Acesso + Salvamento de OC/OP
 
-### Diagnostico
+### Problema 1: Dias na fase não aparecem no primeiro acesso
 
-Identifiquei **dois problemas** que impedem a exibicao dos pedidos concluidos:
+**Causa raiz:** O `useDaysInPhase` usa `orderIds` derivado de `optimisticOrders`. No primeiro render, `optimisticOrders` começa vazio (state inicial), depois é preenchido via `useEffect` quando `orders` chega. Porém, o `orderIdsKey` (JSON.stringify dos IDs ordenados) muda de `"[]"` para os IDs reais, disparando a query. O problema é que o `useMemo` em `orderIds` depende de `optimisticOrders`, que é sincronizado com `orders` via `useEffect` — criando um ciclo extra de render antes da query ser habilitada.
 
-| # | Problema | Local | Impacto |
-|---|----------|-------|---------|
-| 1 | **Query exclui pedidos concluidos** | `src/pages/Metrics.tsx` linha 71 | `.not('status', 'in', '(delivered,completed,cancelled)')` remove todos os 320+ pedidos finalizados |
-| 2 | **CompletedOrdersTable nunca e renderizada** | `src/pages/Metrics.tsx` | O componente existe em `src/components/metrics/CompletedOrdersTable.tsx` mas nao e importado nem usado em nenhuma pagina |
+Quando o usuário troca a visualização e volta, o cache do React Query já tem os dados, então aparece instantaneamente.
 
-Resultado: a pagina Metrics nunca carrega nem exibe pedidos concluidos.
+**Correção:** Usar `orders` diretamente (prop) para derivar `orderIds` em vez de `optimisticOrders`. O `optimisticOrders` é para drag-and-drop visual e não deveria atrasar a query de dias.
 
----
+**Arquivo:** `src/components/KanbanView.tsx` (linha 96)
 
-### Solucao
+```
+// ANTES:
+const orderIds = React.useMemo(() => optimisticOrders.map(o => o.id), [optimisticOrders]);
 
-#### 1. Adicionar query separada para pedidos concluidos
-
-A query principal da pagina Metrics deve continuar excluindo concluidos (para calcular metricas de pedidos ativos). Porem, uma **segunda query** buscara especificamente pedidos `completed` e `delivered` para alimentar a tabela de concluidos.
-
-**Arquivo:** `src/pages/Metrics.tsx`
-
-- Novo state: `completedOrders`
-- Nova query dentro de `loadData()`:
-
-```typescript
-// Query separada para pedidos concluidos (sem limite de 30 dias)
-const { data: completedData } = await supabase
-  .from('orders')
-  .select('*, order_items (*)')
-  .in('status', ['completed', 'delivered'])
-  .order('updated_at', { ascending: false })
-  .range(0, 499);
+// DEPOIS:
+const orderIds = React.useMemo(() => orders.map(o => o.id), [orders]);
 ```
 
-Isso busca ate 500 pedidos concluidos mais recentes, independente da query principal.
+---
 
-#### 2. Importar e renderizar CompletedOrdersTable
+### Problema 2: OC/OP não salva na linha do item
 
-**Arquivo:** `src/pages/Metrics.tsx`
+**Causa raiz:** No `EditOrderDialog.tsx`, quando o usuário altera o campo `production_order_number`, o código na linha 1131 diz explicitamente:
 
-- Importar o componente `CompletedOrdersTable`
-- Adicionar uma secao no final da pagina (antes do dialog de edicao) com a tabela
+```
+// Atualizar apenas o estado local para production_order_number
+// O salvamento será feito quando clicar em "Salvar Alterações"
+```
 
-#### 3. Remover filtro de 30 dias do CompletedOrdersTable
+O valor é salvo **apenas no state local**. Porém, há uma subscription realtime em `order_items` (linha 957-970) que recarrega os itens do banco quando **outro usuário** faz qualquer alteração. Quando isso acontece, o `loadItems()` sobrescreve o state local com os dados do banco — **apagando o valor de OC/OP que o usuário digitou mas ainda não salvou**.
 
-**Arquivo:** `src/components/metrics/CompletedOrdersTable.tsx`
+Fluxo do bug:
+1. Jeferson digita "OP-1234" no campo
+2. Edson (ou qualquer outro) altera um item no mesmo pedido
+3. Realtime dispara `loadItems()` → sobrescreve state com dados do banco
+4. O valor "OP-1234" desaparece do state local
+5. Jeferson clica "Salvar" → salva o valor vazio/antigo do banco
 
-O componente atualmente filtra internamente apenas pedidos dos ultimos 30 dias (linhas 24-35). Como a query ja traz os dados corretos, esse filtro cliente sera removido ou tornado configuravel, para que todos os pedidos retornados pela query sejam exibidos.
+**Correção:** Alterar `production_order_number` para salvar imediatamente no banco (igual a `item_status`, `warehouse`, etc.), em vez de acumular no state local. Isso elimina a janela de perda de dados.
 
-Tambem sera adicionada **paginacao visual** para navegar pelos resultados caso sejam muitos.
+**Arquivo:** `src/components/EditOrderDialog.tsx` (após linha 1129)
+
+Adicionar bloco de auto-save para `production_order_number`:
+- Salvar imediatamente via `supabase.from('order_items').update()`
+- Usar `ignoreNextRealtimeUpdateRef` para evitar reload desnecessário
+- Registrar mudança no histórico via `recordItemChange()`
+- Manter atualização do state local para feedback visual imediato
 
 ---
 
-### Resumo de Alteracoes
+### Resumo de Alterações
 
-| Arquivo | Alteracao |
+| Arquivo | Alteração |
 |---------|-----------|
-| `src/pages/Metrics.tsx` | Adicionar query separada para concluidos, importar e renderizar CompletedOrdersTable |
-| `src/components/metrics/CompletedOrdersTable.tsx` | Remover filtro fixo de 30 dias, adicionar paginacao simples |
+| `src/components/KanbanView.tsx` | Usar `orders` em vez de `optimisticOrders` para derivar `orderIds` |
+| `src/components/EditOrderDialog.tsx` | Auto-save imediato do campo `production_order_number` no banco |
 
 ### Resultado Esperado
 
-- Todos os pedidos concluidos (ate 500 mais recentes) serao exibidos na pagina Metrics
-- Tabela com ordenacao, status de prazo e acoes de visualizacao
-- Performance mantida pois usa query separada com `.range(0, 499)`
+| Problema | Antes | Depois |
+|----------|-------|--------|
+| Dias na fase | Só aparece após trocar visualização | Aparece no primeiro acesso |
+| OC/OP | Perde dados se outro usuário edita antes do save | Salva imediatamente, sem perda |
 
