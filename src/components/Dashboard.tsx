@@ -699,22 +699,36 @@ export const Dashboard = () => {
 
   // 👁️ Reconexão automática ao retornar à aba (fix desconexões Denise Gassen)
   useEffect(() => {
+    let hiddenAt = 0;
+
     const handleVisibilityChange = async () => {
+      if (document.visibilityState === 'hidden') {
+        hiddenAt = Date.now();
+        return;
+      }
+
       if (document.visibilityState === 'visible' && user) {
-        console.log('👁️ [Visibility] Tab voltou ao foco, reconectando...');
-        setRealtimeStatus('updating');
-        
+        const awaySeconds = hiddenAt > 0 ? (Date.now() - hiddenAt) / 1000 : 0;
+
+        // Se ficou fora por menos de 30s, não precisa recarregar
+        if (awaySeconds < 30) {
+          console.log('👁️ [Visibility] Retornou em', awaySeconds.toFixed(0), 's - sem reload');
+          return;
+        }
+
+        console.log('👁️ [Visibility] Retornou após', awaySeconds.toFixed(0), 's - reconectando...');
+
         try {
-          // Renovar token (pode ter expirado em background)
-          await supabase.auth.getSession();
-          
-          // Recarregar dados frescos
+          // Renovar token apenas se ficou fora por mais de 5 minutos
+          if (awaySeconds > 300) {
+            await supabase.auth.getSession();
+          }
+
+          // Recarregar dados (sem alterar loading state para evitar tela branca)
           loadOrders();
         } catch (err) {
           console.error('👁️ [Visibility] Erro ao reconectar:', err);
         }
-        
-        setTimeout(() => setRealtimeStatus('synced'), 2000);
       }
     };
 
