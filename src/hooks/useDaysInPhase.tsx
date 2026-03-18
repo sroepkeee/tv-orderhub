@@ -38,13 +38,32 @@ const fetchPhaseEntryDates = async (orderIds: string[]): Promise<Record<string, 
       .order('changed_at', { ascending: false })
   );
 
-  const [ordersResults, historyResults] = await Promise.all([
-    Promise.all(ordersPromises),
-    Promise.all(historyPromises)
-  ]);
+  let ordersResults: any[];
+  let historyResults: any[];
 
-  const ordersData = ordersResults.flatMap(r => r.data || []);
-  const historyData = historyResults.flatMap(r => r.data || []);
+  try {
+    [ordersResults, historyResults] = await Promise.all([
+      Promise.all(ordersPromises),
+      Promise.all(historyPromises)
+    ]);
+  } catch (err) {
+    console.error('⏱️ [useDaysInPhase] Erro ao buscar dados:', err);
+    // Fallback: retornar dados vazios para que o card mostre 0d em vez de "..."
+    const result: Record<string, PhaseEntry> = {};
+    orderIds.forEach(id => { result[id] = { orderId: id, daysInPhase: 0, phaseEnteredAt: null }; });
+    return result;
+  }
+
+  const ordersData = ordersResults.flatMap(r => {
+    if (r.error) console.warn('⏱️ [useDaysInPhase] Erro orders query:', r.error.message);
+    return r.data || [];
+  });
+  const historyData = historyResults.flatMap(r => {
+    if (r.error) console.warn('⏱️ [useDaysInPhase] Erro history query:', r.error.message);
+    return r.data || [];
+  });
+
+  console.log(`⏱️ [useDaysInPhase] Carregou ${ordersData.length} orders, ${historyData.length} history entries`);
 
   // Criar mapas auxiliares
   const orderInfoMap = new Map<string, { status: string; createdAt: string; category: string }>();

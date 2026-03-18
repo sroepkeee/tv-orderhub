@@ -1,42 +1,70 @@
 
 
-## Plano: Alerta de Matéria-Prima (Placa de Circuito) + Corrigir Dias na Fase
+## Plano: Corrigir Visualizacao de Pedidos Concluidos na Pagina Metrics
 
-### Problema 1: Dias na fase não aparecem (mostra "—")
+### Diagnostico
 
-**Causa raiz:** O `orderIds` muda de referência a cada render porque `orders.map(o => o.id)` cria um novo array. O `useMemo` depende de `orders` (referência do array), que muda sempre que `PriorityView` re-renderiza com `sortedOrders`. Isso causa o `orderIdsKey` a ser recalculado, mas o problema real é que a **query do React Query pode estar falhando silenciosamente** ou os dados retornados não correspondem aos IDs dos pedidos.
+Identifiquei **dois problemas** que impedem a exibicao dos pedidos concluidos:
 
-**Investigação adicional necessária:** Verificar se a query `fetchPhaseEntryDates` está retornando dados. Adicionar log temporário ou verificar se `order_history` tem registros para esses pedidos.
+| # | Problema | Local | Impacto |
+|---|----------|-------|---------|
+| 1 | **Query exclui pedidos concluidos** | `src/pages/Metrics.tsx` linha 71 | `.not('status', 'in', '(delivered,completed,cancelled)')` remove todos os 320+ pedidos finalizados |
+| 2 | **CompletedOrdersTable nunca e renderizada** | `src/pages/Metrics.tsx` | O componente existe em `src/components/metrics/CompletedOrdersTable.tsx` mas nao e importado nem usado em nenhuma pagina |
 
-**Correção provável:** O `useDaysInPhase` busca `orders` e `order_history` em chunks de 50. Se a query falha silenciosamente (ex: RLS bloqueando), retorna `{}` e todos os cards mostram `null` → `...`. Preciso verificar se `order_history` tem RLS que impede a leitura. Vou:
-1. Verificar as RLS policies de `order_history`
-2. Se necessário, ajustar para permitir leitura por membros da organização
-3. Adicionar fallback: se `order_history` não tem dados, usar `created_at` do pedido
+Resultado: a pagina Metrics nunca carrega nem exibe pedidos concluidos.
 
-### Problema 2: Alerta visual para itens MP (Matéria-Prima crua)
+---
 
-**Contexto:** Itens com `material_type = 'MP'` e descrições como "Placa de Circuito Impresso" são matéria-prima crua que não deve ser vendida/faturada pelo SSM. O sistema já tem `materialType` nos itens importados do TOTVS.
+### Solucao
 
-**Correção:**
+#### 1. Adicionar query separada para pedidos concluidos
 
-**Arquivo: `src/components/ImportOrderDialog.tsx`** (na seção de preview, após linha ~610)
-- Detectar itens com `materialType === 'MP'` OU descrição contendo palavras-chave como "placa de circuito", "circuito impresso", "PCB"
-- Exibir um `Alert` amarelo/laranja destacado com ícone de aviso
-- Mensagem: "⚠️ X item(ns) de Matéria-Prima (MP) detectado(s). Itens MP como Placas de Circuito não são vendidos/faturados pelo SSM. Verifique antes de importar."
+A query principal da pagina Metrics deve continuar excluindo concluidos (para calcular metricas de pedidos ativos). Porem, uma **segunda query** buscara especificamente pedidos `completed` e `delivered` para alimentar a tabela de concluidos.
 
-**Arquivo: `src/components/OrderItemsReviewTable.tsx`**
-- Destacar linhas de itens MP com fundo laranja claro
-- Adicionar tooltip no badge MP explicando que precisa validação
+**Arquivo:** `src/pages/Metrics.tsx`
 
-**Arquivo: `src/components/EditOrderDialog.tsx`**
-- Ao abrir um pedido com itens MP, exibir um banner de alerta similar
+- Novo state: `completedOrders`
+- Nova query dentro de `loadData()`:
 
-### Resumo de Alterações
+```typescript
+// Query separada para pedidos concluidos (sem limite de 30 dias)
+const { data: completedData } = await supabase
+  .from('orders')
+  .select('*, order_items (*)')
+  .in('status', ['completed', 'delivered'])
+  .order('updated_at', { ascending: false })
+  .range(0, 499);
+```
 
-| Arquivo | Alteração |
+Isso busca ate 500 pedidos concluidos mais recentes, independente da query principal.
+
+#### 2. Importar e renderizar CompletedOrdersTable
+
+**Arquivo:** `src/pages/Metrics.tsx`
+
+- Importar o componente `CompletedOrdersTable`
+- Adicionar uma secao no final da pagina (antes do dialog de edicao) com a tabela
+
+#### 3. Remover filtro de 30 dias do CompletedOrdersTable
+
+**Arquivo:** `src/components/metrics/CompletedOrdersTable.tsx`
+
+O componente atualmente filtra internamente apenas pedidos dos ultimos 30 dias (linhas 24-35). Como a query ja traz os dados corretos, esse filtro cliente sera removido ou tornado configuravel, para que todos os pedidos retornados pela query sejam exibidos.
+
+Tambem sera adicionada **paginacao visual** para navegar pelos resultados caso sejam muitos.
+
+---
+
+### Resumo de Alteracoes
+
+| Arquivo | Alteracao |
 |---------|-----------|
-| `src/components/ImportOrderDialog.tsx` | Alert para itens MP na preview de importação |
-| `src/components/OrderItemsReviewTable.tsx` | Highlight visual em linhas de itens MP |
-| `src/hooks/useDaysInPhase.tsx` | Adicionar log de debug + verificar se query retorna dados |
-| RLS de `order_history` | Verificar e corrigir se necessário |
+| `src/pages/Metrics.tsx` | Adicionar query separada para concluidos, importar e renderizar CompletedOrdersTable |
+| `src/components/metrics/CompletedOrdersTable.tsx` | Remover filtro fixo de 30 dias, adicionar paginacao simples |
+
+### Resultado Esperado
+
+- Todos os pedidos concluidos (ate 500 mais recentes) serao exibidos na pagina Metrics
+- Tabela com ordenacao, status de prazo e acoes de visualizacao
+- Performance mantida pois usa query separada com `.range(0, 499)`
 

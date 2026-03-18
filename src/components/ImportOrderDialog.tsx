@@ -608,8 +608,40 @@ export const ImportOrderDialog = ({
                     {parsedData.items.filter(item => !item.ncmCode).length} sem NCM
                   </Badge>
                 )}
+                {parsedData.items.some(item => 
+                  item.materialType === 'MP' || 
+                  item.description?.toLowerCase().includes('placa de circuito') ||
+                  item.description?.toLowerCase().includes('circuito impresso') ||
+                  item.description?.toLowerCase().includes('pcb')
+                ) && (
+                  <Badge variant="outline" className="text-xs text-orange-600 border-orange-300 bg-orange-50 dark:bg-orange-950 dark:text-orange-300 dark:border-orange-800">
+                    <AlertTriangle className="h-3 w-3 mr-1" />
+                    MP detectado
+                  </Badge>
+                )}
               </div>
             </div>
+
+            {/* Alerta de Matéria-Prima */}
+            {(() => {
+              const mpItems = parsedData.items.filter(item => 
+                item.materialType === 'MP' || 
+                item.description?.toLowerCase().includes('placa de circuito') ||
+                item.description?.toLowerCase().includes('circuito impresso') ||
+                item.description?.toLowerCase().includes('pcb')
+              );
+              if (mpItems.length === 0) return null;
+              return (
+                <Alert className="border-orange-300 bg-orange-50 dark:bg-orange-950/50 dark:border-orange-800">
+                  <AlertTriangle className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+                  <AlertDescription className="text-xs text-orange-800 dark:text-orange-200">
+                    <strong>⚠️ {mpItems.length} item(ns) de Matéria-Prima (MP) detectado(s).</strong>{' '}
+                    Itens MP como Placas de Circuito Impresso não são vendidos/faturados pelo SSM. 
+                    Verifique se estes itens devem realmente estar neste pedido.
+                  </AlertDescription>
+                </Alert>
+              );
+            })()}
 
             {/* Conteúdo rolável */}
             <div className="flex-1 overflow-y-auto min-h-0 space-y-3 pr-1">
