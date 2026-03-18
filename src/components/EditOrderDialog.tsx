@@ -1128,8 +1128,43 @@ export const EditOrderDialog = ({
       }
     }
 
-    // Atualizar apenas o estado local para production_order_number
-    // O salvamento será feito quando clicar em "Salvar Alterações"
+    // Auto-save production_order_number imediatamente no banco
+    if (field === 'production_order_number' && oldItem.production_order_number !== value && oldItem.id) {
+      console.log(`🔄 Nº OP/OC mudou: ${oldItem.production_order_number} → ${value}`);
+      
+      ignoreNextRealtimeUpdateRef.current = true;
+      
+      const { error } = await supabase
+        .from('order_items')
+        .update({ production_order_number: value })
+        .eq('id', oldItem.id);
+      
+      if (error) {
+        console.error('Error updating production_order_number:', error);
+        ignoreNextRealtimeUpdateRef.current = false;
+        toast({
+          title: "Erro ao salvar Nº OP/OC",
+          description: error.message,
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      await recordItemChange(
+        oldItem.id,
+        'production_order_number',
+        oldItem.production_order_number || '',
+        value,
+        `Nº OP/OC alterado`
+      );
+      
+      toast({
+        title: "Nº OP/OC salvo",
+        description: `Valor atualizado para: ${value || '(vazio)'}`,
+      });
+      
+      loadHistory();
+    }
 
     // NOVO: Detectar mudança de deliveryDate em itens
     if (field === 'deliveryDate' && oldItem.deliveryDate !== value && oldItem.id) {
