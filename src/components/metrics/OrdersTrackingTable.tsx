@@ -198,13 +198,12 @@ export function OrdersTrackingTable({ searchQuery = "", onOrderClick }: OrdersTr
   }, [loadData]);
 
   useEffect(() => {
-    const { data } = supabase
+    supabase
       .from('order_type_config')
       .select('*')
       .order('display_name')
       .then(({ data }) => {
         if (data) setOrderTypes(data);
-        return { data };
       });
   }, []);
 
