@@ -222,15 +222,15 @@ export default function Metrics() {
     );
   }
   
-  const avgProductionTime = calculateAverageProductionTime(orders);
-  const realOnTimeRate = calculateRealOnTimeRate(orders);
-  const onTimeRate = calculateOnTimeRate(orders, 10);
-  const productionCount = getOrderCountByPhase(orders, 'production');
-  const logisticsCount = getOrderCountByPhase(orders, 'logistics');
-  const productionTimeRange = calculateProductionTimeRange(orders);
-  const ordersByDeadline = separateOrdersByDeadline(orders);
-  const ordersStartedToday = getOrdersStartedToday(orders);
-  const ordersEndingToday = getOrdersEndingToday(orders);
+  const avgProductionTime = calculateAverageProductionTime(filteredOrders);
+  const realOnTimeRate = calculateRealOnTimeRate(filteredOrders);
+  const onTimeRate = calculateOnTimeRate(filteredOrders, 10);
+  const productionCount = getOrderCountByPhase(filteredOrders, 'production');
+  const logisticsCount = getOrderCountByPhase(filteredOrders, 'logistics');
+  const productionTimeRange = calculateProductionTimeRange(filteredOrders);
+  const ordersByDeadline = separateOrdersByDeadline(filteredOrders);
+  const ordersStartedToday = getOrdersStartedToday(filteredOrders);
+  const ordersEndingToday = getOrdersEndingToday(filteredOrders);
   
   const getTimeStatus = (days: number): 'good' | 'warning' | 'critical' => {
     if (days <= 10) return 'good';
