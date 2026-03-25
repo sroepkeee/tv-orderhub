@@ -1,6 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Clock, CheckCircle, AlertTriangle, Package, Truck, TrendingDown, Box } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { ArrowLeft, Clock, CheckCircle, AlertTriangle, Package, Truck, TrendingDown, Box, Search, X } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { MetricCard } from "@/components/metrics/MetricCard";
@@ -48,11 +49,44 @@ export default function Metrics() {
   const [itemsBySource, setItemsBySource] = useState({ inStock: 0, production: 0, outOfStock: 0 });
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [showEditDialog, setShowEditDialog] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
   const [previousWeekData, setPreviousWeekData] = useState({
     avgProductionTime: 0,
     onTimeRate: 0,
     weeklyChanges: 0
   });
+
+  const filterOrder = (order: Order, query: string): boolean => {
+    if (!query.trim()) return true;
+    const q = query.toLowerCase().trim();
+    const isNumeric = /^\d+$/.test(q);
+    
+    if (isNumeric) {
+      if (order.orderNumber?.includes(q)) return true;
+      if ((order as any).totvsOrderNumber?.includes(q)) return true;
+      if (order.items?.some(item => item.itemCode?.toLowerCase().includes(q))) return true;
+    }
+    
+    if (order.orderNumber?.toLowerCase().includes(q)) return true;
+    if (order.client?.toLowerCase().includes(q)) return true;
+    if (order.deskTicket?.toLowerCase().includes(q)) return true;
+    if (order.items?.some(item => 
+      item.itemCode?.toLowerCase().includes(q) || 
+      item.itemDescription?.toLowerCase().includes(q)
+    )) return true;
+    
+    return false;
+  };
+
+  const filteredOrders = useMemo(() => {
+    if (!searchQuery.trim()) return orders;
+    return orders.filter(o => filterOrder(o, searchQuery));
+  }, [orders, searchQuery]);
+
+  const filteredCompletedOrders = useMemo(() => {
+    if (!searchQuery.trim()) return completedOrders;
+    return completedOrders.filter(o => filterOrder(o, searchQuery));
+  }, [completedOrders, searchQuery]);
   
   useEffect(() => {
     if (user) {
@@ -221,6 +255,23 @@ export default function Metrics() {
               <h1 className="text-3xl font-bold">📊 Indicadores de Performance</h1>
             </div>
             <p className="text-muted-foreground ml-14">Monitoramento em tempo real da produção e logística</p>
+          </div>
+          <div className="relative w-full max-w-sm">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Buscar pedido, código, cliente..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-8 h-9 text-sm"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery("")}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
           </div>
         </div>
       </header>
