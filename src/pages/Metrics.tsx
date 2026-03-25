@@ -63,24 +63,42 @@ export default function Metrics() {
   const loadData = async () => {
     setLoading(true);
     try {
-      // Carregar pedidos com seus itens
-      const { data: ordersData, error: ordersError } = await supabase
-        .from('orders')
-        .select(`
-          *,
-          order_items (*)
-        `)
-        .not('status', 'in', '(delivered,completed,cancelled)')
-        .order('created_at', { ascending: false });
-      
-      if (ordersError) throw ordersError;
-      
-      // Transformar dados
-      const transformedOrders: Order[] = (ordersData || []).map(dbOrder => {
+      // Executar TODAS as queries em paralelo
+      const [activeResult, completedResult, changes, problematic, changes14] = await Promise.all([
+        // Query 1: Pedidos ativos
+        supabase
+          .from('orders')
+          .select(`*, order_items (*)`)
+          .not('status', 'in', '(delivered,completed,cancelled)')
+          .order('created_at', { ascending: false }),
+        // Query 2: Pedidos concluídos (campos restritos)
+        supabase
+          .from('orders')
+          .select(`
+            id, order_number, customer_name, status, order_type, priority,
+            created_at, updated_at, delivery_date, issue_date, order_category, notes, user_id,
+            order_items (id, item_code, item_description, requested_quantity, 
+                         delivered_quantity, unit, item_source_type, item_status, 
+                         sla_days, sla_deadline, delivery_date, user_id, warehouse,
+                         is_imported, import_lead_time_days, current_phase, phase_started_at,
+                         production_estimated_date, received_status, unit_price, 
+                         discount_percent, total_value, ipi_percent, icms_percent)
+          `)
+          .in('status', ['completed', 'delivered'])
+          .order('updated_at', { ascending: false })
+          .range(0, 499),
+        // Query 3-5: Métricas auxiliares
+        countDateChanges(7),
+        findProblematicOrders(3),
+        countDateChanges(14),
+      ]);
+
+      if (activeResult.error) throw activeResult.error;
+
+      const transformOrder = (dbOrder: any): Order => {
         const createdDate = new Date(dbOrder.created_at);
         const now = new Date();
         const daysOpen = Math.floor((now.getTime() - createdDate.getTime()) / (1000 * 60 * 60 * 24));
-        
         return {
           id: dbOrder.id,
           type: dbOrder.order_type as any,
@@ -98,121 +116,48 @@ export default function Metrics() {
           order_category: dbOrder.order_category,
           daysOpen,
           items: (dbOrder.order_items || []).map((item: any) => ({
-          id: item.id,
-          itemCode: item.item_code,
-          itemDescription: cleanItemDescription(item.item_description),
-          requestedQuantity: item.requested_quantity,
-          deliveredQuantity: item.delivered_quantity,
-          unit: item.unit,
-          warehouse: item.warehouse,
-          deliveryDate: item.delivery_date,
-          userId: item.user_id,
-          item_source_type: item.item_source_type as 'in_stock' | 'production' | 'out_of_stock',
-          item_status: item.item_status as 'pending' | 'in_stock' | 'awaiting_production' | 'purchase_required' | 'completed',
-          sla_days: item.sla_days,
-          is_imported: item.is_imported,
-          import_lead_time_days: item.import_lead_time_days,
-          sla_deadline: item.sla_deadline,
-          current_phase: item.current_phase,
-          phase_started_at: item.phase_started_at,
-          production_estimated_date: item.production_estimated_date,
-          received_status: item.received_status,
-          unit_price: item.unit_price,
-          discount_percent: item.discount_percent,
-          total_value: item.total_value,
-          ipi_percent: item.ipi_percent,
-          icms_percent: item.icms_percent,
-        }))
+            id: item.id,
+            itemCode: item.item_code,
+            itemDescription: cleanItemDescription(item.item_description),
+            requestedQuantity: item.requested_quantity,
+            deliveredQuantity: item.delivered_quantity,
+            unit: item.unit,
+            warehouse: item.warehouse,
+            deliveryDate: item.delivery_date,
+            userId: item.user_id,
+            item_source_type: item.item_source_type as 'in_stock' | 'production' | 'out_of_stock',
+            item_status: item.item_status as 'pending' | 'in_stock' | 'awaiting_production' | 'purchase_required' | 'completed',
+            sla_days: item.sla_days,
+            is_imported: item.is_imported,
+            import_lead_time_days: item.import_lead_time_days,
+            sla_deadline: item.sla_deadline,
+            current_phase: item.current_phase,
+            phase_started_at: item.phase_started_at,
+            production_estimated_date: item.production_estimated_date,
+            received_status: item.received_status,
+            unit_price: item.unit_price,
+            discount_percent: item.discount_percent,
+            total_value: item.total_value,
+            ipi_percent: item.ipi_percent,
+            icms_percent: item.icms_percent,
+          }))
         };
-      });
-      
+      };
+
+      const transformedOrders = (activeResult.data || []).map(transformOrder);
       setOrders(transformedOrders);
 
-      // Query separada para pedidos concluídos
-      const { data: completedData, error: completedError } = await supabase
-        .from('orders')
-        .select(`
-          id, order_number, customer_name, status, order_type, priority,
-          created_at, updated_at, delivery_date, issue_date, order_category, notes, user_id,
-          order_items (id, item_code, item_description, requested_quantity, 
-                       delivered_quantity, unit, item_source_type, item_status, 
-                       sla_days, sla_deadline, delivery_date, user_id, warehouse,
-                       is_imported, import_lead_time_days, current_phase, phase_started_at,
-                       production_estimated_date, received_status, unit_price, 
-                       discount_percent, total_value, ipi_percent, icms_percent)
-        `)
-        .in('status', ['completed', 'delivered'])
-        .order('updated_at', { ascending: false })
-        .range(0, 499);
-
-      if (!completedError && completedData) {
-        const transformedCompleted: Order[] = completedData.map(dbOrder => {
-          const createdDate = new Date(dbOrder.created_at);
-          const now = new Date();
-          const daysOpen = Math.floor((now.getTime() - createdDate.getTime()) / (1000 * 60 * 60 * 24));
-          return {
-            id: dbOrder.id,
-            type: dbOrder.order_type as any,
-            priority: dbOrder.priority as any,
-            orderNumber: dbOrder.order_number,
-            item: dbOrder.customer_name,
-            description: dbOrder.notes || "",
-            quantity: 0,
-            createdDate: createdDate.toISOString().split('T')[0],
-            issueDate: dbOrder.issue_date ? new Date(dbOrder.issue_date).toISOString().split('T')[0] : undefined,
-            status: dbOrder.status as any,
-            client: dbOrder.customer_name,
-            deliveryDeadline: dbOrder.delivery_date,
-            deskTicket: dbOrder.order_number,
-            order_category: dbOrder.order_category,
-            daysOpen,
-            items: (dbOrder.order_items || []).map((item: any) => ({
-              id: item.id,
-              itemCode: item.item_code,
-              itemDescription: cleanItemDescription(item.item_description),
-              requestedQuantity: item.requested_quantity,
-              deliveredQuantity: item.delivered_quantity,
-              unit: item.unit,
-              warehouse: item.warehouse,
-              deliveryDate: item.delivery_date,
-              userId: item.user_id,
-              item_source_type: item.item_source_type,
-              item_status: item.item_status,
-              sla_days: item.sla_days,
-              is_imported: item.is_imported,
-              import_lead_time_days: item.import_lead_time_days,
-              sla_deadline: item.sla_deadline,
-              current_phase: item.current_phase,
-              phase_started_at: item.phase_started_at,
-              production_estimated_date: item.production_estimated_date,
-              received_status: item.received_status,
-              unit_price: item.unit_price,
-              discount_percent: item.discount_percent,
-              total_value: item.total_value,
-              ipi_percent: item.ipi_percent,
-              icms_percent: item.icms_percent,
-            }))
-          };
-        });
-        setCompletedOrders(transformedCompleted);
+      if (!completedResult.error && completedResult.data) {
+        setCompletedOrders(completedResult.data.map(transformOrder));
       }
-      
-      // Calcular distribuição de itens por origem (síncrono)
-      const allItems = transformedOrders.flatMap(o => o.items || []);
-      const itemsSource = countItemsBySource(allItems);
-      setItemsBySource(itemsSource);
 
-      // Executar queries assíncronas em paralelo
-      const [changes, problematic, changes14] = await Promise.all([
-        countDateChanges(7),
-        findProblematicOrders(3),
-        countDateChanges(14),
-      ]);
-      
+      // Métricas síncronas
+      const allItems = transformedOrders.flatMap(o => o.items || []);
+      setItemsBySource(countItemsBySource(allItems));
       setWeeklyChanges(changes);
       setProblematicCount(problematic.length);
 
-      // Calcular dados da semana anterior para comparação
+      // Comparação com semana anterior
       const oneWeekAgo = new Date();
       oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
       const previousWeekOrders = transformedOrders.filter(o => 
