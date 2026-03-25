@@ -119,9 +119,11 @@ export function EnhancedDateChangeHistory({ limit = 20, orders }: EnhancedDateCh
     }
   };
 
+  const orderIds = useMemo(() => orders.map(o => o.id).join(','), [orders]);
+
   useEffect(() => {
     loadDateChanges();
-  }, [orders, limit, showOnlyActive]);
+  }, [orderIds, limit, showOnlyActive]);
 
   const filteredChanges = dateChanges.filter(change => {
     if (categoryFilter !== "all" && change.change_category !== categoryFilter) return false;
