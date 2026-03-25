@@ -131,7 +131,16 @@ export default function Metrics() {
       // Query separada para pedidos concluídos
       const { data: completedData, error: completedError } = await supabase
         .from('orders')
-        .select('*, order_items (*)')
+        .select(`
+          id, order_number, customer_name, status, order_type, priority,
+          created_at, updated_at, delivery_date, issue_date, order_category, notes, user_id,
+          order_items (id, item_code, item_description, requested_quantity, 
+                       delivered_quantity, unit, item_source_type, item_status, 
+                       sla_days, sla_deadline, delivery_date, user_id, warehouse,
+                       is_imported, import_lead_time_days, current_phase, phase_started_at,
+                       production_estimated_date, received_status, unit_price, 
+                       discount_percent, total_value, ipi_percent, icms_percent)
+        `)
         .in('status', ['completed', 'delivered'])
         .order('updated_at', { ascending: false })
         .range(0, 499);
@@ -188,18 +197,20 @@ export default function Metrics() {
         setCompletedOrders(transformedCompleted);
       }
       
-      // Carregar mudanças semanais
-      const changes = await countDateChanges(7);
-      setWeeklyChanges(changes);
-      
-      // Carregar pedidos problemáticos
-      const problematic = await findProblematicOrders(3);
-      setProblematicCount(problematic.length);
-      
-      // Calcular distribuição de itens por origem
+      // Calcular distribuição de itens por origem (síncrono)
       const allItems = transformedOrders.flatMap(o => o.items || []);
       const itemsSource = countItemsBySource(allItems);
       setItemsBySource(itemsSource);
+
+      // Executar queries assíncronas em paralelo
+      const [changes, problematic, changes14] = await Promise.all([
+        countDateChanges(7),
+        findProblematicOrders(3),
+        countDateChanges(14),
+      ]);
+      
+      setWeeklyChanges(changes);
+      setProblematicCount(problematic.length);
 
       // Calcular dados da semana anterior para comparação
       const oneWeekAgo = new Date();
@@ -211,7 +222,7 @@ export default function Metrics() {
       setPreviousWeekData({
         avgProductionTime: calculateAverageProductionTime(previousWeekOrders),
         onTimeRate: calculateOnTimeRate(previousWeekOrders, 10),
-        weeklyChanges: await countDateChanges(14) - weeklyChanges // Diferença entre 14 dias e 7 dias
+        weeklyChanges: changes14 - changes
       });
       
     } catch (error) {

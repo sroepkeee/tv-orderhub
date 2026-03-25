@@ -107,9 +107,13 @@ export const findProblematicOrders = async (
   threshold: number = 3
 ): Promise<Array<{ order_id: string; change_count: number }>> => {
   try {
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - 90);
+
     const { data, error } = await supabase
       .from('delivery_date_changes')
-      .select('order_id');
+      .select('order_id')
+      .gte('changed_at', startDate.toISOString());
     
     if (error) throw error;
     if (!data) return [];
