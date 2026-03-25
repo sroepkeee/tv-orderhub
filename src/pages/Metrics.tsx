@@ -1,6 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Clock, CheckCircle, AlertTriangle, Package, Truck, TrendingDown, Box } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { ArrowLeft, Clock, CheckCircle, AlertTriangle, Package, Truck, TrendingDown, Box, Search, X } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { MetricCard } from "@/components/metrics/MetricCard";
@@ -48,11 +49,44 @@ export default function Metrics() {
   const [itemsBySource, setItemsBySource] = useState({ inStock: 0, production: 0, outOfStock: 0 });
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [showEditDialog, setShowEditDialog] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
   const [previousWeekData, setPreviousWeekData] = useState({
     avgProductionTime: 0,
     onTimeRate: 0,
     weeklyChanges: 0
   });
+
+  const filterOrder = (order: Order, query: string): boolean => {
+    if (!query.trim()) return true;
+    const q = query.toLowerCase().trim();
+    const isNumeric = /^\d+$/.test(q);
+    
+    if (isNumeric) {
+      if (order.orderNumber?.includes(q)) return true;
+      if ((order as any).totvsOrderNumber?.includes(q)) return true;
+      if (order.items?.some(item => item.itemCode?.toLowerCase().includes(q))) return true;
+    }
+    
+    if (order.orderNumber?.toLowerCase().includes(q)) return true;
+    if (order.client?.toLowerCase().includes(q)) return true;
+    if (order.deskTicket?.toLowerCase().includes(q)) return true;
+    if (order.items?.some(item => 
+      item.itemCode?.toLowerCase().includes(q) || 
+      item.itemDescription?.toLowerCase().includes(q)
+    )) return true;
+    
+    return false;
+  };
+
+  const filteredOrders = useMemo(() => {
+    if (!searchQuery.trim()) return orders;
+    return orders.filter(o => filterOrder(o, searchQuery));
+  }, [orders, searchQuery]);
+
+  const filteredCompletedOrders = useMemo(() => {
+    if (!searchQuery.trim()) return completedOrders;
+    return completedOrders.filter(o => filterOrder(o, searchQuery));
+  }, [completedOrders, searchQuery]);
   
   useEffect(() => {
     if (user) {
@@ -188,15 +222,15 @@ export default function Metrics() {
     );
   }
   
-  const avgProductionTime = calculateAverageProductionTime(orders);
-  const realOnTimeRate = calculateRealOnTimeRate(orders);
-  const onTimeRate = calculateOnTimeRate(orders, 10);
-  const productionCount = getOrderCountByPhase(orders, 'production');
-  const logisticsCount = getOrderCountByPhase(orders, 'logistics');
-  const productionTimeRange = calculateProductionTimeRange(orders);
-  const ordersByDeadline = separateOrdersByDeadline(orders);
-  const ordersStartedToday = getOrdersStartedToday(orders);
-  const ordersEndingToday = getOrdersEndingToday(orders);
+  const avgProductionTime = calculateAverageProductionTime(filteredOrders);
+  const realOnTimeRate = calculateRealOnTimeRate(filteredOrders);
+  const onTimeRate = calculateOnTimeRate(filteredOrders, 10);
+  const productionCount = getOrderCountByPhase(filteredOrders, 'production');
+  const logisticsCount = getOrderCountByPhase(filteredOrders, 'logistics');
+  const productionTimeRange = calculateProductionTimeRange(filteredOrders);
+  const ordersByDeadline = separateOrdersByDeadline(filteredOrders);
+  const ordersStartedToday = getOrdersStartedToday(filteredOrders);
+  const ordersEndingToday = getOrdersEndingToday(filteredOrders);
   
   const getTimeStatus = (days: number): 'good' | 'warning' | 'critical' => {
     if (days <= 10) return 'good';
@@ -222,12 +256,29 @@ export default function Metrics() {
             </div>
             <p className="text-muted-foreground ml-14">Monitoramento em tempo real da produção e logística</p>
           </div>
+          <div className="relative w-full max-w-sm">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Buscar pedido, código, cliente..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-8 h-9 text-sm"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery("")}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
+          </div>
         </div>
       </header>
       
 
       {/* SLA Alerts */}
-      <SLAAlert orders={orders} threshold={2} />
+      <SLAAlert orders={filteredOrders} threshold={2} />
       
       {/* Grid de Cards Principais com Tendências */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-8">
@@ -298,13 +349,13 @@ export default function Metrics() {
       
       {/* Evolução e Comparativos */}
       <div className="mb-6">
-        <ComparativeMetrics orders={orders} />
+        <ComparativeMetrics orders={filteredOrders} />
       </div>
 
       {/* Tabela de Acompanhamento Detalhado */}
       <div className="mb-6">
         <OrdersTrackingTable 
-          orders={orders}
+          searchQuery={searchQuery}
           onOrderClick={(order) => {
             setSelectedOrder(order);
             setShowEditDialog(true);
@@ -314,19 +365,19 @@ export default function Metrics() {
 
       {/* Histórico de Mudanças de Prazos (Últimas 10) */}
       <div className="mb-6">
-        <EnhancedDateChangeHistory limit={10} orders={orders} />
+        <EnhancedDateChangeHistory limit={10} orders={filteredOrders} />
       </div>
 
       {/* Performance de SLA por Categoria */}
       <div className="mb-6">
-        <CategorySLAMetrics orders={orders} />
+        <CategorySLAMetrics orders={filteredOrders} />
       </div>
 
       {/* Pedidos Concluídos */}
       <div className="mb-6">
-        <h2 className="text-xl font-semibold mb-4">✅ Pedidos Concluídos ({completedOrders.length})</h2>
+        <h2 className="text-xl font-semibold mb-4">✅ Pedidos Concluídos ({filteredCompletedOrders.length})</h2>
         <CompletedOrdersTable 
-          orders={completedOrders}
+          orders={filteredCompletedOrders}
           onOrderClick={(order) => {
             setSelectedOrder(order);
             setShowEditDialog(true);
