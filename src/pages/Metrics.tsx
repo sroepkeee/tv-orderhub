@@ -278,7 +278,7 @@ export default function Metrics() {
       
 
       {/* SLA Alerts */}
-      <SLAAlert orders={orders} threshold={2} />
+      <SLAAlert orders={filteredOrders} threshold={2} />
       
       {/* Grid de Cards Principais com Tendências */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-8">
@@ -349,13 +349,13 @@ export default function Metrics() {
       
       {/* Evolução e Comparativos */}
       <div className="mb-6">
-        <ComparativeMetrics orders={orders} />
+        <ComparativeMetrics orders={filteredOrders} />
       </div>
 
       {/* Tabela de Acompanhamento Detalhado */}
       <div className="mb-6">
         <OrdersTrackingTable 
-          orders={orders}
+          searchQuery={searchQuery}
           onOrderClick={(order) => {
             setSelectedOrder(order);
             setShowEditDialog(true);
@@ -365,19 +365,19 @@ export default function Metrics() {
 
       {/* Histórico de Mudanças de Prazos (Últimas 10) */}
       <div className="mb-6">
-        <EnhancedDateChangeHistory limit={10} orders={orders} />
+        <EnhancedDateChangeHistory limit={10} orders={filteredOrders} />
       </div>
 
       {/* Performance de SLA por Categoria */}
       <div className="mb-6">
-        <CategorySLAMetrics orders={orders} />
+        <CategorySLAMetrics orders={filteredOrders} />
       </div>
 
       {/* Pedidos Concluídos */}
       <div className="mb-6">
-        <h2 className="text-xl font-semibold mb-4">✅ Pedidos Concluídos ({completedOrders.length})</h2>
+        <h2 className="text-xl font-semibold mb-4">✅ Pedidos Concluídos ({filteredCompletedOrders.length})</h2>
         <CompletedOrdersTable 
-          orders={completedOrders}
+          orders={filteredCompletedOrders}
           onOrderClick={(order) => {
             setSelectedOrder(order);
             setShowEditDialog(true);
