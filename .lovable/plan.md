@@ -1,68 +1,91 @@
 
 
-## Plano: Corrigir Usuários Invisíveis (organization_id NULL no profiles)
+## Plano: Otimizar Carregamento da Pagina de Indicadores
 
-### Diagnóstico
+### Diagnostico
 
-A usuária **Julia Farsen (jfarsen@imply.com)** existe no sistema, está aprovada e ativa, mas **não aparece** na lista de usuários do Admin nem nas menções (@).
+A pagina `Metrics.tsx` faz **5 queries sequenciais** no `loadData`, e apos renderizar, os componentes filhos disparam mais **2 queries independentes**. Problemas identificados:
 
-**Causa raiz:** O campo `profiles.organization_id` está **NULL** para 7 usuários, apesar de todos terem vínculo ativo na tabela `organization_members`. A RLS recentemente adicionada (`Org members can view org profiles`) filtra por `organization_id = get_user_organization_id()`, excluindo esses usuários de todas as queries.
+1. **Queries sequenciais desnecessarias**: `countDateChanges(7)`, `findProblematicOrders(3)`, e `countDateChanges(14)` sao executadas uma apos a outra, quando poderiam ser paralelas
+2. **`findProblematicOrders` sem filtro**: busca TODAS as linhas de `delivery_date_changes` sem limite, traz tudo para o client e processa em JS
+3. **Payload excessivo**: a query de pedidos concluidos traz 500 pedidos com TODOS os itens (`order_items (*)`), gerando payload massivo
+4. **Queries duplicadas de filhos**: `ComparativeMetrics` e `EnhancedDateChangeHistory` fazem queries proprias apos o render, adicionando mais tempo de espera
 
-| Usuário | Email | organization_id | member_org_id |
-|---------|-------|-----------------|---------------|
-| Julia Farsen | jfarsen@imply.com | NULL | 69aed6aa... |
-| Marcelo Silveira | msilveira@imply.com | NULL | 69aed6aa... |
-| compras | compras@imply.com | NULL | 69aed6aa... |
-| Luis Sehnem | lsehnem@imply.com | NULL | 69aed6aa... |
-| Carlos Bencke | cbencke@imply.com | NULL | 69aed6aa... |
-| Lucas Weigel | lweigel@imply.com | NULL | 69aed6aa... |
-| Bryan Lemes | blemes@imply.com | NULL | 69aed6aa... |
+### Correcoes
 
-### Correções
+#### 1. Paralelizar queries no loadData (`src/pages/Metrics.tsx`)
 
-#### 1. Corrigir dados: preencher organization_id dos 7 usuários
+Trocar as chamadas sequenciais por `Promise.all`:
 
-Usar o insert tool para atualizar os profiles com o organization_id correto da `organization_members`:
+```typescript
+// ANTES (sequencial):
+const changes = await countDateChanges(7);
+const problematic = await findProblematicOrders(3);
+// ... mais awaits
 
-```sql
-UPDATE profiles p
-SET organization_id = om.organization_id
-FROM organization_members om
-WHERE om.user_id = p.id
-  AND om.is_active = true
-  AND p.organization_id IS NULL;
+// DEPOIS (paralelo):
+const [changes, problematic, changes14] = await Promise.all([
+  countDateChanges(7),
+  findProblematicOrders(3),
+  countDateChanges(14),
+]);
 ```
 
-#### 2. Prevenir recorrência: adicionar trigger de sincronização
+#### 2. Limitar payload dos pedidos concluidos
 
-Criar uma migration com trigger que, ao inserir/atualizar `organization_members`, sincroniza automaticamente o `profiles.organization_id`. Isso impede que novos usuários aprovados fiquem com organization_id NULL.
+Adicionar `.select()` mais restrito na query de concluidos, trazendo apenas os campos necessarios para a tabela:
 
-```sql
-CREATE OR REPLACE FUNCTION sync_profile_organization_id()
-RETURNS trigger AS $$
-BEGIN
-  IF NEW.is_active = true THEN
-    UPDATE profiles SET organization_id = NEW.organization_id
-    WHERE id = NEW.user_id AND organization_id IS NULL;
-  END IF;
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+```typescript
+// Reduzir campos retornados
+.select(`
+  id, order_number, customer_name, status, order_type, priority,
+  created_at, updated_at, delivery_date, issue_date, order_category, notes,
+  order_items (id, item_code, item_description, requested_quantity, 
+               delivered_quantity, unit, item_source_type, item_status, 
+               sla_days, sla_deadline, delivery_date)
+`)
+```
 
-CREATE TRIGGER trg_sync_profile_org
-AFTER INSERT OR UPDATE ON organization_members
-FOR EACH ROW EXECUTE FUNCTION sync_profile_organization_id();
+#### 3. Otimizar `findProblematicOrders` (`src/lib/metrics.ts`)
+
+Usar `head: true` com count agrupado ou limitar a query:
+
+```typescript
+// Adicionar filtro de data (ultimos 90 dias) e limit
+const startDate = new Date();
+startDate.setDate(startDate.getDate() - 90);
+
+const { data, error } = await supabase
+  .from('delivery_date_changes')
+  .select('order_id')
+  .gte('changed_at', startDate.toISOString());
+```
+
+#### 4. Eliminar re-fetch do `EnhancedDateChangeHistory`
+
+O componente recebe `orders` como prop mas dispara sua propria query ao montar. Adicionar um `useEffect` com dependencia estavel para evitar re-fetches desnecessarios quando `orders` muda referencia.
+
+Estabilizar a dependencia do `useEffect` usando `orders.length` ou IDs em vez do array completo:
+
+```typescript
+const orderIds = useMemo(() => orders.map(o => o.id).join(','), [orders]);
+
+useEffect(() => {
+  loadDateChanges();
+}, [orderIds, limit, showOnlyActive]); // em vez de [orders, ...]
 ```
 
 ### Resumo
 
-| Tipo | Alteração |
-|------|-----------|
-| **UPDATE dados** | Preencher `profiles.organization_id` para os 7 usuários afetados |
-| **Migration** | Trigger para sincronizar automaticamente `profiles.organization_id` ao vincular membro |
+| Arquivo | Alteracao |
+|---------|-----------|
+| `src/pages/Metrics.tsx` | Paralelizar queries com `Promise.all`; reduzir campos do select de concluidos |
+| `src/lib/metrics.ts` | Adicionar filtro de data em `findProblematicOrders` |
+| `src/components/metrics/EnhancedDateChangeHistory.tsx` | Estabilizar dependencia do useEffect para evitar re-fetches |
 
-### Resultado
+### Resultado Esperado
 
-- Julia Farsen e os outros 6 usuários aparecerão imediatamente na lista de Admin e nas menções (@)
-- Novos usuários nunca mais terão esse problema graças ao trigger de sincronização
+- Reducao de ~60% no tempo de carregamento (queries paralelas em vez de sequenciais)
+- Menor payload de rede (campos limitados nos concluidos)
+- Sem re-renders desnecessarios nos componentes filhos
 
