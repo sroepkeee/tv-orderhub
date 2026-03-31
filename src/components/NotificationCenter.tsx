@@ -8,8 +8,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Separator } from '@/components/ui/separator';
-import { Bell, Check, CheckCheck, Trash2, Settings, AlertCircle, RefreshCw } from 'lucide-react';
+import { Bell, Check, CheckCheck, Trash2, Settings, AlertCircle, RefreshCw, Eye } from 'lucide-react';
 import { useNotifications } from '@/hooks/useNotifications';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -36,14 +35,9 @@ export const NotificationCenter = () => {
   const [open, setOpen] = useState(false);
 
   const handleNotificationClick = async (notification: any) => {
-    // Marcar como lida
     await markAsRead(notification.id);
-    
-    // Navegar para o pedido
     setOpen(false);
     navigate('/');
-    
-    // Dispatch custom event para abrir pedido COM comment_id
     setTimeout(() => {
       window.dispatchEvent(
         new CustomEvent('openOrder', {
@@ -58,18 +52,13 @@ export const NotificationCenter = () => {
 
   const handleRequestPermission = async () => {
     const granted = await requestNotificationPermission();
-    if (granted) {
-      toast({
-        title: 'Notificações ativadas!',
-        description: 'Você receberá notificações quando for mencionado.',
-      });
-    } else {
-      toast({
-        title: 'Permissão negada',
-        description: 'Ative as notificações nas configurações do navegador.',
-        variant: 'destructive',
-      });
-    }
+    toast({
+      title: granted ? 'Notificações ativadas!' : 'Permissão negada',
+      description: granted 
+        ? 'Você receberá notificações quando for mencionado.'
+        : 'Ative as notificações nas configurações do navegador.',
+      variant: granted ? 'default' : 'destructive',
+    });
   };
 
   return (
@@ -88,108 +77,111 @@ export const NotificationCenter = () => {
         </Button>
       </DropdownMenuTrigger>
       
-      <DropdownMenuContent align="end" className="w-96 p-0">
+      <DropdownMenuContent align="end" className="w-[420px] p-0" style={{ maxHeight: '80vh' }}>
         {/* Header */}
-        <div className="p-4 border-b">
-          <div className="flex items-center justify-between">
-            <h3 className="font-semibold text-lg">Notificações</h3>
-            <div className="flex items-center gap-2">
-              {unreadCount > 0 && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={markAllAsRead}
-                  className="text-xs"
-                >
-                  <CheckCheck className="h-4 w-4 mr-1" />
-                  Marcar todas
-                </Button>
-              )}
+        <div className="p-3 border-b flex items-center justify-between sticky top-0 bg-popover z-10">
+          <div className="flex items-center gap-2">
+            <h3 className="font-semibold">Notificações</h3>
+            {unreadCount > 0 && (
+              <Badge variant="secondary" className="text-xs">
+                {unreadCount} {unreadCount === 1 ? 'nova' : 'novas'}
+              </Badge>
+            )}
+          </div>
+          <div className="flex items-center gap-1">
+            {unreadCount > 0 && (
               <Button
                 variant="ghost"
-                size="icon"
-                className="h-8 w-8"
-                onClick={handleRequestPermission}
-                title="Ativar notificações desktop"
+                size="sm"
+                onClick={markAllAsRead}
+                className="text-xs h-7 px-2"
               >
-                <Settings className="h-4 w-4" />
+                <CheckCheck className="h-3.5 w-3.5 mr-1" />
+                Marcar todas
               </Button>
-            </div>
+            )}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7"
+              onClick={handleRequestPermission}
+              title="Ativar notificações desktop"
+            >
+              <Settings className="h-3.5 w-3.5" />
+            </Button>
           </div>
         </div>
 
-        {/* Lista de notificações */}
-        <ScrollArea className="max-h-[60vh]">
+        {/* Lista de notificações com scroll fixo */}
+        <div className="overflow-y-auto" style={{ maxHeight: 'calc(80vh - 52px)' }}>
           {loading ? (
             <div className="p-8 text-center">
               <div className="flex flex-col items-center gap-3">
-                <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary" />
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
                 <p className="text-sm text-muted-foreground">
                   {isRetrying ? `Reconectando... (tentativa ${retryCount}/3)` : 'Carregando...'}
                 </p>
               </div>
             </div>
           ) : error ? (
-            <div className="p-8 text-center">
-              <AlertCircle className="h-12 w-12 mx-auto mb-3 text-destructive" />
-              <p className="text-sm font-medium mb-2">Erro ao carregar notificações</p>
-              <p className="text-xs text-muted-foreground mb-4">{error}</p>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={refreshNotifications}
-              >
-                <RefreshCw className="h-4 w-4 mr-2" />
+            <div className="p-6 text-center">
+              <AlertCircle className="h-10 w-10 mx-auto mb-2 text-destructive" />
+              <p className="text-sm font-medium mb-1">Erro ao carregar</p>
+              <p className="text-xs text-muted-foreground mb-3">{error}</p>
+              <Button variant="outline" size="sm" onClick={refreshNotifications}>
+                <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
                 Tentar novamente
               </Button>
             </div>
           ) : notifications.length === 0 ? (
             <div className="p-8 text-center text-muted-foreground">
-              <Bell className="h-12 w-12 mx-auto mb-3 opacity-50" />
-              <p>Nenhuma notificação</p>
+              <Bell className="h-10 w-10 mx-auto mb-2 opacity-50" />
+              <p className="text-sm">Nenhuma notificação</p>
             </div>
           ) : (
-            <div className="divide-y">
+            <div>
               {notifications.map((notification) => (
                 <div
                   key={notification.id}
                   className={cn(
-                    'p-4 hover:bg-accent cursor-pointer transition-colors relative group',
-                    !notification.is_read && 'bg-blue-50/50 dark:bg-blue-950/20'
+                    'px-3 py-3 hover:bg-accent cursor-pointer transition-colors border-b last:border-b-0',
+                    !notification.is_read && 'bg-primary/5'
                   )}
                   onClick={() => handleNotificationClick(notification)}
                 >
-                  {!notification.is_read && (
-                    <div className="absolute top-4 right-4 h-2 w-2 bg-blue-500 rounded-full" />
-                  )}
-                  
-                  <div className="flex items-start gap-3">
+                  <div className="flex items-start gap-2">
+                    {/* Indicador de não lida */}
+                    <div className="pt-1.5 shrink-0">
+                      <div className={cn(
+                        'h-2 w-2 rounded-full',
+                        !notification.is_read ? 'bg-primary' : 'bg-transparent'
+                      )} />
+                    </div>
+                    
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="text-sm font-medium">
+                      <div className="flex items-center gap-1.5 mb-0.5">
+                        <span className="text-sm font-medium truncate">
                           {notification.title}
                         </span>
                         {notification.type === 'mention' && (
-                          <Badge variant="outline" className="text-xs bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300">
+                          <Badge variant="outline" className="text-[10px] px-1.5 py-0 shrink-0 border-primary/30 text-primary">
                             Menção
                           </Badge>
                         )}
                       </div>
                       
-                      <p className="text-sm text-muted-foreground line-clamp-2 mb-2">
+                      <p className="text-xs text-muted-foreground line-clamp-2 mb-1">
                         {parseMentions(notification.message)}
                       </p>
                       
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <span>
+                      <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                        <span className="truncate max-w-[120px]">
                           {notification.metadata?.author_name || 'Usuário'}
                         </span>
                         <span>•</span>
-                        <span>
-                          Pedido #{notification.metadata?.order_number?.slice(0, 8)}
-                        </span>
+                        <span>#{notification.metadata?.order_number?.slice(0, 8)}</span>
                         <span>•</span>
-                        <span>
+                        <span className="shrink-0">
                           {formatDistanceToNow(new Date(notification.created_at), {
                             addSuffix: true,
                             locale: ptBR
@@ -198,32 +190,33 @@ export const NotificationCenter = () => {
                       </div>
                     </div>
                     
-                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    {/* Ações sempre visíveis */}
+                    <div className="flex items-center gap-0.5 shrink-0">
                       {!notification.is_read && (
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-8 w-8"
+                          className="h-7 w-7 text-primary hover:text-primary"
                           onClick={(e) => {
                             e.stopPropagation();
                             markAsRead(notification.id);
                           }}
-                          title="Marcar como lida"
+                          title="Confirmar leitura"
                         >
-                          <Check className="h-4 w-4" />
+                          <Eye className="h-3.5 w-3.5" />
                         </Button>
                       )}
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-8 w-8 text-destructive"
+                        className="h-7 w-7 text-muted-foreground hover:text-destructive"
                         onClick={(e) => {
                           e.stopPropagation();
                           deleteNotification(notification.id);
                         }}
                         title="Excluir"
                       >
-                        <Trash2 className="h-4 w-4" />
+                        <Trash2 className="h-3.5 w-3.5" />
                       </Button>
                     </div>
                   </div>
@@ -231,7 +224,7 @@ export const NotificationCenter = () => {
               ))}
             </div>
           )}
-        </ScrollArea>
+        </div>
       </DropdownMenuContent>
     </DropdownMenu>
   );
