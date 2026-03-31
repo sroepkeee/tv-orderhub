@@ -119,7 +119,7 @@ export const NotificationCenter = () => {
         </div>
 
         {/* Lista de notificações */}
-        <ScrollArea className="h-[400px]">
+        <ScrollArea className="max-h-[60vh]">
           {loading ? (
             <div className="p-8 text-center">
               <div className="flex flex-col items-center gap-3">
