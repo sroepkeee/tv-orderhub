@@ -173,10 +173,22 @@ export const UserApprovalDialog = ({ open, onOpenChange, user, onSuccess }: User
               variant: "destructive",
               duration: 10000,
             });
-            // NÃO retornar - continuar com aprovação mesmo assim
           } else {
             console.log('✅ User successfully linked to organization:', orgId);
           }
+        }
+
+        // Sempre garantir que profiles.organization_id está preenchido
+        const { error: profileOrgError } = await supabase
+          .from('profiles')
+          .update({ organization_id: orgId })
+          .eq('id', user.id)
+          .is('organization_id', null);
+
+        if (profileOrgError) {
+          console.error('Error syncing profile organization_id:', profileOrgError);
+        } else {
+          console.log('✅ Profile organization_id synced for user:', user.id);
         }
 
         // Buscar roles do usuário para aplicar permissões de fase padrão
