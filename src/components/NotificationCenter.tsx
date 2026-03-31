@@ -15,6 +15,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
+import { parseMentions } from '@/lib/mentionUtils';
 
 export const NotificationCenter = () => {
   const {
@@ -118,7 +119,7 @@ export const NotificationCenter = () => {
         </div>
 
         {/* Lista de notificações */}
-        <ScrollArea className="h-[400px]">
+        <ScrollArea className="max-h-[60vh]">
           {loading ? (
             <div className="p-8 text-center">
               <div className="flex flex-col items-center gap-3">
@@ -176,7 +177,7 @@ export const NotificationCenter = () => {
                       </div>
                       
                       <p className="text-sm text-muted-foreground line-clamp-2 mb-2">
-                        {notification.message}
+                        {parseMentions(notification.message)}
                       </p>
                       
                       <div className="flex items-center gap-2 text-xs text-muted-foreground">
