@@ -177,7 +177,7 @@ export const NotificationCenter = () => {
                       </div>
                       
                       <p className="text-sm text-muted-foreground line-clamp-2 mb-2">
-                        {notification.message}
+                        {parseMentions(notification.message)}
                       </p>
                       
                       <div className="flex items-center gap-2 text-xs text-muted-foreground">
