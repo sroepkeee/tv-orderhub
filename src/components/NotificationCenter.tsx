@@ -144,8 +144,10 @@ export const NotificationCenter = () => {
                 <div
                   key={notification.id}
                   className={cn(
-                    'px-3 py-3 hover:bg-accent cursor-pointer transition-colors border-b last:border-b-0',
-                    !notification.is_read && 'bg-primary/5'
+                    'px-3 py-3 cursor-pointer transition-colors border-b last:border-b-0',
+                    !notification.is_read 
+                      ? 'bg-primary/8 hover:bg-primary/12 border-l-[3px] border-l-primary' 
+                      : 'bg-muted/30 hover:bg-accent opacity-75'
                   )}
                   onClick={() => handleNotificationClick(notification)}
                 >
@@ -153,14 +155,17 @@ export const NotificationCenter = () => {
                     {/* Indicador de não lida */}
                     <div className="pt-1.5 shrink-0">
                       <div className={cn(
-                        'h-2 w-2 rounded-full',
-                        !notification.is_read ? 'bg-primary' : 'bg-transparent'
+                        'h-2.5 w-2.5 rounded-full',
+                        !notification.is_read ? 'bg-primary animate-pulse' : 'bg-muted-foreground/20'
                       )} />
                     </div>
                     
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-1.5 mb-0.5">
-                        <span className="text-sm font-medium truncate">
+                        <span className={cn(
+                          "text-sm truncate",
+                          !notification.is_read ? 'font-semibold text-foreground' : 'font-normal text-muted-foreground'
+                        )}>
                           {notification.title}
                         </span>
                         {notification.type === 'mention' && (
@@ -170,7 +175,10 @@ export const NotificationCenter = () => {
                         )}
                       </div>
                       
-                      <p className="text-xs text-muted-foreground line-clamp-2 mb-1">
+                      <p className={cn(
+                        "text-xs line-clamp-2 mb-1",
+                        !notification.is_read ? 'text-foreground/80' : 'text-muted-foreground'
+                      )}>
                         {parseMentions(notification.message)}
                       </p>
                       
@@ -190,33 +198,39 @@ export const NotificationCenter = () => {
                       </div>
                     </div>
                     
-                    {/* Ações sempre visíveis */}
-                    <div className="flex items-center gap-0.5 shrink-0">
-                      {!notification.is_read && (
+                    {/* Ações */}
+                    <div className="flex flex-col items-center gap-1 shrink-0">
+                      {!notification.is_read ? (
                         <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7 text-primary hover:text-primary"
+                          variant="outline"
+                          size="sm"
+                          className="h-7 px-2 text-[11px] text-primary border-primary/30 hover:bg-primary hover:text-primary-foreground"
                           onClick={(e) => {
                             e.stopPropagation();
                             markAsRead(notification.id);
                           }}
                           title="Confirmar leitura"
                         >
-                          <Eye className="h-3.5 w-3.5" />
+                          <Check className="h-3 w-3 mr-1" />
+                          Lido
                         </Button>
+                      ) : (
+                        <span className="text-[10px] text-muted-foreground/60 flex items-center gap-1">
+                          <CheckCheck className="h-3 w-3" />
+                          Lido
+                        </span>
                       )}
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                        className="h-6 w-6 text-muted-foreground/50 hover:text-destructive"
                         onClick={(e) => {
                           e.stopPropagation();
                           deleteNotification(notification.id);
                         }}
                         title="Excluir"
                       >
-                        <Trash2 className="h-3.5 w-3.5" />
+                        <Trash2 className="h-3 w-3" />
                       </Button>
                     </div>
                   </div>
