@@ -241,19 +241,41 @@ export const useNotifications = () => {
   }, [user]);
 
   const markAsRead = async (notificationId: string) => {
-    await supabase
+    // Atualizar estado local imediatamente (optimistic)
+    setNotifications(prev => 
+      prev.map(n => n.id === notificationId ? { ...n, is_read: true } : n)
+    );
+    setUnreadCount(prev => Math.max(0, prev - 1));
+
+    const { error } = await supabase
       .from('notifications')
       .update({ 
         is_read: true, 
         read_at: new Date().toISOString() 
       })
       .eq('id', notificationId);
+
+    if (error) {
+      console.error('🔔 [markAsRead] Erro:', error);
+      // Reverter em caso de erro
+      setNotifications(prev => 
+        prev.map(n => n.id === notificationId ? { ...n, is_read: false } : n)
+      );
+      setUnreadCount(prev => prev + 1);
+    }
   };
 
   const markAllAsRead = async () => {
     if (!user) return;
 
-    await supabase
+    const previousNotifications = notifications;
+    const previousCount = unreadCount;
+
+    // Atualizar estado local imediatamente
+    setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
+    setUnreadCount(0);
+
+    const { error } = await supabase
       .from('notifications')
       .update({ 
         is_read: true, 
@@ -262,16 +284,42 @@ export const useNotifications = () => {
       .eq('user_id', user.id)
       .eq('is_read', false);
 
-    setUnreadCount(0);
+    if (error) {
+      console.error('🔔 [markAllAsRead] Erro:', error);
+      setNotifications(previousNotifications);
+      setUnreadCount(previousCount);
+    } else {
+      toast({
+        title: 'Todas as notificações foram marcadas como lidas',
+      });
+    }
   };
 
   const deleteNotification = async (notificationId: string) => {
-    await supabase
+    const notification = notifications.find(n => n.id === notificationId);
+    
+    setNotifications(prev => prev.filter(n => n.id !== notificationId));
+    if (notification && !notification.is_read) {
+      setUnreadCount(prev => Math.max(0, prev - 1));
+    }
+
+    const { error } = await supabase
       .from('notifications')
       .delete()
       .eq('id', notificationId);
 
-    setNotifications(prev => prev.filter(n => n.id !== notificationId));
+    if (error) {
+      console.error('🔔 [deleteNotification] Erro:', error);
+      // Reverter
+      if (notification) {
+        setNotifications(prev => [...prev, notification].sort(
+          (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        ));
+        if (!notification.is_read) {
+          setUnreadCount(prev => prev + 1);
+        }
+      }
+    }
   };
 
   // Notificações desktop
