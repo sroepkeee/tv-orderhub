@@ -216,6 +216,9 @@ const KanbanCardComponent = ({
     i => i.item_status === 'purchase_required' || i.item_status === 'purchase_requested'
   ).length || 0;
   
+  // Verificar se rateio está pendente
+  const isRateioPending = !order.cost_center && !order.account_item;
+  
   // Micro view rendering (TV/Dashboard mode)
   if (viewMode === "micro") {
     const getPriorityColor = () => {

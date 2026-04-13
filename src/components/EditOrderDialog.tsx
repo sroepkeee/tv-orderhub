@@ -2452,6 +2452,15 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
           <TabsContent value="edit" className="mt-2">
             <ScrollArea className="h-[calc(95vh-180px)] pr-2">
               <form onSubmit={handleSubmit(onSubmit)} className="space-y-2">
+                {/* Banner de Rateio Pendente */}
+                {(!watch('cost_center' as any) && !watch('account_item' as any)) && (
+                  <div className="flex items-center gap-2 p-2 rounded-md bg-amber-50 border border-amber-300 dark:bg-amber-950/30 dark:border-amber-700">
+                    <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400 flex-shrink-0" />
+                    <span className="text-xs font-medium text-amber-700 dark:text-amber-300">
+                      ⚠️ RATEIO PENDENTE — Preencha o Centro de Custo ou Projeto antes de faturar este pedido.
+                    </span>
+                  </div>
+                )}
                 {/* Linha 1: Tipo, Prioridade, Cliente, Prazo */}
                 <div className="grid grid-cols-4 gap-2">
                   <div>
