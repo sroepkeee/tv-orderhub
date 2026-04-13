@@ -1022,7 +1022,7 @@ export const EditOrderDialog = ({
   };
 
   // NOVO: Registrar mudança de item no histórico
-  const recordItemChange = async (itemId: string, field: 'received_status' | 'delivered_quantity' | 'item_source_type' | 'item_status' | 'warehouse' | 'purchase_action_started' | 'production_order_number', oldValue: any, newValue: any, notes?: string) => {
+  const recordItemChange = async (itemId: string, field: 'received_status' | 'delivered_quantity' | 'item_source_type' | 'item_status' | 'warehouse' | 'purchase_action_started' | 'production_order_number' | 'item_code' | 'item_description', oldValue: any, newValue: any, notes?: string) => {
     try {
       const {
         data: {
@@ -1164,6 +1164,140 @@ export const EditOrderDialog = ({
       });
       
       loadHistory();
+    }
+
+    // Auto-save itemCode imediatamente no banco (mesmo padrão do production_order_number)
+    if (field === 'itemCode' && oldItem.itemCode !== value && oldItem.id) {
+      console.log(`🔄 Código do item mudou: ${oldItem.itemCode} → ${value}`);
+      
+      ignoreNextRealtimeUpdateRef.current = true;
+      
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error('Usuário não autenticado');
+
+        const { error } = await supabase
+          .from('order_items')
+          .update({ item_code: value })
+          .eq('id', oldItem.id);
+        
+        if (error) throw error;
+
+        // Registrar no histórico de item
+        await recordItemChange(
+          oldItem.id,
+          'item_code',
+          oldItem.itemCode || '',
+          value,
+          `Código alterado de "${oldItem.itemCode}" para "${value}"`
+        );
+
+        // Registrar em order_changes
+        await supabase.from('order_changes').insert({
+          order_id: order.id,
+          changed_by: user.id,
+          field_name: 'item_code',
+          old_value: oldItem.itemCode || '',
+          new_value: value,
+          change_type: 'update',
+          change_category: 'item_code_change'
+        });
+
+        // Notificar o importador do pedido (user_id do pedido)
+        const orderUserId = (order as any).userId || (order as any).user_id;
+        if (orderUserId && orderUserId !== user.id) {
+          await supabase.from('notifications').insert({
+            user_id: orderUserId,
+            type: 'mention',
+            title: `⚠️ Código alterado no pedido #${order.orderNumber}`,
+            message: `O código "${oldItem.itemCode}" foi substituído por "${value}". Atualize o pedido RAIZ no TOTVS para evitar problemas de faturamento.`,
+            order_id: order.id,
+            metadata: {
+              change_type: 'item_code_change',
+              old_code: oldItem.itemCode,
+              new_code: value,
+              changed_by_name: user.email
+            }
+          });
+        }
+
+        setItems(newItems);
+
+        toast({
+          title: "⚠️ Código de item alterado",
+          description: `Código alterado de "${oldItem.itemCode}" para "${value}". LEMBRE-SE: Atualize o pedido RAIZ no TOTVS!`,
+          variant: "default",
+          duration: 10000,
+        });
+
+        loadHistory();
+        return;
+      } catch (error: any) {
+        console.error('Erro ao atualizar código do item:', error);
+        ignoreNextRealtimeUpdateRef.current = false;
+        toast({
+          title: "Erro ao atualizar código",
+          description: error?.message || "Não foi possível salvar a alteração.",
+          variant: "destructive"
+        });
+        return;
+      }
+    }
+
+    // Auto-save itemDescription imediatamente no banco
+    if (field === 'itemDescription' && oldItem.itemDescription !== value && oldItem.id) {
+      console.log(`🔄 Descrição do item mudou: ${oldItem.itemDescription} → ${value}`);
+      
+      ignoreNextRealtimeUpdateRef.current = true;
+      
+      try {
+        const { error } = await supabase
+          .from('order_items')
+          .update({ item_description: value })
+          .eq('id', oldItem.id);
+        
+        if (error) throw error;
+
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          await recordItemChange(
+            oldItem.id,
+            'item_description',
+            oldItem.itemDescription || '',
+            value,
+            `Descrição alterada`
+          );
+
+          await supabase.from('order_changes').insert({
+            order_id: order.id,
+            changed_by: user.id,
+            field_name: 'item_description',
+            old_value: oldItem.itemDescription || '',
+            new_value: value,
+            change_type: 'update',
+            change_category: 'item_description_change'
+          });
+        }
+
+        setItems(newItems);
+
+        toast({
+          title: "Descrição atualizada",
+          description: `Descrição do item salva com sucesso.`,
+        });
+
+        loadHistory();
+        return;
+      } catch (error: any) {
+        console.error('Erro ao atualizar descrição do item:', error);
+        ignoreNextRealtimeUpdateRef.current = false;
+        toast({
+          title: "Erro ao atualizar descrição",
+          description: error?.message || "Não foi possível salvar.",
+          variant: "destructive"
+        });
+        return;
+      }
     }
 
     // NOVO: Detectar mudança de deliveryDate em itens
@@ -2318,6 +2452,15 @@ Notas: ${(order as any).lab_notes || 'Nenhuma'}
           <TabsContent value="edit" className="mt-2">
             <ScrollArea className="h-[calc(95vh-180px)] pr-2">
               <form onSubmit={handleSubmit(onSubmit)} className="space-y-2">
+                {/* Banner de Rateio Pendente */}
+                {(!watch('cost_center' as any) && !watch('account_item' as any)) && (
+                  <div className="flex items-center gap-2 p-2 rounded-md bg-amber-50 border border-amber-300 dark:bg-amber-950/30 dark:border-amber-700">
+                    <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400 flex-shrink-0" />
+                    <span className="text-xs font-medium text-amber-700 dark:text-amber-300">
+                      ⚠️ RATEIO PENDENTE — Preencha o Centro de Custo ou Projeto antes de faturar este pedido.
+                    </span>
+                  </div>
+                )}
                 {/* Linha 1: Tipo, Prioridade, Cliente, Prazo */}
                 <div className="grid grid-cols-4 gap-2">
                   <div>
