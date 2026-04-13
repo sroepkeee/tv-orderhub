@@ -124,7 +124,7 @@ All colors MUST be HSL.
     --type-ecommerce-bg: 200 80% 96%;
     
     /* E-commerce pulse animation color */
-    --ecommerce-pulse: 0 75% 55%; /* Vermelho para modo claro */
+    --ecommerce-pulse: 270 70% 55%; /* Roxo vibrante para modo claro */
 
     /* Kanban Phase Colors - Unified Neutral Design */
     --phase-almox-ssm: 220 40% 35%;
@@ -303,7 +303,7 @@ All colors MUST be HSL.
     --type-ecommerce-bg: 200 70% 12%;
     
     /* E-commerce pulse animation color - Dark Mode */
-    --ecommerce-pulse: 125 65% 60%; /* Verde claro para modo escuro */
+    --ecommerce-pulse: 270 70% 65%; /* Roxo vibrante para modo escuro */
 
     /* Kanban Phase Colors - Dark Mode Unified Neutral Design */
     --phase-almox-ssm: 220 30% 85%;
