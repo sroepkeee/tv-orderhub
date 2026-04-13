@@ -241,13 +241,18 @@ const KanbanCardComponent = ({
                   "kanban-card kanban-card-micro p-1 flex items-center gap-1.5 cursor-pointer transition-all h-7",
                   isDragging ? 'opacity-50' : 'hover:bg-accent',
                   isAnimating && 'animate-card-pop-in',
-                  isVendasEcommerce && !isMinimal && 'animate-ecommerce-pulse border border-purple-500/40'
+                  isVendasEcommerce && !isMinimal && 'animate-ecommerce-pulse border',
+                  !isVendasEcommerce && order.priority === 'high' && !isMinimal && 'animate-priority-blink border'
                 )}
                 onClick={handleCardClick}
                 onMouseDown={() => setClickStart(Date.now())}
               >
                 {/* Priority indicator */}
-                <div className={cn("w-2 h-2 rounded-full flex-shrink-0", getPriorityColor())} />
+                <div className={cn(
+                  "w-2 h-2 rounded-full flex-shrink-0",
+                  getPriorityColor(),
+                  order.priority === 'high' && !isMinimal && 'animate-pulse'
+                )} />
                 
                 {/* E-commerce indicator */}
                 {isVendasEcommerce && (

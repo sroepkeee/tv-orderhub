@@ -223,12 +223,24 @@ export default {
         },
         "ecommerce-pulse": {
           "0%, 100%": {
-            borderColor: "hsl(var(--ecommerce-pulse) / 0.12)",
-            boxShadow: "0 0 0 0 hsl(var(--ecommerce-pulse) / 0)"
+            borderColor: "hsl(var(--ecommerce-pulse) / 0.3)",
+            boxShadow: "0 0 0 0 hsl(var(--ecommerce-pulse) / 0)",
+            backgroundColor: "hsl(var(--ecommerce-pulse) / 0)"
           },
           "50%": {
-            borderColor: "hsl(var(--ecommerce-pulse) / 0.26)",
-            boxShadow: "0 0 4px 1px hsl(var(--ecommerce-pulse) / 0.12)"
+            borderColor: "hsl(var(--ecommerce-pulse) / 0.7)",
+            boxShadow: "0 0 8px 2px hsl(var(--ecommerce-pulse) / 0.25)",
+            backgroundColor: "hsl(var(--ecommerce-pulse) / 0.05)"
+          },
+        },
+        "priority-blink": {
+          "0%, 100%": {
+            borderColor: "transparent",
+            boxShadow: "none"
+          },
+          "50%": {
+            borderColor: "hsl(var(--priority-high))",
+            boxShadow: "0 0 6px 1px hsl(var(--priority-high) / 0.4)"
           },
         },
         "card-pop-in": {
@@ -245,7 +257,8 @@ export default {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
         "pulse-critical": "pulse-critical 3s ease-in-out infinite",
-        "ecommerce-pulse": "ecommerce-pulse 12s cubic-bezier(0.4, 0, 0.2, 1) infinite",
+        "ecommerce-pulse": "ecommerce-pulse 2s cubic-bezier(0.4, 0, 0.2, 1) infinite",
+        "priority-blink": "priority-blink 1.5s ease-in-out infinite",
         "card-pop-in": "card-pop-in 0.25s cubic-bezier(0.34, 1.56, 0.64, 1) forwards",
         "card-slide-in": "card-slide-in 0.2s ease-out forwards"
       },
