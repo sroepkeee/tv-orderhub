@@ -365,6 +365,11 @@ const KanbanCardComponent = ({
                       {purchaseItemsCount}c
                     </span>
                   )}
+                  {isRateioPending && (
+                    <span className="text-[8px] text-amber-600 dark:text-amber-400 font-medium" title="Rateio pendente">
+                      R!
+                    </span>
+                  )}
                   
                   {/* Days in phase - compact mono */}
                   <span className={cn(
