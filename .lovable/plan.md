@@ -1,74 +1,51 @@
 
 
-## Plano: Persistencia de Mudanca de Codigo, Historico e Notificacao de Rateio
+## Plano: Melhorar Visibilidade de Pedidos E-commerce e Prioritarios no Modo TV
 
-### Problema 1: Mudanca de codigo de item nao persiste corretamente
+### Problema
 
-**Causa raiz**: Quando o usuario altera o `itemCode` no EditOrderDialog, a mudanca passa pelo `updateItem` generico que apenas atualiza o estado local. Diferente de `warehouse`, `item_status` e `production_order_number` que tem auto-save imediato no banco, o `itemCode` so e salvo no submit geral do formulario. Se o dialogo fechar ou houver reload realtime antes do submit, a alteracao e perdida.
+1. **E-commerce pulse quase invisivel**: A animacao `ecommerce-pulse` tem ciclo de 12 segundos e opacidade muito baixa (0.12 a 0.26), tornando-a imperceptivel em telas TV.
+2. **Prioridade alta sem piscar**: No modo micro/TV, pedidos de alta prioridade mostram apenas um ponto colorido estatico — sem animacao chamativa.
 
-**Correcao**: Implementar auto-save imediato para `itemCode` e `itemDescription`, identico ao padrao ja existente para `warehouse` e `production_order_number`.
+### Correcoes
 
-### Problema 2: Historico de mudanca de codigo inexistente
+#### 1. Tornar o pulse do E-commerce mais agressivo (`tailwind.config.ts`)
 
-**Causa raiz**: `recordItemChange` aceita apenas campos especificos (`item_status`, `warehouse`, etc). `item_code` e `item_description` nao estao na lista.
+- Reduzir ciclo de 12s para **2s** (pisca rapido e visivel)
+- Aumentar opacidade do border de 0.12/0.26 para **0.3/0.7**
+- Aumentar intensidade do box-shadow de 4px para **8px**
+- Adicionar leve mudanca de background-color para reforcar o efeito visual
 
-### Problema 3: Notificacao ao importador do pedido
+#### 2. Adicionar animacao pulsante para prioridade alta no modo micro (`KanbanCard.tsx`)
 
-Quando um codigo muda, o usuario que criou/importou o pedido precisa ser notificado para atualizar o pedido RAIZ no TOTVS.
+- Quando `priority === 'high'` e `viewMode === 'micro'`, aplicar uma classe `animate-priority-blink` no card
+- O ponto de prioridade tambem ganha animacao de scale pulsante
 
-### Problema 4: Rateio obrigatorio com alerta visual
-
-Ja existe validacao no submit, mas nao ha alerta proativo na tela para pedidos sem rateio.
-
----
-
-### Alteracoes
-
-#### 1. Auto-save de `itemCode` e `itemDescription` (`EditOrderDialog.tsx`)
-
-Adicionar bloco no `updateItem` (apos o bloco de `production_order_number`, linha ~1167):
+#### 3. Criar keyframe `priority-blink` (`tailwind.config.ts`)
 
 ```
-if (field === 'itemCode' && oldItem.itemCode !== value && oldItem.id) {
-  // auto-save imediato no banco
-  // registrar no order_item_history (old_code -> new_code)
-  // registrar em order_changes
-  // criar notificacao para order.user_id (importador)
-  // toast de alerta sobre TOTVS
+"priority-blink": {
+  "0%, 100%": { borderColor: "transparent", boxShadow: "none" },
+  "50%": { borderColor: "hsl(var(--priority-high))", boxShadow: "0 0 6px 1px hsl(var(--priority-high) / 0.4)" }
 }
 ```
+Ciclo de **1.5s** para ser bem visivel em TV.
 
-Mesma logica para `itemDescription`.
+#### 4. Ajustar cor do E-commerce pulse no CSS (`src/index.css`)
 
-#### 2. Expandir `recordItemChange` para aceitar `item_code` e `item_description`
-
-Atualizar o type union do parametro `field` para incluir `'item_code' | 'item_description'`.
-
-#### 3. Notificacao ao importador do pedido
-
-Quando `itemCode` mudar, inserir registro na tabela `notifications`:
-- `user_id`: `order.user_id` (quem importou o pedido)
-- `type`: `'item_code_change'`
-- `title`: "Codigo de item alterado no pedido #XXX"
-- `message`: "O codigo ANTIGO foi substituido por NOVO. Atualize o pedido RAIZ no TOTVS."
-- `order_id`: referencia ao pedido
-
-#### 4. Badge/alerta de rateio pendente no Dashboard
-
-Adicionar no `KanbanCard.tsx` um indicador visual (badge amarelo) quando o pedido nao tem `cost_center` nem `account_item` preenchidos, para que todos vejam que o rateio esta pendente.
-
-Adicionar banner de alerta no topo do `EditOrderDialog` quando rateio estiver vazio.
-
----
+Usar roxo (purple) em vez de vermelho/verde para manter consistencia com a identidade visual do E-commerce no sistema.
 
 ### Arquivos modificados
 
 | Arquivo | Alteracao |
 |---------|-----------|
-| `src/components/EditOrderDialog.tsx` | Auto-save itemCode/itemDescription; expandir recordItemChange; notificacao ao importador; banner de rateio |
-| `src/components/KanbanCard.tsx` | Badge visual de rateio pendente |
+| `tailwind.config.ts` | Ajustar keyframe ecommerce-pulse (mais intenso, 2s); adicionar keyframe priority-blink |
+| `src/components/KanbanCard.tsx` | Aplicar animate-priority-blink em cards micro com prioridade alta |
+| `src/index.css` | Ajustar cor --ecommerce-pulse para roxo consistente |
 
-### Sem migracoes necessarias
+### Resultado
 
-As tabelas `order_item_history`, `order_changes` e `notifications` ja existem e suportam os campos necessarios.
+- Pedidos E-commerce piscarao visivelmente a cada 2s com borda roxa forte
+- Pedidos de alta prioridade piscarao com borda vermelha a cada 1.5s
+- Ambos os efeitos serao nitidamente visiveis em telas TV a distancia
 
