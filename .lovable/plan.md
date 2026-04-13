@@ -1,56 +1,74 @@
 
 
-## Plano: Corrigir Usuários Pendentes Invisíveis na Tabela de Admin
+## Plano: Persistencia de Mudanca de Codigo, Historico e Notificacao de Rateio
 
-### Diagnóstico
+### Problema 1: Mudanca de codigo de item nao persiste corretamente
 
-A usuária pendente é **Letícia Rodrigues Vieira (leticiavieira@imply.com)**, criada em 31/03/2026.
+**Causa raiz**: Quando o usuario altera o `itemCode` no EditOrderDialog, a mudanca passa pelo `updateItem` generico que apenas atualiza o estado local. Diferente de `warehouse`, `item_status` e `production_order_number` que tem auto-save imediato no banco, o `itemCode` so e salvo no submit geral do formulario. Se o dialogo fechar ou houver reload realtime antes do submit, a alteracao e perdida.
 
-**Causa raiz**: A RLS policy `"Org members can view org profiles"` na tabela `profiles` exige `organization_id = get_user_organization_id()`. Como Letícia tem `organization_id = NULL` e nenhum registro em `organization_members`, seu perfil é **invisível** para o admin via RLS. O badge mostra "1 pendente" porque `user_approval_status` tem policy própria que permite admins verem tudo, mas o JOIN com `profiles` no frontend retorna vazio.
+**Correcao**: Implementar auto-save imediato para `itemCode` e `itemDescription`, identico ao padrao ja existente para `warehouse` e `production_order_number`.
 
-### Correções
+### Problema 2: Historico de mudanca de codigo inexistente
 
-#### 1. Adicionar RLS policy para admins verem todos os profiles
+**Causa raiz**: `recordItemChange` aceita apenas campos especificos (`item_status`, `warehouse`, etc). `item_code` e `item_description` nao estao na lista.
 
-Criar nova policy na tabela `profiles`:
+### Problema 3: Notificacao ao importador do pedido
 
-```sql
-CREATE POLICY "Admins can view all profiles"
-ON public.profiles FOR SELECT
-TO authenticated
-USING (has_role(auth.uid(), 'admin'::app_role));
+Quando um codigo muda, o usuario que criou/importou o pedido precisa ser notificado para atualizar o pedido RAIZ no TOTVS.
+
+### Problema 4: Rateio obrigatorio com alerta visual
+
+Ja existe validacao no submit, mas nao ha alerta proativo na tela para pedidos sem rateio.
+
+---
+
+### Alteracoes
+
+#### 1. Auto-save de `itemCode` e `itemDescription` (`EditOrderDialog.tsx`)
+
+Adicionar bloco no `updateItem` (apos o bloco de `production_order_number`, linha ~1167):
+
+```
+if (field === 'itemCode' && oldItem.itemCode !== value && oldItem.id) {
+  // auto-save imediato no banco
+  // registrar no order_item_history (old_code -> new_code)
+  // registrar em order_changes
+  // criar notificacao para order.user_id (importador)
+  // toast de alerta sobre TOTVS
+}
 ```
 
-Isso permite que admins vejam TODOS os perfis, incluindo os com `organization_id = NULL`.
+Mesma logica para `itemDescription`.
 
-#### 2. Corrigir dados da Letícia (imediato)
+#### 2. Expandir `recordItemChange` para aceitar `item_code` e `item_description`
 
-Buscar o `organization_id` da organização existente e:
-- Inserir registro em `organization_members`
-- Atualizar `profiles.organization_id`
+Atualizar o type union do parametro `field` para incluir `'item_code' | 'item_description'`.
 
-Isso será feito via INSERT/UPDATE direto.
+#### 3. Notificacao ao importador do pedido
 
-#### 3. Robustecer o fluxo de aprovação (`UserApprovalDialog.tsx`)
+Quando `itemCode` mudar, inserir registro na tabela `notifications`:
+- `user_id`: `order.user_id` (quem importou o pedido)
+- `type`: `'item_code_change'`
+- `title`: "Codigo de item alterado no pedido #XXX"
+- `message`: "O codigo ANTIGO foi substituido por NOVO. Atualize o pedido RAIZ no TOTVS."
+- `order_id`: referencia ao pedido
 
-Adicionar lógica no `handleApprove` para garantir que, ao aprovar um usuário com `organization_id = NULL`:
-- Buscar a organização do admin logado
-- Criar o registro em `organization_members`
-- Atualizar `profiles.organization_id`
+#### 4. Badge/alerta de rateio pendente no Dashboard
 
-Isso já existe parcialmente mas pode falhar silenciosamente. Adicionar tratamento explícito.
+Adicionar no `KanbanCard.tsx` um indicador visual (badge amarelo) quando o pedido nao tem `cost_center` nem `account_item` preenchidos, para que todos vejam que o rateio esta pendente.
 
-### Resumo
+Adicionar banner de alerta no topo do `EditOrderDialog` quando rateio estiver vazio.
 
-| Tipo | Alteração |
-|------|-----------|
-| **Migration** | Nova RLS policy: admins podem ver todos os profiles |
-| **UPDATE dados** | Corrigir Letícia: preencher organization_id e organization_members |
-| **Código** | Robustecer UserApprovalDialog para sempre vincular org ao aprovar |
+---
 
-### Resultado
+### Arquivos modificados
 
-- Usuários pendentes (sem org) serão visíveis na tabela de admin
-- A aprovação sempre vinculará o usuário à organização automaticamente
-- Novos registros nunca mais ficarão "invisíveis"
+| Arquivo | Alteracao |
+|---------|-----------|
+| `src/components/EditOrderDialog.tsx` | Auto-save itemCode/itemDescription; expandir recordItemChange; notificacao ao importador; banner de rateio |
+| `src/components/KanbanCard.tsx` | Badge visual de rateio pendente |
+
+### Sem migracoes necessarias
+
+As tabelas `order_item_history`, `order_changes` e `notifications` ja existem e suportam os campos necessarios.
 
