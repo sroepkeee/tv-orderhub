@@ -920,13 +920,13 @@ export function ProductivityViewDialog({ open, onOpenChange }: ProductivityViewD
                           ) : (
                             byUser.map((user, idx) => {
                               // Tenta achar o id correspondente em allUsers para usar como filtro
-                              const userKey = allUsers.find((u) => u.name === user.user_name)?.id || user.user_name;
-                              const isActive = selectedUsers.includes(userKey);
+                              const rowUserKey = allUsers.find((u) => u.name === user.user_name)?.id || userKey(null, user.user_email, user.user_name);
+                              const isActive = selectedUsers.includes(rowUserKey);
                               return (
                                 <TableRow
                                   key={user.user_email || user.user_name + idx}
                                   className={cn("cursor-pointer hover:bg-accent", isActive && "bg-accent/50")}
-                                  onClick={() => toggleArr(selectedUsers, userKey, setSelectedUsers)}
+                                  onClick={() => toggleArr(selectedUsers, rowUserKey, setSelectedUsers)}
                                 >
                                   <TableCell className="font-medium">{idx + 1}</TableCell>
                                   <TableCell className="font-medium">{user.user_name}</TableCell>
