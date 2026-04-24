@@ -408,7 +408,7 @@ export function ProductivityViewDialog({ open, onOpenChange }: ProductivityViewD
   // ===== Agregações Complexidade =====
   const filteredComplexity = useMemo(() => {
     return (complexityQuery.data || []).filter((r) =>
-      matchesFilters(r.user_id, r.user_name, r.order_type)
+      matchesFilters(r.user_id, r.user_name, r.order_type, undefined, r.user_email)
     );
   }, [complexityQuery.data, selectedUsers, selectedTypes]);
 
@@ -432,7 +432,7 @@ export function ProductivityViewDialog({ open, onOpenChange }: ProductivityViewD
   const complexityByUser = useMemo(() => {
     const map = new Map<string, { user_name: string; total: number; firmware: number; image: number; lab: number }>();
     filteredComplexity.forEach((r) => {
-      const key = r.user_id || r.user_name;
+      const key = userKey(r.user_id, r.user_email, r.user_name);
       let entry = map.get(key);
       if (!entry) {
         entry = { user_name: r.user_name, total: 0, firmware: 0, image: 0, lab: 0 };
