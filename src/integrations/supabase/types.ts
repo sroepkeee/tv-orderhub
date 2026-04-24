@@ -6417,7 +6417,64 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      v_orders_completed_daily: {
+        Row: {
+          completion_date: string | null
+          orders_completed: number | null
+          organization_id: string | null
+          user_email: string | null
+          user_id: string | null
+          user_name: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "orders_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      v_orders_imported_daily: {
+        Row: {
+          import_date: string | null
+          orders_imported: number | null
+          organization_id: string | null
+          unique_customers: number | null
+          user_email: string | null
+          user_id: string | null
+          user_name: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "orders_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      v_orders_invoice_requested_daily: {
+        Row: {
+          orders_invoice_requested: number | null
+          organization_id: string | null
+          request_date: string | null
+          user_email: string | null
+          user_id: string | null
+          user_name: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "orders_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       can_access_carrier_conversation: {
