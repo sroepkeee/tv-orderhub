@@ -264,7 +264,7 @@ export function ProductivityViewDialog({ open, onOpenChange }: ProductivityViewD
   const byUser = useMemo(() => {
     const map = new Map<string, { user_name: string; user_email: string | null; total: number }>();
     currentData.forEach((row) => {
-      const key = row.user_id || row.user_name;
+      const key = userKey(row.user_id, row.user_email, row.user_name);
       const existing = map.get(key);
       if (existing) {
         existing.total += row.count;
