@@ -350,7 +350,7 @@ export function ProductivityViewDialog({ open, onOpenChange }: ProductivityViewD
   // ===== Agregações SLA =====
   const filteredSLA = useMemo(() => {
     return (slaQuery.data || []).filter((r) =>
-      matchesFilters(r.user_id, r.user_name, r.order_type, r.priority)
+      matchesFilters(r.user_id, r.user_name, r.order_type, r.priority, r.user_email)
     );
   }, [slaQuery.data, selectedUsers, selectedTypes, selectedPriorities]);
 
@@ -372,7 +372,7 @@ export function ProductivityViewDialog({ open, onOpenChange }: ProductivityViewD
   const slaByUser = useMemo(() => {
     const map = new Map<string, { user_name: string; total: number; onTime: number; late: number }>();
     filteredSLA.forEach((r) => {
-      const key = r.user_id || r.user_name;
+      const key = userKey(r.user_id, r.user_email, r.user_name);
       let entry = map.get(key);
       if (!entry) {
         entry = { user_name: r.user_name, total: 0, onTime: 0, late: 0 };
@@ -390,7 +390,7 @@ export function ProductivityViewDialog({ open, onOpenChange }: ProductivityViewD
   // Cycle time
   const filteredCycle = useMemo(() => {
     return (cycleQuery.data || []).filter((r) =>
-      matchesFilters(r.user_id, r.user_name, r.order_type, r.priority)
+      matchesFilters(r.user_id, r.user_name, r.order_type, r.priority, r.user_email)
     );
   }, [cycleQuery.data, selectedUsers, selectedTypes, selectedPriorities]);
 
