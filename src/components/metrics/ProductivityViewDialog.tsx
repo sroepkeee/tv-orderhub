@@ -568,6 +568,9 @@ export function ProductivityViewDialog({ open, onOpenChange }: ProductivityViewD
           </DialogTitle>
           <DialogDescription>
             Acompanhe a produtividade do time por período, com filtros dinâmicos por usuário, tipo e prioridade.
+            <span className="block text-xs text-muted-foreground/80 mt-1">
+              O intervalo de datas considera a <strong>data de criação</strong> do pedido em todas as abas.
+            </span>
           </DialogDescription>
         </DialogHeader>
 
