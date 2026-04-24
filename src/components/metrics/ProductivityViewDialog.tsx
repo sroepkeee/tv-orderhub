@@ -159,6 +159,21 @@ export function ProductivityViewDialog({ open, onOpenChange }: ProductivityViewD
     endDate: dateRange?.to,
     enabled: open,
   });
+  const slaQuery = useProductivitySLA({
+    startDate: dateRange?.from,
+    endDate: dateRange?.to,
+    enabled: open && (activeTab === "sla"),
+  });
+  const cycleQuery = useProductivityCycleTime({
+    startDate: dateRange?.from,
+    endDate: dateRange?.to,
+    enabled: open && (activeTab === "sla" || activeTab === "complexity"),
+  });
+  const complexityQuery = useProductivityComplexity({
+    startDate: dateRange?.from,
+    endDate: dateRange?.to,
+    enabled: open && activeTab === "complexity",
+  });
 
   // ===== Listas únicas para os filtros (extraídas do dataset by_type, mais rico) =====
   const allUsers = useMemo(() => {
