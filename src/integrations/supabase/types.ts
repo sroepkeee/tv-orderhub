@@ -6475,6 +6475,31 @@ export type Database = {
           },
         ]
       }
+      v_productivity_by_type_daily: {
+        Row: {
+          activity_date: string | null
+          order_category: string | null
+          order_type: string | null
+          orders_completed: number | null
+          orders_imported: number | null
+          orders_invoice_requested: number | null
+          organization_id: string | null
+          priority: string | null
+          unique_customers: number | null
+          user_email: string | null
+          user_id: string | null
+          user_name: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "orders_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       can_access_carrier_conversation: {
