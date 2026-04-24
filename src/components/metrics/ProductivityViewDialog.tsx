@@ -330,7 +330,7 @@ export function ProductivityViewDialog({ open, onOpenChange }: ProductivityViewD
     // matriz usuário x tipo
     const userMap = new Map<string, { user_name: string; user_email: string | null; total: number; types: Map<string, number> }>();
     filteredByType.forEach((r) => {
-      const key = r.user_id || r.user_name;
+      const key = userKey(r.user_id, r.user_email, r.user_name);
       let entry = userMap.get(key);
       if (!entry) {
         entry = { user_name: r.user_name, user_email: r.user_email, total: 0, types: new Map() };
