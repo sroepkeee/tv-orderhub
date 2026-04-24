@@ -1393,15 +1393,15 @@ export function ProductivityViewDialog({ open, onOpenChange }: ProductivityViewD
                     </TableHeader>
                     <TableBody>
                       {complexityByUser.map((u, idx) => {
-                        const userKey = allUsers.find((x) => x.name === u.user_name)?.id || u.user_name;
-                        const isActive = selectedUsers.includes(userKey);
+                        const rowUserKey = allUsers.find((x) => x.name === u.user_name)?.id || userKey(null, null, u.user_name);
+                        const isActive = selectedUsers.includes(rowUserKey);
                         const complex = u.firmware + u.image + u.lab;
                         const pct = u.total > 0 ? (complex / u.total) * 100 : 0;
                         return (
                           <TableRow
                             key={u.user_name + idx}
                             className={cn("cursor-pointer hover:bg-accent", isActive && "bg-accent/50")}
-                            onClick={() => toggleArr(selectedUsers, userKey, setSelectedUsers)}
+                            onClick={() => toggleArr(selectedUsers, rowUserKey, setSelectedUsers)}
                           >
                             <TableCell className="font-medium">{idx + 1}</TableCell>
                             <TableCell className="font-medium">{u.user_name}</TableCell>
