@@ -41,6 +41,7 @@ import {
   type ProductivityRow,
 } from "@/hooks/useProductivityMetrics";
 import { useProductivityByType } from "@/hooks/useProductivityByType";
+import { ProductivityOrdersSheet } from "./ProductivityOrdersSheet";
 import {
   LineChart,
   Line,
