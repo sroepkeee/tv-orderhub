@@ -233,7 +233,7 @@ export function ProductivityViewDialog({ open, onOpenChange }: ProductivityViewD
   // Para abas simples (imported/invoice_requested/completed) aplicamos APENAS o filtro de usuário
   // (o dataset não tem tipo/prioridade). Tipo/prioridade só afetam a aba "Por Tipo".
   const filterSimple = (rows: ProductivityRow[]) =>
-    rows.filter((r) => matchesFilters(r.user_id, r.user_name));
+    rows.filter((r) => matchesFilters(r.user_id, r.user_name, undefined, undefined, r.user_email));
 
   const filteredImported = useMemo(() => filterSimple(importedQuery.data || []), [importedQuery.data, selectedUsers]);
   const filteredInvoice = useMemo(() => filterSimple(invoiceQuery.data || []), [invoiceQuery.data, selectedUsers]);
@@ -241,7 +241,7 @@ export function ProductivityViewDialog({ open, onOpenChange }: ProductivityViewD
 
   const filteredByType = useMemo(() => {
     return (byTypeQuery.data || []).filter((r) =>
-      matchesFilters(r.user_id, r.user_name, r.order_type, r.priority)
+      matchesFilters(r.user_id, r.user_name, r.order_type, r.priority, r.user_email)
     );
   }, [byTypeQuery.data, selectedUsers, selectedTypes, selectedPriorities]);
 
