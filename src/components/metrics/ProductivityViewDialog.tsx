@@ -774,11 +774,13 @@ export function ProductivityViewDialog({ open, onOpenChange }: ProductivityViewD
 
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as TabKey)}>
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-6">
             <TabsTrigger value="imported">📥 Importados</TabsTrigger>
             <TabsTrigger value="invoice_requested">💰 Faturamento</TabsTrigger>
             <TabsTrigger value="completed">✅ Concluídos</TabsTrigger>
             <TabsTrigger value="by_type">📊 Por Tipo</TabsTrigger>
+            <TabsTrigger value="sla">🎯 SLA</TabsTrigger>
+            <TabsTrigger value="complexity">🧩 Complexidade</TabsTrigger>
           </TabsList>
 
           {/* Abas simples (3 primeiras) */}
