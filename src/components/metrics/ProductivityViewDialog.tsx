@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { format, subDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { CalendarIcon, Download, FileSpreadsheet, BarChart3, Users, TrendingUp, X, Filter, Package } from "lucide-react";
+import { CalendarIcon, Download, FileSpreadsheet, BarChart3, Users, TrendingUp, X, Filter, Package, Clock, Target, Cpu } from "lucide-react";
 import { DateRange } from "react-day-picker";
 import * as XLSX from "xlsx";
 import {
@@ -41,6 +41,9 @@ import {
   type ProductivityRow,
 } from "@/hooks/useProductivityMetrics";
 import { useProductivityByType } from "@/hooks/useProductivityByType";
+import { useProductivitySLA } from "@/hooks/useProductivitySLA";
+import { useProductivityCycleTime } from "@/hooks/useProductivityCycleTime";
+import { useProductivityComplexity } from "@/hooks/useProductivityComplexity";
 import { ProductivityOrdersSheet } from "./ProductivityOrdersSheet";
 import {
   LineChart,
@@ -61,7 +64,7 @@ interface ProductivityViewDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
-type TabKey = ProductivityView | "by_type";
+type TabKey = ProductivityView | "by_type" | "sla" | "complexity";
 
 const VIEW_LABELS: Record<ProductivityView, string> = {
   imported: "Importados",
@@ -155,6 +158,21 @@ export function ProductivityViewDialog({ open, onOpenChange }: ProductivityViewD
     startDate: dateRange?.from,
     endDate: dateRange?.to,
     enabled: open,
+  });
+  const slaQuery = useProductivitySLA({
+    startDate: dateRange?.from,
+    endDate: dateRange?.to,
+    enabled: open && (activeTab === "sla"),
+  });
+  const cycleQuery = useProductivityCycleTime({
+    startDate: dateRange?.from,
+    endDate: dateRange?.to,
+    enabled: open && (activeTab === "sla" || activeTab === "complexity"),
+  });
+  const complexityQuery = useProductivityComplexity({
+    startDate: dateRange?.from,
+    endDate: dateRange?.to,
+    enabled: open && activeTab === "complexity",
   });
 
   // ===== Listas únicas para os filtros (extraídas do dataset by_type, mais rico) =====
@@ -304,6 +322,105 @@ export function ProductivityViewDialog({ open, onOpenChange }: ProductivityViewD
     () => filteredByType.reduce((s, r) => s + r.orders_imported, 0),
     [filteredByType]
   );
+
+  // ===== Agregações SLA =====
+  const filteredSLA = useMemo(() => {
+    return (slaQuery.data || []).filter((r) =>
+      matchesFilters(r.user_id, r.user_name, r.order_type, r.priority)
+    );
+  }, [slaQuery.data, selectedUsers, selectedTypes, selectedPriorities]);
+
+  const slaTotals = useMemo(() => {
+    let totalCompleted = 0,
+      onTime = 0,
+      late = 0,
+      atRisk = 0;
+    filteredSLA.forEach((r) => {
+      totalCompleted += r.total_completed;
+      onTime += r.on_time_count;
+      late += r.late_count;
+      atRisk += r.sla_at_risk;
+    });
+    const onTimePct = totalCompleted > 0 ? (onTime / totalCompleted) * 100 : 0;
+    return { totalCompleted, onTime, late, atRisk, onTimePct };
+  }, [filteredSLA]);
+
+  const slaByUser = useMemo(() => {
+    const map = new Map<string, { user_name: string; total: number; onTime: number; late: number }>();
+    filteredSLA.forEach((r) => {
+      const key = r.user_id || r.user_name;
+      let entry = map.get(key);
+      if (!entry) {
+        entry = { user_name: r.user_name, total: 0, onTime: 0, late: 0 };
+        map.set(key, entry);
+      }
+      entry.total += r.total_completed;
+      entry.onTime += r.on_time_count;
+      entry.late += r.late_count;
+    });
+    return Array.from(map.values())
+      .map((u) => ({ ...u, pct: u.total > 0 ? (u.onTime / u.total) * 100 : 0 }))
+      .sort((a, b) => b.pct - a.pct);
+  }, [filteredSLA]);
+
+  // Cycle time
+  const filteredCycle = useMemo(() => {
+    return (cycleQuery.data || []).filter((r) =>
+      matchesFilters(r.user_id, r.user_name, r.order_type, r.priority)
+    );
+  }, [cycleQuery.data, selectedUsers, selectedTypes, selectedPriorities]);
+
+  const cycleAvg = useMemo(() => {
+    const valid = filteredCycle.filter((r) => r.avg_cycle_days !== null);
+    if (valid.length === 0) return null;
+    const totalOrders = valid.reduce((s, r) => s + r.orders_count, 0);
+    const weighted = valid.reduce(
+      (s, r) => s + (r.avg_cycle_days || 0) * r.orders_count,
+      0
+    );
+    return totalOrders > 0 ? weighted / totalOrders : null;
+  }, [filteredCycle]);
+
+  // ===== Agregações Complexidade =====
+  const filteredComplexity = useMemo(() => {
+    return (complexityQuery.data || []).filter((r) =>
+      matchesFilters(r.user_id, r.user_name, r.order_type)
+    );
+  }, [complexityQuery.data, selectedUsers, selectedTypes]);
+
+  const complexityTotals = useMemo(() => {
+    let totalOrders = 0,
+      firmware = 0,
+      image = 0,
+      complex = 0,
+      lab = 0;
+    filteredComplexity.forEach((r) => {
+      totalOrders += r.total_orders;
+      firmware += r.requires_firmware_count;
+      image += r.requires_image_count;
+      complex += r.technical_complex_count;
+      lab += r.lab_processed_count;
+    });
+    const complexPct = totalOrders > 0 ? (complex / totalOrders) * 100 : 0;
+    return { totalOrders, firmware, image, complex, lab, complexPct };
+  }, [filteredComplexity]);
+
+  const complexityByUser = useMemo(() => {
+    const map = new Map<string, { user_name: string; total: number; firmware: number; image: number; lab: number }>();
+    filteredComplexity.forEach((r) => {
+      const key = r.user_id || r.user_name;
+      let entry = map.get(key);
+      if (!entry) {
+        entry = { user_name: r.user_name, total: 0, firmware: 0, image: 0, lab: 0 };
+        map.set(key, entry);
+      }
+      entry.total += r.total_orders;
+      entry.firmware += r.requires_firmware_count;
+      entry.image += r.requires_image_count;
+      entry.lab += r.lab_processed_count;
+    });
+    return Array.from(map.values()).sort((a, b) => b.total - a.total);
+  }, [filteredComplexity]);
 
   // ===== Toggles de filtros (para chips clicáveis) =====
   const toggleArr = (arr: string[], val: string, setter: (v: string[]) => void) => {
@@ -657,11 +774,13 @@ export function ProductivityViewDialog({ open, onOpenChange }: ProductivityViewD
 
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as TabKey)}>
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-6">
             <TabsTrigger value="imported">📥 Importados</TabsTrigger>
             <TabsTrigger value="invoice_requested">💰 Faturamento</TabsTrigger>
             <TabsTrigger value="completed">✅ Concluídos</TabsTrigger>
             <TabsTrigger value="by_type">📊 Por Tipo</TabsTrigger>
+            <TabsTrigger value="sla">🎯 SLA</TabsTrigger>
+            <TabsTrigger value="complexity">🧩 Complexidade</TabsTrigger>
           </TabsList>
 
           {/* Abas simples (3 primeiras) */}
@@ -968,6 +1087,334 @@ export function ProductivityViewDialog({ open, onOpenChange }: ProductivityViewD
                     )}
                   </TableBody>
                 </Table>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Aba: SLA */}
+          <TabsContent value="sla" className="space-y-4 mt-4">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                    <Target className="h-4 w-4" /> No Prazo
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-3xl font-bold text-[hsl(142_71%_45%)]">
+                    {slaTotals.onTimePct.toFixed(1)}%
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {slaTotals.onTime} de {slaTotals.totalCompleted} concluídos
+                  </p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                    <X className="h-4 w-4" /> Em Atraso
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-3xl font-bold text-destructive">{slaTotals.late}</div>
+                  <p className="text-xs text-muted-foreground mt-1">pedidos fora do prazo</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                    <Filter className="h-4 w-4" /> Em Risco
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-3xl font-bold text-[hsl(38_92%_50%)]">{slaTotals.atRisk}</div>
+                  <p className="text-xs text-muted-foreground mt-1">próximos do limite</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                    <Clock className="h-4 w-4" /> Tempo de Ciclo
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-3xl font-bold">
+                    {cycleAvg !== null ? `${cycleAvg.toFixed(1)}d` : "—"}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">média ponderada</p>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Ranking SLA por Usuário */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Performance SLA por Usuário</CardTitle>
+                <p className="text-xs text-muted-foreground">Clique em uma linha para filtrar</p>
+              </CardHeader>
+              <CardContent>
+                {slaQuery.isLoading ? (
+                  <div className="h-32 flex items-center justify-center text-muted-foreground">
+                    Carregando...
+                  </div>
+                ) : slaByUser.length === 0 ? (
+                  <div className="h-32 flex items-center justify-center text-muted-foreground">
+                    Sem dados de SLA no período
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-12">#</TableHead>
+                        <TableHead>Usuário</TableHead>
+                        <TableHead className="text-right">Concluídos</TableHead>
+                        <TableHead className="text-right">No Prazo</TableHead>
+                        <TableHead className="text-right">Atrasados</TableHead>
+                        <TableHead className="text-right">% No Prazo</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {slaByUser.map((u, idx) => {
+                        const userKey = allUsers.find((x) => x.name === u.user_name)?.id || u.user_name;
+                        const isActive = selectedUsers.includes(userKey);
+                        return (
+                          <TableRow
+                            key={u.user_name + idx}
+                            className={cn("cursor-pointer hover:bg-accent", isActive && "bg-accent/50")}
+                            onClick={() => toggleArr(selectedUsers, userKey, setSelectedUsers)}
+                          >
+                            <TableCell className="font-medium">{idx + 1}</TableCell>
+                            <TableCell className="font-medium">{u.user_name}</TableCell>
+                            <TableCell className="text-right">{u.total}</TableCell>
+                            <TableCell className="text-right text-[hsl(142_71%_45%)]">{u.onTime}</TableCell>
+                            <TableCell className="text-right text-destructive">{u.late}</TableCell>
+                            <TableCell className="text-right font-bold">
+                              <Badge
+                                variant={u.pct >= 90 ? "default" : u.pct >= 70 ? "secondary" : "destructive"}
+                              >
+                                {u.pct.toFixed(1)}%
+                              </Badge>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Tempo de ciclo por tipo */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Tempo de Ciclo por Tipo de Pedido</CardTitle>
+                <p className="text-xs text-muted-foreground">Dias médios entre criação e conclusão</p>
+              </CardHeader>
+              <CardContent>
+                {cycleQuery.isLoading ? (
+                  <div className="h-32 flex items-center justify-center text-muted-foreground">
+                    Carregando...
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Tipo</TableHead>
+                        <TableHead className="text-right">Pedidos</TableHead>
+                        <TableHead className="text-right">Média (dias)</TableHead>
+                        <TableHead className="text-right">Mínimo</TableHead>
+                        <TableHead className="text-right">Máximo</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {(() => {
+                        const map = new Map<string, { type: string; orders: number; sumAvg: number; min: number; max: number }>();
+                        filteredCycle.forEach((r) => {
+                          const e = map.get(r.order_type) || {
+                            type: r.order_type,
+                            orders: 0,
+                            sumAvg: 0,
+                            min: Infinity,
+                            max: 0,
+                          };
+                          e.orders += r.orders_count;
+                          e.sumAvg += (r.avg_cycle_days || 0) * r.orders_count;
+                          if (r.min_cycle_days !== null) e.min = Math.min(e.min, r.min_cycle_days);
+                          if (r.max_cycle_days !== null) e.max = Math.max(e.max, r.max_cycle_days);
+                          map.set(r.order_type, e);
+                        });
+                        const rows = Array.from(map.values())
+                          .map((e) => ({ ...e, avg: e.orders > 0 ? e.sumAvg / e.orders : 0 }))
+                          .sort((a, b) => b.orders - a.orders);
+                        if (rows.length === 0) {
+                          return (
+                            <TableRow>
+                              <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                                Sem dados no período
+                              </TableCell>
+                            </TableRow>
+                          );
+                        }
+                        return rows.map((e) => (
+                          <TableRow
+                            key={e.type}
+                            className="cursor-pointer hover:bg-accent"
+                            onClick={() => toggleArr(selectedTypes, e.type, setSelectedTypes)}
+                          >
+                            <TableCell className="font-medium">{labelType(e.type)}</TableCell>
+                            <TableCell className="text-right">{e.orders}</TableCell>
+                            <TableCell className="text-right font-bold">{e.avg.toFixed(1)}</TableCell>
+                            <TableCell className="text-right text-muted-foreground">
+                              {e.min === Infinity ? "—" : e.min.toFixed(0)}
+                            </TableCell>
+                            <TableCell className="text-right text-muted-foreground">
+                              {e.max === 0 ? "—" : e.max.toFixed(0)}
+                            </TableCell>
+                          </TableRow>
+                        ));
+                      })()}
+                    </TableBody>
+                  </Table>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Aba: Complexidade */}
+          <TabsContent value="complexity" className="space-y-4 mt-4">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                    <Cpu className="h-4 w-4" /> Total Pedidos
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-3xl font-bold">{complexityTotals.totalOrders}</div>
+                  <p className="text-xs text-muted-foreground mt-1">no período filtrado</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                    🔧 Requer Firmware
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-3xl font-bold">{complexityTotals.firmware}</div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {complexityTotals.totalOrders > 0
+                      ? `${((complexityTotals.firmware / complexityTotals.totalOrders) * 100).toFixed(1)}% do total`
+                      : "—"}
+                  </p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                    🖼️ Requer Imagem
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-3xl font-bold">{complexityTotals.image}</div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {complexityTotals.totalOrders > 0
+                      ? `${((complexityTotals.image / complexityTotals.totalOrders) * 100).toFixed(1)}% do total`
+                      : "—"}
+                  </p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                    🧪 Processados Lab
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-3xl font-bold">{complexityTotals.lab}</div>
+                  <p className="text-xs text-muted-foreground mt-1">passaram pelo laboratório</p>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Tabela Complexidade por Usuário */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Complexidade Técnica por Usuário</CardTitle>
+                <p className="text-xs text-muted-foreground">
+                  Distribuição de pedidos com requisitos técnicos (firmware, imagem, lab)
+                </p>
+              </CardHeader>
+              <CardContent>
+                {complexityQuery.isLoading ? (
+                  <div className="h-32 flex items-center justify-center text-muted-foreground">
+                    Carregando...
+                  </div>
+                ) : complexityByUser.length === 0 ? (
+                  <div className="h-32 flex items-center justify-center text-muted-foreground">
+                    Sem dados de complexidade no período
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-12">#</TableHead>
+                        <TableHead>Usuário</TableHead>
+                        <TableHead className="text-right">Total</TableHead>
+                        <TableHead className="text-right">Firmware</TableHead>
+                        <TableHead className="text-right">Imagem</TableHead>
+                        <TableHead className="text-right">Lab</TableHead>
+                        <TableHead className="text-right">% Complexos</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {complexityByUser.map((u, idx) => {
+                        const userKey = allUsers.find((x) => x.name === u.user_name)?.id || u.user_name;
+                        const isActive = selectedUsers.includes(userKey);
+                        const complex = u.firmware + u.image + u.lab;
+                        const pct = u.total > 0 ? (complex / u.total) * 100 : 0;
+                        return (
+                          <TableRow
+                            key={u.user_name + idx}
+                            className={cn("cursor-pointer hover:bg-accent", isActive && "bg-accent/50")}
+                            onClick={() => toggleArr(selectedUsers, userKey, setSelectedUsers)}
+                          >
+                            <TableCell className="font-medium">{idx + 1}</TableCell>
+                            <TableCell className="font-medium">{u.user_name}</TableCell>
+                            <TableCell className="text-right">{u.total}</TableCell>
+                            <TableCell className="text-right">{u.firmware}</TableCell>
+                            <TableCell className="text-right">{u.image}</TableCell>
+                            <TableCell className="text-right">{u.lab}</TableCell>
+                            <TableCell className="text-right font-bold">
+                              <Badge variant={pct >= 50 ? "default" : "secondary"}>
+                                {pct.toFixed(1)}%
+                              </Badge>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Tempo de ciclo médio para complexos */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Clock className="h-4 w-4" /> Insight: Tempo de Ciclo Médio
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold">
+                  {cycleAvg !== null ? `${cycleAvg.toFixed(1)} dias` : "—"}
+                </div>
+                <p className="text-sm text-muted-foreground mt-2">
+                  Pedidos com requisitos técnicos (firmware/imagem/lab) tendem a ter ciclos
+                  significativamente maiores. Use esse indicador para refinar previsões de SLA por
+                  tipo de complexidade.
+                </p>
               </CardContent>
             </Card>
           </TabsContent>
