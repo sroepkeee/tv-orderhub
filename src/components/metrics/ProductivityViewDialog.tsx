@@ -64,7 +64,7 @@ interface ProductivityViewDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
-type TabKey = ProductivityView | "by_type";
+type TabKey = ProductivityView | "by_type" | "sla" | "complexity";
 
 const VIEW_LABELS: Record<ProductivityView, string> = {
   imported: "Importados",
