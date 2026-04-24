@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { format, subDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { CalendarIcon, Download, FileSpreadsheet, BarChart3, Users, TrendingUp, X, Filter, Package } from "lucide-react";
+import { CalendarIcon, Download, FileSpreadsheet, BarChart3, Users, TrendingUp, X, Filter, Package, Clock, Target, Cpu } from "lucide-react";
 import { DateRange } from "react-day-picker";
 import * as XLSX from "xlsx";
 import {
