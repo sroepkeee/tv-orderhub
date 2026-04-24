@@ -1,7 +1,8 @@
 import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ArrowLeft, Clock, CheckCircle, AlertTriangle, Package, Truck, TrendingDown, Box, Search, X } from "lucide-react";
+import { ArrowLeft, Clock, CheckCircle, AlertTriangle, Package, Truck, TrendingDown, Box, Search, X, BarChart3 } from "lucide-react";
+import { ProductivityViewDialog } from "@/components/metrics/ProductivityViewDialog";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { MetricCard } from "@/components/metrics/MetricCard";
@@ -50,6 +51,7 @@ export default function Metrics() {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [productivityOpen, setProductivityOpen] = useState(false);
   const [previousWeekData, setPreviousWeekData] = useState({
     avgProductionTime: 0,
     onTimeRate: 0,
@@ -256,25 +258,36 @@ export default function Metrics() {
             </div>
             <p className="text-muted-foreground ml-14">Monitoramento em tempo real da produção e logística</p>
           </div>
-          <div className="relative w-full max-w-sm">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Buscar pedido, código, cliente..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-8 h-9 text-sm"
-            />
-            {searchQuery && (
-              <button
-                onClick={() => setSearchQuery("")}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            )}
+          <div className="flex items-center gap-3">
+            <Button
+              onClick={() => setProductivityOpen(true)}
+              className="gap-2"
+            >
+              <BarChart3 className="h-4 w-4" />
+              Visão Produtividade
+            </Button>
+            <div className="relative w-full max-w-sm">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Buscar pedido, código, cliente..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-8 h-9 text-sm w-72"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery("")}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </header>
+
+      <ProductivityViewDialog open={productivityOpen} onOpenChange={setProductivityOpen} />
       
 
       {/* SLA Alerts */}
