@@ -6500,6 +6500,85 @@ export type Database = {
           },
         ]
       }
+      v_productivity_complexity_daily: {
+        Row: {
+          activity_date: string | null
+          complexity_percent: number | null
+          lab_processed_count: number | null
+          order_category: string | null
+          order_type: string | null
+          organization_id: string | null
+          requires_firmware_count: number | null
+          requires_image_count: number | null
+          technical_complex_count: number | null
+          total_orders: number | null
+          user_email: string | null
+          user_id: string | null
+          user_name: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "orders_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      v_productivity_cycle_time: {
+        Row: {
+          activity_date: string | null
+          avg_cycle_days: number | null
+          max_cycle_days: number | null
+          min_cycle_days: number | null
+          order_category: string | null
+          order_type: string | null
+          orders_count: number | null
+          organization_id: string | null
+          priority: string | null
+          user_email: string | null
+          user_id: string | null
+          user_name: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "orders_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      v_productivity_sla_daily: {
+        Row: {
+          activity_date: string | null
+          late_count: number | null
+          on_time_count: number | null
+          on_time_percent: number | null
+          order_category: string | null
+          order_type: string | null
+          organization_id: string | null
+          priority: string | null
+          sla_at_risk: number | null
+          sla_late: number | null
+          sla_on_time: number | null
+          total_completed: number | null
+          user_email: string | null
+          user_id: string | null
+          user_name: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "orders_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       can_access_carrier_conversation: {

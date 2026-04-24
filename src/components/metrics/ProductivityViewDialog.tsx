@@ -41,6 +41,7 @@ import {
   type ProductivityRow,
 } from "@/hooks/useProductivityMetrics";
 import { useProductivityByType } from "@/hooks/useProductivityByType";
+import { ProductivityOrdersSheet } from "./ProductivityOrdersSheet";
 import {
   LineChart,
   Line,
@@ -116,6 +117,21 @@ export function ProductivityViewDialog({ open, onOpenChange }: ProductivityViewD
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
   const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
   const [selectedPriorities, setSelectedPriorities] = useState<string[]>([]);
+
+  // Drill-down sheet (lista de pedidos individuais)
+  const [drillOpen, setDrillOpen] = useState(false);
+  const [drillContext, setDrillContext] = useState<{
+    title: string;
+    subtitle?: string;
+    userIds?: string[];
+    orderTypes?: string[];
+    priorities?: string[];
+  }>({ title: "" });
+
+  const openDrill = (ctx: typeof drillContext) => {
+    setDrillContext(ctx);
+    setDrillOpen(true);
+  };
 
   const importedQuery = useProductivityMetrics({
     view: "imported",
@@ -552,24 +568,41 @@ export function ProductivityViewDialog({ open, onOpenChange }: ProductivityViewD
               </Popover>
             </div>
 
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button>
-                  <Download className="mr-2 h-4 w-4" />
-                  Exportar
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={exportSingleCSV}>
-                  <Download className="mr-2 h-4 w-4" />
-                  CSV (visão atual)
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={exportAllExcel}>
-                  <FileSpreadsheet className="mr-2 h-4 w-4" />
-                  Excel (todas as visões)
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                onClick={() =>
+                  openDrill({
+                    title: "Pedidos do recorte atual",
+                    subtitle: `Filtros: ${activeFilterCount > 0 ? `${activeFilterCount} ativos` : "todos"}`,
+                    userIds: selectedUsers.length > 0 ? selectedUsers.filter((u) => u.length === 36) : undefined,
+                    orderTypes: selectedTypes.length > 0 ? selectedTypes : undefined,
+                    priorities: selectedPriorities.length > 0 ? selectedPriorities : undefined,
+                  })
+                }
+              >
+                <Package className="mr-2 h-4 w-4" />
+                Ver pedidos
+              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button>
+                    <Download className="mr-2 h-4 w-4" />
+                    Exportar
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={exportSingleCSV}>
+                    <Download className="mr-2 h-4 w-4" />
+                    CSV (visão atual)
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={exportAllExcel}>
+                    <FileSpreadsheet className="mr-2 h-4 w-4" />
+                    Excel (todas as visões)
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           </div>
 
           {/* Chips de filtros ativos */}
@@ -940,6 +973,19 @@ export function ProductivityViewDialog({ open, onOpenChange }: ProductivityViewD
           </TabsContent>
         </Tabs>
       </DialogContent>
+
+      <ProductivityOrdersSheet
+        open={drillOpen}
+        onOpenChange={setDrillOpen}
+        title={drillContext.title}
+        subtitle={drillContext.subtitle}
+        startDate={dateRange?.from}
+        endDate={dateRange?.to}
+        userIds={drillContext.userIds}
+        orderTypes={drillContext.orderTypes}
+        priorities={drillContext.priorities}
+        includePending={activeTab === "imported"}
+      />
     </Dialog>
   );
 }
