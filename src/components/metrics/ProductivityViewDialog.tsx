@@ -716,7 +716,9 @@ export function ProductivityViewDialog({ open, onOpenChange }: ProductivityViewD
                   openDrill({
                     title: "Pedidos do recorte atual",
                     subtitle: `Filtros: ${activeFilterCount > 0 ? `${activeFilterCount} ativos` : "todos"}`,
-                    userIds: selectedUsers.length > 0 ? selectedUsers.filter((u) => u.length === 36) : undefined,
+                    userIds: selectedUsers.length > 0
+                      ? selectedUsers.filter((u) => u.startsWith("id:")).map((u) => u.slice(3))
+                      : undefined,
                     orderTypes: selectedTypes.length > 0 ? selectedTypes : undefined,
                     priorities: selectedPriorities.length > 0 ? selectedPriorities : undefined,
                   })
