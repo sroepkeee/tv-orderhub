@@ -118,6 +118,21 @@ export function ProductivityViewDialog({ open, onOpenChange }: ProductivityViewD
   const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
   const [selectedPriorities, setSelectedPriorities] = useState<string[]>([]);
 
+  // Drill-down sheet (lista de pedidos individuais)
+  const [drillOpen, setDrillOpen] = useState(false);
+  const [drillContext, setDrillContext] = useState<{
+    title: string;
+    subtitle?: string;
+    userIds?: string[];
+    orderTypes?: string[];
+    priorities?: string[];
+  }>({ title: "" });
+
+  const openDrill = (ctx: typeof drillContext) => {
+    setDrillContext(ctx);
+    setDrillOpen(true);
+  };
+
   const importedQuery = useProductivityMetrics({
     view: "imported",
     startDate: dateRange?.from,
