@@ -41,6 +41,9 @@ import {
   type ProductivityRow,
 } from "@/hooks/useProductivityMetrics";
 import { useProductivityByType } from "@/hooks/useProductivityByType";
+import { useProductivitySLA } from "@/hooks/useProductivitySLA";
+import { useProductivityCycleTime } from "@/hooks/useProductivityCycleTime";
+import { useProductivityComplexity } from "@/hooks/useProductivityComplexity";
 import { ProductivityOrdersSheet } from "./ProductivityOrdersSheet";
 import {
   LineChart,
