@@ -568,24 +568,41 @@ export function ProductivityViewDialog({ open, onOpenChange }: ProductivityViewD
               </Popover>
             </div>
 
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button>
-                  <Download className="mr-2 h-4 w-4" />
-                  Exportar
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={exportSingleCSV}>
-                  <Download className="mr-2 h-4 w-4" />
-                  CSV (visão atual)
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={exportAllExcel}>
-                  <FileSpreadsheet className="mr-2 h-4 w-4" />
-                  Excel (todas as visões)
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                onClick={() =>
+                  openDrill({
+                    title: "Pedidos do recorte atual",
+                    subtitle: `Filtros: ${activeFilterCount > 0 ? `${activeFilterCount} ativos` : "todos"}`,
+                    userIds: selectedUsers.length > 0 ? selectedUsers.filter((u) => u.length === 36) : undefined,
+                    orderTypes: selectedTypes.length > 0 ? selectedTypes : undefined,
+                    priorities: selectedPriorities.length > 0 ? selectedPriorities : undefined,
+                  })
+                }
+              >
+                <Package className="mr-2 h-4 w-4" />
+                Ver pedidos
+              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button>
+                    <Download className="mr-2 h-4 w-4" />
+                    Exportar
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={exportSingleCSV}>
+                    <Download className="mr-2 h-4 w-4" />
+                    CSV (visão atual)
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={exportAllExcel}>
+                    <FileSpreadsheet className="mr-2 h-4 w-4" />
+                    Excel (todas as visões)
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           </div>
 
           {/* Chips de filtros ativos */}
