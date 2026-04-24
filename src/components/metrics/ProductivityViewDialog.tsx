@@ -1101,7 +1101,7 @@ export function ProductivityViewDialog({ open, onOpenChange }: ProductivityViewD
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-3xl font-bold text-green-600">
+                  <div className="text-3xl font-bold text-[hsl(142_71%_45%)]">
                     {slaTotals.onTimePct.toFixed(1)}%
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">
@@ -1127,7 +1127,7 @@ export function ProductivityViewDialog({ open, onOpenChange }: ProductivityViewD
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-3xl font-bold text-orange-500">{slaTotals.atRisk}</div>
+                  <div className="text-3xl font-bold text-[hsl(38_92%_50%)]">{slaTotals.atRisk}</div>
                   <p className="text-xs text-muted-foreground mt-1">próximos do limite</p>
                 </CardContent>
               </Card>
@@ -1186,7 +1186,7 @@ export function ProductivityViewDialog({ open, onOpenChange }: ProductivityViewD
                             <TableCell className="font-medium">{idx + 1}</TableCell>
                             <TableCell className="font-medium">{u.user_name}</TableCell>
                             <TableCell className="text-right">{u.total}</TableCell>
-                            <TableCell className="text-right text-green-600">{u.onTime}</TableCell>
+                            <TableCell className="text-right text-[hsl(142_71%_45%)]">{u.onTime}</TableCell>
                             <TableCell className="text-right text-destructive">{u.late}</TableCell>
                             <TableCell className="text-right font-bold">
                               <Badge
