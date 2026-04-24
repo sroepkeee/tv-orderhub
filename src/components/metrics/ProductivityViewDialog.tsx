@@ -973,6 +973,19 @@ export function ProductivityViewDialog({ open, onOpenChange }: ProductivityViewD
           </TabsContent>
         </Tabs>
       </DialogContent>
+
+      <ProductivityOrdersSheet
+        open={drillOpen}
+        onOpenChange={setDrillOpen}
+        title={drillContext.title}
+        subtitle={drillContext.subtitle}
+        startDate={dateRange?.from}
+        endDate={dateRange?.to}
+        userIds={drillContext.userIds}
+        orderTypes={drillContext.orderTypes}
+        priorities={drillContext.priorities}
+        includePending={activeTab === "imported"}
+      />
     </Dialog>
   );
 }
