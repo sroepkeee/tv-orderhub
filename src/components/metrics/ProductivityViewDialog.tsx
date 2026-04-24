@@ -175,17 +175,31 @@ export function ProductivityViewDialog({ open, onOpenChange }: ProductivityViewD
     enabled: open && activeTab === "complexity",
   });
 
-  // ===== Listas únicas para os filtros (extraídas do dataset by_type, mais rico) =====
+  // ===== Chave normalizada por usuário (resolve user_id null vs preenchido entre views) =====
+  const userKey = (userId: string | null | undefined, email?: string | null, name?: string | null): string => {
+    if (userId) return `id:${userId}`;
+    if (email) return `email:${email.trim().toLowerCase()}`;
+    if (name) return `name:${name.trim().toLowerCase()}`;
+    return "name:desconhecido";
+  };
+
+  // ===== Listas únicas — consolidadas de TODAS as queries carregadas =====
   const allUsers = useMemo(() => {
     const map = new Map<string, string>();
-    (byTypeQuery.data || []).forEach((r) => {
-      const key = r.user_id || r.user_name;
-      if (!map.has(key)) map.set(key, r.user_name);
-    });
+    const collect = (rows: Array<{ user_id: string | null; user_name: string; user_email: string | null }> | undefined) => {
+      (rows || []).forEach((r) => {
+        const key = userKey(r.user_id, r.user_email, r.user_name);
+        if (!map.has(key)) map.set(key, r.user_name || "Desconhecido");
+      });
+    };
+    collect(byTypeQuery.data);
+    collect(importedQuery.data);
+    collect(invoiceQuery.data);
+    collect(completedQuery.data);
     return Array.from(map.entries())
       .map(([id, name]) => ({ id, name }))
       .sort((a, b) => a.name.localeCompare(b.name));
-  }, [byTypeQuery.data]);
+  }, [byTypeQuery.data, importedQuery.data, invoiceQuery.data, completedQuery.data]);
 
   const allTypes = useMemo(() => {
     const set = new Set<string>();
@@ -200,9 +214,15 @@ export function ProductivityViewDialog({ open, onOpenChange }: ProductivityViewD
   }, [byTypeQuery.data]);
 
   // ===== Aplicação dos filtros =====
-  const matchesFilters = (userId: string | null, userName: string, type?: string, priority?: string) => {
+  const matchesFilters = (
+    userId: string | null,
+    userName: string,
+    type?: string,
+    priority?: string,
+    email?: string | null,
+  ) => {
     if (selectedUsers.length > 0) {
-      const key = userId || userName;
+      const key = userKey(userId, email, userName);
       if (!selectedUsers.includes(key)) return false;
     }
     if (type !== undefined && selectedTypes.length > 0 && !selectedTypes.includes(type)) return false;
