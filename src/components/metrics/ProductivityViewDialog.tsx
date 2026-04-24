@@ -231,10 +231,14 @@ export function ProductivityViewDialog({ open, onOpenChange }: ProductivityViewD
     completed: { data: filteredCompleted, isLoading: completedQuery.isLoading },
   };
 
-  const isSimpleTab = activeTab !== "by_type";
+  const isSimpleTab = activeTab === "imported" || activeTab === "invoice_requested" || activeTab === "completed";
   const simpleView = (isSimpleTab ? activeTab : "imported") as ProductivityView;
-  const currentData = queries[simpleView].data;
-  const isLoading = isSimpleTab ? queries[simpleView].isLoading : byTypeQuery.isLoading;
+  const currentData = queries[simpleView]?.data ?? [];
+  const isLoading = isSimpleTab
+    ? (queries[simpleView]?.isLoading ?? false)
+    : activeTab === "by_type"
+      ? byTypeQuery.isLoading
+      : false;
 
   // ===== Agregações para abas simples =====
   const byUser = useMemo(() => {
