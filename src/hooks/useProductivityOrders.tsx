@@ -31,6 +31,8 @@ export interface ProductivityOrdersFilters {
   enabled?: boolean;
   /** When true, also includes orders not yet completed (uses created_at as date filter). */
   includePending?: boolean;
+  /** Specific statuses to filter by. Overrides includePending/default behavior when provided. */
+  statuses?: string[];
 }
 
 export function useProductivityOrders({
@@ -41,6 +43,7 @@ export function useProductivityOrders({
   priorities,
   enabled = true,
   includePending = false,
+  statuses,
 }: ProductivityOrdersFilters) {
   const { organizationId } = useOrganizationId();
 
@@ -54,6 +57,7 @@ export function useProductivityOrders({
       orderTypes?.sort().join(","),
       priorities?.sort().join(","),
       includePending,
+      statuses?.sort().join(","),
     ],
     enabled: enabled && !!organizationId && !!startDate && !!endDate,
     queryFn: async (): Promise<ProductivityOrderRow[]> => {
@@ -73,7 +77,9 @@ export function useProductivityOrders({
         .order("created_at", { ascending: false })
         .limit(500);
 
-      if (!includePending) {
+      if (statuses && statuses.length > 0) {
+        query = query.in("status", statuses);
+      } else if (!includePending) {
         query = query.in("status", ["completed", "delivered"]);
       }
 

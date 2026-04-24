@@ -1460,7 +1460,21 @@ export function ProductivityViewDialog({ open, onOpenChange }: ProductivityViewD
         userIds={drillContext.userIds}
         orderTypes={drillContext.orderTypes}
         priorities={drillContext.priorities}
-        includePending={activeTab === "imported"}
+        includePending={activeTab === "imported" || activeTab === "by_type"}
+        statuses={
+          activeTab === "invoice_requested"
+            ? [
+                "invoice_requested",
+                "ready_to_invoice",
+                "pending_invoice_request",
+                "awaiting_invoice",
+                "invoice_issued",
+                "invoice_sent",
+              ]
+            : activeTab === "completed" || activeTab === "sla"
+              ? ["completed", "delivered"]
+              : undefined
+        }
       />
     </Dialog>
   );
