@@ -323,6 +323,105 @@ export function ProductivityViewDialog({ open, onOpenChange }: ProductivityViewD
     [filteredByType]
   );
 
+  // ===== Agregações SLA =====
+  const filteredSLA = useMemo(() => {
+    return (slaQuery.data || []).filter((r) =>
+      matchesFilters(r.user_id, r.user_name, r.order_type, r.priority)
+    );
+  }, [slaQuery.data, selectedUsers, selectedTypes, selectedPriorities]);
+
+  const slaTotals = useMemo(() => {
+    let totalCompleted = 0,
+      onTime = 0,
+      late = 0,
+      atRisk = 0;
+    filteredSLA.forEach((r) => {
+      totalCompleted += r.total_completed;
+      onTime += r.on_time_count;
+      late += r.late_count;
+      atRisk += r.sla_at_risk;
+    });
+    const onTimePct = totalCompleted > 0 ? (onTime / totalCompleted) * 100 : 0;
+    return { totalCompleted, onTime, late, atRisk, onTimePct };
+  }, [filteredSLA]);
+
+  const slaByUser = useMemo(() => {
+    const map = new Map<string, { user_name: string; total: number; onTime: number; late: number }>();
+    filteredSLA.forEach((r) => {
+      const key = r.user_id || r.user_name;
+      let entry = map.get(key);
+      if (!entry) {
+        entry = { user_name: r.user_name, total: 0, onTime: 0, late: 0 };
+        map.set(key, entry);
+      }
+      entry.total += r.total_completed;
+      entry.onTime += r.on_time_count;
+      entry.late += r.late_count;
+    });
+    return Array.from(map.values())
+      .map((u) => ({ ...u, pct: u.total > 0 ? (u.onTime / u.total) * 100 : 0 }))
+      .sort((a, b) => b.pct - a.pct);
+  }, [filteredSLA]);
+
+  // Cycle time
+  const filteredCycle = useMemo(() => {
+    return (cycleQuery.data || []).filter((r) =>
+      matchesFilters(r.user_id, r.user_name, r.order_type, r.priority)
+    );
+  }, [cycleQuery.data, selectedUsers, selectedTypes, selectedPriorities]);
+
+  const cycleAvg = useMemo(() => {
+    const valid = filteredCycle.filter((r) => r.avg_cycle_days !== null);
+    if (valid.length === 0) return null;
+    const totalOrders = valid.reduce((s, r) => s + r.orders_count, 0);
+    const weighted = valid.reduce(
+      (s, r) => s + (r.avg_cycle_days || 0) * r.orders_count,
+      0
+    );
+    return totalOrders > 0 ? weighted / totalOrders : null;
+  }, [filteredCycle]);
+
+  // ===== Agregações Complexidade =====
+  const filteredComplexity = useMemo(() => {
+    return (complexityQuery.data || []).filter((r) =>
+      matchesFilters(r.user_id, r.user_name, r.order_type)
+    );
+  }, [complexityQuery.data, selectedUsers, selectedTypes]);
+
+  const complexityTotals = useMemo(() => {
+    let totalOrders = 0,
+      firmware = 0,
+      image = 0,
+      complex = 0,
+      lab = 0;
+    filteredComplexity.forEach((r) => {
+      totalOrders += r.total_orders;
+      firmware += r.requires_firmware_count;
+      image += r.requires_image_count;
+      complex += r.technical_complex_count;
+      lab += r.lab_processed_count;
+    });
+    const complexPct = totalOrders > 0 ? (complex / totalOrders) * 100 : 0;
+    return { totalOrders, firmware, image, complex, lab, complexPct };
+  }, [filteredComplexity]);
+
+  const complexityByUser = useMemo(() => {
+    const map = new Map<string, { user_name: string; total: number; firmware: number; image: number; lab: number }>();
+    filteredComplexity.forEach((r) => {
+      const key = r.user_id || r.user_name;
+      let entry = map.get(key);
+      if (!entry) {
+        entry = { user_name: r.user_name, total: 0, firmware: 0, image: 0, lab: 0 };
+        map.set(key, entry);
+      }
+      entry.total += r.total_orders;
+      entry.firmware += r.requires_firmware_count;
+      entry.image += r.requires_image_count;
+      entry.lab += r.lab_processed_count;
+    });
+    return Array.from(map.values()).sort((a, b) => b.total - a.total);
+  }, [filteredComplexity]);
+
   // ===== Toggles de filtros (para chips clicáveis) =====
   const toggleArr = (arr: string[], val: string, setter: (v: string[]) => void) => {
     setter(arr.includes(val) ? arr.filter((x) => x !== val) : [...arr, val]);
