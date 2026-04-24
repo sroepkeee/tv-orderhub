@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { format, subDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { CalendarIcon, Download, FileSpreadsheet, BarChart3, Users, TrendingUp } from "lucide-react";
+import { CalendarIcon, Download, FileSpreadsheet, BarChart3, Users, TrendingUp, X, Filter, Package } from "lucide-react";
 import { DateRange } from "react-day-picker";
 import * as XLSX from "xlsx";
 import {
@@ -30,6 +30,9 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
 import {
@@ -37,6 +40,7 @@ import {
   type ProductivityView,
   type ProductivityRow,
 } from "@/hooks/useProductivityMetrics";
+import { useProductivityByType } from "@/hooks/useProductivityByType";
 import {
   LineChart,
   Line,
@@ -46,12 +50,17 @@ import {
   Tooltip,
   ResponsiveContainer,
   Legend,
+  BarChart,
+  Bar,
+  Cell,
 } from "recharts";
 
 interface ProductivityViewDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
+
+type TabKey = ProductivityView | "by_type";
 
 const VIEW_LABELS: Record<ProductivityView, string> = {
   imported: "Importados",
@@ -65,12 +74,48 @@ const VIEW_FILE_NAMES: Record<ProductivityView, string> = {
   completed: "Concluidos",
 };
 
+const TYPE_LABELS: Record<string, string> = {
+  reposicao_estoque: "Reposição Estoque",
+  reposicao_ecommerce: "Reposição E-commerce",
+  vendas_balcao: "Vendas Balcão",
+  vendas_ecommerce: "Vendas E-commerce",
+  transferencia_filial: "Transferência",
+  remessa_conserto: "Remessa Conserto",
+  reposicao: "Reposição",
+  vendas: "Vendas",
+  ecommerce: "E-commerce",
+  transferencia: "Transferência",
+  unknown: "Sem tipo",
+};
+
+const PRIORITY_LABELS: Record<string, string> = {
+  urgent: "Urgente",
+  high: "Alta",
+  normal: "Normal",
+  low: "Baixa",
+};
+
+const PRIORITY_COLORS: Record<string, string> = {
+  urgent: "hsl(var(--destructive))",
+  high: "hsl(25 95% 53%)",
+  normal: "hsl(var(--primary))",
+  low: "hsl(var(--muted-foreground))",
+};
+
+const labelType = (t: string) => TYPE_LABELS[t] || t;
+const labelPriority = (p: string) => PRIORITY_LABELS[p] || p;
+
 export function ProductivityViewDialog({ open, onOpenChange }: ProductivityViewDialogProps) {
-  const [activeView, setActiveView] = useState<ProductivityView>("imported");
+  const [activeTab, setActiveTab] = useState<TabKey>("imported");
   const [dateRange, setDateRange] = useState<DateRange | undefined>({
     from: subDays(new Date(), 30),
     to: new Date(),
   });
+
+  // Filtros globais (aplicados em todas as abas)
+  const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
+  const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
+  const [selectedPriorities, setSelectedPriorities] = useState<string[]>([]);
 
   const importedQuery = useProductivityMetrics({
     view: "imported",
@@ -90,17 +135,74 @@ export function ProductivityViewDialog({ open, onOpenChange }: ProductivityViewD
     endDate: dateRange?.to,
     enabled: open,
   });
+  const byTypeQuery = useProductivityByType({
+    startDate: dateRange?.from,
+    endDate: dateRange?.to,
+    enabled: open,
+  });
 
-  const queries = {
-    imported: importedQuery,
-    invoice_requested: invoiceQuery,
-    completed: completedQuery,
+  // ===== Listas únicas para os filtros (extraídas do dataset by_type, mais rico) =====
+  const allUsers = useMemo(() => {
+    const map = new Map<string, string>();
+    (byTypeQuery.data || []).forEach((r) => {
+      const key = r.user_id || r.user_name;
+      if (!map.has(key)) map.set(key, r.user_name);
+    });
+    return Array.from(map.entries())
+      .map(([id, name]) => ({ id, name }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [byTypeQuery.data]);
+
+  const allTypes = useMemo(() => {
+    const set = new Set<string>();
+    (byTypeQuery.data || []).forEach((r) => set.add(r.order_type));
+    return Array.from(set).sort();
+  }, [byTypeQuery.data]);
+
+  const allPriorities = useMemo(() => {
+    const set = new Set<string>();
+    (byTypeQuery.data || []).forEach((r) => set.add(r.priority));
+    return Array.from(set).sort();
+  }, [byTypeQuery.data]);
+
+  // ===== Aplicação dos filtros =====
+  const matchesFilters = (userId: string | null, userName: string, type?: string, priority?: string) => {
+    if (selectedUsers.length > 0) {
+      const key = userId || userName;
+      if (!selectedUsers.includes(key)) return false;
+    }
+    if (type !== undefined && selectedTypes.length > 0 && !selectedTypes.includes(type)) return false;
+    if (priority !== undefined && selectedPriorities.length > 0 && !selectedPriorities.includes(priority)) return false;
+    return true;
   };
 
-  const currentData = queries[activeView].data || [];
-  const isLoading = queries[activeView].isLoading;
+  // Para abas simples (imported/invoice_requested/completed) aplicamos APENAS o filtro de usuário
+  // (o dataset não tem tipo/prioridade). Tipo/prioridade só afetam a aba "Por Tipo".
+  const filterSimple = (rows: ProductivityRow[]) =>
+    rows.filter((r) => matchesFilters(r.user_id, r.user_name));
 
-  // Agregação por usuário
+  const filteredImported = useMemo(() => filterSimple(importedQuery.data || []), [importedQuery.data, selectedUsers]);
+  const filteredInvoice = useMemo(() => filterSimple(invoiceQuery.data || []), [invoiceQuery.data, selectedUsers]);
+  const filteredCompleted = useMemo(() => filterSimple(completedQuery.data || []), [completedQuery.data, selectedUsers]);
+
+  const filteredByType = useMemo(() => {
+    return (byTypeQuery.data || []).filter((r) =>
+      matchesFilters(r.user_id, r.user_name, r.order_type, r.priority)
+    );
+  }, [byTypeQuery.data, selectedUsers, selectedTypes, selectedPriorities]);
+
+  const queries = {
+    imported: { data: filteredImported, isLoading: importedQuery.isLoading },
+    invoice_requested: { data: filteredInvoice, isLoading: invoiceQuery.isLoading },
+    completed: { data: filteredCompleted, isLoading: completedQuery.isLoading },
+  };
+
+  const isSimpleTab = activeTab !== "by_type";
+  const simpleView = (isSimpleTab ? activeTab : "imported") as ProductivityView;
+  const currentData = queries[simpleView].data;
+  const isLoading = isSimpleTab ? queries[simpleView].isLoading : byTypeQuery.isLoading;
+
+  // ===== Agregações para abas simples =====
   const byUser = useMemo(() => {
     const map = new Map<string, { user_name: string; user_email: string | null; total: number }>();
     currentData.forEach((row) => {
@@ -109,17 +211,12 @@ export function ProductivityViewDialog({ open, onOpenChange }: ProductivityViewD
       if (existing) {
         existing.total += row.count;
       } else {
-        map.set(key, {
-          user_name: row.user_name,
-          user_email: row.user_email,
-          total: row.count,
-        });
+        map.set(key, { user_name: row.user_name, user_email: row.user_email, total: row.count });
       }
     });
     return Array.from(map.values()).sort((a, b) => b.total - a.total);
   }, [currentData]);
 
-  // Agregação por dia (para gráfico)
   const byDay = useMemo(() => {
     const map = new Map<string, number>();
     currentData.forEach((row) => {
@@ -138,54 +235,136 @@ export function ProductivityViewDialog({ open, onOpenChange }: ProductivityViewD
   const dailyAvg = byDay.length > 0 ? Math.round(totalCount / byDay.length) : 0;
   const topUser = byUser[0];
 
+  // ===== Agregações para "Por Tipo" =====
+  const byTypeAgg = useMemo(() => {
+    const map = new Map<string, { type: string; imported: number; invoiced: number; completed: number }>();
+    filteredByType.forEach((r) => {
+      const existing = map.get(r.order_type);
+      if (existing) {
+        existing.imported += r.orders_imported;
+        existing.invoiced += r.orders_invoice_requested;
+        existing.completed += r.orders_completed;
+      } else {
+        map.set(r.order_type, {
+          type: r.order_type,
+          imported: r.orders_imported,
+          invoiced: r.orders_invoice_requested,
+          completed: r.orders_completed,
+        });
+      }
+    });
+    return Array.from(map.values())
+      .map((v) => ({ ...v, label: labelType(v.type) }))
+      .sort((a, b) => b.imported - a.imported);
+  }, [filteredByType]);
+
+  const byPriorityAgg = useMemo(() => {
+    const map = new Map<string, number>();
+    filteredByType.forEach((r) => {
+      map.set(r.priority, (map.get(r.priority) || 0) + r.orders_imported);
+    });
+    return Array.from(map.entries())
+      .map(([priority, total]) => ({ priority, label: labelPriority(priority), total }))
+      .sort((a, b) => b.total - a.total);
+  }, [filteredByType]);
+
+  const byUserTypeAgg = useMemo(() => {
+    // matriz usuário x tipo
+    const userMap = new Map<string, { user_name: string; user_email: string | null; total: number; types: Map<string, number> }>();
+    filteredByType.forEach((r) => {
+      const key = r.user_id || r.user_name;
+      let entry = userMap.get(key);
+      if (!entry) {
+        entry = { user_name: r.user_name, user_email: r.user_email, total: 0, types: new Map() };
+        userMap.set(key, entry);
+      }
+      entry.total += r.orders_imported;
+      entry.types.set(r.order_type, (entry.types.get(r.order_type) || 0) + r.orders_imported);
+    });
+    return Array.from(userMap.values()).sort((a, b) => b.total - a.total);
+  }, [filteredByType]);
+
+  const byTypeTotalImported = useMemo(
+    () => filteredByType.reduce((s, r) => s + r.orders_imported, 0),
+    [filteredByType]
+  );
+
+  // ===== Toggles de filtros (para chips clicáveis) =====
+  const toggleArr = (arr: string[], val: string, setter: (v: string[]) => void) => {
+    setter(arr.includes(val) ? arr.filter((x) => x !== val) : [...arr, val]);
+  };
+
+  const clearAllFilters = () => {
+    setSelectedUsers([]);
+    setSelectedTypes([]);
+    setSelectedPriorities([]);
+  };
+
+  const activeFilterCount = selectedUsers.length + selectedTypes.length + selectedPriorities.length;
+
+  // ===== Exports =====
   const exportSingleCSV = () => {
-    if (!currentData.length) {
-      toast({ title: "Nenhum dado para exportar", variant: "destructive" });
-      return;
-    }
-
-    const headers = ["Data", "Usuário", "Email", "Quantidade"];
-    if (activeView === "imported") headers.push("Clientes Únicos");
-
-    const rows = currentData.map((r) => {
-      const base = [
-        r.date,
+    if (isSimpleTab) {
+      if (!currentData.length) {
+        toast({ title: "Nenhum dado para exportar", variant: "destructive" });
+        return;
+      }
+      const headers = ["Data", "Usuário", "Email", "Quantidade"];
+      if (simpleView === "imported") headers.push("Clientes Únicos");
+      const rows = currentData.map((r) => {
+        const base = [r.date, r.user_name, r.user_email || "", r.count.toString()];
+        if (simpleView === "imported") base.push((r.unique_customers ?? 0).toString());
+        return base;
+      });
+      const csv = [headers, ...rows]
+        .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(","))
+        .join("\n");
+      const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `produtividade_${VIEW_FILE_NAMES[simpleView]}_${format(new Date(), "yyyy-MM-dd")}.csv`;
+      link.click();
+      URL.revokeObjectURL(url);
+      toast({ title: "CSV exportado com sucesso" });
+    } else {
+      // Por Tipo
+      if (!filteredByType.length) {
+        toast({ title: "Nenhum dado para exportar", variant: "destructive" });
+        return;
+      }
+      const headers = ["Data", "Usuário", "Email", "Tipo", "Categoria", "Prioridade", "Importados", "Faturamento", "Concluídos"];
+      const rows = filteredByType.map((r) => [
+        r.activity_date,
         r.user_name,
         r.user_email || "",
-        r.count.toString(),
-      ];
-      if (activeView === "imported") {
-        base.push((r.unique_customers ?? 0).toString());
-      }
-      return base;
-    });
-
-    const csv = [headers, ...rows]
-      .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(","))
-      .join("\n");
-
-    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `produtividade_${VIEW_FILE_NAMES[activeView]}_${format(new Date(), "yyyy-MM-dd")}.csv`;
-    link.click();
-    URL.revokeObjectURL(url);
-
-    toast({ title: "CSV exportado com sucesso" });
+        labelType(r.order_type),
+        r.order_category,
+        labelPriority(r.priority),
+        r.orders_imported.toString(),
+        r.orders_invoice_requested.toString(),
+        r.orders_completed.toString(),
+      ]);
+      const csv = [headers, ...rows]
+        .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(","))
+        .join("\n");
+      const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `produtividade_PorTipo_${format(new Date(), "yyyy-MM-dd")}.csv`;
+      link.click();
+      URL.revokeObjectURL(url);
+      toast({ title: "CSV exportado com sucesso" });
+    }
   };
 
   const exportAllExcel = () => {
     const datasets: Array<{ name: string; rows: ProductivityRow[]; view: ProductivityView }> = [
-      { name: "Importados", rows: importedQuery.data || [], view: "imported" },
-      { name: "Faturamento", rows: invoiceQuery.data || [], view: "invoice_requested" },
-      { name: "Concluidos", rows: completedQuery.data || [], view: "completed" },
+      { name: "Importados", rows: filteredImported, view: "imported" },
+      { name: "Faturamento", rows: filteredInvoice, view: "invoice_requested" },
+      { name: "Concluidos", rows: filteredCompleted, view: "completed" },
     ];
-
-    if (datasets.every((d) => !d.rows.length)) {
-      toast({ title: "Nenhum dado para exportar", variant: "destructive" });
-      return;
-    }
 
     const wb = XLSX.utils.book_new();
     datasets.forEach(({ name, rows, view }) => {
@@ -203,6 +382,21 @@ export function ProductivityViewDialog({ open, onOpenChange }: ProductivityViewD
       XLSX.utils.book_append_sheet(wb, ws, name);
     });
 
+    // Aba Por Tipo
+    const byTypeData = filteredByType.map((r) => ({
+      Data: r.activity_date,
+      Usuário: r.user_name,
+      Email: r.user_email || "",
+      Tipo: labelType(r.order_type),
+      Categoria: r.order_category,
+      Prioridade: labelPriority(r.priority),
+      Importados: r.orders_imported,
+      Faturamento: r.orders_invoice_requested,
+      Concluídos: r.orders_completed,
+    }));
+    const wsType = XLSX.utils.json_to_sheet(byTypeData.length ? byTypeData : [{ Info: "Sem dados no período" }]);
+    XLSX.utils.book_append_sheet(wb, wsType, "Por Tipo");
+
     XLSX.writeFile(wb, `produtividade_completo_${format(new Date(), "yyyy-MM-dd")}.xlsx`);
     toast({ title: "Excel exportado com sucesso" });
   };
@@ -216,136 +410,427 @@ export function ProductivityViewDialog({ open, onOpenChange }: ProductivityViewD
             Visão Produtividade — Pós-Venda
           </DialogTitle>
           <DialogDescription>
-            Acompanhe a produtividade do time por período: pedidos importados, solicitações de faturamento e conclusões.
+            Acompanhe a produtividade do time por período, com filtros dinâmicos por usuário, tipo e prioridade.
           </DialogDescription>
         </DialogHeader>
 
         {/* Filtros + Exportar */}
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b pb-4">
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button variant="outline" className={cn("justify-start text-left font-normal", !dateRange && "text-muted-foreground")}>
-                <CalendarIcon className="mr-2 h-4 w-4" />
-                {dateRange?.from ? (
-                  dateRange.to ? (
-                    <>
-                      {format(dateRange.from, "dd/MM/yyyy", { locale: ptBR })} —{" "}
-                      {format(dateRange.to, "dd/MM/yyyy", { locale: ptBR })}
-                    </>
-                  ) : (
-                    format(dateRange.from, "dd/MM/yyyy", { locale: ptBR })
-                  )
-                ) : (
-                  <span>Selecione o período</span>
-                )}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="start">
-              <Calendar
-                mode="range"
-                selected={dateRange}
-                onSelect={setDateRange}
-                numberOfMonths={2}
-                initialFocus
-                className={cn("p-3 pointer-events-auto")}
-              />
-            </PopoverContent>
-          </Popover>
+        <div className="space-y-3 border-b pb-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className={cn("justify-start text-left font-normal", !dateRange && "text-muted-foreground")}>
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {dateRange?.from ? (
+                      dateRange.to ? (
+                        <>
+                          {format(dateRange.from, "dd/MM/yyyy", { locale: ptBR })} —{" "}
+                          {format(dateRange.to, "dd/MM/yyyy", { locale: ptBR })}
+                        </>
+                      ) : (
+                        format(dateRange.from, "dd/MM/yyyy", { locale: ptBR })
+                      )
+                    ) : (
+                      <span>Selecione o período</span>
+                    )}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="range"
+                    selected={dateRange}
+                    onSelect={setDateRange}
+                    numberOfMonths={2}
+                    initialFocus
+                    className={cn("p-3 pointer-events-auto")}
+                  />
+                </PopoverContent>
+              </Popover>
 
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button>
-                <Download className="mr-2 h-4 w-4" />
-                Exportar
+              {/* Filtro Usuários */}
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="sm">
+                    <Users className="mr-2 h-4 w-4" />
+                    Usuários
+                    {selectedUsers.length > 0 && (
+                      <Badge variant="secondary" className="ml-2">{selectedUsers.length}</Badge>
+                    )}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-64 p-0" align="start">
+                  <ScrollArea className="h-64">
+                    <div className="p-2 space-y-1">
+                      {allUsers.length === 0 ? (
+                        <div className="text-xs text-muted-foreground px-2 py-4 text-center">
+                          Sem usuários no período
+                        </div>
+                      ) : (
+                        allUsers.map((u) => (
+                          <div
+                            key={u.id}
+                            className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-accent cursor-pointer"
+                            onClick={() => toggleArr(selectedUsers, u.id, setSelectedUsers)}
+                          >
+                            <Checkbox checked={selectedUsers.includes(u.id)} />
+                            <span className="text-sm truncate">{u.name}</span>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </ScrollArea>
+                </PopoverContent>
+              </Popover>
+
+              {/* Filtro Tipos */}
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="sm">
+                    <Package className="mr-2 h-4 w-4" />
+                    Tipos
+                    {selectedTypes.length > 0 && (
+                      <Badge variant="secondary" className="ml-2">{selectedTypes.length}</Badge>
+                    )}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-64 p-0" align="start">
+                  <ScrollArea className="h-64">
+                    <div className="p-2 space-y-1">
+                      {allTypes.length === 0 ? (
+                        <div className="text-xs text-muted-foreground px-2 py-4 text-center">
+                          Sem tipos no período
+                        </div>
+                      ) : (
+                        allTypes.map((t) => (
+                          <div
+                            key={t}
+                            className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-accent cursor-pointer"
+                            onClick={() => toggleArr(selectedTypes, t, setSelectedTypes)}
+                          >
+                            <Checkbox checked={selectedTypes.includes(t)} />
+                            <span className="text-sm truncate">{labelType(t)}</span>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </ScrollArea>
+                </PopoverContent>
+              </Popover>
+
+              {/* Filtro Prioridades */}
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="sm">
+                    <Filter className="mr-2 h-4 w-4" />
+                    Prioridade
+                    {selectedPriorities.length > 0 && (
+                      <Badge variant="secondary" className="ml-2">{selectedPriorities.length}</Badge>
+                    )}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-56 p-2" align="start">
+                  <div className="space-y-1">
+                    {allPriorities.length === 0 ? (
+                      <div className="text-xs text-muted-foreground px-2 py-4 text-center">
+                        Sem dados
+                      </div>
+                    ) : (
+                      allPriorities.map((p) => (
+                        <div
+                          key={p}
+                          className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-accent cursor-pointer"
+                          onClick={() => toggleArr(selectedPriorities, p, setSelectedPriorities)}
+                        >
+                          <Checkbox checked={selectedPriorities.includes(p)} />
+                          <span className="text-sm">{labelPriority(p)}</span>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </PopoverContent>
+              </Popover>
+            </div>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button>
+                  <Download className="mr-2 h-4 w-4" />
+                  Exportar
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={exportSingleCSV}>
+                  <Download className="mr-2 h-4 w-4" />
+                  CSV (visão atual)
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={exportAllExcel}>
+                  <FileSpreadsheet className="mr-2 h-4 w-4" />
+                  Excel (todas as visões)
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+
+          {/* Chips de filtros ativos */}
+          {activeFilterCount > 0 && (
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs text-muted-foreground">Filtros ativos:</span>
+              {selectedUsers.map((uid) => {
+                const u = allUsers.find((x) => x.id === uid);
+                return (
+                  <Badge key={`u-${uid}`} variant="secondary" className="gap-1 pl-2 pr-1">
+                    👤 {u?.name || uid}
+                    <button
+                      onClick={() => toggleArr(selectedUsers, uid, setSelectedUsers)}
+                      className="ml-1 hover:bg-muted rounded p-0.5"
+                      aria-label="Remover filtro"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </Badge>
+                );
+              })}
+              {selectedTypes.map((t) => (
+                <Badge key={`t-${t}`} variant="secondary" className="gap-1 pl-2 pr-1">
+                  📦 {labelType(t)}
+                  <button
+                    onClick={() => toggleArr(selectedTypes, t, setSelectedTypes)}
+                    className="ml-1 hover:bg-muted rounded p-0.5"
+                    aria-label="Remover filtro"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </Badge>
+              ))}
+              {selectedPriorities.map((p) => (
+                <Badge key={`p-${p}`} variant="secondary" className="gap-1 pl-2 pr-1">
+                  ⚡ {labelPriority(p)}
+                  <button
+                    onClick={() => toggleArr(selectedPriorities, p, setSelectedPriorities)}
+                    className="ml-1 hover:bg-muted rounded p-0.5"
+                    aria-label="Remover filtro"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </Badge>
+              ))}
+              <Button variant="ghost" size="sm" onClick={clearAllFilters} className="h-6 text-xs">
+                Limpar todos
               </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={exportSingleCSV}>
-                <Download className="mr-2 h-4 w-4" />
-                CSV (visão atual)
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={exportAllExcel}>
-                <FileSpreadsheet className="mr-2 h-4 w-4" />
-                Excel (3 visões)
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+            </div>
+          )}
         </div>
 
         {/* Tabs */}
-        <Tabs value={activeView} onValueChange={(v) => setActiveView(v as ProductivityView)}>
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="imported">📥 {VIEW_LABELS.imported}</TabsTrigger>
-            <TabsTrigger value="invoice_requested">💰 {VIEW_LABELS.invoice_requested}</TabsTrigger>
-            <TabsTrigger value="completed">✅ {VIEW_LABELS.completed}</TabsTrigger>
+        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as TabKey)}>
+          <TabsList className="grid w-full grid-cols-4">
+            <TabsTrigger value="imported">📥 Importados</TabsTrigger>
+            <TabsTrigger value="invoice_requested">💰 Faturamento</TabsTrigger>
+            <TabsTrigger value="completed">✅ Concluídos</TabsTrigger>
+            <TabsTrigger value="by_type">📊 Por Tipo</TabsTrigger>
           </TabsList>
 
-          <TabsContent value={activeView} className="space-y-4 mt-4">
-            {/* KPIs */}
+          {/* Abas simples (3 primeiras) */}
+          {(["imported", "invoice_requested", "completed"] as ProductivityView[]).map((tabKey) => (
+            <TabsContent key={tabKey} value={tabKey} className="space-y-4 mt-4">
+              {activeTab === tabKey && (
+                <>
+                  {/* KPIs */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                          <TrendingUp className="h-4 w-4" /> Total no Período
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-3xl font-bold">{totalCount}</div>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {VIEW_LABELS[tabKey].toLowerCase()}
+                        </p>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                          <BarChart3 className="h-4 w-4" /> Média Diária
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-3xl font-bold">{dailyAvg}</div>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          em {byDay.length} {byDay.length === 1 ? "dia" : "dias"} com atividade
+                        </p>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                          <Users className="h-4 w-4" /> Top Usuário
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-lg font-bold truncate">{topUser?.user_name || "—"}</div>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {topUser ? `${topUser.total} ${VIEW_LABELS[tabKey].toLowerCase()}` : "Sem dados"}
+                        </p>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  {/* Gráfico */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-base">Evolução Diária</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      {isLoading ? (
+                        <div className="h-64 flex items-center justify-center text-muted-foreground">Carregando...</div>
+                      ) : byDay.length === 0 ? (
+                        <div className="h-64 flex items-center justify-center text-muted-foreground">Sem dados no período selecionado</div>
+                      ) : (
+                        <ResponsiveContainer width="100%" height={250}>
+                          <LineChart data={byDay}>
+                            <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                            <XAxis dataKey="date" className="text-xs" />
+                            <YAxis className="text-xs" />
+                            <Tooltip
+                              contentStyle={{
+                                backgroundColor: "hsl(var(--card))",
+                                border: "1px solid hsl(var(--border))",
+                                borderRadius: "0.5rem",
+                              }}
+                            />
+                            <Legend />
+                            <Line
+                              type="monotone"
+                              dataKey="total"
+                              name={VIEW_LABELS[tabKey]}
+                              stroke="hsl(var(--primary))"
+                              strokeWidth={2}
+                              dot={{ r: 4 }}
+                            />
+                          </LineChart>
+                        </ResponsiveContainer>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  {/* Ranking — clique para filtrar */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-base">Ranking por Usuário</CardTitle>
+                      <p className="text-xs text-muted-foreground">Clique em uma linha para filtrar por aquele usuário</p>
+                    </CardHeader>
+                    <CardContent>
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="w-12">#</TableHead>
+                            <TableHead>Usuário</TableHead>
+                            <TableHead>Email</TableHead>
+                            <TableHead className="text-right">Total</TableHead>
+                            <TableHead className="text-right">% do Total</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {byUser.length === 0 ? (
+                            <TableRow>
+                              <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                                Sem dados no período
+                              </TableCell>
+                            </TableRow>
+                          ) : (
+                            byUser.map((user, idx) => {
+                              // Tenta achar o id correspondente em allUsers para usar como filtro
+                              const userKey = allUsers.find((u) => u.name === user.user_name)?.id || user.user_name;
+                              const isActive = selectedUsers.includes(userKey);
+                              return (
+                                <TableRow
+                                  key={user.user_email || user.user_name + idx}
+                                  className={cn("cursor-pointer hover:bg-accent", isActive && "bg-accent/50")}
+                                  onClick={() => toggleArr(selectedUsers, userKey, setSelectedUsers)}
+                                >
+                                  <TableCell className="font-medium">{idx + 1}</TableCell>
+                                  <TableCell className="font-medium">{user.user_name}</TableCell>
+                                  <TableCell className="text-muted-foreground text-xs">
+                                    {user.user_email || "—"}
+                                  </TableCell>
+                                  <TableCell className="text-right font-bold">{user.total}</TableCell>
+                                  <TableCell className="text-right text-muted-foreground">
+                                    {totalCount > 0 ? ((user.total / totalCount) * 100).toFixed(1) : "0"}%
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            })
+                          )}
+                        </TableBody>
+                      </Table>
+                    </CardContent>
+                  </Card>
+                </>
+              )}
+            </TabsContent>
+          ))}
+
+          {/* Aba: Por Tipo */}
+          <TabsContent value="by_type" className="space-y-4 mt-4">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <Card>
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                    <TrendingUp className="h-4 w-4" /> Total no Período
+                    <Package className="h-4 w-4" /> Tipos Distintos
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-3xl font-bold">{totalCount}</div>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {VIEW_LABELS[activeView].toLowerCase()}
-                  </p>
+                  <div className="text-3xl font-bold">{byTypeAgg.length}</div>
+                  <p className="text-xs text-muted-foreground mt-1">no período filtrado</p>
                 </CardContent>
               </Card>
-
               <Card>
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                    <BarChart3 className="h-4 w-4" /> Média Diária
+                    <TrendingUp className="h-4 w-4" /> Total Importados
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-3xl font-bold">{dailyAvg}</div>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    em {byDay.length} {byDay.length === 1 ? "dia" : "dias"} com atividade
-                  </p>
+                  <div className="text-3xl font-bold">{byTypeTotalImported}</div>
+                  <p className="text-xs text-muted-foreground mt-1">somando todos os tipos</p>
                 </CardContent>
               </Card>
-
               <Card>
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                    <Users className="h-4 w-4" /> Top Usuário
+                    <Filter className="h-4 w-4" /> Tipo Líder
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-lg font-bold truncate">{topUser?.user_name || "—"}</div>
+                  <div className="text-lg font-bold truncate">{byTypeAgg[0]?.label || "—"}</div>
                   <p className="text-xs text-muted-foreground mt-1">
-                    {topUser ? `${topUser.total} ${VIEW_LABELS[activeView].toLowerCase()}` : "Sem dados"}
+                    {byTypeAgg[0] ? `${byTypeAgg[0].imported} pedidos` : "Sem dados"}
                   </p>
                 </CardContent>
               </Card>
             </div>
 
-            {/* Gráfico */}
+            {/* Gráfico de barras por tipo — clicável */}
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">Evolução Diária</CardTitle>
+                <CardTitle className="text-base">Pedidos por Tipo</CardTitle>
+                <p className="text-xs text-muted-foreground">Clique em uma barra para filtrar</p>
               </CardHeader>
               <CardContent>
                 {isLoading ? (
-                  <div className="h-64 flex items-center justify-center text-muted-foreground">
-                    Carregando...
-                  </div>
-                ) : byDay.length === 0 ? (
-                  <div className="h-64 flex items-center justify-center text-muted-foreground">
-                    Sem dados no período selecionado
-                  </div>
+                  <div className="h-64 flex items-center justify-center text-muted-foreground">Carregando...</div>
+                ) : byTypeAgg.length === 0 ? (
+                  <div className="h-64 flex items-center justify-center text-muted-foreground">Sem dados no período selecionado</div>
                 ) : (
-                  <ResponsiveContainer width="100%" height={250}>
-                    <LineChart data={byDay}>
+                  <ResponsiveContainer width="100%" height={280}>
+                    <BarChart data={byTypeAgg} layout="vertical" margin={{ left: 80 }}>
                       <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                      <XAxis dataKey="date" className="text-xs" />
-                      <YAxis className="text-xs" />
+                      <XAxis type="number" className="text-xs" />
+                      <YAxis dataKey="label" type="category" className="text-xs" width={140} />
                       <Tooltip
                         contentStyle={{
                           backgroundColor: "hsl(var(--card))",
@@ -354,55 +839,97 @@ export function ProductivityViewDialog({ open, onOpenChange }: ProductivityViewD
                         }}
                       />
                       <Legend />
-                      <Line
-                        type="monotone"
-                        dataKey="total"
-                        name={VIEW_LABELS[activeView]}
-                        stroke="hsl(var(--primary))"
-                        strokeWidth={2}
-                        dot={{ r: 4 }}
-                      />
-                    </LineChart>
+                      <Bar dataKey="imported" name="Importados" fill="hsl(var(--primary))" cursor="pointer">
+                        {byTypeAgg.map((entry) => (
+                          <Cell
+                            key={entry.type}
+                            opacity={selectedTypes.length === 0 || selectedTypes.includes(entry.type) ? 1 : 0.3}
+                            onClick={() => toggleArr(selectedTypes, entry.type, setSelectedTypes)}
+                          />
+                        ))}
+                      </Bar>
+                      <Bar dataKey="invoiced" name="Faturamento" fill="hsl(38 92% 50%)" />
+                      <Bar dataKey="completed" name="Concluídos" fill="hsl(142 71% 45%)" />
+                    </BarChart>
                   </ResponsiveContainer>
                 )}
               </CardContent>
             </Card>
 
-            {/* Ranking */}
+            {/* Distribuição por Prioridade */}
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">Ranking por Usuário</CardTitle>
+                <CardTitle className="text-base">Distribuição por Prioridade</CardTitle>
+                <p className="text-xs text-muted-foreground">Clique em uma barra para filtrar</p>
               </CardHeader>
               <CardContent>
+                {byPriorityAgg.length === 0 ? (
+                  <div className="h-32 flex items-center justify-center text-muted-foreground">Sem dados</div>
+                ) : (
+                  <ResponsiveContainer width="100%" height={180}>
+                    <BarChart data={byPriorityAgg}>
+                      <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                      <XAxis dataKey="label" className="text-xs" />
+                      <YAxis className="text-xs" />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: "hsl(var(--card))",
+                          border: "1px solid hsl(var(--border))",
+                          borderRadius: "0.5rem",
+                        }}
+                      />
+                      <Bar dataKey="total" name="Pedidos" cursor="pointer">
+                        {byPriorityAgg.map((entry) => (
+                          <Cell
+                            key={entry.priority}
+                            fill={PRIORITY_COLORS[entry.priority] || "hsl(var(--primary))"}
+                            opacity={selectedPriorities.length === 0 || selectedPriorities.includes(entry.priority) ? 1 : 0.3}
+                            onClick={() => toggleArr(selectedPriorities, entry.priority, setSelectedPriorities)}
+                          />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Matriz Usuário x Tipo */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Matriz Usuário × Tipo</CardTitle>
+                <p className="text-xs text-muted-foreground">Pedidos importados por usuário e tipo</p>
+              </CardHeader>
+              <CardContent className="overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="w-12">#</TableHead>
                       <TableHead>Usuário</TableHead>
-                      <TableHead>Email</TableHead>
-                      <TableHead className="text-right">Total</TableHead>
-                      <TableHead className="text-right">% do Total</TableHead>
+                      {byTypeAgg.map((t) => (
+                        <TableHead key={t.type} className="text-right whitespace-nowrap">
+                          {t.label}
+                        </TableHead>
+                      ))}
+                      <TableHead className="text-right font-bold">Total</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {byUser.length === 0 ? (
+                    {byUserTypeAgg.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                        <TableCell colSpan={byTypeAgg.length + 2} className="text-center text-muted-foreground py-8">
                           Sem dados no período
                         </TableCell>
                       </TableRow>
                     ) : (
-                      byUser.map((user, idx) => (
-                        <TableRow key={user.user_email || user.user_name + idx}>
-                          <TableCell className="font-medium">{idx + 1}</TableCell>
-                          <TableCell className="font-medium">{user.user_name}</TableCell>
-                          <TableCell className="text-muted-foreground text-xs">
-                            {user.user_email || "—"}
-                          </TableCell>
-                          <TableCell className="text-right font-bold">{user.total}</TableCell>
-                          <TableCell className="text-right text-muted-foreground">
-                            {totalCount > 0 ? ((user.total / totalCount) * 100).toFixed(1) : "0"}%
-                          </TableCell>
+                      byUserTypeAgg.map((u, idx) => (
+                        <TableRow key={u.user_email || u.user_name + idx}>
+                          <TableCell className="font-medium whitespace-nowrap">{u.user_name}</TableCell>
+                          {byTypeAgg.map((t) => (
+                            <TableCell key={t.type} className="text-right">
+                              {u.types.get(t.type) || 0}
+                            </TableCell>
+                          ))}
+                          <TableCell className="text-right font-bold">{u.total}</TableCell>
                         </TableRow>
                       ))
                     )}
