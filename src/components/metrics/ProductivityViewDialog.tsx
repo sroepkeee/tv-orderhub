@@ -175,17 +175,31 @@ export function ProductivityViewDialog({ open, onOpenChange }: ProductivityViewD
     enabled: open && activeTab === "complexity",
   });
 
-  // ===== Listas únicas para os filtros (extraídas do dataset by_type, mais rico) =====
+  // ===== Chave normalizada por usuário (resolve user_id null vs preenchido entre views) =====
+  const userKey = (userId: string | null | undefined, email?: string | null, name?: string | null): string => {
+    if (userId) return `id:${userId}`;
+    if (email) return `email:${email.trim().toLowerCase()}`;
+    if (name) return `name:${name.trim().toLowerCase()}`;
+    return "name:desconhecido";
+  };
+
+  // ===== Listas únicas — consolidadas de TODAS as queries carregadas =====
   const allUsers = useMemo(() => {
     const map = new Map<string, string>();
-    (byTypeQuery.data || []).forEach((r) => {
-      const key = r.user_id || r.user_name;
-      if (!map.has(key)) map.set(key, r.user_name);
-    });
+    const collect = (rows: Array<{ user_id: string | null; user_name: string; user_email: string | null }> | undefined) => {
+      (rows || []).forEach((r) => {
+        const key = userKey(r.user_id, r.user_email, r.user_name);
+        if (!map.has(key)) map.set(key, r.user_name || "Desconhecido");
+      });
+    };
+    collect(byTypeQuery.data);
+    collect(importedQuery.data);
+    collect(invoiceQuery.data);
+    collect(completedQuery.data);
     return Array.from(map.entries())
       .map(([id, name]) => ({ id, name }))
       .sort((a, b) => a.name.localeCompare(b.name));
-  }, [byTypeQuery.data]);
+  }, [byTypeQuery.data, importedQuery.data, invoiceQuery.data, completedQuery.data]);
 
   const allTypes = useMemo(() => {
     const set = new Set<string>();
@@ -200,9 +214,15 @@ export function ProductivityViewDialog({ open, onOpenChange }: ProductivityViewD
   }, [byTypeQuery.data]);
 
   // ===== Aplicação dos filtros =====
-  const matchesFilters = (userId: string | null, userName: string, type?: string, priority?: string) => {
+  const matchesFilters = (
+    userId: string | null,
+    userName: string,
+    type?: string,
+    priority?: string,
+    email?: string | null,
+  ) => {
     if (selectedUsers.length > 0) {
-      const key = userId || userName;
+      const key = userKey(userId, email, userName);
       if (!selectedUsers.includes(key)) return false;
     }
     if (type !== undefined && selectedTypes.length > 0 && !selectedTypes.includes(type)) return false;
@@ -213,7 +233,7 @@ export function ProductivityViewDialog({ open, onOpenChange }: ProductivityViewD
   // Para abas simples (imported/invoice_requested/completed) aplicamos APENAS o filtro de usuário
   // (o dataset não tem tipo/prioridade). Tipo/prioridade só afetam a aba "Por Tipo".
   const filterSimple = (rows: ProductivityRow[]) =>
-    rows.filter((r) => matchesFilters(r.user_id, r.user_name));
+    rows.filter((r) => matchesFilters(r.user_id, r.user_name, undefined, undefined, r.user_email));
 
   const filteredImported = useMemo(() => filterSimple(importedQuery.data || []), [importedQuery.data, selectedUsers]);
   const filteredInvoice = useMemo(() => filterSimple(invoiceQuery.data || []), [invoiceQuery.data, selectedUsers]);
@@ -221,7 +241,7 @@ export function ProductivityViewDialog({ open, onOpenChange }: ProductivityViewD
 
   const filteredByType = useMemo(() => {
     return (byTypeQuery.data || []).filter((r) =>
-      matchesFilters(r.user_id, r.user_name, r.order_type, r.priority)
+      matchesFilters(r.user_id, r.user_name, r.order_type, r.priority, r.user_email)
     );
   }, [byTypeQuery.data, selectedUsers, selectedTypes, selectedPriorities]);
 
@@ -244,7 +264,7 @@ export function ProductivityViewDialog({ open, onOpenChange }: ProductivityViewD
   const byUser = useMemo(() => {
     const map = new Map<string, { user_name: string; user_email: string | null; total: number }>();
     currentData.forEach((row) => {
-      const key = row.user_id || row.user_name;
+      const key = userKey(row.user_id, row.user_email, row.user_name);
       const existing = map.get(key);
       if (existing) {
         existing.total += row.count;
@@ -310,7 +330,7 @@ export function ProductivityViewDialog({ open, onOpenChange }: ProductivityViewD
     // matriz usuário x tipo
     const userMap = new Map<string, { user_name: string; user_email: string | null; total: number; types: Map<string, number> }>();
     filteredByType.forEach((r) => {
-      const key = r.user_id || r.user_name;
+      const key = userKey(r.user_id, r.user_email, r.user_name);
       let entry = userMap.get(key);
       if (!entry) {
         entry = { user_name: r.user_name, user_email: r.user_email, total: 0, types: new Map() };
@@ -330,7 +350,7 @@ export function ProductivityViewDialog({ open, onOpenChange }: ProductivityViewD
   // ===== Agregações SLA =====
   const filteredSLA = useMemo(() => {
     return (slaQuery.data || []).filter((r) =>
-      matchesFilters(r.user_id, r.user_name, r.order_type, r.priority)
+      matchesFilters(r.user_id, r.user_name, r.order_type, r.priority, r.user_email)
     );
   }, [slaQuery.data, selectedUsers, selectedTypes, selectedPriorities]);
 
@@ -352,7 +372,7 @@ export function ProductivityViewDialog({ open, onOpenChange }: ProductivityViewD
   const slaByUser = useMemo(() => {
     const map = new Map<string, { user_name: string; total: number; onTime: number; late: number }>();
     filteredSLA.forEach((r) => {
-      const key = r.user_id || r.user_name;
+      const key = userKey(r.user_id, r.user_email, r.user_name);
       let entry = map.get(key);
       if (!entry) {
         entry = { user_name: r.user_name, total: 0, onTime: 0, late: 0 };
@@ -370,7 +390,7 @@ export function ProductivityViewDialog({ open, onOpenChange }: ProductivityViewD
   // Cycle time
   const filteredCycle = useMemo(() => {
     return (cycleQuery.data || []).filter((r) =>
-      matchesFilters(r.user_id, r.user_name, r.order_type, r.priority)
+      matchesFilters(r.user_id, r.user_name, r.order_type, r.priority, r.user_email)
     );
   }, [cycleQuery.data, selectedUsers, selectedTypes, selectedPriorities]);
 
@@ -388,7 +408,7 @@ export function ProductivityViewDialog({ open, onOpenChange }: ProductivityViewD
   // ===== Agregações Complexidade =====
   const filteredComplexity = useMemo(() => {
     return (complexityQuery.data || []).filter((r) =>
-      matchesFilters(r.user_id, r.user_name, r.order_type)
+      matchesFilters(r.user_id, r.user_name, r.order_type, undefined, r.user_email)
     );
   }, [complexityQuery.data, selectedUsers, selectedTypes]);
 
@@ -412,7 +432,7 @@ export function ProductivityViewDialog({ open, onOpenChange }: ProductivityViewD
   const complexityByUser = useMemo(() => {
     const map = new Map<string, { user_name: string; total: number; firmware: number; image: number; lab: number }>();
     filteredComplexity.forEach((r) => {
-      const key = r.user_id || r.user_name;
+      const key = userKey(r.user_id, r.user_email, r.user_name);
       let entry = map.get(key);
       if (!entry) {
         entry = { user_name: r.user_name, total: 0, firmware: 0, image: 0, lab: 0 };
@@ -548,6 +568,9 @@ export function ProductivityViewDialog({ open, onOpenChange }: ProductivityViewD
           </DialogTitle>
           <DialogDescription>
             Acompanhe a produtividade do time por período, com filtros dinâmicos por usuário, tipo e prioridade.
+            <span className="block text-xs text-muted-foreground/80 mt-1">
+              O intervalo de datas considera a <strong>data de criação</strong> do pedido em todas as abas.
+            </span>
           </DialogDescription>
         </DialogHeader>
 
@@ -696,7 +719,9 @@ export function ProductivityViewDialog({ open, onOpenChange }: ProductivityViewD
                   openDrill({
                     title: "Pedidos do recorte atual",
                     subtitle: `Filtros: ${activeFilterCount > 0 ? `${activeFilterCount} ativos` : "todos"}`,
-                    userIds: selectedUsers.length > 0 ? selectedUsers.filter((u) => u.length === 36) : undefined,
+                    userIds: selectedUsers.length > 0
+                      ? selectedUsers.filter((u) => u.startsWith("id:")).map((u) => u.slice(3))
+                      : undefined,
                     orderTypes: selectedTypes.length > 0 ? selectedTypes : undefined,
                     priorities: selectedPriorities.length > 0 ? selectedPriorities : undefined,
                   })
@@ -900,13 +925,13 @@ export function ProductivityViewDialog({ open, onOpenChange }: ProductivityViewD
                           ) : (
                             byUser.map((user, idx) => {
                               // Tenta achar o id correspondente em allUsers para usar como filtro
-                              const userKey = allUsers.find((u) => u.name === user.user_name)?.id || user.user_name;
-                              const isActive = selectedUsers.includes(userKey);
+                              const rowUserKey = allUsers.find((u) => u.name === user.user_name)?.id || userKey(null, user.user_email, user.user_name);
+                              const isActive = selectedUsers.includes(rowUserKey);
                               return (
                                 <TableRow
                                   key={user.user_email || user.user_name + idx}
                                   className={cn("cursor-pointer hover:bg-accent", isActive && "bg-accent/50")}
-                                  onClick={() => toggleArr(selectedUsers, userKey, setSelectedUsers)}
+                                  onClick={() => toggleArr(selectedUsers, rowUserKey, setSelectedUsers)}
                                 >
                                   <TableCell className="font-medium">{idx + 1}</TableCell>
                                   <TableCell className="font-medium">{user.user_name}</TableCell>
@@ -1179,13 +1204,13 @@ export function ProductivityViewDialog({ open, onOpenChange }: ProductivityViewD
                     </TableHeader>
                     <TableBody>
                       {slaByUser.map((u, idx) => {
-                        const userKey = allUsers.find((x) => x.name === u.user_name)?.id || u.user_name;
-                        const isActive = selectedUsers.includes(userKey);
+                        const rowUserKey = allUsers.find((x) => x.name === u.user_name)?.id || userKey(null, null, u.user_name);
+                        const isActive = selectedUsers.includes(rowUserKey);
                         return (
                           <TableRow
                             key={u.user_name + idx}
                             className={cn("cursor-pointer hover:bg-accent", isActive && "bg-accent/50")}
-                            onClick={() => toggleArr(selectedUsers, userKey, setSelectedUsers)}
+                            onClick={() => toggleArr(selectedUsers, rowUserKey, setSelectedUsers)}
                           >
                             <TableCell className="font-medium">{idx + 1}</TableCell>
                             <TableCell className="font-medium">{u.user_name}</TableCell>
@@ -1373,15 +1398,15 @@ export function ProductivityViewDialog({ open, onOpenChange }: ProductivityViewD
                     </TableHeader>
                     <TableBody>
                       {complexityByUser.map((u, idx) => {
-                        const userKey = allUsers.find((x) => x.name === u.user_name)?.id || u.user_name;
-                        const isActive = selectedUsers.includes(userKey);
+                        const rowUserKey = allUsers.find((x) => x.name === u.user_name)?.id || userKey(null, null, u.user_name);
+                        const isActive = selectedUsers.includes(rowUserKey);
                         const complex = u.firmware + u.image + u.lab;
                         const pct = u.total > 0 ? (complex / u.total) * 100 : 0;
                         return (
                           <TableRow
                             key={u.user_name + idx}
                             className={cn("cursor-pointer hover:bg-accent", isActive && "bg-accent/50")}
-                            onClick={() => toggleArr(selectedUsers, userKey, setSelectedUsers)}
+                            onClick={() => toggleArr(selectedUsers, rowUserKey, setSelectedUsers)}
                           >
                             <TableCell className="font-medium">{idx + 1}</TableCell>
                             <TableCell className="font-medium">{u.user_name}</TableCell>
