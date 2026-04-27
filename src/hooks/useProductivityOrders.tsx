@@ -35,6 +35,21 @@ export interface ProductivityOrdersFilters {
   statuses?: string[];
 }
 
+const INVOICE_STATUSES = [
+  "invoice_requested",
+  "ready_to_invoice",
+  "pending_invoice_request",
+  "awaiting_invoice",
+  "invoice_issued",
+  "invoice_sent",
+];
+
+const COMPLETION_STATUSES = ["completed", "delivered"];
+
+function arraysShareAny(a: string[], b: string[]) {
+  return a.some((x) => b.includes(x));
+}
+
 export function useProductivityOrders({
   startDate,
   endDate,
@@ -63,6 +78,39 @@ export function useProductivityOrders({
     queryFn: async (): Promise<ProductivityOrderRow[]> => {
       if (!organizationId || !startDate || !endDate) return [];
 
+      const startStr = format(startDate, "yyyy-MM-dd");
+      const endStr = format(endDate, "yyyy-MM-dd") + "T23:59:59";
+
+      // ===== Modo "histórico de transição" =====
+      // Quando o filtro statuses for de fases transitórias (Faturamento) ou terminais
+      // (Concluído), a data do gráfico vem de order_history.changed_at, não de
+      // orders.created_at. Buscamos as transições no período e depois carregamos
+      // os pedidos correspondentes.
+      const useHistoryLookup =
+        !!statuses &&
+        (arraysShareAny(statuses, INVOICE_STATUSES) ||
+          arraysShareAny(statuses, COMPLETION_STATUSES));
+
+      let orderIds: string[] | null = null;
+
+      if (useHistoryLookup && statuses) {
+        const { data: historyRows, error: historyErr } = await (supabase as any)
+          .from("order_history")
+          .select("order_id")
+          .eq("organization_id", organizationId)
+          .in("new_status", statuses)
+          .gte("changed_at", startStr)
+          .lte("changed_at", endStr)
+          .limit(2000);
+
+        if (historyErr) throw historyErr;
+        orderIds = Array.from(
+          new Set((historyRows || []).map((r: any) => r.order_id as string))
+        );
+
+        if (orderIds.length === 0) return [];
+      }
+
       let query = (supabase as any)
         .from("orders")
         .select(`
@@ -72,15 +120,21 @@ export function useProductivityOrders({
           profiles:user_id ( full_name )
         `)
         .eq("organization_id", organizationId)
-        .gte("created_at", format(startDate, "yyyy-MM-dd"))
-        .lte("created_at", format(endDate, "yyyy-MM-dd") + "T23:59:59")
         .order("created_at", { ascending: false })
         .limit(500);
 
-      if (statuses && statuses.length > 0) {
-        query = query.in("status", statuses);
-      } else if (!includePending) {
-        query = query.in("status", ["completed", "delivered"]);
+      if (useHistoryLookup && orderIds) {
+        query = query.in("id", orderIds);
+      } else {
+        query = query
+          .gte("created_at", startStr)
+          .lte("created_at", endStr);
+
+        if (statuses && statuses.length > 0) {
+          query = query.in("status", statuses);
+        } else if (!includePending) {
+          query = query.in("status", COMPLETION_STATUSES);
+        }
       }
 
       if (userIds && userIds.length > 0) {
