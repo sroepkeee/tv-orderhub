@@ -1,85 +1,94 @@
-
-# Correção de Filtros Inconsistentes — Visão Produtividade
-
 ## Diagnóstico
 
-Identifiquei 3 causas-raiz que fazem o filtro de **usuário** parecer "errado" e o intervalo de **datas** parecer "diferente" entre abas:
+O gráfico da aba **Faturamento** mostra apenas dados a partir de **15/03** para o usuário Carlos Ecke porque a view `v_orders_invoice_requested_daily` tem uma falha conceitual:
 
-### 1. Cada view usa um campo de data diferente (mesmo intervalo no calendário → resultados diferentes)
-
-| Aba | View | Coluna de data filtrada |
-|---|---|---|
-| Importados | `v_orders_imported_daily` | `DATE(created_at)` |
-| Faturamento | `v_orders_invoice_requested_daily` | `DATE(updated_at)` |
-| Concluídos | `v_orders_completed_daily` | `DATE(updated_at)` |
-| Por Tipo | `v_productivity_by_type_daily` | `DATE(created_at)` |
-| SLA | `v_productivity_sla_daily` | `DATE(COALESCE(shipping_date, updated_at))` |
-| Complexidade | `v_productivity_complexity_daily` | `DATE(created_at)` |
-| Drill "Ver pedidos" | `orders` direto | `created_at` |
-
-→ Selecionar `01/01 → 24/04` numa aba conta pedidos **criados** nesse período; em outra conta pedidos **atualizados/enviados** nesse período. Mesmo cliente/usuário pode aparecer em uma e sumir em outra.
-
-### 2. A lista de usuários do filtro depende **só** de `byTypeQuery` (created_at)
-
-`allUsers` é construído a partir de `byTypeQuery.data`. Se um usuário só aparece em pedidos finalizados (concluídos via updated_at) mas nada criado dentro do período, ele **não aparece no dropdown** — porém aparece no ranking/gráfico da aba Concluídos. Isso gera a sensação de "filtra errado".
-
-### 3. Ao clicar em "Faturamento" com filtro de usuário ativo, gráfico e ranking mostram dados que **não batem entre si**
-
-Acontece porque o filtro só compara por `user_id || user_name`. Quando `user_id` é `NULL` numa view e preenchido em outra, o mesmo usuário tem chaves distintas → o filtro deixa passar registros indesejados ou esconde corretos.
-
----
-
-## Plano de correção
-
-### Etapa 1 — Unificar a coluna de data nas views simples (migration SQL)
-
-Recriar as 3 views simples para usar **`DATE(created_at) AS activity_date`** consistentemente, mantendo as colunas antigas (`import_date`, `request_date`, `completion_date`) como aliases para retrocompatibilidade. Assim, o intervalo selecionado significa sempre "pedidos criados nesse período" — e os números do **Por Tipo** vão bater com Importados / Faturamento / Concluídos.
-
-```text
-v_orders_imported_daily         → DATE(created_at) AS import_date  (já é)
-v_orders_invoice_requested_daily → DATE(created_at) AS request_date (mudar)
-v_orders_completed_daily        → DATE(created_at) AS completion_date (mudar)
-v_productivity_sla_daily        → DATE(created_at) AS activity_date (mudar)
-v_productivity_cycle_time       → DATE(created_at) AS activity_date (mudar)
+```sql
+WHERE o.status = ANY (ARRAY['invoice_requested', 'ready_to_invoice', ...])
+GROUP BY DATE(o.created_at)
 ```
 
-Justificativa: "produtividade" no contexto Pós-Venda significa **quantos pedidos cada usuário cuidou** dentre os recebidos no período. Usar `created_at` como eixo temporal padroniza tudo. SLA continua medindo on-time pelo `delivery_date` vs `shipping_date` (a métrica não muda, só o eixo de agrupamento).
+Ou seja, ela só conta pedidos **que ainda estão hoje** em algum status de faturamento. Como faturamento é um estado **transitório**, todos os pedidos que Carlos faturou em Jan/Fev/Mar já avançaram para `completed`/`delivered` e desapareceram da view. O 15/03 é simplesmente o pedido mais antigo dele que ainda não foi concluído.
 
-### Etapa 2 — Fonte única para a lista de usuários
+Verificado no banco:
+- View atual retorna **8 registros** para Carlos (todos a partir de 16/03)
+- Tabela `order_history` tem **60+ transições reais** de Carlos para statuses de faturamento entre Jan e 14/03
 
-No `ProductivityViewDialog.tsx`, montar `allUsers`/`allTypes`/`allPriorities` consolidando dados de **todas as queries carregadas** (importedQuery + invoiceQuery + completedQuery + byTypeQuery), não apenas do `byTypeQuery`. Assim o dropdown sempre lista quem aparece em qualquer aba.
+## Solução
 
-### Etapa 3 — Normalizar a chave de usuário
+Reconstruir a view `v_orders_invoice_requested_daily` para usar a tabela `order_history`, contando **transições efetivas** para statuses de faturamento (independente do status atual do pedido). A data passa a ser `DATE(oh.changed_at)` — quando o pedido foi de fato encaminhado para faturar.
 
-Padronizar a chave usada em `matchesFilters` e nos agregadores (`byUser`, `slaByUser`, `complexityByUser`) usando sempre **`user_id` quando existir, senão fallback para `email` lowercased, senão `user_name` trim+lower**. Hoje o mix `user_id || user_name` cria duplicatas e falsos negativos quando o `user_id` vem `null` em uma view e preenchido em outra.
+A mesma lógica já existe e funciona em `v_orders_completed_daily` (concluídos é um estado terminal, então usar status atual ainda funciona, mas idealmente também deveria usar histórico — ver passo opcional).
 
-### Etapa 4 — Drill-down ("Ver pedidos") respeitar a aba ativa
+### Passo 1 — Recriar `v_orders_invoice_requested_daily` baseada em `order_history`
 
-Hoje `useProductivityOrders` filtra **sempre por `created_at`**. Vamos:
-- Manter o filtro padrão por `created_at` (alinhado com etapa 1).
-- Passar o contexto da aba ativa para o sheet (ex.: "Faturamento") apenas para fins de título/subtítulo e para incluir filtro de status correspondente quando aplicável (`invoice_requested`-like statuses na aba Faturamento, `completed/delivered` na aba Concluídos, etc).
+```sql
+CREATE OR REPLACE VIEW public.v_orders_invoice_requested_daily AS
+SELECT
+  DATE(oh.changed_at) AS request_date,
+  o.user_id,
+  o.organization_id,
+  COALESCE(p.full_name, p.email, 'Desconhecido') AS user_name,
+  p.email AS user_email,
+  COUNT(DISTINCT oh.order_id) AS orders_invoice_requested
+FROM order_history oh
+JOIN orders o ON o.id = oh.order_id
+LEFT JOIN profiles p ON p.id = o.user_id
+WHERE oh.new_status IN (
+  'invoice_requested','ready_to_invoice','pending_invoice_request',
+  'awaiting_invoice','invoice_issued','invoice_sent'
+)
+  AND (oh.old_status IS NULL OR oh.old_status NOT IN (
+    'invoice_requested','ready_to_invoice','pending_invoice_request',
+    'awaiting_invoice','invoice_issued','invoice_sent'
+  )) -- só conta a primeira entrada em "faturamento" para evitar contagem dupla
+GROUP BY DATE(oh.changed_at), o.user_id, o.organization_id, p.full_name, p.email;
+```
 
-### Etapa 5 — Indicar visualmente o eixo de data em cada aba
+O `COUNT(DISTINCT oh.order_id)` + filtro `old_status NOT IN (...)` garante que cada pedido seja contado **uma única vez** no dia em que entrou pela primeira vez na fase de faturamento, mesmo que tenha trafegado entre vários sub-statuses de faturamento (p.ex. `ready_to_invoice` → `invoice_requested` → `invoice_issued`).
 
-Adicionar um pequeno texto auxiliar abaixo do seletor de data ("Período baseado na **data de criação** do pedido") para evitar dúvida futura do usuário.
+### Passo 2 — Recriar `v_orders_completed_daily` da mesma forma (consistência)
 
----
+```sql
+CREATE OR REPLACE VIEW public.v_orders_completed_daily AS
+SELECT
+  DATE(oh.changed_at) AS completion_date,
+  o.user_id,
+  o.organization_id,
+  COALESCE(p.full_name, p.email, 'Desconhecido') AS user_name,
+  p.email AS user_email,
+  COUNT(DISTINCT oh.order_id) AS orders_completed
+FROM order_history oh
+JOIN orders o ON o.id = oh.order_id
+LEFT JOIN profiles p ON p.id = o.user_id
+WHERE oh.new_status IN ('completed','delivered')
+  AND (oh.old_status IS NULL OR oh.old_status NOT IN ('completed','delivered'))
+GROUP BY DATE(oh.changed_at), o.user_id, o.organization_id, p.full_name, p.email;
+```
+
+Assim a "data de conclusão" passa a ser de fato o dia em que o pedido foi concluído (não a data de criação).
+
+### Passo 3 — Ajustar drill-down "Ver pedidos" da aba Faturamento
+
+O hook `useProductivityOrders` filtra hoje por `created_at` no range. Para a aba Faturamento, os pedidos cuja **transição** ocorreu no range podem ter sido **criados** antes do range. Vamos ampliar a janela do drill-down quando `statuses` for de faturamento, mostrando pedidos que **estão** em qualquer status de faturamento OU **já passaram** por faturamento (joins com `order_history`).
+
+Edição em `src/hooks/useProductivityOrders.tsx`: quando `statuses` corresponder ao set de faturamento, trocar a query para um JOIN com `order_history` filtrando pela data da transição em vez de `created_at`.
+
+### Passo 4 — Validar no preview
+
+Após o deploy, abrir Visão Produtividade → Faturamento → filtrar Carlos Ecke + range 01/01/2026 a 24/04/2026. Esperado: gráfico apresenta barras desde 05/01.
 
 ## Arquivos afetados
 
-- `supabase/migrations/<novo>.sql` — recriar as 5 views unificando para `created_at`.
-- `src/hooks/useProductivityMetrics.tsx` — sem mudança (continua lendo `import_date`/`request_date`/`completion_date`, agora todas vindo de `created_at`).
-- `src/components/metrics/ProductivityViewDialog.tsx`:
-  - `allUsers/allTypes/allPriorities` consolidados de todas as queries.
-  - Função `userKey()` centralizada e usada em todos os agregadores.
-  - Texto explicativo do eixo de data.
-- `src/components/metrics/ProductivityOrdersSheet.tsx` + `useProductivityOrders.tsx` — aceitar status alvo opcional por aba.
+**Migration nova:**
+- `supabase/migrations/<timestamp>_fix_invoice_view_history.sql` — recria as 2 views.
 
----
+**Código (1 arquivo):**
+- `src/hooks/useProductivityOrders.tsx` — quando `statuses` for de faturamento, consultar via `order_history` para que o drill-down mostre os pedidos cuja transição ocorreu no período (não os criados).
 
-## Resultado esperado
+Nenhuma alteração necessária em `ProductivityViewDialog.tsx` — os labels e queries continuam compatíveis.
 
-1. Selecionar `01/01 → 24/04` retorna o **mesmo conjunto base de pedidos** em todas as abas (recorte por criação).
-2. Filtrar por "Carlos Ecke" mostra apenas seus pedidos consistentemente — sem registros vazando, sem desaparecer ao trocar de aba.
-3. Ranking, gráfico diário e drill-down "Ver pedidos" passam a coincidir em totais.
-4. A aba **SLA** continua medindo on-time corretamente (a métrica é independente do eixo temporal).
+## Observações
+
+- As views permanecem com os **mesmos nomes de colunas** (`request_date`, `completion_date`, etc.), então o frontend não precisa de mudanças além do hook do drill-down.
+- Pedidos importados (`Importados`) continuam usando `created_at` — correto, pois "importação" = criação.
+- SLA / Cycle Time / Complexidade continuam baseados em `status atual = completed/delivered`, o que é correto para essas métricas (só faz sentido medir SLA de pedidos concluídos).
